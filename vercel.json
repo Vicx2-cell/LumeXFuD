@@ -1,0 +1,32 @@
+{
+  "crons": [
+    {
+      "path":     "/api/cron/release-payments",
+      "schedule": "*/1 * * * *"
+    },
+    {
+      "path":     "/api/cron/vendor-auto-cancel",
+      "schedule": "*/1 * * * *"
+    },
+    {
+      "path":     "/api/cron/subscription-check",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path":     "/api/cron/reset-daily-limits",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path":     "/api/cron/wallet-reconciliation",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path":     "/api/cron/recalculate-vendor-scores",
+      "schedule": "0 0 * * 0"
+    },
+    {
+      "path":     "/api/cron/reset-weekly-leaderboard",
+      "schedule": "0 0 * * 1"
+    }
+  ]
+}
