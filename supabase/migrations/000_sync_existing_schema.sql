@@ -73,8 +73,7 @@ ALTER TABLE vendors ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW(
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'vendors_phone_key' AND conrelid = 'vendors'::regclass
+    SELECT 1 FROM pg_constraint WHERE conname = 'vendors_phone_key'
   ) THEN
     ALTER TABLE vendors ADD CONSTRAINT vendors_phone_key UNIQUE (phone);
   END IF;
@@ -140,13 +139,14 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_instructions TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
--- idempotency unique constraint
+-- idempotency unique constraint (check first to avoid error on re-run)
 DO $$
 BEGIN
-  BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'orders_idempotency_key_unique'
+  ) THEN
     ALTER TABLE orders ADD CONSTRAINT orders_idempotency_key_unique UNIQUE (idempotency_key);
-  EXCEPTION WHEN duplicate_object THEN NULL;
-  END;
+  END IF;
 END $$;
 
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
