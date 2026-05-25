@@ -1,0 +1,109 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useCart } from './cart-context'
+
+const NAV_ITEMS = [
+  { href: '/', label: 'Home', icon: HomeIcon },
+  { href: '/orders', label: 'Orders', icon: OrdersIcon },
+  { href: '/cart', label: 'Cart', icon: CartIcon, showBadge: true },
+  { href: '/profile', label: 'Profile', icon: ProfileIcon },
+]
+
+export function BottomNav() {
+  const pathname = usePathname()
+  const { totalItems } = useCart()
+
+  return (
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/8"
+      style={{
+        background: 'rgba(10,10,11,0.95)',
+        backdropFilter: 'blur(20px)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
+    >
+      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
+        {NAV_ITEMS.map(({ href, label, icon: Icon, showBadge }) => {
+          const active = pathname === href
+          return (
+            <Link
+              key={href}
+              href={href}
+              className="flex flex-col items-center gap-1 min-w-[44px] min-h-[44px] justify-center relative"
+            >
+              <div className="relative">
+                <Icon active={active} />
+                {showBadge && totalItems > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 text-[10px] font-bold rounded-full flex items-center justify-center"
+                    style={{
+                      background: '#F5A623',
+                      color: '#000',
+                      minWidth: 16,
+                      height: 16,
+                      padding: '0 3px',
+                    }}
+                  >
+                    {totalItems > 9 ? '9+' : totalItems}
+                  </span>
+                )}
+              </div>
+              <span
+                className="text-[10px] font-medium"
+                style={{ color: active ? '#F5A623' : 'rgba(255,255,255,0.5)' }}
+              >
+                {label}
+              </span>
+            </Link>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
+
+function HomeIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? '#F5A623' : 'none'}
+      stroke={active ? '#F5A623' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9,22 9,12 15,12 15,22" />
+    </svg>
+  )
+}
+
+function OrdersIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+      stroke={active ? '#F5A623' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14,2 14,8 20,8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10,9 9,9 8,9" />
+    </svg>
+  )
+}
+
+function CartIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+      stroke={active ? '#F5A623' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="21" r="1" />
+      <circle cx="20" cy="21" r="1" />
+      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+    </svg>
+  )
+}
+
+function ProfileIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+      stroke={active ? '#F5A623' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  )
+}

@@ -1,0 +1,98 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/session'
+import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { refundTransaction } from '@/lib/paystack/transfer'
+import { audit } from '@/lib/audit'
+import { refundInput } from '@/lib/validators'
+import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { renderTemplate } from '@/lib/termii/templates'
+
+export async function POST(req: NextRequest) {
+  const session = await getCurrentUser()
+  if (!session || (session.role !== 'admin' && session.role !== 'super_admin')) {
+    return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+  }
+
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+
+  const parsed = refundInput.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
+  }
+
+  const { order_id, reason, amount } = parsed.data
+  const db = createSupabaseAdmin()
+
+  const { data: order, error } = await db
+    .from('orders')
+    .select('id, order_number, total_amount, payment_status, paystack_reference, customer_id, guest_phone, status')
+    .eq('id', order_id)
+    .single()
+
+  if (error || !order) {
+    return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+  }
+
+  if (order.payment_status !== 'PAID') {
+    return NextResponse.json({ error: 'Order was not paid' }, { status: 400 })
+  }
+
+  const refundAmount = amount ?? (order.total_amount as number)
+  if (refundAmount > (order.total_amount as number)) {
+    return NextResponse.json({ error: 'Refund exceeds order total' }, { status: 400 })
+  }
+
+  // Trigger Paystack refund
+  await refundTransaction(order.paystack_reference as string, refundAmount)
+
+  // Record refund
+  await db.from('refunds').insert({
+    order_id: order.id,
+    paystack_transaction_reference: order.paystack_reference,
+    amount: refundAmount,
+    reason,
+    status: 'PROCESSING',
+    triggered_by: session.phone,
+  })
+
+  // Update order
+  await db
+    .from('orders')
+    .update({ status: 'REFUNDED', updated_at: new Date().toISOString() })
+    .eq('id', order.id)
+
+  // Audit log
+  await audit({
+    actor_id: session.phone,
+    actor_role: session.role,
+    action: 'refund_initiated',
+    target_table: 'orders',
+    target_id: order.id as string,
+    new_value: { refund_amount: refundAmount, reason },
+    ip_address: req.headers.get('x-forwarded-for') ?? undefined,
+  })
+
+  // Notify customer
+  let customerPhone: string | null = (order.guest_phone as string) ?? null
+  if (!customerPhone && order.customer_id) {
+    const { data: customer } = await db.from('customers').select('phone').eq('id', order.customer_id).single()
+    customerPhone = (customer?.phone as string) ?? null
+  }
+
+  if (customerPhone) {
+    void sendWhatsAppWithFallback({
+      to: customerPhone,
+      message: renderTemplate('REFUND_INITIATED', {
+        amount: Math.round(refundAmount / 100),
+        order_number: order.order_number as string,
+      }),
+    }).catch(() => {})
+  }
+
+  return NextResponse.json({ success: true })
+}

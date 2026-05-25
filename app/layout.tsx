@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { validateEnv } from '@/lib/env'
+import { Providers } from '@/components/providers'
 
-// Validate required env vars at startup — throws if any are missing
 if (process.env.NODE_ENV !== 'test') validateEnv()
 
 export const metadata: Metadata = {
@@ -34,7 +34,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }
