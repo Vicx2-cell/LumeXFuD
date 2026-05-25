@@ -1,0 +1,423 @@
+// ─── Auth & Sessions ──────────────────────────────────────────────────────────
+
+export interface Customer {
+  id: string
+  phone: string
+  name: string | null
+  hostel: string | null
+  room_number: string | null
+  default_delivery_address: string | null
+  dispute_count: number
+  last_dispute_at: string | null
+  dispute_blocked_until: string | null
+  deleted_at: string | null
+  created_at: string
+}
+
+export interface Session {
+  id: string
+  user_id: string
+  role: 'customer' | 'vendor' | 'rider' | 'admin' | 'super_admin'
+  expires_at: string
+  ip_address: string | null
+  user_agent: string | null
+  revoked_at: string | null
+  created_at: string
+}
+
+export interface OtpAttempt {
+  id: string
+  phone: string
+  otp_hash: string
+  expires_at: string
+  used_at: string | null
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+}
+
+// ─── Vendors ──────────────────────────────────────────────────────────────────
+
+export type VendorStatus = 'OPEN' | 'BUSY' | 'CLOSED'
+export type SubscriptionTier = 'FOUNDING' | 'EARLY' | 'STANDARD'
+export type TrustTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
+
+export interface Vendor {
+  id: string
+  phone: string
+  shop_name: string
+  owner_name: string
+  logo_url: string | null
+  shop_photo_url: string | null
+  prep_time_minutes: number
+  status: VendorStatus
+  busy_until: string | null
+  paused_until: string | null
+  category: string
+  description: string | null
+  paystack_subaccount_code: string | null
+  bank_code: string | null
+  bank_account_number: string | null
+  bank_account_name: string | null
+  subscription_tier: SubscriptionTier
+  subscription_paid_until: string | null
+  avg_rating: number
+  total_ratings: number
+  is_active: boolean
+  approved_at: string | null
+  approved_by: string | null
+  created_at: string
+  deleted_at: string | null
+}
+
+export interface MenuItem {
+  id: string
+  vendor_id: string
+  name: string
+  description: string | null
+  price_kobo: number
+  image_url: string | null
+  category: 'RICE' | 'PROTEIN' | 'DRINKS' | 'SNACKS' | 'OTHER'
+  is_available: boolean
+  daily_limit: number | null
+  sold_today: number
+  display_order: number
+  created_at: string
+  deleted_at: string | null
+}
+
+// ─── Riders ───────────────────────────────────────────────────────────────────
+
+export type RiderStatus = 'ONLINE' | 'BUSY' | 'OFFLINE'
+
+export interface Rider {
+  id: string
+  phone: string
+  full_name: string
+  bike_plate: string | null
+  bank_code: string | null
+  bank_account_number: string | null
+  bank_account_name: string | null
+  status: RiderStatus
+  active_order_id: string | null
+  last_status_update_at: string | null
+  avg_rating: number
+  total_ratings: number
+  total_deliveries: number
+  acceptance_rate: number
+  is_active: boolean
+  approved_at: string | null
+  approved_by: string | null
+  created_at: string
+  deleted_at: string | null
+}
+
+// ─── Orders ───────────────────────────────────────────────────────────────────
+
+export type OrderStatus =
+  | 'PENDING'
+  | 'VENDOR_ACCEPTED'
+  | 'PREPARING'
+  | 'READY'
+  | 'RIDER_ASSIGNED'
+  | 'PICKED_UP'
+  | 'DELIVERED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'DISPUTED'
+  | 'REFUNDED'
+
+export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
+export type DeliveryType = 'BIKE' | 'DOOR'
+
+export interface Order {
+  id: string
+  order_number: string
+  customer_id: string
+  vendor_id: string
+  rider_id: string | null
+  guest_phone: string | null
+  status: OrderStatus
+  delivery_type: DeliveryType
+  delivery_address: string
+  delivery_instructions: string | null
+  subtotal: number
+  platform_markup: number
+  delivery_fee: number
+  platform_delivery_cut: number
+  rider_delivery_cut: number
+  tip_amount: number
+  total_amount: number
+  paystack_reference: string
+  idempotency_key: string | null
+  payment_status: PaymentStatus
+  rider_payment_status: 'PENDING' | 'HELD' | 'RELEASED'
+  rider_auto_release_at: string | null
+  rider_payment_released_at: string | null
+  delivery_photo_url: string | null
+  vendor_accepted_at: string | null
+  preparing_at: string | null
+  ready_at: string | null
+  rider_assigned_at: string | null
+  picked_up_at: string | null
+  delivered_at: string | null
+  completed_at: string | null
+  cancelled_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OrderItem {
+  id: string
+  order_id: string
+  menu_item_id: string | null
+  name: string
+  price: number
+  quantity: number
+  subtotal: number
+  notes: string | null
+  created_at: string
+}
+
+export interface OrderMessage {
+  id: string
+  order_id: string
+  sender_id: string
+  sender_role: 'customer' | 'vendor' | 'rider'
+  message_text: string
+  message_type: 'TEXT' | 'STATUS_UPDATE' | 'DISPUTE_NOTE' | 'CONFIRMATION'
+  read_at: string | null
+  created_at: string
+}
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
+
+export interface Payment {
+  id: string
+  order_id: string
+  paystack_reference: string
+  paystack_transaction_id: string | null
+  amount: number
+  status: PaymentStatus
+  channel: string | null
+  paid_at: string | null
+  created_at: string
+}
+
+export interface ProcessedWebhook {
+  id: string
+  reference: string
+  event: string
+  payload: Record<string, unknown> | null
+  processed_at: string
+}
+
+export interface Refund {
+  id: string
+  order_id: string
+  paystack_transaction_reference: string
+  paystack_refund_reference: string | null
+  amount_kobo: number
+  reason: string
+  status: 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'NEEDS_ATTENTION'
+  triggered_by: string
+  failure_reason: string | null
+  created_at: string
+  completed_at: string | null
+}
+
+// ─── Wallet ───────────────────────────────────────────────────────────────────
+
+export type WalletUserType = 'VENDOR' | 'RIDER'
+export type WalletTransactionType = 'CREDIT' | 'DEBIT' | 'HOLD' | 'RELEASE' | 'FREEZE' | 'WITHDRAWAL'
+
+export interface WalletBalance {
+  user_id: string
+  user_type: WalletUserType
+  total_balance: number
+  available_balance: number
+  held_balance: number
+  trust_tier: TrustTier
+  wallet_pin_hash: string | null
+  last_bank_added_at: string | null
+  is_frozen: boolean
+  updated_at: string
+}
+
+export interface WalletTransaction {
+  id: string
+  user_id: string
+  user_type: WalletUserType
+  type: WalletTransactionType
+  amount: number
+  balance_before: number
+  balance_after: number
+  reference: string | null
+  order_id: string | null
+  status: 'PENDING' | 'COMPLETED' | 'FAILED'
+  paystack_transfer_code: string | null
+  failure_reason: string | null
+  created_at: string
+}
+
+// ─── Subscriptions ────────────────────────────────────────────────────────────
+
+export interface VendorSubscription {
+  id: string
+  vendor_id: string
+  amount: number
+  paystack_reference: string
+  paid_at: string
+  period_start: string
+  period_end: string
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED'
+}
+
+export interface VendorScore {
+  id: string
+  vendor_id: string
+  avg_rating: number
+  rating_count: number
+  order_count_30d: number
+  avg_prep_time: number
+  order_completion_rate: number
+  repeat_customer_rate: number
+  cancel_rate: number
+  dispute_rate: number
+  composite_score: number
+  visibility_tier: 'PREMIUM' | 'FEATURED' | 'STANDARD' | 'DECLINING'
+  updated_at: string
+}
+
+// ─── Ratings ──────────────────────────────────────────────────────────────────
+
+export interface Rating {
+  id: string
+  order_id: string
+  customer_id: string
+  vendor_id: string
+  rider_id: string | null
+  vendor_rating: number
+  vendor_review: string | null
+  rider_rating: number
+  rider_review: string | null
+  would_order_again: boolean | null
+  photo_url: string | null
+  created_at: string
+}
+
+// ─── Gamification ─────────────────────────────────────────────────────────────
+
+export interface CustomerXP {
+  id: string
+  customer_id: string
+  total_xp: number
+  weekly_xp: number
+  level: number
+  current_streak_days: number
+  best_streak_days: number
+  last_order_date: string | null
+  streak_freeze_count: number
+  updated_at: string
+}
+
+export interface CustomerBadge {
+  id: string
+  customer_id: string
+  badge_id: string
+  earned_at: string
+}
+
+export interface Badge {
+  id: string
+  name: string
+  description: string | null
+  icon_url: string | null
+  unlock_condition: string | null
+}
+
+// ─── Admin ────────────────────────────────────────────────────────────────────
+
+export interface Admin {
+  id: string
+  phone: string
+  name: string
+  role: 'admin' | 'super_admin'
+  is_active: boolean
+  created_at: string
+}
+
+export interface AuditLog {
+  id: string
+  actor_id: string
+  actor_role: string
+  action: string
+  target_table: string | null
+  target_id: string | null
+  old_value: Record<string, unknown> | null
+  new_value: Record<string, unknown> | null
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+}
+
+export interface SuperAuditLog extends AuditLog {
+  amount_kobo: number | null
+}
+
+export interface AdminDevice {
+  id: string
+  admin_id: string
+  device_fingerprint: string
+  device_name: string | null
+  first_seen: string
+  last_seen: string
+}
+
+// ─── System ───────────────────────────────────────────────────────────────────
+
+export interface Settings {
+  id: string
+  value: Record<string, unknown>
+  updated_by: string | null
+  updated_at: string
+}
+
+export interface Notification {
+  id: string
+  user_id: string
+  user_type: 'CUSTOMER' | 'VENDOR' | 'RIDER' | 'ADMIN' | 'SUPER_ADMIN'
+  channel: 'whatsapp' | 'sms' | 'push'
+  template: string
+  payload: Record<string, unknown> | null
+  status: 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'
+  termii_id: string | null
+  error: string | null
+  retry_count: number
+  sent_at: string | null
+  created_at: string
+}
+
+export interface TrendingData {
+  id: 1
+  orders_last_hour: number | null
+  top_item_name: string | null
+  top_item_count: number | null
+  top_vendor_name: string | null
+  new_vendor_name: string | null
+  updated_at: string | null
+}
+
+export interface Dispute {
+  id: string
+  order_id: string
+  customer_id: string
+  reason: string
+  description: string | null
+  customer_photo_url: string | null
+  status: 'OPEN' | 'INVESTIGATING' | 'RESOLVED_REFUND' | 'RESOLVED_NO_ACTION'
+  resolved_by: string | null
+  resolved_at: string | null
+  refund_id: string | null
+  created_at: string
+}

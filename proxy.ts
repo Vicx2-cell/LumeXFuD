@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySessionToken } from './lib/auth'
+import { verifySessionToken } from './lib/session'
 
 const PROTECTED: Array<{ pattern: RegExp; roles: string[] }> = [
   { pattern: /^\/vendor-dashboard(\/|$)/, roles: ['vendor', 'admin', 'super_admin'] },

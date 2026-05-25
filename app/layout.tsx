@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { validateEnv } from '@/lib/env'
+
+// Validate required env vars at startup — throws if any are missing
+if (process.env.NODE_ENV !== 'test') validateEnv()
 
 export const metadata: Metadata = {
   title: 'LumeX Fud — Campus life, simplified.',
