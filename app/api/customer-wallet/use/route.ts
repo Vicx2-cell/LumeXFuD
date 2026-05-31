@@ -3,7 +3,6 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { spendCustomerWallet, formatPrice } from '@/lib/customer-wallet'
 import { z } from 'zod'
-import crypto from 'crypto'
 
 // POST /api/customer-wallet/use
 // Called internally during checkout to deduct wallet balance for an order.
@@ -61,7 +60,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Order is not in PENDING state' }, { status: 400 })
   }
 
-  const reference = `CWUSE-${order_id.slice(0, 8)}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
+  // Deterministic reference (one per order) so a duplicate call hits the
+  // UNIQUE(reference) constraint — a second layer behind the RPC's idempotency
+  // guard and the uq_cwt_order_payment index. NEVER use a random reference here,
+  // or repeated calls would each debit the wallet (double-spend).
+  const reference = `CWUSE-${order_id}`
 
   const result = await spendCustomerWallet({
     customerId,
@@ -74,6 +77,14 @@ export async function POST(req: NextRequest) {
   if (!result.success) {
     return NextResponse.json({ error: result.errorMsg ?? 'Wallet deduction failed' }, { status: 400 })
   }
+
+  // Record the wallet payment on the order for traceability/reconciliation.
+  // Best-effort: the debit already settled atomically; a stamp failure here
+  // must not fail the request.
+  await db
+    .from('orders')
+    .update({ payment_method: 'WALLET', wallet_amount_kobo: amount_kobo, updated_at: new Date().toISOString() })
+    .eq('id', order_id)
 
   return NextResponse.json({
     success:                true,

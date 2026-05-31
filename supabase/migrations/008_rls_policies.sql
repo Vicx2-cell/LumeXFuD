@@ -14,12 +14,26 @@
 -- ============================================================
 
 -- ─── Drop existing policies to avoid conflicts on re-run ─────────────────────
+-- IMPORTANT: only drop policies for the tables THIS migration recreates. The
+-- old version dropped EVERY policy in the public schema, which silently wiped
+-- policies owned by later migrations (013 wallet extras, 014 customer_wallets /
+-- customer_wallet_transactions / rider_milestone_bonuses, 015 platform_earnings)
+-- whenever 008 was re-run or applied out of order — leaving e.g. customer_wallets
+-- RLS-enabled with NO policy. Scope the drop so 008 stays self-contained.
 DO $$
 DECLARE
   rec RECORD;
+  managed TEXT[] := ARRAY[
+    'settings','vendors','menu_items','customers','orders','order_items',
+    'wallet_balances','wallet_transactions','trending_data','disputes',
+    'sessions','otp_attempts','processed_webhooks','audit_logs',
+    'super_audit_logs','admin_devices','admins','refunds',
+    'vendor_subscriptions','notifications','pin_reset_audit'
+  ];
 BEGIN
   FOR rec IN
-    SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public'
+    SELECT policyname, tablename FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = ANY(managed)
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I', rec.policyname, rec.tablename);
   END LOOP;
