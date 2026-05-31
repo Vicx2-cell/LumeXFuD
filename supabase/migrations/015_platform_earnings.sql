@@ -37,6 +37,9 @@ CREATE INDEX IF NOT EXISTS idx_platform_earnings_order
 ALTER TABLE platform_earnings ENABLE ROW LEVEL SECURITY;
 
 -- Deny all JWT-authenticated access (customers, vendors, riders, admins)
+-- DROP first: CREATE POLICY has no IF NOT EXISTS, so a re-run would otherwise
+-- abort with 42710 "policy ... already exists". Idempotent: safe to re-run.
+DROP POLICY IF EXISTS "platform_earnings_no_public_access" ON platform_earnings;
 CREATE POLICY "platform_earnings_no_public_access"
   ON platform_earnings
   FOR ALL

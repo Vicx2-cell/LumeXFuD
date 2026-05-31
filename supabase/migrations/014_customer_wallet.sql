@@ -48,7 +48,11 @@ CREATE INDEX IF NOT EXISTS idx_customer_wallet_tx_order
 
 -- ─── RLS POLICIES ─────────────────────────────────────────────────────────────
 
+-- DROP-before-CREATE: CREATE POLICY has no IF NOT EXISTS, so re-running this
+-- migration would abort with 42710 "policy ... already exists". Idempotent.
+
 -- Customer sees own wallet
+DROP POLICY IF EXISTS "customer_sees_own_wallet" ON customer_wallets;
 CREATE POLICY "customer_sees_own_wallet" ON customer_wallets
   FOR SELECT USING (
     customer_id IN (
@@ -57,6 +61,7 @@ CREATE POLICY "customer_sees_own_wallet" ON customer_wallets
   );
 
 -- Customer sees own transactions
+DROP POLICY IF EXISTS "customer_sees_own_wallet_tx" ON customer_wallet_transactions;
 CREATE POLICY "customer_sees_own_wallet_tx" ON customer_wallet_transactions
   FOR SELECT USING (
     customer_id IN (
@@ -65,9 +70,11 @@ CREATE POLICY "customer_sees_own_wallet_tx" ON customer_wallet_transactions
   );
 
 -- Service role full access
+DROP POLICY IF EXISTS "service_role_customer_wallet_all" ON customer_wallets;
 CREATE POLICY "service_role_customer_wallet_all" ON customer_wallets
   FOR ALL USING (auth.role() = 'service_role');
 
+DROP POLICY IF EXISTS "service_role_customer_wallet_tx_all" ON customer_wallet_transactions;
 CREATE POLICY "service_role_customer_wallet_tx_all" ON customer_wallet_transactions
   FOR ALL USING (auth.role() = 'service_role');
 
@@ -308,5 +315,6 @@ CREATE TABLE IF NOT EXISTS rider_milestone_bonuses (
   UNIQUE(rider_id, milestone)
 );
 ALTER TABLE rider_milestone_bonuses ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "service_role_rider_milestones" ON rider_milestone_bonuses;
 CREATE POLICY "service_role_rider_milestones" ON rider_milestone_bonuses
   FOR ALL USING (auth.role() = 'service_role');
