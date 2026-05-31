@@ -5,6 +5,7 @@ import { orderStatusInput } from '@/lib/validators'
 import { audit } from '@/lib/audit'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
+import { recordOrderCompletedEarnings } from '@/lib/platform-earnings'
 import type { OrderStatus } from '@/types'
 
 // Whitelist: [from, to, allowed roles]
@@ -62,11 +63,28 @@ export async function PATCH(
 
   const { data: order, error } = await db
     .from('orders')
-    .select('id, order_number, status, vendor_id, customer_id, rider_id, guest_phone, total_amount, rider_delivery_cut')
+    .select('id, order_number, status, vendor_id, customer_id, rider_id, guest_phone, total_amount, rider_delivery_cut, platform_markup, platform_delivery_cut')
     .eq('id', id)
     .single()
 
   if (error || !order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+
+  // Ownership (BOLA prevention): the transition whitelist gates by ROLE, but a
+  // role alone doesn't bind the actor to THIS order — without this, any vendor
+  // could accept/cancel another vendor's order, any rider could mark a stranger's
+  // order PICKED_UP, and any customer could COMPLETE any DELIVERED order (early
+  // rider payout). Admins/super admins are exempt (they act on all orders).
+  // Riders reach RIDER_ASSIGNED via the race-safe /accept route, so by the time
+  // they hit /status their rider_id is already bound to the row.
+  if (session.role !== 'admin' && session.role !== 'super_admin') {
+    const ownerId =
+      session.role === 'vendor' ? order.vendor_id
+      : session.role === 'rider' ? order.rider_id
+      : order.customer_id
+    if (!ownerId || ownerId !== session.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  }
 
   const currentStatus = order.status as OrderStatus
 
@@ -97,6 +115,16 @@ export async function PATCH(
   }
 
   await db.from('orders').update(updateData).eq('id', id)
+
+  // Record platform earnings when order completes (fire-and-forget)
+  if (newStatus === 'COMPLETED') {
+    void recordOrderCompletedEarnings({
+      order_id:             id,
+      platform_markup_kobo: (order.platform_markup as number) ?? 0,
+      delivery_cut_kobo:    (order.platform_delivery_cut as number) ?? 0,
+      order_number:         order.order_number as string,
+    })
+  }
 
   // Notifications
   void sendNotificationForStatus(newStatus, order, db).catch(() => {})

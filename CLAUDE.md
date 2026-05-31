@@ -276,7 +276,8 @@ POST /api/cron/vendor-auto-cancel Every minute
 POST /api/cron/subscription-check Daily 9am
 POST /api/cron/reset-daily-limits Midnight
 POST /api/cron/wallet-reconciliation Daily 6am
-POST /api/cron/recalculate-vendor-scores Weekly Sunday midnight
+POST /api/cron/recalculate-vendor-scores Weekly Su
+nday midnight
 POST /api/cron/reset-weekly-leaderboard Monday midnight
 Admin (see docs/admin.md)
 GET /api/admin/dashboard
@@ -365,3 +366,98 @@ Sound Alert and Notification Patterns
 activity)
 END OF CORE CLAUDE.md
 For any subsystem implementation — READ the matching doc in docs/ first
+## Login PIN System (alternative to OTP)
+
+### Why PIN not password
+PIN is faster, mobile-native, familiar to Nigerian users (OPay, PalmPay, Kuda model).
+Password is desktop-centric and gets forgotten/reused. PIN is 4 digits — no forgot flow needed because OTP always works as fallback.
+
+### PIN Flow
+First login (OTP verified):
+- Prompt: "Set a 4-digit PIN for faster future logins" (skippable)
+- If set: bcrypt hash (cost 12), stored in customers/vendors/riders table
+
+Returning login:
+- Customer enters phone number
+- Two options shown:
+  1. "Send OTP" (always works)
+  2. "Use PIN" (only shown if PIN is set)
+- If PIN chosen: enter 4 digits → verified → logged in
+- Wrong PIN: max 5 attempts, then 30-min lockout (Upstash)
+- Lockout: force OTP to unlock
+
+Forgot PIN:
+- "Use OTP instead" link on PIN screen
+- OTP verified → prompt to set new PIN
+- No separate "forgot password" page needed
+
+### Database Additions
+Add to customers, vendors, riders tables:
+  login_pin_hash TEXT (nullable — null means PIN not set)
+  pin_attempts INT DEFAULT 0
+  pin_locked_until TIMESTAMPTZ
+
+### API Routes
+POST /api/auth/set-pin
+  - Verify auth (must be logged in via OTP first)
+  - Validate: exactly 4 digits, not 0000/1234/1111 (weak PINs)
+  - bcrypt hash cost 12
+  - UPDATE user table: login_pin_hash
+  - WhatsApp: "Your LumeX login PIN has been set."
+
+POST /api/auth/login-pin
+  Body: { phone, pin }
+  1. Normalize phone
+  2. Rate limit: 5 attempts per phone per 30 mins
+  3. Look up user, check pin_locked_until
+  4. bcrypt compare
+  5. If wrong: increment pin_attempts, lock at 5
+  6. If correct: reset pin_attempts, create session, set JWT cookie
+  7. Return { role, redirect_path }
+
+POST /api/auth/change-pin
+  - Verify auth
+  - Require current PIN OR recent OTP verification
+  - Validate new PIN
+  - Hash and update
+  - WhatsApp notification
+
+### UI Changes
+Login page:
+- Phone input → "Continue" button
+- Next screen checks if user has PIN set
+- If yes: show PIN keypad (4 circles) + "Use OTP instead" below
+- If no: show OTP screen directly
+
+PIN keypad:
+- Large number buttons (mobile-friendly)
+- Circles fill as digits entered
+- Auto-submit on 4th digit
+- "Use OTP instead" text below
+
+### Security Rules
+- PIN never stored in plain text — bcrypt only
+- PIN never sent over network in plain text
+- Max 4 digit PIN — not 6 (intentionally simple)
+- Weak PINs blocked: 0000, 1111, 1234, 4321, 0123, 9999
+- 5 wrong attempts → 30-min lockout → WhatsApp alert
+- New device + PIN login → WhatsApp alert to user
+- PIN change requires current PIN or fresh OTP
+
+---
+
+## LEGACY NOTES FOR AUDITOR
+
+The old codebase was built with these systems that are now REMOVED:
+- OTP authentication via Termii (replaced by 6-digit PIN only)
+- 4-digit PIN (upgraded to 6-digit)
+- Gamification: XP, streaks, daily rewards (fully removed)
+- docs/gamification.md references (ignore these docs)
+- docs/messaging.md in-app order messaging (removed from MVP)
+- docs/ratings.md (removed from MVP)
+- docs/vendor-ranking.md scoring algorithm (simplified)
+- Guest checkout (removed)
+- send-otp and verify-otp API routes (replaced by PIN auth)
+- login_pin_hash 4-digit (now 6-digit everywhere)
+
+The auditor must flag ALL of the above for removal or update.

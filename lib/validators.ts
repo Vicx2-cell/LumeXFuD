@@ -65,21 +65,33 @@ export const vendorPauseInput = z.object({
 // ─── Wallet ───────────────────────────────────────────────────────────────────
 
 export const withdrawInput = z.object({
-  amount: z.number().int().min(50000).max(2500000), // ₦500 - ₦25,000 in kobo
-  bank_code: z.string().min(3).max(10),
-  account_number: z.string().length(10).regex(/^\d{10}$/),
-  otp: z.string().length(6).regex(/^\d{6}$/),
-  pin: z.string().length(4).regex(/^\d{4}$/),
+  amount_naira: z.number().int().min(500).max(25_000),
+  wallet_pin:   z.string().length(4).regex(/^\d{4}$/),
 })
 
 export const verifyAccountInput = z.object({
   account_number: z.string().length(10).regex(/^\d{10}$/),
-  bank_code: z.string().min(3).max(10),
+  bank_code:      z.string().min(3).max(10),
 })
 
-export const setPinInput = z.object({
-  pin: z.string().length(4).regex(/^\d{4}$/),
+export const saveBankInput = z.object({
+  account_number: z.string().length(10).regex(/^\d{10}$/),
+  bank_code:      z.string().min(3).max(10),
+  bank_name:      z.string().min(2).max(100),
+  account_name:   z.string().min(2).max(200),
+  wallet_pin:     z.string().length(4).regex(/^\d{4}$/),
+})
+
+export const walletSetPinInput = z.object({
+  pin:         z.string().length(4).regex(/^\d{4}$/),
+  confirm_pin: z.string().length(4).regex(/^\d{4}$/),
   current_pin: z.string().length(4).regex(/^\d{4}$/).optional(),
+})
+
+export const walletFreezeInput = z.object({
+  user_id:   z.string().uuid(),
+  user_type: z.enum(['VENDOR', 'RIDER']),
+  reason:    z.string().min(5).max(500),
 })
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
@@ -93,6 +105,85 @@ export const refundInput = z.object({
   order_id: z.string().uuid(),
   reason: z.string().min(5).max(500),
   amount: z.number().int().positive().optional(),
+})
+
+// ─── Login PIN ────────────────────────────────────────────────────────────────
+
+export const loginPinInput = z.object({
+  phone: z.string().min(7).max(20),
+  pin:   z.string().length(6).regex(/^\d{6}$/),
+})
+
+export const setPinLoginInput = z.object({
+  pin: z.string().length(6).regex(/^\d{6}$/),
+})
+
+export const changePinLoginInput = z.object({
+  current_pin: z.string().length(6).regex(/^\d{6}$/),
+  new_pin:     z.string().length(6).regex(/^\d{6}$/, 'PIN must be exactly 6 digits'),
+})
+
+export const removePinLoginInput = z.object({
+  current_pin: z.string().length(6).regex(/^\d{6}$/),
+})
+
+// ─── Universal PIN auth ────────────────────────────────────────────────────────
+
+const pinField   = z.string().length(6).regex(/^\d{6}$/, 'PIN must be 6 digits')
+const phoneField = z.string().min(7).max(20)
+const answerField = z.string().min(2).max(200).transform((s) => s.trim().toLowerCase())
+
+export const registerInput = z.object({
+  name:         z.string().min(1).max(100).transform((s) => s.trim()),
+  phone:        phoneField,
+  pin:          pinField,
+  confirm_pin:  pinField,
+  question_1:   z.string().min(5).max(300),
+  answer_1:     answerField,
+  question_2:   z.string().min(5).max(300),
+  answer_2:     answerField,
+})
+
+export const universalLoginInput = z.object({
+  phone: phoneField,
+  pin:   pinField,
+})
+
+export const firstLoginSetupInput = z.object({
+  pin:         pinField,
+  confirm_pin: pinField,
+  question_1:  z.string().min(5).max(300),
+  answer_1:    answerField,
+  question_2:  z.string().min(5).max(300),
+  answer_2:    answerField,
+})
+
+export const forgotPinGetQuestionsInput = z.object({
+  phone: phoneField,
+})
+
+export const forgotPinSecurityAnswersInput = z.object({
+  phone:       phoneField,
+  answer_1:    answerField,
+  answer_2:    answerField,
+  new_pin:     pinField,
+  confirm_pin: pinField,
+})
+
+export const forgotPinRecoveryCodeInput = z.object({
+  phone:         phoneField,
+  recovery_code: z.string().min(10).max(30),
+  new_pin:       pinField,
+  confirm_pin:   pinField,
+})
+
+export const regenerateRecoveryCodeInput = z.object({
+  current_pin: pinField,
+})
+
+export const adminResetPinInput = z.object({
+  user_id:   z.string().min(1).max(100),
+  user_role: z.enum(['customer', 'vendor', 'rider', 'admin']),
 })
 
 // ─── Image upload ─────────────────────────────────────────────────────────────

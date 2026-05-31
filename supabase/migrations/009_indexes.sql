@@ -59,10 +59,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_rider_release
   ON orders(status, rider_auto_release_at)
   WHERE status = 'DELIVERED';
 
--- ─── VENDOR SCORES ────────────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_vendor_scores_score
-  ON vendor_scores(composite_score DESC);
-
--- ─── GAMIFICATION ─────────────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_customer_xp_weekly_leaderboard
-  ON customer_xp(weekly_xp DESC);
+-- NOTE: the vendor_scores index lives in 018_vendor_scores.sql, alongside the
+-- CREATE TABLE. It was removed from here because the table does not exist yet at
+-- migration 009 — indexing it here aborts a fresh-DB run with "relation
+-- vendor_scores does not exist". 018 owns the table and its index.

@@ -6,6 +6,7 @@ import { audit } from '@/lib/audit'
 import { refundInput } from '@/lib/validators'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
+import { recordPlatformEarning } from '@/lib/platform-earnings'
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
@@ -65,6 +66,14 @@ export async function POST(req: NextRequest) {
     .from('orders')
     .update({ status: 'REFUNDED', updated_at: new Date().toISOString() })
     .eq('id', order.id)
+
+  // Record as platform cost (fire-and-forget)
+  void recordPlatformEarning({
+    type:        'REFUND_COST',
+    amount_kobo: -refundAmount,   // negative = cost to the platform
+    order_id:    order.id as string,
+    description: `Refund — order ${order.order_number as string}: ${reason}`,
+  })
 
   // Audit log
   await audit({

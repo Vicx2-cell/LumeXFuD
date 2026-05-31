@@ -68,7 +68,7 @@ export const TEMPLATES = {
 
   LEVEL_UP: `✨ Level up! You are now: {new_level}\nTotal XP: {total_xp}\nKeep ordering to unlock the next level.`,
 
-  WEEKLY_LEADERBOARD_TOP_3: `🏆 You finished #{rank} on the weekly leaderboard!\nXP earned: {weekly_xp}\nThis week's leaderboard resets now — keep ordering!`,
+  WEEKLY_LEADERBOARD_TOP_3: `🏆 You finished #{rank} on this week's leaderboard with {orders} orders!\nA new week starts now — keep ordering: {app_url}`,
 
   // ─── Messages ─────────────────────────────────────────────────────────────
   MESSAGE_UNREAD_5MIN: `💬 {sender_name} sent a message about order #{order_number}:\n'{message_preview}'\nReply: {order_url}`,

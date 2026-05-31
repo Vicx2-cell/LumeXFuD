@@ -85,21 +85,9 @@ export async function GET(_req: NextRequest) {
 
   const customerId = customer?.id
 
-  const [ordersRes, ratingsRes, messagesRes, xpRes, badgesRes] = await Promise.all([
+  const [ordersRes] = await Promise.all([
     customerId
       ? db.from('orders').select('*, order_items(*)').eq('customer_id', customerId)
-      : Promise.resolve({ data: [] }),
-    customerId
-      ? db.from('ratings').select('*').eq('customer_id', customerId)
-      : Promise.resolve({ data: [] }),
-    customerId
-      ? db.from('order_messages').select('*').eq('sender_id', customerId)
-      : Promise.resolve({ data: [] }),
-    customerId
-      ? db.from('customer_xp').select('*').eq('customer_id', customerId).single()
-      : Promise.resolve({ data: null }),
-    customerId
-      ? db.from('customer_badges').select('*, badges(*)').eq('customer_id', customerId)
       : Promise.resolve({ data: [] }),
   ])
 
@@ -107,12 +95,6 @@ export async function GET(_req: NextRequest) {
     exported_at: new Date().toISOString(),
     account: { ...customer, phone: maskPhone(customer?.phone ?? '') },
     orders: ordersRes.data ?? [],
-    ratings: ratingsRes.data ?? [],
-    messages: messagesRes.data ?? [],
-    gamification: {
-      xp: xpRes.data,
-      badges: badgesRes.data ?? [],
-    },
   }
 
   await audit({

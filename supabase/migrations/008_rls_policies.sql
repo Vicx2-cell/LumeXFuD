@@ -48,25 +48,26 @@ CREATE POLICY "customers update own profile" ON customers
   FOR UPDATE USING (phone = (auth.jwt() ->> 'phone'));
 
 -- ─── ORDERS (role-based visibility) ──────────────────────────────────────────
+-- ::TEXT casts on both sides of IN so UUID vs TEXT column types never conflict.
+
 CREATE POLICY "customers see own orders" ON orders
   FOR SELECT USING (
-    customer_id IN (
-      SELECT id FROM customers WHERE phone = (auth.jwt() ->> 'phone')
+    customer_id::TEXT = (
+      SELECT id::TEXT FROM customers WHERE phone = (auth.jwt() ->> 'phone')
     )
-    OR guest_phone = (auth.jwt() ->> 'phone')
   );
 
 CREATE POLICY "vendors see own orders" ON orders
   FOR SELECT USING (
-    vendor_id IN (
-      SELECT id FROM vendors WHERE phone = (auth.jwt() ->> 'phone')
+    vendor_id::TEXT = (
+      SELECT id::TEXT FROM vendors WHERE phone = (auth.jwt() ->> 'phone')
     )
   );
 
 CREATE POLICY "riders see assigned or available orders" ON orders
   FOR SELECT USING (
-    rider_id IN (
-      SELECT id FROM riders WHERE phone = (auth.jwt() ->> 'phone')
+    rider_id::TEXT = (
+      SELECT id::TEXT FROM riders WHERE phone = (auth.jwt() ->> 'phone')
     )
     OR (status = 'READY' AND rider_id IS NULL)
   );
@@ -74,30 +75,23 @@ CREATE POLICY "riders see assigned or available orders" ON orders
 -- ─── ORDER ITEMS ─────────────────────────────────────────────────────────────
 CREATE POLICY "order items visible with order" ON order_items
   FOR SELECT USING (
-    order_id IN (
-      SELECT id FROM orders
+    order_id::TEXT IN (
+      SELECT id::TEXT FROM orders
       WHERE
-        customer_id IN (SELECT id FROM customers WHERE phone = (auth.jwt() ->> 'phone'))
-        OR guest_phone = (auth.jwt() ->> 'phone')
-        OR vendor_id  IN (SELECT id FROM vendors WHERE phone = (auth.jwt() ->> 'phone'))
-        OR rider_id   IN (SELECT id FROM riders WHERE phone = (auth.jwt() ->> 'phone'))
-    )
-  );
-
--- ─── ORDER MESSAGES ──────────────────────────────────────────────────────────
-CREATE POLICY "order messages visible with order" ON order_messages
-  FOR SELECT USING (
-    order_id IN (
-      SELECT id FROM orders
-      WHERE
-        customer_id IN (SELECT id FROM customers WHERE phone = (auth.jwt() ->> 'phone'))
-        OR guest_phone = (auth.jwt() ->> 'phone')
-        OR vendor_id  IN (SELECT id FROM vendors WHERE phone = (auth.jwt() ->> 'phone'))
-        OR rider_id   IN (SELECT id FROM riders WHERE phone = (auth.jwt() ->> 'phone'))
+        customer_id::TEXT = (
+          SELECT id::TEXT FROM customers WHERE phone = (auth.jwt() ->> 'phone')
+        )
+        OR vendor_id::TEXT = (
+          SELECT id::TEXT FROM vendors WHERE phone = (auth.jwt() ->> 'phone')
+        )
+        OR rider_id::TEXT = (
+          SELECT id::TEXT FROM riders WHERE phone = (auth.jwt() ->> 'phone')
+        )
     )
   );
 
 -- ─── WALLET BALANCES ─────────────────────────────────────────────────────────
+-- wallet_balances.user_id is TEXT; cast id::TEXT to match.
 CREATE POLICY "users see own wallet" ON wallet_balances
   FOR SELECT USING (
     (user_type = 'VENDOR' AND user_id IN (
@@ -121,36 +115,6 @@ CREATE POLICY "users see own wallet transactions" ON wallet_transactions
     ))
   );
 
--- ─── RATINGS ─────────────────────────────────────────────────────────────────
-CREATE POLICY "customers see own ratings" ON ratings
-  FOR SELECT USING (
-    customer_id IN (
-      SELECT id FROM customers WHERE phone = (auth.jwt() ->> 'phone')
-    )
-  );
-
-CREATE POLICY "public read vendor ratings" ON ratings
-  FOR SELECT USING (true);
-
--- ─── CUSTOMER XP + BADGES ────────────────────────────────────────────────────
-CREATE POLICY "customers see own xp" ON customer_xp
-  FOR SELECT USING (
-    customer_id IN (
-      SELECT id FROM customers WHERE phone = (auth.jwt() ->> 'phone')
-    )
-  );
-
-CREATE POLICY "customers see own badges" ON customer_badges
-  FOR SELECT USING (
-    customer_id IN (
-      SELECT id FROM customers WHERE phone = (auth.jwt() ->> 'phone')
-    )
-  );
-
--- Badges catalogue is public
-CREATE POLICY "public read badges" ON badges
-  FOR SELECT USING (true);
-
 -- ─── TRENDING DATA (public read for homepage) ─────────────────────────────────
 CREATE POLICY "public read trending" ON trending_data
   FOR SELECT USING (true);
@@ -158,8 +122,8 @@ CREATE POLICY "public read trending" ON trending_data
 -- ─── DISPUTES ────────────────────────────────────────────────────────────────
 CREATE POLICY "customers see own disputes" ON disputes
   FOR SELECT USING (
-    customer_id IN (
-      SELECT id FROM customers WHERE phone = (auth.jwt() ->> 'phone')
+    customer_id::TEXT = (
+      SELECT id::TEXT FROM customers WHERE phone = (auth.jwt() ->> 'phone')
     )
   );
 
@@ -194,4 +158,7 @@ CREATE POLICY "deny anon vendor subscriptions" ON vendor_subscriptions
   FOR ALL TO anon USING (false);
 
 CREATE POLICY "deny anon notifications" ON notifications
+  FOR ALL TO anon USING (false);
+
+CREATE POLICY "deny anon pin reset audit" ON pin_reset_audit
   FOR ALL TO anon USING (false);

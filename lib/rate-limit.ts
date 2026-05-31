@@ -37,6 +37,30 @@ export async function rateLimitOtpVerify(phone: string): Promise<RateLimitResult
   return check(_otpVerifyLimiter, `otp:verify:${phone}`)
 }
 
+// 5 PIN login attempts per phone per 30 minutes
+const _pinLoginLimiter = makeRatelimit(5, 1800)
+export async function rateLimitPinLogin(phone: string): Promise<RateLimitResult> {
+  return check(_pinLoginLimiter, `pin:login:${phone}`)
+}
+
+// 3 forgot-PIN (security questions) attempts per phone per hour
+const _forgotPinQuestionsLimiter = makeRatelimit(3, 3600)
+export async function rateLimitForgotPinQuestions(phone: string): Promise<RateLimitResult> {
+  return check(_forgotPinQuestionsLimiter, `forgot:questions:${phone}`)
+}
+
+// 5 get-questions lookups per IP per hour (enumeration prevention)
+const _forgotPinGetQuestionsLimiter = makeRatelimit(5, 3600)
+export async function rateLimitForgotPinGetQuestions(ip: string): Promise<RateLimitResult> {
+  return check(_forgotPinGetQuestionsLimiter, `forgot:getq:${ip}`)
+}
+
+// 5 forgot-PIN (recovery code) attempts per phone per hour
+const _forgotPinRecoveryCodeLimiter = makeRatelimit(5, 3600)
+export async function rateLimitForgotPinRecoveryCode(phone: string): Promise<RateLimitResult> {
+  return check(_forgotPinRecoveryCodeLimiter, `forgot:recovery:${phone}`)
+}
+
 // Generic: N requests per window (seconds)
 export async function rateLimitGeneric(key: string, requests: number, windowSeconds: number): Promise<RateLimitResult> {
   const limiter = makeRatelimit(requests, windowSeconds)

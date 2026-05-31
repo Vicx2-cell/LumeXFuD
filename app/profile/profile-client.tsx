@@ -4,6 +4,50 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CustomerProfile, XPData, BadgeItem } from './page'
 
+const KEYPAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'] as const
+
+function PinIndicators({ value }: { value: string }) {
+  return (
+    <div className="flex gap-3 justify-center my-4">
+      {[0,1,2,3,4,5].map((i) => (
+        <div
+          key={i}
+          className="w-4 h-4 rounded-full transition-all"
+          style={{
+            background: value.length > i ? '#F5A623' : 'rgba(255,255,255,0.15)',
+            border: `2px solid ${value.length > i ? '#F5A623' : 'rgba(255,255,255,0.2)'}`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function NumericKeypad({ onKey }: { onKey: (key: string) => void }) {
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {KEYPAD.map((key, i) => (
+        key === '' ? (
+          <div key={i} />
+        ) : (
+          <button
+            key={i}
+            onClick={() => onKey(key)}
+            className="rounded-xl font-semibold text-lg flex items-center justify-center transition-opacity active:opacity-60"
+            style={{
+              background: key === '⌫' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)',
+              color: '#fff',
+              minHeight: 52,
+            }}
+          >
+            {key}
+          </button>
+        )
+      ))}
+    </div>
+  )
+}
+
 const LEVEL_NAMES = ['', 'Newcomer', 'Regular', 'Foodie', 'Fanatic', 'Loyalist', 'Champion', 'Legend', 'Icon', 'Elite', 'ABSU OG']
 
 export function ProfileClient({
@@ -23,6 +67,117 @@ export function ProfileClient({
   const [room, setRoom] = useState(profile?.room_number ?? '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  // Security / PIN management
+  type PinFlow = 'idle' | 'change-current' | 'change-new' | 'change-confirm' | 'remove'
+  const [pinFlow, setPinFlow] = useState<PinFlow>('idle')
+  const [pinCurrent, setPinCurrent] = useState('')
+  const [pinNew, setPinNew] = useState('')
+  const [pinConfirm, setPinConfirm] = useState('')
+  const [pinError, setPinError] = useState('')
+  const [pinWorking, setPinWorking] = useState(false)
+  const [pinSuccess, setPinSuccess] = useState('')
+
+  function resetPinFlow() {
+    setPinFlow('idle')
+    setPinCurrent('')
+    setPinNew('')
+    setPinConfirm('')
+    setPinError('')
+    setPinSuccess('')
+  }
+
+  function handleChangePinKey(key: string) {
+    const setter =
+      pinFlow === 'change-current' ? setPinCurrent :
+      pinFlow === 'change-new'     ? setPinNew     : setPinConfirm
+    const value =
+      pinFlow === 'change-current' ? pinCurrent :
+      pinFlow === 'change-new'     ? pinNew     : pinConfirm
+
+    if (key === '⌫') {
+      setter(value.slice(0, -1))
+      setPinError('')
+      return
+    }
+    if (value.length >= 6) return
+    const next = value + key
+    setter(next)
+
+    if (next.length === 6) {
+      if (pinFlow === 'change-current') setPinFlow('change-new')
+      else if (pinFlow === 'change-new') setPinFlow('change-confirm')
+      else void submitChangePin(next)
+    }
+  }
+
+  async function submitChangePin(confirm: string) {
+    if (confirm !== pinNew) {
+      setPinError('PINs don\'t match. Try again.')
+      setPinNew('')
+      setPinConfirm('')
+      setPinFlow('change-new')
+      return
+    }
+    setPinWorking(true)
+    setPinError('')
+    try {
+      const res = await fetch('/api/auth/change-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_pin: pinCurrent, new_pin: pinNew }),
+      })
+      const data = await res.json() as { error?: string }
+      if (!res.ok) {
+        setPinError(data.error ?? 'Failed to change PIN.')
+        setPinCurrent('')
+        setPinNew('')
+        setPinConfirm('')
+        setPinFlow('change-current')
+      } else {
+        setPinSuccess('PIN changed successfully.')
+        setTimeout(resetPinFlow, 2000)
+      }
+    } catch {
+      setPinError('Network error. Try again.')
+      resetPinFlow()
+    } finally {
+      setPinWorking(false)
+    }
+  }
+
+  function handleRemovePinKey(key: string) {
+    if (key === '⌫') { setPinCurrent((v) => v.slice(0, -1)); setPinError(''); return }
+    if (pinCurrent.length >= 6) return
+    const next = pinCurrent + key
+    setPinCurrent(next)
+    if (next.length === 6) void submitRemovePin(next)
+  }
+
+  async function submitRemovePin(pin: string) {
+    setPinWorking(true)
+    setPinError('')
+    try {
+      const res = await fetch('/api/auth/remove-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_pin: pin }),
+      })
+      const data = await res.json() as { error?: string }
+      if (!res.ok) {
+        setPinError(data.error ?? 'Failed to remove PIN.')
+        setPinCurrent('')
+      } else {
+        setPinSuccess('PIN removed.')
+        setTimeout(resetPinFlow, 2000)
+      }
+    } catch {
+      setPinError('Network error. Try again.')
+      resetPinFlow()
+    } finally {
+      setPinWorking(false)
+    }
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -183,6 +338,65 @@ export function ProfileClient({
           >
             {saved ? '✓ Saved!' : saving ? 'Saving…' : 'Save changes'}
           </button>
+        </div>
+
+        {/* Security — PIN management */}
+        <div className="rounded-2xl p-4 space-y-3" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <h3 className="text-sm font-semibold text-white/70">Security</h3>
+
+          {pinSuccess && (
+            <p className="text-green-400 text-sm">{pinSuccess}</p>
+          )}
+
+          {pinFlow === 'idle' && (
+            <div className="space-y-2">
+              <button
+                onClick={() => { resetPinFlow(); setPinFlow('change-current') }}
+                className="block w-full text-left text-sm text-white/60 hover:text-white py-1"
+              >
+                🔑 Change login PIN
+              </button>
+              <button
+                onClick={() => { resetPinFlow(); setPinFlow('remove') }}
+                className="block w-full text-left text-sm py-1"
+                style={{ color: '#ef4444' }}
+              >
+                🗑️ Remove login PIN
+              </button>
+            </div>
+          )}
+
+          {(pinFlow === 'change-current' || pinFlow === 'change-new' || pinFlow === 'change-confirm') && (
+            <div className="space-y-3">
+              <p className="text-sm text-white/60 text-center">
+                {pinFlow === 'change-current' ? 'Enter current PIN' :
+                 pinFlow === 'change-new'     ? 'Choose new PIN'    : 'Confirm new PIN'}
+              </p>
+              <PinIndicators value={
+                pinFlow === 'change-current' ? pinCurrent :
+                pinFlow === 'change-new'     ? pinNew     : pinConfirm
+              } />
+              {pinError && <p className="text-red-400 text-xs text-center">{pinError}</p>}
+              {pinWorking
+                ? <p className="text-center text-sm text-white/40">Saving…</p>
+                : <NumericKeypad onKey={handleChangePinKey} />
+              }
+              <button onClick={resetPinFlow} className="w-full py-1.5 text-xs text-white/30 text-center">Cancel</button>
+            </div>
+          )}
+
+          {pinFlow === 'remove' && (
+            <div className="space-y-3">
+              <p className="text-sm text-white/60 text-center">Enter current PIN to confirm removal</p>
+              <PinIndicators value={pinCurrent} />
+              {pinError && <p className="text-red-400 text-xs text-center">{pinError}</p>}
+              {pinWorking
+                ? <p className="text-center text-sm text-white/40">Removing…</p>
+                : <NumericKeypad onKey={handleRemovePinKey} />
+              }
+              <button onClick={resetPinFlow} className="w-full py-1.5 text-xs text-white/30 text-center">Cancel</button>
+            </div>
+          )}
         </div>
 
         {/* NDPR links */}

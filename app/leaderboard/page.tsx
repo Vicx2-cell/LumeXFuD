@@ -6,30 +6,54 @@ export const revalidate = 300
 export default async function LeaderboardPage() {
   const db = createSupabaseAdmin()
 
-  const { data: leaders } = await db
-    .from('customer_xp')
-    .select(`
-      customer_id, weekly_xp, level,
-      customers ( name )
-    `)
-    .eq('customers.leaderboard_opt_out', false)
-    .order('weekly_xp', { ascending: false })
-    .limit(10)
+  // MVP leaderboard ranks customers by COMPLETED orders over a rolling
+  // 7-day window (XP/levels were removed). Computed live from orders.
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  const top = (leaders ?? []).map((row, i) => {
-    const customer = (Array.isArray(row.customers) ? row.customers[0] : row.customers) as { name: string | null } | null
-    const rawName = customer?.name ?? 'Anonymous'
+  // Paginate: a single PostgREST response caps at 1000 rows, which a busy
+  // week of orders exceeds — an unpaginated query would skew the rankings.
+  const PAGE = 1000
+  const counts = new Map<string, number>()
+  for (let from = 0; ; from += PAGE) {
+    const { data: orders } = await db
+      .from('orders')
+      .select('customer_id')
+      .eq('status', 'COMPLETED')
+      .gte('completed_at', sevenDaysAgo)
+      .not('customer_id', 'is', null)
+      .range(from, from + PAGE - 1)
+    const batch = (orders ?? []) as Array<{ customer_id: string }>
+    for (const o of batch) {
+      counts.set(o.customer_id, (counts.get(o.customer_id) ?? 0) + 1)
+    }
+    if (batch.length < PAGE) break
+  }
+
+  const ranked = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+
+  // Resolve names for the ranked customers.
+  const nameById = new Map<string, string | null>()
+  if (ranked.length > 0) {
+    const { data: customers } = await db
+      .from('customers')
+      .select('id, name')
+      .in('id', ranked.map(([id]) => id))
+      .is('deleted_at', null)
+    for (const c of (customers ?? []) as Array<{ id: string; name: string | null }>) {
+      nameById.set(c.id, c.name)
+    }
+  }
+
+  const top = ranked.map(([customerId, orderCount], i) => {
+    const rawName = nameById.get(customerId) ?? 'Anonymous'
     const parts = rawName.trim().split(' ')
     const display =
       parts.length > 1
         ? `${parts[0]} ${parts[parts.length - 1][0]}.`
         : parts[0]
-    return {
-      rank: i + 1,
-      name: display,
-      weekly_xp: row.weekly_xp as number,
-      level: row.level as number,
-    }
+    return { rank: i + 1, name: display, orders: orderCount }
   })
 
   const medals = ['🥇', '🥈', '🥉']
@@ -40,7 +64,7 @@ export default async function LeaderboardPage() {
         style={{ background: 'rgba(10,10,11,0.95)', backdropFilter: 'blur(20px)' }}>
         <div className="max-w-lg mx-auto">
           <h1 className="font-semibold">Weekly Leaderboard</h1>
-          <p className="text-xs text-white/40 mt-0.5">Resets every Monday midnight</p>
+          <p className="text-xs text-white/40 mt-0.5">Top orderers this week · resets Monday</p>
         </div>
       </div>
 
@@ -69,18 +93,16 @@ export default async function LeaderboardPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm truncate">{entry.name}</p>
-                <p className="text-xs text-white/40 mt-0.5">Level {entry.level}</p>
+                <p className="text-xs text-white/40 mt-0.5">
+                  {entry.orders} order{entry.orders === 1 ? '' : 's'} this week
+                </p>
               </div>
               <div className="text-right shrink-0">
-                <p className="font-bold text-sm" style={{ color: '#F5A623' }}>{entry.weekly_xp.toLocaleString()} XP</p>
+                <p className="font-bold text-sm" style={{ color: '#F5A623' }}>{entry.orders}</p>
               </div>
             </div>
           ))
         )}
-
-        <p className="text-center text-xs text-white/30 pt-4">
-          Only customers who opted in are shown. Manage in your profile.
-        </p>
       </div>
 
       <BottomNav />

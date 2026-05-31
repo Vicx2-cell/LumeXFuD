@@ -1,6 +1,7 @@
 import { createSupabaseAdmin } from '../supabase/server'
 import { sendWhatsAppWithFallback } from '../termii/whatsapp'
 import { renderTemplate } from '../termii/templates'
+import { recordPlatformEarning } from '../platform-earnings'
 
 export type PaystackEvent =
   | 'charge.success'
@@ -221,9 +222,11 @@ async function handleSubscriptionPayment(
   const periodEnd = new Date(now)
   periodEnd.setMonth(periodEnd.getMonth() + 1)
 
+  const subscriptionAmount = Number(metadata.amount ?? 0)
+
   await db.from('vendor_subscriptions').insert({
     vendor_id: vendorId,
-    amount: metadata.amount ?? 0,
+    amount: subscriptionAmount,
     paystack_reference: reference,
     paid_at: now.toISOString(),
     period_start: now.toISOString(),
@@ -235,4 +238,11 @@ async function handleSubscriptionPayment(
     .from('vendors')
     .update({ subscription_paid_until: periodEnd.toISOString() })
     .eq('id', vendorId)
+
+  // Record as platform revenue (fire-and-forget)
+  void recordPlatformEarning({
+    type:        'VENDOR_SUBSCRIPTION',
+    amount_kobo: subscriptionAmount,
+    description: `Vendor subscription — vendor ${vendorId} — ref ${reference}`,
+  })
 }

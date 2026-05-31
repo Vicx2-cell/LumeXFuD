@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/session'
-import { normalizePhone } from '@/lib/phone'
 import { createOrderInput } from '@/lib/validators'
 import { generateOrderNumber } from '@/lib/order-number'
 import { initializePaystackTransaction } from '@/lib/paystack/init'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 
 // Allowed delivery types from settings
 const DELIVERY_FEES: Record<string, number> = {
@@ -14,30 +14,20 @@ const DELIVERY_FEES: Record<string, number> = {
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
-  let guestPhone: string | null = null
-
   if (!session) {
-    // Guest checkout — requires phone in body
-    const raw = await req.json().catch(() => null)
-    if (!raw || typeof raw.guest_phone !== 'string') {
-      return NextResponse.json({ error: 'Authentication required or provide guest_phone' }, { status: 401 })
-    }
-    try {
-      guestPhone = normalizePhone(raw.guest_phone as string)
-    } catch {
-      return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 })
-    }
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  }
+
+  // Rate limit: each order create spins up a Paystack transaction — cap bursts
+  // per user (15 / 5 min) to stop checkout spam. No-ops if Upstash is unset.
+  const rl = await rateLimitGeneric(`order:create:${session.userId ?? session.phone}`, 15, 300)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many orders in a short time. Please wait a moment and try again.' }, { status: 429 })
   }
 
   let body: Record<string, unknown>
   try {
-    if (!session) {
-      // already parsed above but need full body
-      const raw2 = await req.text().catch(() => '{}')
-      body = JSON.parse(raw2)
-    } else {
-      body = await req.json()
-    }
+    body = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
@@ -126,32 +116,15 @@ export async function POST(req: NextRequest) {
   // Generate order number
   const orderNumber = await generateOrderNumber()
 
-  // Get customer id or null for guest
-  let customerId: string | null = null
-  let customerEmail: string
-  let customerPhone: string
+  const { data: c } = await db
+    .from('customers')
+    .select('id, phone')
+    .eq('phone', session.phone)
+    .single()
 
-  if (session) {
-    customerId = (await db
-      .from('customers')
-      .select('id, phone')
-      .eq('phone', session.phone)
-      .single()
-      .then((r) => r.data)) as unknown as string | null
-
-    const { data: c } = await db
-      .from('customers')
-      .select('id, phone')
-      .eq('phone', session.phone)
-      .single()
-
-    customerId = c?.id ?? null
-    customerPhone = session.phone
-    customerEmail = `${session.phone.replace('+', '')}@lumex.fud`
-  } else {
-    customerPhone = guestPhone!
-    customerEmail = `${guestPhone!.replace('+', '')}@lumex.fud`
-  }
+  const customerId: string | null = c?.id ?? null
+  const customerPhone = session.phone
+  const customerEmail = `${session.phone.replace('+', '')}@lumex.fud`
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
@@ -175,7 +148,6 @@ export async function POST(req: NextRequest) {
       order_number: orderNumber,
       customer_id: customerId,
       vendor_id,
-      guest_phone: guestPhone,
       status: 'PENDING_PAYMENT',
       delivery_type,
       delivery_address,

@@ -1,144 +1,96 @@
 'use client'
 
-import { useState, useRef, useEffect, Suspense } from 'react'
+import { useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import PinInput from '@/components/auth/PinInput'
 
 export default function AuthPage() {
   return (
     <Suspense>
-      <AuthForm />
+      <LoginForm />
     </Suspense>
   )
 }
 
-function AuthForm() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const nextPath = searchParams.get('next') ?? '/'
+function LoginForm() {
+  const router   = useRouter()
+  const params   = useSearchParams()
+  const nextPath = params.get('next') ?? '/'
 
-  const [step, setStep] = useState<'phone' | 'otp' | 'name'>('phone')
-  const [phone, setPhone] = useState('+234')
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', ''])
-  const [name, setName] = useState('')
-  const [countdown, setCountdown] = useState(0)
+  const [phone,   setPhone]   = useState('+234')
+  const [pin,     setPin]     = useState('')
+  const [error,   setError]   = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const otpRefs = useRef<Array<HTMLInputElement | null>>([])
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [step,    setStep]    = useState<'phone' | 'pin'>('phone')
 
-  useEffect(() => {
-    if (countdown > 0) {
-      timerRef.current = setInterval(() => setCountdown((c) => c - 1), 1000)
-    } else if (timerRef.current) {
-      clearInterval(timerRef.current)
-    }
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [countdown])
-
-  async function sendOtp() {
+  const submitLogin = useCallback(async (pinValue: string) => {
+    if (pinValue.length !== 6) return
     setError('')
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/send-otp', {
-        method: 'POST',
+      const res  = await fetch('/api/auth/login', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
+        body:    JSON.stringify({ phone, pin: pinValue }),
       })
-      const data = await res.json() as { error?: string }
+      const data = await res.json() as {
+        error?: string
+        role?: string
+        redirect_path?: string
+        pin_reset_pending?: boolean
+      }
       if (!res.ok) {
-        setError(data.error ?? 'Failed to send OTP')
+        setPin('')
+        setError(data.error ?? 'Invalid phone or PIN')
         return
       }
-      setStep('otp')
-      setCountdown(45)
+      if (data.pin_reset_pending) {
+        router.push('/auth/setup')
+        return
+      }
+      router.push(data.redirect_path ?? nextPath)
     } catch {
-      setError('Network error. Please try again.')
+      setPin('')
+      setError('Connection error. Please try again.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [phone, nextPath, router])
 
-  async function verifyOtp() {
-    const otp = otpDigits.join('')
-    if (otp.length !== 6) return
+  function handlePhoneContinue() {
+    if (phone.length < 13) return
+    setPin('')
     setError('')
-    setLoading(true)
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, otp }),
-      })
-      const data = await res.json() as { error?: string; role?: string; redirect_path?: string }
-      if (!res.ok) {
-        setError(data.error ?? 'Invalid OTP')
-        setOtpDigits(['', '', '', '', '', ''])
-        otpRefs.current[0]?.focus()
-        return
-      }
-      if (data.role === 'customer') {
-        setStep('name')
-      } else {
-        router.push(data.redirect_path ?? nextPath)
-      }
-    } catch {
-      setError('Network error. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function saveName() {
-    if (name.trim()) {
-      try {
-        await fetch('/api/auth/me', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim() }),
-        })
-      } catch {
-        // non-critical
-      }
-    }
-    router.push(nextPath)
-  }
-
-  function handleOtpChange(index: number, value: string) {
-    const digit = value.replace(/\D/g, '').slice(-1)
-    const next = [...otpDigits]
-    next[index] = digit
-    setOtpDigits(next)
-    if (digit && index < 5) {
-      otpRefs.current[index + 1]?.focus()
-    }
-    if (next.every((d) => d) && next.join('').length === 6) {
-      setOtpDigits(next)
-      setTimeout(verifyOtp, 100)
-    }
-  }
-
-  function handleOtpKeyDown(index: number, e: React.KeyboardEvent) {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      otpRefs.current[index - 1]?.focus()
-    }
+    setStep('pin')
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-5 py-12" style={{ background: '#0A0A0B' }}>
+    <div
+      className="min-h-dvh flex flex-col items-center justify-center px-5 py-12"
+      style={{ background: '#0A0A0B' }}
+    >
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-10">
-          <span className="inline-block px-4 py-1.5 rounded-lg font-bold text-sm" style={{ background: '#F5A623', color: '#000' }}>
+          <span
+            className="inline-block px-4 py-1.5 rounded-lg font-bold text-sm"
+            style={{ background: '#F5A623', color: '#000' }}
+          >
             LumeX Fud
           </span>
           <h1 className="text-2xl font-bold mt-4 tracking-tight">Campus life, simplified.</h1>
-          <p className="text-sm text-white/40 mt-1">Sign in or create your account</p>
+          <p className="text-sm text-white/40 mt-1">
+            {step === 'phone' ? 'Sign in with your phone number and PIN' : 'Enter your 6-digit PIN'}
+          </p>
         </div>
 
+        {/* ── Phone step ── */}
         {step === 'phone' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-white/60 mb-2">Your phone number</label>
+              <label className="block text-xs font-medium text-white/60 mb-2">
+                Phone number
+              </label>
               <input
                 type="tel"
                 value={phone}
@@ -149,7 +101,11 @@ function AuthForm() {
                 }}
                 placeholder="+2348012345678"
                 className="w-full rounded-xl px-4 py-3.5 text-base outline-none"
-                style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                style={{
+                  background: '#111113',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#fff',
+                }}
                 autoComplete="tel"
                 inputMode="tel"
               />
@@ -158,103 +114,81 @@ function AuthForm() {
             {error && <p className="text-red-400 text-sm">{error}</p>}
 
             <button
-              onClick={sendOtp}
-              disabled={loading || phone.length < 13}
+              onClick={handlePhoneContinue}
+              disabled={phone.length < 13}
               className="w-full rounded-xl py-4 font-semibold text-base transition-opacity disabled:opacity-50"
               style={{ background: '#F5A623', color: '#000', minHeight: 56 }}
             >
-              {loading ? 'Sending…' : 'Send OTP'}
+              Login
             </button>
 
             <button
-              onClick={() => router.push(nextPath)}
-              className="w-full py-3 text-sm text-white/40 text-center"
+              onClick={() => router.push('/auth/forgot-pin')}
+              className="w-full py-2.5 text-sm text-center"
+              style={{ color: '#F5A623' }}
             >
-              Continue as Guest
+              Forgot PIN?
             </button>
+
+            <p className="text-center text-sm text-white/40 pt-1">
+              New here?{' '}
+              <button
+                onClick={() => router.push('/auth/register')}
+                className="font-medium"
+                style={{ color: '#F5A623' }}
+              >
+                Create account →
+              </button>
+            </p>
           </div>
         )}
 
-        {step === 'otp' && (
+        {/* ── PIN step ── */}
+        {step === 'pin' && (
           <div className="space-y-6">
             <div className="text-center">
-              <p className="text-sm text-white/60">Code sent to</p>
-              <p className="font-medium mt-1">{phone}</p>
+              <p className="text-sm text-white/50">{phone}</p>
             </div>
 
-            <div className="flex gap-3 justify-center">
-              {otpDigits.map((digit, i) => (
-                <input
-                  key={i}
-                  ref={(el) => { otpRefs.current[i] = el }}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleOtpChange(i, e.target.value)}
-                  onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                  className="w-12 h-14 text-center text-xl font-bold rounded-xl outline-none"
-                  style={{
-                    background: '#111113',
-                    border: `1px solid ${digit ? '#F5A623' : 'rgba(255,255,255,0.1)'}`,
-                    color: '#fff',
-                  }}
-                  autoFocus={i === 0}
-                />
-              ))}
-            </div>
-
-            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-
-            <button
-              onClick={verifyOtp}
-              disabled={loading || otpDigits.join('').length !== 6}
-              className="w-full rounded-xl py-4 font-semibold text-base transition-opacity disabled:opacity-50"
-              style={{ background: '#F5A623', color: '#000', minHeight: 56 }}
-            >
-              {loading ? 'Verifying…' : 'Verify OTP'}
-            </button>
-
-            <div className="text-center">
-              {countdown > 0 ? (
-                <p className="text-sm text-white/40">Resend in {countdown}s</p>
-              ) : (
-                <button onClick={sendOtp} disabled={loading} className="text-sm text-[#F5A623]">
-                  Resend OTP
-                </button>
-              )}
-            </div>
-
-            <button onClick={() => setStep('phone')} className="w-full py-2 text-sm text-white/40 text-center">
-              ← Change number
-            </button>
-          </div>
-        )}
-
-        {step === 'name' && (
-          <div className="space-y-5">
-            <div className="text-center">
-              <p className="text-xl font-bold">Welcome!</p>
-              <p className="text-sm text-white/50 mt-1">What should we call you?</p>
-            </div>
-
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your first name"
-              className="w-full rounded-xl px-4 py-3.5 text-base outline-none"
-              style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
-              autoFocus
+            <PinInput
+              value={pin}
+              onChange={(v) => { setPin(v); setError('') }}
+              onComplete={submitLogin}
+              error={error}
+              disabled={loading}
+              label="Enter your PIN"
             />
 
-            <button
-              onClick={saveName}
-              className="w-full rounded-xl py-4 font-semibold text-base"
-              style={{ background: '#F5A623', color: '#000', minHeight: 56 }}
-            >
-              {name.trim() ? 'Get started' : 'Skip'}
-            </button>
+            {loading && (
+              <p className="text-center text-sm text-white/40">Verifying…</p>
+            )}
+
+            <div className="space-y-2 pt-1">
+              <button
+                onClick={() => router.push('/auth/forgot-pin')}
+                className="w-full py-2.5 text-sm text-center"
+                style={{ color: '#F5A623' }}
+              >
+                Forgot PIN?
+              </button>
+              <button
+                onClick={() => { setPin(''); setError(''); setStep('phone') }}
+                className="w-full py-2 text-sm text-white/30 text-center"
+              >
+                ← Change number
+              </button>
+            </div>
+
+            <p className="text-center text-sm text-white/40">
+              New here?{' '}
+              <button
+                onClick={() => router.push('/auth/register')}
+                className="font-medium"
+                style={{ color: '#F5A623' }}
+              >
+                Create account →
+              </button>
+            </p>
           </div>
         )}
       </div>

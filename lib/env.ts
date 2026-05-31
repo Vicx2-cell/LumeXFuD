@@ -12,6 +12,7 @@ const REQUIRED_VARS = [
   'CRON_SECRET',
   'ADMIN_PHONE',
   'SUPER_ADMIN_PHONE',
+  'SUPER_ADMIN_DEFAULT_PIN',
 ] as const
 
 export function validateEnv(): void {
@@ -23,5 +24,8 @@ export function validateEnv(): void {
   }
   if ((process.env.JWT_SECRET?.length ?? 0) < 32) {
     throw new Error('JWT_SECRET must be at least 32 characters')
+  }
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    console.warn('[env] UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN not set — rate limiting is DISABLED. PIN brute-force protection is off.')
   }
 }

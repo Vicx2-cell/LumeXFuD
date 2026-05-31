@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { awardXP, updateStreak } from '@/lib/gamification'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
 
@@ -48,10 +47,6 @@ export async function POST(
       updated_at: now,
     })
     .eq('id', id)
-
-  // Award XP and update streak
-  void awardXP(customer.id as string, 'ORDER_COMPLETED').catch(() => {})
-  void updateStreak(customer.id as string).catch(() => {})
 
   // Notify rider
   if (order.rider_id) {

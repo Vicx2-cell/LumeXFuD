@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { createSupabaseAdmin } from './supabase/server'
@@ -6,8 +7,29 @@ export type SessionRole = 'customer' | 'vendor' | 'rider' | 'admin' | 'super_adm
 
 export interface SessionPayload {
   sessionId: string
+  userId?: string
   phone: string
   role: SessionRole
+  name?: string
+  pin_reset_pending?: boolean
+}
+
+export type UserRole = SessionRole
+
+export type DetectRoleResult = {
+  role: UserRole
+  userId: string
+  tableName: string
+} | null
+
+// Shape of the per-role name/pin lookup in createSession. The display-name
+// column differs by table (name / owner_name / full_name), so all variants
+// are optional.
+type AuthNameRow = {
+  name?: string | null
+  owner_name?: string | null
+  full_name?: string | null
+  pin_reset_pending?: boolean | null
 }
 
 const SESSION_DURATIONS: Record<SessionRole, number> = {
@@ -45,12 +67,73 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
     ) return null
     return {
       sessionId: payload.sessionId,
+      userId: typeof payload.userId === 'string' ? payload.userId : undefined,
       phone: payload.phone,
       role: payload.role as SessionRole,
+      name: typeof payload.name === 'string' ? payload.name : undefined,
+      pin_reset_pending: typeof payload.pin_reset_pending === 'boolean' ? payload.pin_reset_pending : undefined,
     }
   } catch {
     return null
   }
+}
+
+/**
+ * Detect the user's role and return the user id and table name.
+ * Follows priority: super_admin -> admin -> vendor -> rider -> customer
+ */
+export async function detectRole(phone: string): Promise<DetectRoleResult> {
+  const db = createSupabaseAdmin()
+
+  // 1. Super admin (stored in customers table)
+  if (phone === process.env.SUPER_ADMIN_PHONE) {
+    const { data: customer, error } = await db
+      .from('customers')
+      .select('id')
+      .eq('phone', phone)
+      .maybeSingle()
+    if (!error && customer) return { role: 'super_admin', userId: customer.id, tableName: 'customers' }
+  }
+
+  // 2. Admin (operational admin stored in customers table)
+  if (phone === process.env.ADMIN_PHONE) {
+    const { data: customer, error } = await db
+      .from('customers')
+      .select('id')
+      .eq('phone', phone)
+      .maybeSingle()
+    if (!error && customer) return { role: 'admin', userId: customer.id, tableName: 'customers' }
+  }
+
+  // 3. Vendor
+  const { data: vendor, error: vErr } = await db
+    .from('vendors')
+    .select('id,is_active')
+    .eq('phone', phone)
+    .maybeSingle()
+  if (!vErr && vendor && vendor.is_active) {
+    return { role: 'vendor', userId: vendor.id, tableName: 'vendors' }
+  }
+
+  // 4. Rider
+  const { data: rider, error: rErr } = await db
+    .from('riders')
+    .select('id,is_active')
+    .eq('phone', phone)
+    .maybeSingle()
+  if (!rErr && rider && rider.is_active) {
+    return { role: 'rider', userId: rider.id, tableName: 'riders' }
+  }
+
+  // 5. Default: customer
+  const { data: customer, error: cErr } = await db
+    .from('customers')
+    .select('id')
+    .eq('phone', phone)
+    .maybeSingle()
+  if (!cErr && customer) return { role: 'customer', userId: customer.id, tableName: 'customers' }
+
+  return null
 }
 
 export async function createSession(
@@ -66,7 +149,9 @@ export async function createSession(
   const { data, error } = await db
     .from('sessions')
     .insert({
+      id: crypto.randomUUID(),
       user_id: userId,
+      phone,
       role,
       expires_at: expiresAt,
       ip_address: ipAddress,
@@ -78,7 +163,42 @@ export async function createSession(
   if (error || !data) throw new Error('Failed to create session')
 
   const sessionId = data.id as string
-  const token = await signSessionToken({ sessionId, phone, role })
+  // Fetch display name and pin_reset_pending from appropriate table
+  let name: string | undefined
+  let pinResetPending: boolean | undefined
+  try {
+    if (role === 'customer') {
+      const { data: u } = await db.from('customers').select('name,pin_reset_pending').eq('id', userId).maybeSingle()
+      name = (u as AuthNameRow | null)?.name ?? undefined
+      pinResetPending = (u as AuthNameRow | null)?.pin_reset_pending ?? undefined
+    } else if (role === 'vendor') {
+      const { data: u } = await db.from('vendors').select('owner_name,pin_reset_pending').eq('id', userId).maybeSingle()
+      name = (u as AuthNameRow | null)?.owner_name ?? undefined
+      pinResetPending = (u as AuthNameRow | null)?.pin_reset_pending ?? undefined
+    } else if (role === 'rider') {
+      const { data: u } = await db.from('riders').select('full_name,pin_reset_pending').eq('id', userId).maybeSingle()
+      name = (u as AuthNameRow | null)?.full_name ?? undefined
+      pinResetPending = (u as AuthNameRow | null)?.pin_reset_pending ?? undefined
+    } else if (role === 'admin') {
+      const { data: u } = await db.from('admins').select('name,pin_reset_pending').eq('id', userId).maybeSingle()
+      name = (u as AuthNameRow | null)?.name ?? undefined
+      pinResetPending = (u as AuthNameRow | null)?.pin_reset_pending ?? undefined
+    } else if (role === 'super_admin') {
+      const { data: u } = await db.from('customers').select('name,pin_reset_pending').eq('id', userId).maybeSingle()
+      if (u) {
+        name = (u as AuthNameRow | null)?.name ?? undefined
+        pinResetPending = (u as AuthNameRow | null)?.pin_reset_pending ?? undefined
+      } else {
+        const { data: a } = await db.from('admins').select('name,pin_reset_pending').eq('id', userId).maybeSingle()
+        name = (a as AuthNameRow | null)?.name ?? undefined
+        pinResetPending = (a as AuthNameRow | null)?.pin_reset_pending ?? undefined
+      }
+    }
+  } catch {
+    // ignore — token can still be issued without these fields
+  }
+
+  const token = await signSessionToken({ sessionId, userId, phone, role, name, pin_reset_pending: pinResetPending })
   return { token, sessionId }
 }
 
