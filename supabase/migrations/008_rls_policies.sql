@@ -105,14 +105,18 @@ CREATE POLICY "order items visible with order" ON order_items
   );
 
 -- ─── WALLET BALANCES ─────────────────────────────────────────────────────────
--- wallet_balances.user_id is TEXT; cast id::TEXT to match.
+-- Cast BOTH sides ::TEXT. The migration declares user_id as TEXT, but a DB
+-- bootstrapped from an existing schema (000_sync) may have it as uuid — leaving
+-- user_id uncast then throws "operator does not exist: uuid = text". Casting
+-- user_id::TEXT works whether the column is text or uuid (matches the rest of
+-- this file's both-sides-::TEXT convention).
 CREATE POLICY "users see own wallet" ON wallet_balances
   FOR SELECT USING (
-    (user_type = 'VENDOR' AND user_id IN (
+    (user_type = 'VENDOR' AND user_id::TEXT IN (
       SELECT id::TEXT FROM vendors WHERE phone = (auth.jwt() ->> 'phone')
     ))
     OR
-    (user_type = 'RIDER' AND user_id IN (
+    (user_type = 'RIDER' AND user_id::TEXT IN (
       SELECT id::TEXT FROM riders WHERE phone = (auth.jwt() ->> 'phone')
     ))
   );
@@ -120,11 +124,11 @@ CREATE POLICY "users see own wallet" ON wallet_balances
 -- ─── WALLET TRANSACTIONS ─────────────────────────────────────────────────────
 CREATE POLICY "users see own wallet transactions" ON wallet_transactions
   FOR SELECT USING (
-    (user_type = 'VENDOR' AND user_id IN (
+    (user_type = 'VENDOR' AND user_id::TEXT IN (
       SELECT id::TEXT FROM vendors WHERE phone = (auth.jwt() ->> 'phone')
     ))
     OR
-    (user_type = 'RIDER' AND user_id IN (
+    (user_type = 'RIDER' AND user_id::TEXT IN (
       SELECT id::TEXT FROM riders WHERE phone = (auth.jwt() ->> 'phone')
     ))
   );
