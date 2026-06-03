@@ -59,7 +59,10 @@ export async function signSessionToken(payload: SessionPayload): Promise<string>
 
 export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, getSecret())
+    // Pin the algorithm on verify — never let the token's own header pick it.
+    // Our tokens are always HS256 (see signSessionToken); accepting anything
+    // else invites algorithm-substitution attacks.
+    const { payload } = await jwtVerify(token, getSecret(), { algorithms: ['HS256'] })
     if (
       typeof payload.sessionId !== 'string' ||
       typeof payload.phone !== 'string' ||

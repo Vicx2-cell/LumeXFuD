@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSession, setCookieOptions } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { loginPinInput } from '@/lib/validators'
-import { compareSecret, findAuthUserByPhone, getRoleRedirect, hashSecret } from '@/lib/pin-auth'
+import { compareSecret, findAuthUserByPhone, getRoleRedirect, hashSecret, AUTH_USER_COLUMNS, type AuthUserRow } from '@/lib/pin-auth'
 import { rateLimitPinLogin } from '@/lib/rate-limit'
 
 const LOCKOUT_MINUTES = 30
@@ -14,8 +14,10 @@ async function ensureSuperAdminBootstrap(phone: string, pin: string) {
   if (phone !== process.env.SUPER_ADMIN_PHONE) return null
   if (pin !== SUPER_ADMIN_DEFAULT_PIN) return null
   const db = createSupabaseAdmin()
-  const { data: existingCustomer } = await db.from('customers').select('*').eq('phone', phone).maybeSingle()
-  if (existingCustomer) return { role: 'super_admin' as const, table: 'customers', user: existingCustomer }
+  // Explicit auth columns only — never select('*') (would pull bcrypt hashes
+  // into memory needlessly).
+  const { data: existingCustomer } = await db.from('customers').select(AUTH_USER_COLUMNS).eq('phone', phone).maybeSingle()
+  if (existingCustomer) return { role: 'super_admin' as const, table: 'customers', user: existingCustomer as unknown as AuthUserRow }
 
   const pinHash = await hashSecret(pin)
   const { data: user, error } = await db.from('customers').insert({
@@ -27,9 +29,9 @@ async function ensureSuperAdminBootstrap(phone: string, pin: string) {
     pin_reset_pending: false,
     recovery_attempts: 0,
     recovery_locked_until: null,
-  }).select('*').single()
+  }).select(AUTH_USER_COLUMNS).single()
   if (error || !user) return null
-  return { role: 'super_admin' as const, table: 'customers', user }
+  return { role: 'super_admin' as const, table: 'customers', user: user as unknown as AuthUserRow }
 }
 
 export async function POST(req: NextRequest) {
@@ -58,9 +60,12 @@ export async function POST(req: NextRequest) {
 
     const lockUntil = user.user.pin_locked_until ? new Date(user.user.pin_locked_until) : null
     if (lockUntil && lockUntil > new Date()) {
+      // Mirror the Upstash rate-limit response (429 + "Too many login attempts")
+      // so a locked EXISTING account is indistinguishable from a throttled
+      // unknown one — no account-enumeration via the lockout status/message.
       return NextResponse.json(
-        { error: `Account locked until ${lockUntil.toLocaleTimeString()}.` },
-        { status: 423 }
+        { error: `Too many login attempts. Try again after ${lockUntil.toLocaleTimeString()}.` },
+        { status: 429 }
       )
     }
 

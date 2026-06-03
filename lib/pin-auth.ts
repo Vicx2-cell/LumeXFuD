@@ -16,7 +16,7 @@ const DUMMY_HASH = bcrypt.hashSync('lxmx-dummy-secret', 12)
 
 // Explicit auth columns only — never SELECT * here (rule 14), which on
 // vendors/riders would also pull bank_account_number (rules 15/16).
-const AUTH_USER_COLUMNS =
+export const AUTH_USER_COLUMNS =
   'id, phone, login_pin_hash, pin_attempts, pin_locked_until, pin_reset_pending, ' +
   'security_question_1, security_question_2, security_answer_1_hash, security_answer_2_hash, ' +
   'recovery_code_hash, recovery_attempts, recovery_locked_until'

@@ -4,6 +4,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { resolveDisputeInput } from '@/lib/validators'
 import { refundTransaction } from '@/lib/paystack/transfer'
 import { recordPlatformEarning } from '@/lib/platform-earnings'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 
 export async function POST(
@@ -15,6 +16,11 @@ export async function POST(
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['admin', 'super_admin'].includes(session.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const rl = await rateLimitGeneric(`dispute-resolve:${session.phone}`, 20, 300)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429 })
   }
 
   let body: unknown

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { spendCustomerWallet, formatPrice } from '@/lib/customer-wallet'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 
 // POST /api/customer-wallet/use
@@ -20,6 +21,11 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'customer') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const rl = await rateLimitGeneric(`cwallet-use:${session.userId ?? session.phone}`, 30, 600)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429 })
   }
 
   const body = await req.json().catch(() => null)

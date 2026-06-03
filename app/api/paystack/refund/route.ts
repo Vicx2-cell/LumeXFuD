@@ -7,11 +7,17 @@ import { refundInput } from '@/lib/validators'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
 import { recordPlatformEarning } from '@/lib/platform-earnings'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
   if (!session || (session.role !== 'admin' && session.role !== 'super_admin')) {
     return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+  }
+
+  const rl = await rateLimitGeneric(`refund:${session.phone}`, 20, 300)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many refund requests. Please slow down.' }, { status: 429 })
   }
 
   let body: unknown
