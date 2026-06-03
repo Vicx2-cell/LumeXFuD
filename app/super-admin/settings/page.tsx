@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+// settings is id-keyed with a JSONB value of varying shape
+// (e.g. {"amount_kobo": N}, {"value": N}, {"open":"07:00","close":"22:00"}).
 interface Setting {
-  key: string
-  value: string
+  id: string
+  value: unknown
   updated_at: string
 }
 
@@ -35,8 +37,8 @@ export default function SuperAdminSettings() {
   useEffect(() => { fetchSettings() }, [])
 
   function startEdit(setting: Setting) {
-    setEditing(setting.key)
-    setEditValue(setting.value)
+    setEditing(setting.id)
+    setEditValue(JSON.stringify(setting.value))
   }
 
   function cancelEdit() {
@@ -44,17 +46,24 @@ export default function SuperAdminSettings() {
     setEditValue('')
   }
 
-  async function saveEdit(key: string) {
+  async function saveEdit(id: string) {
     if (!editValue.trim()) return
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(editValue.trim())
+    } catch {
+      showToast('Value must be valid JSON (e.g. {"amount_kobo": 25000})')
+      return
+    }
     setSaving(true)
     const res = await fetch('/api/super-admin/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, value: editValue.trim() }),
+      body: JSON.stringify({ id, value: parsed }),
     })
     const d = await res.json() as { error?: string }
     if (res.ok) {
-      showToast(`${key} updated`)
+      showToast(`${id} updated`)
       setEditing(null)
       await fetchSettings()
     } else {
@@ -63,16 +72,13 @@ export default function SuperAdminSettings() {
     setSaving(false)
   }
 
-  // Format known numeric keys as Naira for display
-  const KOBO_KEYS = ['platform_markup_kobo', 'bike_delivery_fee_kobo', 'door_delivery_fee_kobo',
-    'rider_bike_cut_kobo', 'rider_door_cut_kobo', 'minimum_order_kobo']
-
-  function displayValue(key: string, value: string) {
-    if (KOBO_KEYS.includes(key)) {
-      const n = parseInt(value, 10)
-      if (!isNaN(n)) return `₦${(n / 100).toLocaleString('en-NG')} (${n} kobo)`
+  // Human-readable rendering of a JSONB setting value. {amount_kobo} shows Naira.
+  function displayValue(value: unknown): string {
+    if (value && typeof value === 'object' && 'amount_kobo' in value) {
+      const n = Number((value as { amount_kobo: unknown }).amount_kobo)
+      if (Number.isFinite(n)) return `₦${(n / 100).toLocaleString('en-NG')} (${n} kobo)`
     }
-    return value
+    return JSON.stringify(value)
   }
 
   return (
@@ -97,7 +103,7 @@ export default function SuperAdminSettings() {
         <div className="rounded-2xl mb-5 p-3 flex gap-2"
           style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
           <span className="text-sm">⚠️</span>
-          <p className="text-xs text-red-400">All price changes apply to new orders instantly. Double-check before saving.</p>
+          <p className="text-xs text-red-400">Values are JSON. All price changes apply to new orders instantly. Double-check before saving.</p>
         </div>
 
         {loading ? (
@@ -111,20 +117,20 @@ export default function SuperAdminSettings() {
         ) : (
           <div className="space-y-2">
             {settings.map((s) => (
-              <div key={s.key} className="rounded-xl p-4" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
-                {editing === s.key ? (
+              <div key={s.id} className="rounded-xl p-4" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+                {editing === s.id ? (
                   <div>
-                    <p className="text-xs text-white/40 font-mono mb-2">{s.key}</p>
+                    <p className="text-xs text-white/40 font-mono mb-2">{s.id}</p>
                     <input
                       type="text"
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
-                      className="w-full rounded-lg px-3 py-2 text-sm outline-none mb-3"
+                      className="w-full rounded-lg px-3 py-2 text-sm outline-none mb-3 font-mono"
                       style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(245,166,35,0.4)', color: '#fff' }}
                       autoFocus
                     />
                     <div className="flex gap-2">
-                      <button onClick={() => saveEdit(s.key)} disabled={saving}
+                      <button onClick={() => saveEdit(s.id)} disabled={saving}
                         className="flex-1 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
                         style={{ background: '#F5A623', color: '#000' }}>
                         {saving ? 'Saving…' : 'Save'}
@@ -139,8 +145,8 @@ export default function SuperAdminSettings() {
                 ) : (
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-white/40 font-mono">{s.key}</p>
-                      <p className="text-sm font-medium text-white mt-0.5">{displayValue(s.key, s.value)}</p>
+                      <p className="text-xs text-white/40 font-mono">{s.id}</p>
+                      <p className="text-sm font-medium text-white mt-0.5">{displayValue(s.value)}</p>
                       <p className="text-xs text-white/20 mt-1">
                         Updated {new Date(s.updated_at).toLocaleString('en-NG', { dateStyle: 'short', timeStyle: 'short' })}
                       </p>

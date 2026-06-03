@@ -55,10 +55,10 @@ export async function POST(req: NextRequest) {
   // Resolve customer
   const { data: cust } = await db
     .from('customers')
-    .select('id, full_name')
+    .select('id, name')
     .eq('phone', session.phone)
     .maybeSingle()
-  const customer = cust as { id: string; full_name: string | null } | null
+  const customer = cust as { id: string; name: string | null } | null
   if (!customer) {
     return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
   }
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         type:        'WALLET_TOPUP',
         customer_id:  customer.id,
         customer_phone: session.phone,
-        customer_name:  customer.full_name ?? '',
+        customer_name:  customer.name ?? '',
         bonus_pct:    bonusPct,
         bonus_kobo:   bonusKobo,
         cancel_action: 'TOPUP_CANCELLED',

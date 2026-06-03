@@ -81,19 +81,35 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // SERVER-SIDE price calculation — never trust client
-  const { data: settings } = await db
+  // SERVER-SIDE price calculation — never trust client (rule #4 + #17).
+  // Pricing lives in the settings table as id-keyed JSONB rows seeded in 010,
+  // each money row shaped {"amount_kobo": N}. The hardcoded numbers below are
+  // defensive fallbacks only — the DB rows are the source of truth.
+  const PRICING_IDS = [
+    'platform_markup', 'delivery_fee_bike', 'delivery_fee_door',
+    'rider_delivery_cut_bike', 'rider_delivery_cut_door', 'min_order_amount',
+  ]
+  const { data: settingsRows } = await db
     .from('settings')
-    .select('value')
-    .eq('id', 'pricing')
-    .single()
+    .select('id, value')
+    .in('id', PRICING_IDS)
 
-  const pricing = (settings?.value as Record<string, number>) ?? {}
-  const platformMarkup: number = (pricing.platform_markup ?? 25000) // ₦250 in kobo
-  const bikeFee: number = pricing.bike_fee ?? DELIVERY_FEES.BIKE
-  const doorFee: number = pricing.door_fee ?? DELIVERY_FEES.DOOR
+  const priceMap = new Map<string, number>()
+  for (const row of (settingsRows ?? []) as Array<{ id: string; value: { amount_kobo?: number } }>) {
+    priceMap.set(row.id, Number(row.value?.amount_kobo))
+  }
+  const kobo = (id: string, fallback: number): number => {
+    const v = priceMap.get(id)
+    return v !== undefined && Number.isFinite(v) ? v : fallback
+  }
+
+  const platformMarkup: number = kobo('platform_markup', 25000) // ₦250 in kobo
+  const bikeFee: number = kobo('delivery_fee_bike', DELIVERY_FEES.BIKE)
+  const doorFee: number = kobo('delivery_fee_door', DELIVERY_FEES.DOOR)
   const deliveryFee: number = delivery_type === 'BIKE' ? bikeFee : doorFee
-  const riderCut: number = delivery_type === 'BIKE' ? (pricing.bike_rider_cut ?? 40000) : (pricing.door_rider_cut ?? 80000)
+  const riderCut: number = delivery_type === 'BIKE'
+    ? kobo('rider_delivery_cut_bike', 40000)
+    : kobo('rider_delivery_cut_door', 80000)
   const platformDeliveryCut: number = deliveryFee - riderCut
   const tipKobo: number = Math.max(0, Math.min(tip_amount ?? 0, 50000))
 
@@ -103,7 +119,7 @@ export async function POST(req: NextRequest) {
     subtotal += menuItem.price_kobo * item.quantity
   }
 
-  const minimumOrder = pricing.minimum_order ?? 50000 // ₦500
+  const minimumOrder = kobo('min_order_amount', 50000) // ₦500
   if (subtotal < minimumOrder) {
     return NextResponse.json(
       { error: `Minimum order is ₦${minimumOrder / 100}` },
