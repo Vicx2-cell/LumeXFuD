@@ -246,10 +246,10 @@ export default function VendorMenuPage() {
               </div>
               <div className="space-y-2">
                 {form.addons.map((a, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input value={a.name} onChange={(e) => { const next = [...form.addons]; next[i] = { ...a, name: e.target.value }; setForm({ ...form, addons: next }) }} placeholder="Extra meat" className={inputCls + ' flex-1'} />
-                    <input value={a.price} inputMode="numeric" onChange={(e) => { const next = [...form.addons]; next[i] = { ...a, price: e.target.value.replace(/[^0-9]/g, '') }; setForm({ ...form, addons: next }) }} placeholder="₦300" className={inputCls + ' w-24'} />
-                    <button onClick={() => setForm({ ...form, addons: form.addons.filter((_, j) => j !== i) })} className="px-2 text-red-400 text-lg">×</button>
+                  <div key={i} className="flex gap-2 items-center">
+                    <input value={a.name} onChange={(e) => { const next = [...form.addons]; next[i] = { ...a, name: e.target.value }; setForm({ ...form, addons: next }) }} placeholder="Extra meat" className={addonInputCls + ' flex-1 min-w-0'} />
+                    <input value={a.price} inputMode="numeric" onChange={(e) => { const next = [...form.addons]; next[i] = { ...a, price: e.target.value.replace(/[^0-9]/g, '') }; setForm({ ...form, addons: next }) }} placeholder="₦300" className={addonInputCls + ' w-20 shrink-0'} />
+                    <button onClick={() => setForm({ ...form, addons: form.addons.filter((_, j) => j !== i) })} className="px-2 text-red-400 text-lg shrink-0">×</button>
                   </div>
                 ))}
               </div>
@@ -273,6 +273,8 @@ export default function VendorMenuPage() {
 }
 
 const inputCls = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none bg-white/5 border border-white/10 text-white placeholder-white/30'
+// Same styling minus w-full, for the flex add-on rows (w-full would fight flex-1/w-20).
+const addonInputCls = 'rounded-xl px-3 py-2.5 text-sm outline-none bg-white/5 border border-white/10 text-white placeholder-white/30'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
