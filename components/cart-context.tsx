@@ -2,12 +2,32 @@
 
 import { createContext, useContext, useEffect, useReducer, type ReactNode } from 'react'
 
-export interface CartItem {
+export interface CartAddon {
   id: string
   name: string
   price_kobo: number
+}
+
+export interface CartItem {
+  id: string            // composite line key (see cartLineKey) — NOT the menu item id
+  menu_item_id: string
+  name: string
+  price_kobo: number    // base item price; add-ons are priced separately
   quantity: number
   special_instructions?: string
+  addons: CartAddon[]
+}
+
+// A cart line is identified by its menu item + the exact set of add-ons, so the
+// same food with different add-ons forms distinct lines and identical ones merge.
+export function cartLineKey(menuItemId: string, addons: { id: string }[]): string {
+  if (addons.length === 0) return menuItemId
+  return menuItemId + '|' + addons.map((a) => a.id).sort().join(',')
+}
+
+function lineKobo(item: CartItem): number {
+  const addonsKobo = (item.addons ?? []).reduce((s, a) => s + a.price_kobo, 0)
+  return item.price_kobo + addonsKobo
 }
 
 export interface CartState {
@@ -25,8 +45,15 @@ type CartAction =
 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
-    case 'HYDRATE':
-      return action.state
+    case 'HYDRATE': {
+      // Normalize older persisted carts that predate add-ons.
+      const items = (action.state.items ?? []).map((it) => ({
+        ...it,
+        menu_item_id: it.menu_item_id ?? it.id,
+        addons: it.addons ?? [],
+      }))
+      return { ...action.state, items }
+    }
 
     case 'ADD_ITEM': {
       if (state.vendor_id && state.vendor_id !== action.vendor_id) {
@@ -136,7 +163,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   const totalItems = cart.items.reduce((sum, i) => sum + i.quantity, 0)
-  const subtotal = cart.items.reduce((sum, i) => sum + i.price_kobo * i.quantity, 0)
+  const subtotal = cart.items.reduce((sum, i) => sum + lineKobo(i) * i.quantity, 0)
 
   return (
     <CartContext.Provider value={{ cart, addItem, removeItem, setQuantity, clearCart, totalItems, subtotal }}>

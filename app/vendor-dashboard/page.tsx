@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { formatPrice } from '@/lib/money'
 
-interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null }
+interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
 interface VendorOrder {
   id: string
   order_number: string
@@ -178,6 +178,13 @@ export default function VendorDashboard() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => router.push('/vendor-dashboard/menu')}
+              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+              style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.25)' }}
+            >
+              🍽️ Menu
+            </button>
+            <button
               onClick={() => router.push('/vendor-dashboard/earnings')}
               className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
               style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.25)' }}
@@ -341,9 +348,14 @@ function OrderCard({
 
       <div className="space-y-1 border-t border-white/6 pt-3">
         {order.order_items?.map((item) => (
-          <div key={item.id} className="flex items-center gap-1.5 text-sm">
-            <span className="text-white/90">{item.quantity}× {item.name}</span>
-            {item.notes && <span className="text-xs text-amber-400">· {item.notes}</span>}
+          <div key={item.id} className="text-sm">
+            <div className="flex items-center gap-1.5">
+              <span className="text-white/90">{item.quantity}× {item.name}</span>
+              {item.notes && <span className="text-xs text-amber-400">· {item.notes}</span>}
+            </div>
+            {item.addons && item.addons.length > 0 && (
+              <p className="text-xs text-white/40 pl-4">+ {item.addons.map((a) => a.name).join(', ')}</p>
+            )}
           </div>
         ))}
       </div>

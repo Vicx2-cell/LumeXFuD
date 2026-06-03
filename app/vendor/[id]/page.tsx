@@ -30,12 +30,40 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
     .is('deleted_at', null)
     .order('display_order', { ascending: true })
 
+  const baseItems = (menu ?? []) as Omit<MenuItem, 'addons'>[]
+
+  // Attach available add-ons per item. (Degrades gracefully to none if migration
+  // 020 hasn't been run yet — the query just returns no rows.)
+  const itemIds = baseItems.map((i) => i.id)
+  const byItem = new Map<string, MenuAddon[]>()
+  if (itemIds.length > 0) {
+    const { data: addonRows } = await db
+      .from('menu_item_addons')
+      .select('id, menu_item_id, name, price_kobo')
+      .in('menu_item_id', itemIds)
+      .eq('is_available', true)
+      .is('deleted_at', null)
+      .order('display_order', { ascending: true })
+    for (const a of (addonRows ?? []) as Array<MenuAddon & { menu_item_id: string }>) {
+      const arr = byItem.get(a.menu_item_id) ?? []
+      arr.push({ id: a.id, name: a.name, price_kobo: a.price_kobo })
+      byItem.set(a.menu_item_id, arr)
+    }
+  }
+  const menuWithAddons: MenuItem[] = baseItems.map((i) => ({ ...i, addons: byItem.get(i.id) ?? [] }))
+
   return (
     <main className="min-h-dvh pb-32" style={{ background: '#0A0A0B' }}>
-      <VendorMenuClient vendor={vendor as VendorInfo} menu={(menu ?? []) as MenuItem[]} />
+      <VendorMenuClient vendor={vendor as VendorInfo} menu={menuWithAddons} />
       <BottomNav />
     </main>
   )
+}
+
+export interface MenuAddon {
+  id: string
+  name: string
+  price_kobo: number
 }
 
 export interface VendorInfo {
@@ -64,4 +92,5 @@ export interface MenuItem {
   daily_limit: number | null
   sold_today: number
   display_order: number
+  addons: MenuAddon[]
 }

@@ -81,6 +81,34 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── Add-ons: validate each belongs to its item + is available, price from DB ──
+  // (never trust client add-on prices — rule #4). chosenAddons is parallel to items.
+  const allAddonIds = Array.from(new Set(items.flatMap((i) => i.addons ?? [])))
+  const addonMap = new Map<string, { id: string; menu_item_id: string; name: string; price_kobo: number; is_available: boolean }>()
+  if (allAddonIds.length > 0) {
+    const { data: addonRows } = await db
+      .from('menu_item_addons')
+      .select('id, menu_item_id, name, price_kobo, is_available')
+      .in('id', allAddonIds)
+      .is('deleted_at', null)
+    for (const a of (addonRows ?? []) as Array<{ id: string; menu_item_id: string; name: string; price_kobo: number; is_available: boolean }>) {
+      addonMap.set(a.id, a)
+    }
+  }
+
+  const chosenAddons: Array<Array<{ name: string; price_kobo: number }>> = []
+  for (const item of items) {
+    const picked: Array<{ name: string; price_kobo: number }> = []
+    for (const addonId of item.addons ?? []) {
+      const a = addonMap.get(addonId)
+      if (!a || a.menu_item_id !== item.menu_item_id || !a.is_available) {
+        return NextResponse.json({ error: 'One or more add-ons are invalid or unavailable' }, { status: 400 })
+      }
+      picked.push({ name: a.name, price_kobo: a.price_kobo })
+    }
+    chosenAddons.push(picked)
+  }
+
   // SERVER-SIDE price calculation — never trust client (rule #4 + #17).
   // Pricing lives in the settings table as id-keyed JSONB rows seeded in 010,
   // each money row shaped {"amount_kobo": N}. The hardcoded numbers below are
@@ -114,10 +142,11 @@ export async function POST(req: NextRequest) {
   const tipKobo: number = Math.max(0, Math.min(tip_amount ?? 0, 50000))
 
   let subtotal = 0
-  for (const item of items) {
+  items.forEach((item, idx) => {
     const menuItem = itemMap.get(item.menu_item_id)!
-    subtotal += menuItem.price_kobo * item.quantity
-  }
+    const addonKobo = chosenAddons[idx].reduce((s, a) => s + a.price_kobo, 0)
+    subtotal += (menuItem.price_kobo + addonKobo) * item.quantity
+  })
 
   const minimumOrder = kobo('min_order_amount', 50000) // ₦500
   if (subtotal < minimumOrder) {
@@ -188,16 +217,19 @@ export async function POST(req: NextRequest) {
   }
 
   // Insert order items with price SNAPSHOTS
-  const orderItems = items.map((item) => {
+  const orderItems = items.map((item, idx) => {
     const menuItem = itemMap.get(item.menu_item_id)!
+    const picked = chosenAddons[idx]
+    const addonKobo = picked.reduce((s, a) => s + a.price_kobo, 0)
     return {
       order_id: order.id,
       menu_item_id: item.menu_item_id,
       name: menuItem.name,
-      price: menuItem.price_kobo,
+      price: menuItem.price_kobo,            // base unit price snapshot
       quantity: item.quantity,
-      subtotal: menuItem.price_kobo * item.quantity,
+      subtotal: (menuItem.price_kobo + addonKobo) * item.quantity,
       notes: item.special_instructions ?? null,
+      addons: picked,                        // [{name, price_kobo}] snapshot
     }
   })
 

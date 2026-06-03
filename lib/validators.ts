@@ -20,6 +20,7 @@ export const createOrderInput = z.object({
       menu_item_id: z.string().uuid(),
       quantity: z.number().int().positive().max(20),
       special_instructions: z.string().max(200).optional(),
+      addons: z.array(z.string().uuid()).max(20).optional().default([]),
     })
   ).min(1).max(50),
   delivery_type: z.enum(['BIKE', 'DOOR']),
@@ -190,3 +191,34 @@ export const adminResetPinInput = z.object({
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
 export const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp']
+
+// ─── Vendor menu ────────────────────────────────────────────────────────────────
+
+export const MENU_CATEGORIES = ['RICE', 'PROTEIN', 'DRINKS', 'SNACKS', 'OTHER'] as const
+
+// Add-on prices are entered in naira by the vendor; converted to kobo server-side.
+export const menuAddonInput = z.object({
+  name:        z.string().min(1).max(60),
+  price_naira: z.number().int().min(0).max(100_000),
+})
+
+export const createMenuItemInput = z.object({
+  name:         z.string().min(1).max(100),
+  price_naira:  z.number().int().min(1).max(1_000_000),
+  category:     z.enum(MENU_CATEGORIES),
+  description:  z.string().max(300).optional(),
+  image_url:    z.string().url().max(500).optional(),
+  is_available: z.boolean().optional().default(true),
+  addons:       z.array(menuAddonInput).max(20).optional().default([]),
+})
+
+export const updateMenuItemInput = z.object({
+  name:         z.string().min(1).max(100).optional(),
+  price_naira:  z.number().int().min(1).max(1_000_000).optional(),
+  category:     z.enum(MENU_CATEGORIES).optional(),
+  description:  z.string().max(300).nullable().optional(),
+  image_url:    z.string().url().max(500).nullable().optional(),
+  is_available: z.boolean().optional(),
+  // When present, replaces the item's whole add-on list.
+  addons:       z.array(menuAddonInput).max(20).optional(),
+})

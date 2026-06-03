@@ -89,9 +89,10 @@ export default function CartPage() {
         body: JSON.stringify({
           vendor_id:             cart.vendor_id,
           items:                 cart.items.map((i) => ({
-            menu_item_id:          i.id,
+            menu_item_id:          i.menu_item_id,
             quantity:              i.quantity,
             special_instructions:  i.special_instructions,
+            addons:                i.addons.map((a) => a.id),
           })),
           delivery_type:         deliveryType,
           delivery_address:      address,
@@ -153,11 +154,17 @@ export default function CartPage() {
       <div className="max-w-lg mx-auto px-4 py-4 space-y-5">
         {/* Items */}
         <div className="rounded-2xl overflow-hidden" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
-          {cart.items.map((item, idx) => (
+          {cart.items.map((item, idx) => {
+            const addonsKobo = item.addons.reduce((s, a) => s + a.price_kobo, 0)
+            const eachKobo = item.price_kobo + addonsKobo
+            return (
             <div key={item.id} className={`flex items-center gap-3 px-4 py-3 ${idx < cart.items.length - 1 ? 'border-b border-white/5' : ''}`}>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{item.name}</p>
-                <p className="text-xs text-white/40 mt-0.5">{formatPrice(item.price_kobo)} each</p>
+                {item.addons.length > 0 && (
+                  <p className="text-xs text-white/40 mt-0.5 truncate">+ {item.addons.map((a) => a.name).join(', ')}</p>
+                )}
+                <p className="text-xs text-white/40 mt-0.5">{formatPrice(eachKobo)} each</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={() => setQuantity(item.id, item.quantity - 1)}
@@ -168,9 +175,10 @@ export default function CartPage() {
                   className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold"
                   style={{ background: '#F5A623', color: '#000', minWidth: 32, minHeight: 32 }}>+</button>
               </div>
-              <p className="text-sm font-semibold w-20 text-right shrink-0">{formatPrice(item.price_kobo * item.quantity)}</p>
+              <p className="text-sm font-semibold w-20 text-right shrink-0">{formatPrice(eachKobo * item.quantity)}</p>
             </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Delivery type */}

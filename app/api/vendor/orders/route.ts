@@ -24,7 +24,7 @@ export async function GET() {
     .select(`
       id, order_number, status, delivery_type, delivery_address,
       subtotal, total_amount, created_at, customer_id,
-      order_items ( id, name, quantity, price, notes )
+      order_items ( id, name, quantity, price, notes, addons )
     `)
     .eq('vendor_id', vendor.id)
     .not('status', 'in', '("COMPLETED","CANCELLED","REFUNDED")')
