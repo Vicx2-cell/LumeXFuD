@@ -158,8 +158,8 @@ export default function RegisterPage() {
                 onChange={(event) => handleChange('pin', event.target.value.replace(/[^0-9]/g, ''))}
                 className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
                 inputMode="numeric"
-                maxLength={4}
-                placeholder="1234"
+                maxLength={6}
+                placeholder="123456"
               />
             </label>
             <label className="block text-sm text-white/70">
@@ -170,8 +170,8 @@ export default function RegisterPage() {
                 onChange={(event) => handleChange('confirm_pin', event.target.value.replace(/[^0-9]/g, ''))}
                 className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
                 inputMode="numeric"
-                maxLength={4}
-                placeholder="1234"
+                maxLength={6}
+                placeholder="123456"
               />
             </label>
           </div>

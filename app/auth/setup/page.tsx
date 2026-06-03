@@ -35,6 +35,10 @@ export default function SetupPage() {
   }
 
   const handleSubmit = async () => {
+    if (!/^\d{6}$/.test(form.pin)) {
+      setError('PIN must be exactly 6 digits.')
+      return
+    }
     if (form.pin !== form.confirm_pin) {
       setError('PIN confirmation does not match.')
       return
@@ -109,8 +113,8 @@ export default function SetupPage() {
                 onChange={(event) => handleChange('pin', event.target.value.replace(/[^0-9]/g, ''))}
                 className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
                 inputMode="numeric"
-                maxLength={4}
-                placeholder="1234"
+                maxLength={6}
+                placeholder="123456"
               />
             </label>
             <label className="block text-sm text-white/70">
@@ -121,8 +125,8 @@ export default function SetupPage() {
                 onChange={(event) => handleChange('confirm_pin', event.target.value.replace(/[^0-9]/g, ''))}
                 className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
                 inputMode="numeric"
-                maxLength={4}
-                placeholder="1234"
+                maxLength={6}
+                placeholder="123456"
               />
             </label>
           </div>

@@ -10,7 +10,8 @@ const REQUIRED_VARS = [
   'TERMII_SENDER_ID',
   'NEXT_PUBLIC_APP_URL',
   'CRON_SECRET',
-  'ADMIN_PHONE',
+  // ADMIN_PHONE is optional — operational admins are provisioned via the
+  // super-admin panel (admins table), not designated by env.
   'SUPER_ADMIN_PHONE',
   'SUPER_ADMIN_DEFAULT_PIN',
 ] as const

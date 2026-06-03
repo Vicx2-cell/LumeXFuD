@@ -45,7 +45,12 @@ export async function POST(req: NextRequest) {
     const insert = {
       owner_name,
       shop_name,
+      // The live DB (from 000_sync) carries legacy NOT NULL columns the current
+      // schema dropped: `name` and `owner_phone`. Populate them from the new
+      // fields so inserts don't fail with 23502.
+      name: shop_name,
       phone: normalized,
+      owner_phone: normalized,
       category: category ?? 'Other',
       subscription_tier: subscription_tier ?? 'STANDARD',
       login_pin_hash: pinHash,

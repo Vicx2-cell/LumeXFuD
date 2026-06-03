@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
 
     const insert = {
       full_name,
+      // Legacy NOT NULL column in the live DB (from 000_sync) — mirror full_name.
+      name: full_name,
       phone: normalized,
       login_pin_hash: pinHash,
       pin_reset_pending: true,
