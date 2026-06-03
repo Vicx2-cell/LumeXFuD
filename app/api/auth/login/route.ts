@@ -101,7 +101,10 @@ export async function POST(req: NextRequest) {
 
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
     const userAgent = req.headers.get('user-agent') ?? undefined
-    const { token } = await createSession(user.user.id, normalizedPhone, user.role, ipAddress, userAgent)
+    // Use the canonical E.164 phone stored on the user row, NOT the raw login
+    // input — the JWT phone drives every downstream `.eq('phone', ...)` lookup
+    // and the RLS `auth.jwt() ->> 'phone'` checks (rule #2).
+    const { token } = await createSession(user.user.id, user.user.phone, user.role, ipAddress, userAgent)
 
     const res = NextResponse.json({
       role: user.role,

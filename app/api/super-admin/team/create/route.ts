@@ -3,6 +3,12 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
 import { generateTempPin, hashSecret } from '@/lib/pin-auth'
+import { z } from 'zod'
+
+const createTeamInput = z.object({
+  name:  z.string().min(1).max(100),
+  phone: z.string().min(7).max(20),
+})
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,8 +17,9 @@ export async function POST(req: NextRequest) {
     if (user.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const body = await req.json()
-    const { name, phone } = body
-    if (!name || !phone) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    const parsed = createTeamInput.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: 'Missing or invalid required fields' }, { status: 400 })
+    const { name, phone } = parsed.data
 
     let normalized: string
     try { normalized = normalizePhone(phone) } catch { return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 }) }

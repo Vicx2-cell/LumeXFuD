@@ -3,6 +3,15 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
 import { generateTempPin, hashSecret } from '@/lib/pin-auth'
+import { z } from 'zod'
+
+const createVendorInput = z.object({
+  owner_name:        z.string().min(1).max(100),
+  shop_name:         z.string().min(1).max(100),
+  phone:             z.string().min(7).max(20),
+  category:          z.string().min(1).max(50).optional(),
+  subscription_tier: z.string().min(1).max(20).optional(),
+})
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,10 +22,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { owner_name, shop_name, phone, category, subscription_tier } = body
-    if (!owner_name || !shop_name || !phone) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    const parsed = createVendorInput.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Missing or invalid required fields' }, { status: 400 })
     }
+    const { owner_name, shop_name, phone, category, subscription_tier } = parsed.data
 
     let normalized: string
     try {

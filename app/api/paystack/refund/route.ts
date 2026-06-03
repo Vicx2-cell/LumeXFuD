@@ -51,15 +51,20 @@ export async function POST(req: NextRequest) {
   // Trigger Paystack refund
   await refundTransaction(order.paystack_reference as string, refundAmount)
 
-  // Record refund
-  await db.from('refunds').insert({
+  // Record refund (column is amount_kobo — surface a write failure rather than
+  // leaving an issued refund with no ledger row, per rule #30)
+  const { error: refundInsertErr } = await db.from('refunds').insert({
     order_id: order.id,
     paystack_transaction_reference: order.paystack_reference,
-    amount: refundAmount,
+    amount_kobo: refundAmount,
     reason,
     status: 'PROCESSING',
     triggered_by: session.phone,
   })
+  if (refundInsertErr) {
+    console.error('[paystack/refund] refunds ledger insert failed:', refundInsertErr.message)
+    return NextResponse.json({ error: 'Refund issued but failed to record — investigate immediately' }, { status: 500 })
+  }
 
   // Update order
   await db

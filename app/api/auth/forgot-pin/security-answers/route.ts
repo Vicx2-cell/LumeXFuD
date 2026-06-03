@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
 
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
     const userAgent = req.headers.get('user-agent') ?? undefined
-    const { token } = await createSession(target.user.id, normalizedPhone, target.role, ipAddress, userAgent)
+    const { token } = await createSession(target.user.id, target.user.phone, target.role, ipAddress, userAgent)
     const res = NextResponse.json({ redirect_path: target.role === 'customer' ? '/' : target.role === 'vendor' ? '/vendor-dashboard' : target.role === 'rider' ? '/rider' : target.role === 'admin' ? '/admin' : '/super-admin' })
     res.cookies.set('session', token, setCookieOptions(target.role))
     return res

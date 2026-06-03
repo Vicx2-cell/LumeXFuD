@@ -28,8 +28,7 @@ export async function GET(req: NextRequest) {
     .select(`
       id, order_number, status, payment_status, total_amount,
       delivery_type, created_at, vendor_id,
-      vendors ( shop_name, logo_url ),
-      ratings ( id )
+      vendors ( shop_name, logo_url )
     `, { count: 'exact' })
     .eq('customer_id', customer.id)
     .neq('status', 'PENDING_PAYMENT')

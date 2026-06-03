@@ -37,7 +37,7 @@ export async function POST(
   }
 
   const now = new Date().toISOString()
-  await db
+  const { data: completedRows } = await db
     .from('orders')
     .update({
       status: 'COMPLETED',
@@ -47,6 +47,12 @@ export async function POST(
       updated_at: now,
     })
     .eq('id', id)
+    .eq('status', 'DELIVERED') // optimistic lock — ignore a concurrent double-confirm
+    .select('id')
+
+  if (!completedRows || completedRows.length === 0) {
+    return NextResponse.json({ success: true }) // already completed concurrently
+  }
 
   // Notify rider
   if (order.rider_id) {

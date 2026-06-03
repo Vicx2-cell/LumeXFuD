@@ -16,11 +16,17 @@ export async function DELETE(req: NextRequest) {
 
   const db = createSupabaseAdmin()
 
+  const { data: cust } = await db.from('customers').select('id').eq('phone', user.phone).single()
+  const customerId = cust?.id
+  if (!customerId) {
+    return NextResponse.json({ error: 'Account not found' }, { status: 404 })
+  }
+
   // Block deletion if active orders exist
   const { data: activeOrders } = await db
     .from('orders')
     .select('id')
-    .eq('customer_id', (await db.from('customers').select('id').eq('phone', user.phone).single()).data?.id ?? '')
+    .eq('customer_id', customerId)
     .not('status', 'in', '("COMPLETED","CANCELLED","REFUNDED")')
     .limit(1)
 
@@ -32,6 +38,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   // Soft delete + anonymize
+  const now = new Date().toISOString()
   const anonymizedPhone = `DELETED_${Date.now()}_${user.phone.slice(-4)}`
   await db
     .from('customers')
@@ -41,15 +48,16 @@ export async function DELETE(req: NextRequest) {
       hostel: null,
       room_number: null,
       default_delivery_address: null,
-      deleted_at: new Date().toISOString(),
+      deleted_at: now,
     })
-    .eq('phone', user.phone)
+    .eq('id', customerId)
 
-  // Revoke all sessions
+  // Revoke all sessions for this user (sessions.user_id is the customer id, NOT
+  // the session id — the previous `.eq('user_id', sessionId)` matched nothing).
   await db
     .from('sessions')
-    .update({ revoked_at: new Date().toISOString() })
-    .eq('user_id', user.sessionId)
+    .update({ revoked_at: now })
+    .eq('user_id', customerId)
 
   await audit({
     actor_id: user.phone,
@@ -77,9 +85,12 @@ export async function GET(_req: NextRequest) {
 
   const db = createSupabaseAdmin()
 
+  // Explicit columns only — never select('*') here: the customers row holds
+  // login_pin_hash / recovery_code_hash / security_answer hashes, which must
+  // never appear in a user-facing data export (rules #14/#16).
   const { data: customer } = await db
     .from('customers')
-    .select('*')
+    .select('id, phone, name, hostel, room_number, default_delivery_address, dispute_count, created_at, updated_at')
     .eq('phone', user.phone)
     .single()
 

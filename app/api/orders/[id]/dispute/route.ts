@@ -34,7 +34,7 @@ export async function POST(
 
   const { data: customer } = await db
     .from('customers')
-    .select('id, phone')
+    .select('id, phone, dispute_count')
     .eq('phone', session.phone)
     .single()
 
@@ -42,7 +42,7 @@ export async function POST(
 
   const { data: order, error } = await db
     .from('orders')
-    .select('id, order_number, status, customer_id, delivered_at, vendor_id, dispute_count')
+    .select('id, order_number, status, customer_id, delivered_at, vendor_id')
     .eq('id', id)
     .eq('customer_id', customer.id)
     .single()
@@ -66,8 +66,11 @@ export async function POST(
     status: 'OPEN',
   })
 
-  // Increment dispute count
-  await db.from('customers').update({ dispute_count: ((order.dispute_count as number) ?? 0) + 1 }).eq('id', customer.id)
+  // Increment the CUSTOMER's dispute count (was incorrectly read off the order row)
+  await db.from('customers').update({
+    dispute_count: ((customer.dispute_count as number) ?? 0) + 1,
+    last_dispute_at: new Date().toISOString(),
+  }).eq('id', customer.id)
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
   const { data: vendor } = await db.from('vendors').select('shop_name').eq('id', order.vendor_id).single()
