@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { verifyWalletPin } from '@/lib/wallet'
+import { encryptField } from '@/lib/crypto'
 import { audit } from '@/lib/audit'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { z } from 'zod'
@@ -91,7 +92,8 @@ export async function POST(req: NextRequest) {
   await db
     .from('wallet_balances')
     .update({
-      bank_account_number: account_number,
+      bank_account_number: encryptField(account_number), // encrypted at rest
+      bank_account_last4:  account_number.slice(-4),      // plaintext, for display
       bank_code,
       bank_account_name:   verifiedName,
       bank_name,

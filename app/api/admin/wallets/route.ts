@@ -17,7 +17,7 @@ interface WalletRow {
   is_frozen: boolean
   frozen_reason: string | null
   bank_name: string | null
-  bank_account_number: string | null
+  bank_account_last4: string | null
   lifetime_earned: number
   total_withdrawals: number
   updated_at: string
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     .from('wallet_balances')
     .select(
       'user_id, user_type, total_balance, available_balance, held_balance, ' +
-      'trust_tier, is_frozen, frozen_reason, bank_name, bank_account_number, ' +
+      'trust_tier, is_frozen, frozen_reason, bank_name, bank_account_last4, ' +
       'lifetime_earned, total_withdrawals, updated_at'
     )
     .order('total_balance', { ascending: false })
@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
       is_frozen:         w.is_frozen,
       frozen_reason:     w.frozen_reason,
       bank_name:         w.bank_name,
-      bank_last_4:       w.bank_account_number ? w.bank_account_number.slice(-4) : null,
+      bank_last_4:       w.bank_account_last4 ?? null,
       lifetime_earned:   formatPrice(w.lifetime_earned ?? 0),
       total_withdrawn:   formatPrice(w.total_withdrawals ?? 0),
       updated_at:        w.updated_at,

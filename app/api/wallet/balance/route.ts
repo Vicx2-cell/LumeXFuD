@@ -18,7 +18,7 @@ export async function GET() {
     .from('wallet_balances')
     .select(
       'total_balance, available_balance, held_balance, trust_tier, ' +
-      'wallet_pin_hash, bank_account_number, bank_code, bank_account_name, bank_name, ' +
+      'wallet_pin_hash, bank_account_number, bank_account_last4, bank_code, bank_account_name, bank_name, ' +
       'last_bank_added_at, is_frozen, frozen_reason, lifetime_earned, total_withdrawals, ' +
       'pin_attempts, pin_locked_until'
     )
@@ -67,9 +67,7 @@ export async function GET() {
     wallet_pin_set: !!wallet?.wallet_pin_hash,
     bank_connected: !!(wallet?.bank_account_number),
     bank_name:      wallet?.bank_name ?? null,
-    bank_last_4:    wallet?.bank_account_number
-      ? wallet.bank_account_number.slice(-4)
-      : null,
+    bank_last_4:    wallet?.bank_account_last4 ?? null,
     bank_account_name: wallet?.bank_account_name ?? null,
     bank_ready:     bankReady,
     bank_ready_at:  coolingExpires?.toISOString() ?? null,

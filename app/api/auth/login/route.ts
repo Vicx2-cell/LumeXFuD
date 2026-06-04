@@ -69,23 +69,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    let passwordMatch = await compareSecret(pin, user.user.login_pin_hash)
-    const shouldAllowDefaultSuperAdminPin =
-      !passwordMatch &&
-      user.role === 'super_admin' &&
-      normalizedPhone === process.env.SUPER_ADMIN_PHONE &&
-      pin === SUPER_ADMIN_DEFAULT_PIN
-
-    if (shouldAllowDefaultSuperAdminPin) {
-      const db = createSupabaseAdmin()
-      const defaultHash = await hashSecret(pin)
-      await db.from(user.table).update({
-        login_pin_hash: defaultHash,
-        pin_attempts: 0,
-        pin_locked_until: null,
-      }).eq('id', user.user.id)
-      passwordMatch = true
-    }
+    // The SUPER_ADMIN_DEFAULT_PIN only bootstraps the account (see
+    // ensureSuperAdminBootstrap, which creates the row hashed with it). It is
+    // deliberately NOT a permanent override here: once the super admin changes
+    // their PIN, the default no longer logs in — closing a standing backdoor.
+    const passwordMatch = await compareSecret(pin, user.user.login_pin_hash)
 
     if (!passwordMatch) {
       const db = createSupabaseAdmin()

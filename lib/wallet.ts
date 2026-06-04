@@ -14,7 +14,8 @@ export interface WalletBalance {
   held_balance: number
   trust_tier: TrustTier
   wallet_pin_hash: string | null
-  bank_account_number: string | null
+  bank_account_number: string | null   // AES-256-GCM ciphertext at rest (lib/crypto)
+  bank_account_last4: string | null     // plaintext last 4, for display
   bank_code: string | null
   bank_account_name: string | null
   bank_name: string | null

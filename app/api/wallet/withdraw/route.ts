@@ -5,6 +5,7 @@ import {
   verifyWalletPin, debitWalletWithdrawal, reverseWithdrawal, formatPrice,
 } from '@/lib/wallet'
 import { createTransferRecipient, initiateTransfer } from '@/lib/paystack/transfer'
+import { decryptField } from '@/lib/crypto'
 import { audit } from '@/lib/audit'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { z } from 'zod'
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     .select(
       'wallet_pin_hash, pin_attempts, pin_locked_until, ' +
       'is_frozen, frozen_reason, ' +
-      'bank_account_number, bank_code, bank_account_name, bank_name, last_bank_added_at, ' +
+      'bank_account_number, bank_account_last4, bank_code, bank_account_name, bank_name, last_bank_added_at, ' +
       'available_balance'
     )
     .eq('user_id', session.userId!)
@@ -176,7 +177,8 @@ export async function POST(req: NextRequest) {
 
   // ── 11. Atomic balance debit via Postgres RPC ──────────────────────────────
   const reference = `WD-${session.userId!.slice(0, 8)}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
-  const description = `Withdrawal to ${wallet.bank_name ?? 'bank'} ****${wallet.bank_account_number.slice(-4)}`
+  const last4 = wallet.bank_account_last4 ?? ''
+  const description = `Withdrawal to ${wallet.bank_name ?? 'bank'} ****${last4}`
 
   const debitResult = await debitWalletWithdrawal({
     userId:      session.userId!,
@@ -197,7 +199,7 @@ export async function POST(req: NextRequest) {
   try {
     const recipientCode = await createTransferRecipient({
       name:           wallet.bank_account_name ?? session.name ?? 'Account Holder',
-      account_number: wallet.bank_account_number,
+      account_number: decryptField(wallet.bank_account_number), // decrypt only here, at payout
       bank_code:      wallet.bank_code,
     })
 
@@ -265,7 +267,7 @@ export async function POST(req: NextRequest) {
       amount_kobo:  amountKobo,
       reference,
       transfer_code: transferCode,
-      bank_last_4:  wallet.bank_account_number.slice(-4),
+      bank_last_4:  last4,
     },
   })
 
@@ -276,7 +278,7 @@ export async function POST(req: NextRequest) {
   if (urCast?.phone) {
     sendWhatsAppWithFallback({
       to: urCast.phone,
-      message: `Withdrawal of ${formatPrice(amountKobo)} initiated to ${wallet.bank_name ?? 'your bank'} ****${wallet.bank_account_number.slice(-4)}.\nShould arrive in a few minutes.\nRef: ${reference}`,
+      message: `Withdrawal of ${formatPrice(amountKobo)} initiated to ${wallet.bank_name ?? 'your bank'} ****${last4}.\nShould arrive in a few minutes.\nRef: ${reference}`,
     }).catch(() => {})
   }
 
@@ -285,6 +287,6 @@ export async function POST(req: NextRequest) {
     reference,
     amount:    formatPrice(amountKobo),
     bank_name: wallet.bank_name,
-    bank_last_4: wallet.bank_account_number.slice(-4),
+    bank_last_4: last4,
   })
 }

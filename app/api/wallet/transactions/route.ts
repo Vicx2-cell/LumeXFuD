@@ -23,12 +23,12 @@ export async function GET(req: NextRequest) {
   // Fetch bank last-4 for display
   const { data: walletRaw } = await db
     .from('wallet_balances')
-    .select('bank_account_number')
+    .select('bank_account_last4')
     .eq('user_id', session.userId!)
     .eq('user_type', userType)
     .maybeSingle()
-  const wallet = walletRaw as unknown as Pick<WalletBalance, 'bank_account_number'> | null
-  const bankLast4 = wallet?.bank_account_number?.slice(-4) ?? undefined
+  const wallet = walletRaw as unknown as Pick<WalletBalance, 'bank_account_last4'> | null
+  const bankLast4 = wallet?.bank_account_last4 ?? undefined
 
   let query = db
     .from('wallet_transactions')
