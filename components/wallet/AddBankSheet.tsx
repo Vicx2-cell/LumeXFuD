@@ -121,9 +121,9 @@ export default function AddBankSheet({ open, onClose, onSuccess }: Props) {
                   {banks.length === 0 ? 'Loading banks...' : 'No banks found'}
                 </p>
               )}
-              {filteredBanks.map((b) => (
+              {filteredBanks.map((b, i) => (
                 <button
-                  key={b.code}
+                  key={`${b.code}-${i}`}
                   className="w-full text-left px-4 py-3 rounded-xl text-white hover:bg-white/10 transition-colors"
                   onClick={() => { setSelectedBank(b); setStep(2) }}
                 >
