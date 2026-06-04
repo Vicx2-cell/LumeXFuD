@@ -55,8 +55,7 @@ export default async function OrdersPage({
     .from('orders')
     .select(`
       id, order_number, status, total_amount, created_at, delivery_type,
-      vendors ( shop_name, logo_url ),
-      ratings ( id )
+      vendors ( shop_name, logo_url )
     `, { count: 'exact' })
     .eq('customer_id', customer.id)
     .neq('status', 'PENDING_PAYMENT')
@@ -92,8 +91,6 @@ export default async function OrdersPage({
           orders.map((order) => {
             const vendorRaw = order.vendors
             const vendor = (Array.isArray(vendorRaw) ? vendorRaw[0] : vendorRaw) as { shop_name: string; logo_url: string | null } | null
-            const hasRating = Array.isArray(order.ratings) && order.ratings.length > 0
-            const needsRating = order.status === 'COMPLETED' && !hasRating
             const statusColor = STATUS_COLORS[order.status as string] ?? 'rgba(255,255,255,0.4)'
 
             return (
@@ -123,11 +120,6 @@ export default async function OrdersPage({
                   </p>
                   <p className="font-semibold text-sm">{formatPrice(order.total_amount as number)}</p>
                 </div>
-                {needsRating && (
-                  <div className="mt-2 text-xs font-medium" style={{ color: '#F5A623' }}>
-                    ★ Rate this order
-                  </div>
-                )}
                 {order.status === 'COMPLETED' && (
                   <div className="mt-3 border-t border-white/5 pt-3">
                     <button

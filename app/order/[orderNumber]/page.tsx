@@ -22,8 +22,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNum
       rider_auto_release_at, customer_id, guest_phone, vendor_id, rider_id,
       vendors ( shop_name, prep_time_minutes ),
       riders ( full_name, phone ),
-      order_items ( id, name, price, quantity, subtotal ),
-      ratings ( id )
+      order_items ( id, name, price, quantity, subtotal, addons )
     `)
     .eq('order_number', orderNumber)
     .single()
@@ -82,6 +81,5 @@ export interface OrderDetail {
   rider_id: string | null
   vendors: { shop_name: string; prep_time_minutes: number } | null
   riders: { full_name: string; phone: string } | null
-  order_items: Array<{ id: string; name: string; price: number; quantity: number; subtotal: number }>
-  ratings: Array<{ id: string }> | null
+  order_items: Array<{ id: string; name: string; price: number; quantity: number; subtotal: number; addons?: { name: string; price_kobo: number }[] }>
 }

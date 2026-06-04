@@ -13,7 +13,6 @@ export default async function ProfilePage() {
   const db = createSupabaseAdmin()
 
   let profile: CustomerProfile | null = null
-  let xp: XPData | null = null
 
   if (session.role === 'customer') {
     const { data: customer } = await db
@@ -25,22 +24,11 @@ export default async function ProfilePage() {
     profile = customer as CustomerProfile | null
 
     if (customer) {
-      const { data: xpData } = await db
-        .from('customer_xp')
-        .select('total_xp, weekly_xp, level, current_streak_days, best_streak_days, streak_freeze_count')
-        .eq('customer_id', customer.id)
-        .single()
-      xp = xpData as XPData | null
-
-      const { data: badges } = await db
-        .from('customer_badges')
-        .select('badge_id, earned_at, badges(name, description)')
-        .eq('customer_id', customer.id)
-        .order('earned_at', { ascending: false })
-
+      // Gamification (XP, streaks, badges) was removed from the MVP — those
+      // tables no longer exist. Pass empty so the profile renders cleanly.
       return (
         <main className="min-h-dvh pb-24" style={{ background: '#0A0A0B' }}>
-          <ProfileClient profile={profile} xp={xp} badges={(badges ?? []) as unknown as BadgeItem[]} phone={session.phone} />
+          <ProfileClient profile={profile} xp={null} badges={[]} phone={session.phone} />
           <BottomNav />
         </main>
       )

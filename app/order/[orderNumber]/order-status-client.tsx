@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { formatPrice } from '@/lib/money'
@@ -28,14 +28,6 @@ function getStatusIndex(status: string): number {
 export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail }) {
   const router = useRouter()
   const [order, setOrder] = useState(initialOrder)
-  const [showMessage, setShowMessage] = useState(false)
-  const [message, setMessage] = useState('')
-  const [messages, setMessages] = useState<MessageItem[]>([])
-  const [sendingMsg, setSendingMsg] = useState(false)
-  const [ratingData, setRatingData] = useState({ vendor_rating: 0, rider_rating: 0, feedback: '' })
-  const [showRating, setShowRating] = useState(false)
-  const [ratingSubmitted, setRatingSubmitted] = useState(false)
-  const msgEndRef = useRef<HTMLDivElement>(null)
 
   const statusIdx = getStatusIndex(order.status)
   const isActive = !['COMPLETED', 'CANCELLED', 'REFUNDED', 'DISPUTED'].includes(order.status)
@@ -58,72 +50,9 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
     return () => { void supabase.removeChannel(channel) }
   }, [order.id])
 
-  // Show rating prompt after completed
-  useEffect(() => {
-    if (order.status === 'COMPLETED' && !order.ratings?.length && !ratingSubmitted) {
-      setShowRating(true)
-    }
-  }, [order.status, order.ratings, ratingSubmitted])
-
-  // Load messages when chat opens
-  useEffect(() => {
-    if (!showMessage) return
-    fetch(`/api/orders/${order.id}/messages`)
-      .then((r) => r.json())
-      .then((d: { messages?: MessageItem[] }) => {
-        if (d.messages) setMessages(d.messages)
-      })
-      .catch(() => {})
-  }, [showMessage, order.id])
-
-  // Mark messages as read
-  useEffect(() => {
-    if (!showMessage) return
-    fetch(`/api/orders/${order.id}/messages/read`, { method: 'PATCH' }).catch(() => {})
-  }, [showMessage, order.id])
-
-  // Scroll to latest message
-  useEffect(() => {
-    msgEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  async function sendMessage() {
-    if (!message.trim()) return
-    setSendingMsg(true)
-    try {
-      const res = await fetch(`/api/orders/${order.id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message.trim(), recipient_type: 'VENDOR' }),
-      })
-      const data = await res.json() as { message?: MessageItem }
-      if (res.ok && data.message) {
-        setMessages((prev) => [...prev, data.message!])
-        setMessage('')
-      }
-    } finally {
-      setSendingMsg(false)
-    }
-  }
-
   async function confirmDelivery() {
     await fetch(`/api/orders/${order.id}/confirm`, { method: 'POST' })
     setOrder((prev) => ({ ...prev, status: 'COMPLETED' }))
-  }
-
-  async function submitRating() {
-    if (ratingData.vendor_rating === 0) return
-    await fetch(`/api/orders/${order.id}/rate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        vendor_rating: ratingData.vendor_rating,
-        rider_rating: ratingData.rider_rating || undefined,
-        vendor_review: ratingData.feedback || undefined,
-      }),
-    })
-    setRatingSubmitted(true)
-    setShowRating(false)
   }
 
   // ETA calculation
@@ -145,99 +74,7 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
 
   return (
     <>
-      {/* Messaging bottom sheet */}
-      {showMessage && (
-        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(0,0,0,0.7)' }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowMessage(false) }}>
-          <div className="mt-auto w-full max-w-lg mx-auto rounded-t-3xl flex flex-col"
-            style={{ background: '#111113', maxHeight: '70vh' }}>
-            <div className="flex items-center justify-between p-4 border-b border-white/8">
-              <h3 className="font-semibold">Message {order.vendors?.shop_name ?? 'Vendor'}</h3>
-              <button onClick={() => setShowMessage(false)} className="text-white/50 text-xl">×</button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-              {messages.length === 0 && (
-                <p className="text-center text-sm text-white/30 py-4">No messages yet</p>
-              )}
-              {messages.map((msg) => (
-                <div key={msg.id}
-                  className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${msg.sender_type === 'CUSTOMER' ? 'ml-auto' : ''}`}
-                  style={{
-                    background: msg.sender_type === 'CUSTOMER' ? '#F5A623' : 'rgba(255,255,255,0.08)',
-                    color: msg.sender_type === 'CUSTOMER' ? '#000' : '#fff',
-                  }}
-                >
-                  <p>{msg.message}</p>
-                  <p className={`text-[10px] mt-1 ${msg.sender_type === 'CUSTOMER' ? 'text-black/40' : 'text-white/30'}`}>
-                    {new Date(msg.created_at).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}
-                    {msg.read_at && msg.sender_type === 'CUSTOMER' ? ' ✓✓' : ''}
-                  </p>
-                </div>
-              ))}
-              <div ref={msgEndRef} />
-            </div>
-            {isActive && (
-              <div className="p-3 border-t border-white/8 flex gap-2">
-                <input
-                  type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value.slice(0, 300))}
-                  onKeyDown={(e) => { if (e.key === 'Enter') sendMessage() }}
-                  placeholder="Type a message..."
-                  className="flex-1 rounded-xl px-3 py-2.5 text-sm outline-none"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={sendingMsg || !message.trim()}
-                  className="w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-40"
-                  style={{ background: '#F5A623', color: '#000' }}
-                >
-                  →
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Rating modal */}
-      {showRating && !ratingSubmitted && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-lg rounded-t-3xl p-6 space-y-4" style={{ background: '#111113' }}>
-            <h3 className="font-semibold text-lg">Rate your order</h3>
-            <div>
-              <p className="text-sm text-white/60 mb-2">{order.vendors?.shop_name}</p>
-              <StarRating value={ratingData.vendor_rating} onChange={(v) => setRatingData((d) => ({ ...d, vendor_rating: v }))} />
-            </div>
-            {order.rider_id && (
-              <div>
-                <p className="text-sm text-white/60 mb-2">Rider (optional)</p>
-                <StarRating value={ratingData.rider_rating} onChange={(v) => setRatingData((d) => ({ ...d, rider_rating: v }))} />
-              </div>
-            )}
-            <textarea
-              value={ratingData.feedback}
-              onChange={(e) => setRatingData((d) => ({ ...d, feedback: e.target.value.slice(0, 150) }))}
-              placeholder="Any feedback? (optional)"
-              rows={2}
-              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}
-            />
-            <button
-              onClick={submitRating}
-              disabled={ratingData.vendor_rating === 0}
-              className="w-full rounded-xl py-3.5 font-semibold disabled:opacity-40"
-              style={{ background: '#F5A623', color: '#000' }}
-            >
-              Submit rating
-            </button>
-            <button onClick={() => setShowRating(false)} className="w-full py-2 text-sm text-white/40">Maybe later</button>
-          </div>
-        </div>
-      )}
-
-      {/* Main content */}
+      {/* Header */}
       <div className="sticky top-0 z-40 border-b border-white/8 px-4 py-3"
         style={{ background: 'rgba(10,10,11,0.95)', backdropFilter: 'blur(20px)' }}>
         <div className="max-w-lg mx-auto flex items-center gap-3">
@@ -278,9 +115,7 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
                 <div className="flex flex-col items-center">
                   <div
                     className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${current && step.animated ? 'animate-pulse' : ''}`}
-                    style={{
-                      background: done ? '#22c55e' : current ? '#F5A623' : 'rgba(255,255,255,0.1)',
-                    }}
+                    style={{ background: done ? '#22c55e' : current ? '#F5A623' : 'rgba(255,255,255,0.1)' }}
                   >
                     {done && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20,6 9,17 4,12"/></svg>}
                   </div>
@@ -307,24 +142,8 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
               <p className="text-xs text-white/40">Your rider</p>
             </div>
             <div className="flex gap-2">
-              <a
-                href={`tel:${order.riders.phone}`}
-                className="w-10 h-10 rounded-full flex items-center justify-center"
-                style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}
-                aria-label="Call rider"
-              >
-                📞
-              </a>
-              <a
-                href={`https://wa.me/${order.riders.phone.replace('+', '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full flex items-center justify-center"
-                style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}
-                aria-label="WhatsApp rider"
-              >
-                💬
-              </a>
+              <a href={`tel:${order.riders.phone}`} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }} aria-label="Call rider">📞</a>
+              <a href={`https://wa.me/${order.riders.phone.replace('+', '')}`} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }} aria-label="WhatsApp rider">💬</a>
             </div>
           </div>
         )}
@@ -332,18 +151,10 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
         {/* Action buttons */}
         {order.status === 'DELIVERED' && (
           <div className="space-y-3">
-            <button
-              onClick={confirmDelivery}
-              className="w-full rounded-xl py-4 font-semibold"
-              style={{ background: '#F5A623', color: '#000' }}
-            >
+            <button onClick={confirmDelivery} className="w-full rounded-xl py-4 font-semibold" style={{ background: '#F5A623', color: '#000' }}>
               I received my food ✓
             </button>
-            <button
-              onClick={() => router.push(`/order/${order.order_number}/dispute`)}
-              className="w-full py-3 text-sm rounded-xl"
-              style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
-            >
+            <button onClick={() => router.push(`/order/${order.order_number}/dispute`)} className="w-full py-3 text-sm rounded-xl" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>
               Report a problem
             </button>
           </div>
@@ -355,9 +166,14 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
             <h3 className="text-sm font-semibold text-white/70">Order items</h3>
           </div>
           {order.order_items.map((item, idx) => (
-            <div key={item.id} className={`flex justify-between px-4 py-3 text-sm ${idx < order.order_items.length - 1 ? 'border-b border-white/5' : ''}`}>
-              <span className="text-white/80">{item.name} × {item.quantity}</span>
-              <span>{formatPrice(item.subtotal)}</span>
+            <div key={item.id} className={`px-4 py-3 text-sm ${idx < order.order_items.length - 1 ? 'border-b border-white/5' : ''}`}>
+              <div className="flex justify-between">
+                <span className="text-white/80">{item.name} × {item.quantity}</span>
+                <span>{formatPrice(item.subtotal)}</span>
+              </div>
+              {item.addons && item.addons.length > 0 && (
+                <p className="text-xs text-white/40 mt-0.5">+ {item.addons.map((a) => a.name).join(', ')}</p>
+              )}
             </div>
           ))}
           <div className="px-4 py-3 border-t border-white/8 flex justify-between font-semibold">
@@ -366,17 +182,6 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
           </div>
         </div>
       </div>
-
-      {/* Floating message button */}
-      {isActive && (
-        <button
-          onClick={() => setShowMessage(true)}
-          className="fixed bottom-24 right-4 rounded-full px-4 py-3 font-medium text-sm flex items-center gap-2 shadow-lg"
-          style={{ background: '#F5A623', color: '#000' }}
-        >
-          💬 Message
-        </button>
-      )}
     </>
   )
 }
@@ -394,31 +199,4 @@ function getTimestampForStatus(status: string, order: OrderDetail): string | nul
     CANCELLED: order.cancelled_at,
   }
   return map[status] ?? null
-}
-
-function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  return (
-    <div className="flex gap-2">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          onClick={() => onChange(star)}
-          className="text-3xl transition-transform active:scale-90"
-          style={{ color: star <= value ? '#F5A623' : 'rgba(255,255,255,0.2)' }}
-          aria-label={`${star} star`}
-        >
-          ★
-        </button>
-      ))}
-    </div>
-  )
-}
-
-interface MessageItem {
-  id: string
-  sender_type: string
-  recipient_type: string
-  message: string
-  read_at: string | null
-  created_at: string
 }
