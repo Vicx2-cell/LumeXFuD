@@ -146,8 +146,8 @@ export default function LandingPage() {
               },
               {
                 icon: '🏆',
-                title: 'Earn rewards',
-                desc: 'Every order earns you XP, streaks, and badges. Climb the weekly leaderboard.',
+                title: 'Weekly leaderboard',
+                desc: 'Every completed order climbs you up the weekly leaderboard. Be the campus #1.',
               },
               {
                 icon: '📍',
