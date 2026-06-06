@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { BackButton } from '@/components/back-button'
 import type { CustomerProfile, XPData, BadgeItem } from './page'
 
 const KEYPAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'] as const
@@ -206,7 +207,8 @@ export function ProfileClient({
     <>
       <div className="sticky top-0 z-40 border-b border-white/8 px-4 py-3"
         style={{ background: 'rgba(10,10,11,0.95)', backdropFilter: 'blur(20px)' }}>
-        <div className="max-w-lg mx-auto">
+        <div className="max-w-lg mx-auto flex items-center gap-3">
+          <BackButton />
           <h1 className="font-semibold">Profile</h1>
         </div>
       </div>

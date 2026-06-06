@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import RecoveryCodeDisplay from '@/components/auth/RecoveryCodeDisplay'
 import SecurityQuestionSelect from '@/components/auth/SecurityQuestionSelect'
 import { SECURITY_QUESTIONS } from '@/lib/pin-auth'
+import { BackButton } from '@/components/back-button'
 
 const initialForm = {
   name: '',
@@ -109,6 +110,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-dvh flex items-center justify-center px-5 py-12" style={{ background: '#0A0A0B' }}>
       <div className="w-full max-w-lg space-y-6">
+        <BackButton fallback="/auth" />
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <h1 className="text-2xl font-semibold text-white">Create your account</h1>
           <p className="mt-2 text-sm text-white/60">

@@ -2,6 +2,7 @@ import { createSupabaseAdmin } from '../supabase/server'
 import { sendWhatsAppWithFallback } from '../termii/whatsapp'
 import { renderTemplate } from '../termii/templates'
 import { recordPlatformEarning } from '../platform-earnings'
+import { processCustomerTopup } from '../customer-wallet'
 
 export type PaystackEvent =
   | 'charge.success'
@@ -30,6 +31,16 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
 
       if ((metadata.type as string) === 'SUBSCRIPTION') {
         await handleSubscriptionPayment(db, reference, metadata)
+        break
+      }
+
+      // Customer wallet top-up. Without this branch the payment fell through to
+      // the order path below, matched no order, and silently no-op'd — the
+      // customer was charged but never credited. processCustomerTopup is
+      // idempotent (topup_customer_wallet RPC keys on the unique reference), so
+      // a Paystack retry can't double-credit.
+      if ((metadata.type as string) === 'WALLET_TOPUP') {
+        await handleWalletTopup(reference, data, metadata)
         break
       }
 
@@ -74,12 +85,19 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
 
     case 'charge.failed': {
       const reference = data.reference as string
+      // Guard the transition: only cancel an order that is still awaiting its
+      // first payment. Without the payment_status + status filter, a late or
+      // replayed charge.failed could clobber an order that had already been paid
+      // and progressed (e.g. VENDOR_ACCEPTED), wrongly cancelling it. A failed
+      // top-up/subscription charge has no matching order row, so it no-ops here.
       const { data: order } = await db
         .from('orders')
         .update({ payment_status: 'FAILED', status: 'CANCELLED', updated_at: new Date().toISOString() })
         .eq('paystack_reference', reference)
+        .eq('payment_status', 'PENDING')
+        .in('status', ['PENDING_PAYMENT', 'PENDING'])
         .select('order_number, customer_id, guest_phone')
-        .single()
+        .maybeSingle()
 
       if (!order) break
 
@@ -244,5 +262,26 @@ async function handleSubscriptionPayment(
     type:        'VENDOR_SUBSCRIPTION',
     amount_kobo: subscriptionAmount,
     description: `Vendor subscription — vendor ${vendorId} — ref ${reference}`,
+  })
+}
+
+async function handleWalletTopup(
+  reference: string,
+  data: Record<string, unknown>,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  const customerId = metadata.customer_id as string | undefined
+  const amountKobo = Number(data.amount ?? 0)
+  if (!customerId || !Number.isFinite(amountKobo) || amountKobo <= 0) return
+
+  // processCustomerTopup recomputes the bonus from settings (never trusts the
+  // client-supplied metadata bonus) and credits both TOPUP + TOPUP_BONUS rows
+  // atomically. Idempotent on `reference`.
+  await processCustomerTopup({
+    customerId,
+    amountKobo,
+    reference,
+    customerPhone: metadata.customer_phone as string | undefined,
+    customerName:  metadata.customer_name as string | undefined,
   })
 }

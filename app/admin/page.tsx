@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
+import { BackButton } from '@/components/back-button'
 
 interface DashboardMetrics {
   orders_today: number
@@ -97,6 +98,7 @@ export default function AdminDashboard() {
       <div className="mx-auto max-w-2xl">
         {/* Header */}
         <div className="mb-6">
+          <div className="mb-3"><BackButton /></div>
           <span className="inline-block px-3 py-1 rounded-lg text-xs font-bold mb-3"
             style={{ background: '#F5A623', color: '#000' }}>Admin</span>
           <div className="flex items-end justify-between">

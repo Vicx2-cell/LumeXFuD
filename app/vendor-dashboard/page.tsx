@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { formatPrice } from '@/lib/money'
+import { BackButton } from '@/components/back-button'
 
 interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
 interface VendorOrder {
@@ -172,9 +173,12 @@ export default function VendorDashboard() {
       {/* Header */}
       <div className="sticky top-0 z-40 border-b border-white/8" style={{ background: 'rgba(10,10,11,0.95)', backdropFilter: 'blur(20px)' }}>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] text-white/30 uppercase tracking-widest">Vendor</p>
-            <p className="font-semibold text-white leading-tight">{vendor?.shop_name ?? '—'}</p>
+          <div className="flex items-center gap-2">
+            <BackButton />
+            <div>
+              <p className="text-[10px] text-white/30 uppercase tracking-widest">Vendor</p>
+              <p className="font-semibold text-white leading-tight">{vendor?.shop_name ?? '—'}</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button

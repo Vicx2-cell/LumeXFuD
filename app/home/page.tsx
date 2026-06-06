@@ -1,6 +1,7 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { formatPrice } from '@/lib/money'
 import { BottomNav } from '@/components/nav-bottom'
+import { BackButton } from '@/components/back-button'
 import { VendorCardSkeleton } from '@/components/ui/skeleton'
 import { HomepageClient } from '../homepage-client'
 import { Suspense } from 'react'
@@ -46,9 +47,12 @@ export default async function CustomerHomePage() {
         style={{ background: 'rgba(10,10,11,0.9)', backdropFilter: 'blur(20px)' }}
       >
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div>
-            <span className="text-xs text-white/40">LumeX Fud</span>
-            <h1 className="text-base font-semibold leading-tight">What are you eating today?</h1>
+          <div className="flex items-center gap-2">
+            <BackButton />
+            <div>
+              <span className="text-xs text-white/40">LumeX Fud</span>
+              <h1 className="text-base font-semibold leading-tight">What are you eating today?</h1>
+            </div>
           </div>
           <a
             href="/profile"

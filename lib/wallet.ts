@@ -138,6 +138,10 @@ export async function debitWalletWithdrawal(params: {
   amount: number
   reference: string
   description: string
+  dailyLimit: number
+  dailyStart: string   // ISO; start of the current local day
+  weeklyLimit: number
+  weeklyStart: string  // ISO; start of the current local week
 }): Promise<{ txId: string; success: boolean; errorMsg: string | null }> {
   const db = createSupabaseAdmin()
   const { data, error } = await db.rpc('debit_wallet_withdrawal', {
@@ -146,6 +150,10 @@ export async function debitWalletWithdrawal(params: {
     p_amount:     params.amount,
     p_reference:  params.reference,
     p_description: params.description,
+    p_daily_limit:  params.dailyLimit,
+    p_daily_start:  params.dailyStart,
+    p_weekly_limit: params.weeklyLimit,
+    p_weekly_start: params.weeklyStart,
   })
 
   if (error) throw new Error(`debit_wallet_withdrawal failed: ${error.message}`)

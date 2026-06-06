@@ -46,7 +46,7 @@ export default function AdminAudit() {
     <div className="min-h-dvh px-4 py-8" style={{ background: '#0A0A0B' }}>
       <div className="mx-auto max-w-2xl">
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.push('/admin')} className="w-9 h-9 rounded-full flex items-center justify-center text-white/50"
+          <button onClick={() => router.back()} className="w-9 h-9 rounded-full flex items-center justify-center text-white/50"
             style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
           <h1 className="text-xl font-bold text-white">Audit Log</h1>
         </div>

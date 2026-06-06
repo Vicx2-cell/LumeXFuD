@@ -180,12 +180,19 @@ export async function POST(req: NextRequest) {
   const last4 = wallet.bank_account_last4 ?? ''
   const description = `Withdrawal to ${wallet.bank_name ?? 'bank'} ****${last4}`
 
+  // The daily/weekly caps are also enforced atomically inside the RPC (under the
+  // wallet-row lock) so concurrent withdrawals can't slip past them — the checks
+  // above are just fast-fail UX. Pass the same limits + period boundaries.
   const debitResult = await debitWalletWithdrawal({
     userId:      session.userId!,
     userType,
     amount:      amountKobo,
     reference,
     description,
+    dailyLimit:  DAILY_LIMIT_KOBO,
+    dailyStart:  todayStart.toISOString(),
+    weeklyLimit: WEEKLY_LIMIT_KOBO,
+    weeklyStart: weekStart.toISOString(),
   })
 
   if (!debitResult.success) {

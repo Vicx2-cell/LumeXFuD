@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import WithdrawSheet from './WithdrawSheet'
 import AddBankSheet from './AddBankSheet'
+import { BackButton } from '@/components/back-button'
 
 interface TierProgress {
   current_count: number
@@ -140,6 +141,10 @@ export default function WalletView({ userType }: Props) {
 
   return (
     <div className="p-4 pb-24 space-y-4 max-w-lg mx-auto">
+      <div className="flex items-center gap-3">
+        <BackButton />
+        <h1 className="font-semibold text-base">Wallet</h1>
+      </div>
       {/* ── Balance Card ─────────────────────────────────────── */}
       <div className="bg-white/5 backdrop-blur rounded-2xl p-5 border border-white/10">
         <div className="flex items-center justify-between mb-4">

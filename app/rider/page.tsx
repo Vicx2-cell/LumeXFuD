@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { formatPrice } from '@/lib/money'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { BackButton } from '@/components/back-button'
 
 type RiderStatus = 'ONLINE' | 'OFFLINE' | 'BUSY'
 
@@ -245,13 +246,16 @@ export default function RiderDashboard() {
       {/* Header */}
       <div className="px-4 pt-10 pb-4">
         <div className="flex items-start justify-between">
-          <div>
-            <span className="inline-block px-2.5 py-0.5 rounded-lg text-xs font-bold mb-2"
-              style={{ background: '#F5A623', color: '#000' }}>Rider</span>
-            <h1 className="text-xl font-bold text-white">{rider.full_name}</h1>
-            <p className="text-sm text-white/40 mt-0.5">
-              {rider.total_deliveries} deliveries · ⭐ {rider.avg_rating?.toFixed(1) ?? '—'}
-            </p>
+          <div className="flex items-start gap-2">
+            <BackButton />
+            <div>
+              <span className="inline-block px-2.5 py-0.5 rounded-lg text-xs font-bold mb-2"
+                style={{ background: '#F5A623', color: '#000' }}>Rider</span>
+              <h1 className="text-xl font-bold text-white">{rider.full_name}</h1>
+              <p className="text-sm text-white/40 mt-0.5">
+                {rider.total_deliveries} deliveries · ⭐ {rider.avg_rating?.toFixed(1) ?? '—'}
+              </p>
+            </div>
           </div>
           {/* Online/Offline toggle */}
           <button

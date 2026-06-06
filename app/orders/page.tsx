@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { BottomNav } from '@/components/nav-bottom'
+import { BackButton } from '@/components/back-button'
 import { formatPrice } from '@/lib/money'
 
 export const dynamic = 'force-dynamic'
@@ -68,7 +69,8 @@ export default async function OrdersPage({
     <main className="min-h-dvh pb-24" style={{ background: '#0A0A0B' }}>
       <div className="sticky top-0 z-40 border-b border-white/8 px-4 py-3"
         style={{ background: 'rgba(10,10,11,0.95)', backdropFilter: 'blur(20px)' }}>
-        <div className="max-w-lg mx-auto">
+        <div className="max-w-lg mx-auto flex items-center gap-3">
+          <BackButton />
           <h1 className="font-semibold text-base">Your orders</h1>
         </div>
       </div>

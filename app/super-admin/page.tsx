@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { BackButton } from '@/components/back-button'
 
 const actions = [
   {
@@ -44,6 +45,7 @@ export default function SuperAdminDashboard() {
     <div className="min-h-dvh px-5 py-10" style={{ background: '#0A0A0B' }}>
       <div className="mx-auto max-w-2xl">
         <div className="mb-8">
+          <div className="mb-3"><BackButton /></div>
           <span
             className="inline-block px-3 py-1 rounded-lg text-xs font-bold mb-3"
             style={{ background: '#F5A623', color: '#000' }}

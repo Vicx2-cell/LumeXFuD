@@ -127,7 +127,7 @@ export default function NewVendorPage() {
   return (
     <div className="min-h-dvh px-5 py-10" style={{ background: '#0A0A0B' }}>
       <div className="mx-auto max-w-md">
-        <button onClick={() => router.push('/admin')} className="mb-6 text-sm text-white/40 hover:text-white">
+        <button onClick={() => router.back()} className="mb-6 text-sm text-white/40 hover:text-white">
           ← Back
         </button>
         <h1 className="text-2xl font-bold text-white mb-1">Add Vendor</h1>

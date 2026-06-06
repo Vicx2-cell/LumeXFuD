@@ -38,7 +38,7 @@ export default function SuperAdminAudit() {
     <div className="min-h-dvh px-4 py-8" style={{ background: '#0A0A0B' }}>
       <div className="mx-auto max-w-2xl">
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.push('/super-admin')} className="w-9 h-9 rounded-full flex items-center justify-center text-white/50"
+          <button onClick={() => router.back()} className="w-9 h-9 rounded-full flex items-center justify-center text-white/50"
             style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
           <div>
             <span className="inline-block px-2 py-0.5 rounded text-xs font-bold mb-1"

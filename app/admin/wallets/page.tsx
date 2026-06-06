@@ -126,7 +126,7 @@ export default function AdminWalletsPage() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.push('/admin')}
+          <button onClick={() => router.back()}
             className="w-9 h-9 rounded-full flex items-center justify-center text-white/50"
             style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
           <div>

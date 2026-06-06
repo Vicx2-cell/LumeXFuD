@@ -173,20 +173,13 @@ export async function POST(req: NextRequest) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
-  // Initialize Paystack
-  const paystackResult = await initializePaystackTransaction({
-    email: customerEmail,
-    amount: totalAmount,
-    reference: orderNumber,
-    callback_url: `${appUrl}/order/${orderNumber}`,
-    metadata: {
-      order_number: orderNumber,
-      customer_phone: customerPhone,
-      vendor_id,
-    },
-  })
+  // Idempotency: a client-supplied key dedupes a double-tapped checkout. We
+  // RESERVE it by inserting the order row BEFORE talking to Paystack — the
+  // orders.idempotency_key UNIQUE constraint makes the second concurrent insert
+  // fail, so we never open a second Paystack transaction for the same intent.
+  // Absent header → random key (no cross-request dedup, but no regression).
+  const idempotencyKey = req.headers.get('idempotency-key')?.trim() || crypto.randomUUID()
 
-  // Insert order
   const { data: order, error: orderError } = await db
     .from('orders')
     .insert({
@@ -205,7 +198,7 @@ export async function POST(req: NextRequest) {
       tip_amount: tipKobo,
       total_amount: totalAmount,
       paystack_reference: orderNumber,
-      idempotency_key: crypto.randomUUID(),
+      idempotency_key: idempotencyKey,
       payment_status: 'PENDING',
       rider_payment_status: 'PENDING',
     })
@@ -213,8 +206,64 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (orderError || !order) {
+    // 23505 = unique_violation on idempotency_key → this is a duplicate submit.
+    // Return the original order's stored Paystack authorization instead of
+    // creating a second order/charge.
+    if (orderError?.code === '23505') {
+      const { data: existing } = await db
+        .from('orders')
+        .select('order_number, customer_id, paystack_authorization_url, paystack_access_code')
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle()
+
+      // Bind the key to its owner — a client must not retrieve another
+      // customer's checkout link by reusing their idempotency key.
+      if (existing && existing.customer_id !== customerId) {
+        return NextResponse.json({ error: 'Invalid idempotency key' }, { status: 409 })
+      }
+      if (existing?.paystack_authorization_url) {
+        return NextResponse.json({
+          order_number: existing.order_number,
+          authorization_url: existing.paystack_authorization_url,
+          access_code: existing.paystack_access_code,
+          idempotent_replay: true,
+        })
+      }
+      // Original is still being created (auth not stored yet) — ask the client to retry.
+      return NextResponse.json({ error: 'Order is being created, please retry' }, { status: 409 })
+    }
     return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
   }
+
+  // Initialize Paystack now that the order (and its idempotency key) is reserved.
+  let paystackResult
+  try {
+    paystackResult = await initializePaystackTransaction({
+      email: customerEmail,
+      amount: totalAmount,
+      reference: orderNumber,
+      callback_url: `${appUrl}/order/${orderNumber}`,
+      metadata: {
+        order_number: orderNumber,
+        customer_phone: customerPhone,
+        vendor_id,
+      },
+    })
+  } catch (err) {
+    // No charge was created — drop the reserved order so the customer can retry.
+    console.error('[orders] Paystack init failed, rolling back order:', err)
+    await db.from('orders').delete().eq('id', order.id)
+    return NextResponse.json({ error: 'Could not start payment. Please try again.' }, { status: 502 })
+  }
+
+  // Persist the authorization so a duplicate request can replay it (above).
+  await db
+    .from('orders')
+    .update({
+      paystack_authorization_url: paystackResult.authorization_url,
+      paystack_access_code: paystackResult.access_code,
+    })
+    .eq('id', order.id)
 
   // Insert order items with price SNAPSHOTS
   const orderItems = items.map((item, idx) => {
