@@ -24,11 +24,14 @@ export interface PayoutOrder {
 export async function completeOrderPayout(order: PayoutOrder): Promise<void> {
   const db = createSupabaseAdmin()
 
-  // 1. Free the rider — unconditional, so a credit hiccup can never leave them
-  //    stuck. Scoped to this order so we don't clear a freshly-accepted one.
+  // 1. Free the rider — clear active_order_id AND flip BUSY back to ONLINE so
+  //    they're available for the next job. Accepting an order sets them BUSY but
+  //    nothing reset it, and the UI disables the toggle while BUSY, so without
+  //    this a rider is stuck BUSY forever. Scoped to this order so we never touch
+  //    a rider who has already moved on to a newer one.
   if (order.rider_id) {
     await db.from('riders')
-      .update({ active_order_id: null })
+      .update({ active_order_id: null, status: 'ONLINE', last_status_update_at: new Date().toISOString() })
       .eq('id', order.rider_id)
       .eq('active_order_id', order.id)
   }
