@@ -216,7 +216,11 @@ export default function RiderDashboard() {
       })
       const d = await res.json().catch(() => ({})) as { error?: string }
       if (res.ok) {
-        showToast(status === 'PICKED_UP' ? 'Marked as picked up' : 'Marked as delivered')
+        showToast(
+          status === 'PICKED_UP' ? 'Marked as picked up'
+          : status === 'COMPLETED' ? 'Delivery completed — you can take a new order'
+          : 'Marked as delivered'
+        )
         await fetchData()
       } else {
         showToast(d.error ?? 'Failed to update order')
@@ -382,6 +386,16 @@ export default function RiderDashboard() {
                 style={{ background: '#22C55E', color: '#000' }}
               >
                 {updatingStatus ? 'Updating…' : 'Mark as Delivered'}
+              </button>
+            )}
+            {current.status === 'DELIVERED' && (
+              <button
+                onClick={() => updateOrderStatus(current.id, 'COMPLETED')}
+                disabled={updatingStatus}
+                className="w-full py-3 rounded-xl font-semibold text-sm disabled:opacity-50"
+                style={{ background: '#22C55E', color: '#000' }}
+              >
+                {updatingStatus ? 'Updating…' : 'Complete Delivery ✓'}
               </button>
             )}
           </div>

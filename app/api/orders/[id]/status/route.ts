@@ -6,6 +6,7 @@ import { audit } from '@/lib/audit'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
 import { recordOrderCompletedEarnings } from '@/lib/platform-earnings'
+import { completeOrderPayout } from '@/lib/order-payout'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import type { OrderStatus } from '@/types'
 
@@ -17,7 +18,9 @@ const TRANSITIONS: Array<[OrderStatus, OrderStatus, string[]]> = [
   ['READY', 'RIDER_ASSIGNED', ['rider', 'admin', 'super_admin']],
   ['RIDER_ASSIGNED', 'PICKED_UP', ['rider', 'admin', 'super_admin']],
   ['PICKED_UP', 'DELIVERED', ['rider', 'admin', 'super_admin']],
-  ['DELIVERED', 'COMPLETED', ['customer', 'admin', 'super_admin']],
+  // Riders can mark their own delivery complete (frees them for the next order);
+  // customers can confirm; staff can force it.
+  ['DELIVERED', 'COMPLETED', ['rider', 'customer', 'admin', 'super_admin']],
   ['PENDING', 'CANCELLED', ['vendor', 'admin', 'super_admin']],
   ['VENDOR_ACCEPTED', 'CANCELLED', ['vendor', 'admin', 'super_admin']],
   ['DISPUTED', 'REFUNDED', ['admin', 'super_admin']],
@@ -67,7 +70,7 @@ export async function PATCH(
 
   const { data: order, error } = await db
     .from('orders')
-    .select('id, order_number, status, vendor_id, customer_id, rider_id, guest_phone, total_amount, rider_delivery_cut, platform_markup, platform_delivery_cut')
+    .select('id, order_number, status, vendor_id, customer_id, rider_id, guest_phone, total_amount, subtotal, rider_delivery_cut, tip_amount, platform_markup, platform_delivery_cut')
     .eq('id', id)
     .single()
 
@@ -120,13 +123,25 @@ export async function PATCH(
 
   await db.from('orders').update(updateData).eq('id', id)
 
-  // Record platform earnings when order completes (fire-and-forget)
+  // On completion: record platform earnings, credit the vendor + rider wallets,
+  // and free the rider for their next order. This used to be done only by the
+  // release-payments cron (which isn't running) — doing it here makes the flow
+  // self-contained, so a rider tapping "Complete delivery" pays everyone out.
   if (newStatus === 'COMPLETED') {
     void recordOrderCompletedEarnings({
       order_id:             id,
       platform_markup_kobo: (order.platform_markup as number) ?? 0,
       delivery_cut_kobo:    (order.platform_delivery_cut as number) ?? 0,
       order_number:         order.order_number as string,
+    })
+    await completeOrderPayout({
+      id,
+      order_number:       order.order_number as string,
+      vendor_id:          (order.vendor_id as string | null) ?? null,
+      rider_id:           (order.rider_id as string | null) ?? null,
+      subtotal:           (order.subtotal as number) ?? 0,
+      rider_delivery_cut: (order.rider_delivery_cut as number) ?? 0,
+      tip_amount:         (order.tip_amount as number) ?? 0,
     })
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { completeOrderPayout } from '@/lib/order-payout'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
@@ -30,7 +31,7 @@ export async function POST(
 
   const { data: order, error } = await db
     .from('orders')
-    .select('id, order_number, status, customer_id, rider_id, rider_delivery_cut')
+    .select('id, order_number, status, customer_id, vendor_id, rider_id, subtotal, rider_delivery_cut, tip_amount')
     .eq('id', id)
     .eq('customer_id', customer.id)
     .single()
@@ -57,6 +58,17 @@ export async function POST(
   if (!completedRows || completedRows.length === 0) {
     return NextResponse.json({ success: true }) // already completed concurrently
   }
+
+  // Credit vendor + rider wallets and free the rider (same as the status route).
+  await completeOrderPayout({
+    id,
+    order_number:       order.order_number as string,
+    vendor_id:          (order.vendor_id as string | null) ?? null,
+    rider_id:           (order.rider_id as string | null) ?? null,
+    subtotal:           (order.subtotal as number) ?? 0,
+    rider_delivery_cut: (order.rider_delivery_cut as number) ?? 0,
+    tip_amount:         (order.tip_amount as number) ?? 0,
+  })
 
   // Notify rider
   if (order.rider_id) {
