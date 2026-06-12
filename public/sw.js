@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lumexfud-v2';
+const CACHE_NAME = 'lumexfud-v3';
 const OFFLINE_URL = '/offline';
 
 // Assets to pre-cache on install
@@ -45,11 +45,24 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
+          // Safari/WebKit (iOS) throws "page couldn't load" when a service worker
+          // hands a REDIRECTED response back for a navigation. Our auth proxy
+          // 307-redirects "/" -> "/vendor-dashboard" | "/rider" for logged-in
+          // users, and the PWA launches at "/", so this fired on every launch and
+          // broke the dashboards. Rebuild a clean, non-redirected response from
+          // the final body so WebKit will render it.
+          const safe = response.redirected
+            ? new Response(response.body, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers,
+              })
+            : response;
           if (response.ok) {
-            const clone = response.clone();
+            const clone = safe.clone();
             caches.open(CACHE_NAME).then((c) => c.put(request, clone));
           }
-          return response;
+          return safe;
         })
         .catch(() =>
           caches.match(request).then((cached) =>
