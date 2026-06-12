@@ -1,4 +1,1 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "comment": "Crons are NOT defined here: (1) Vercel Hobby allows only 2 daily crons, and (2) Vercel native cron sends GET while every /api/cron/* route is POST + Bearer CRON_SECRET. Both are solved by an external scheduler. See docs/cron-setup.md."
-}
+{}

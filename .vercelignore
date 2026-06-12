@@ -1,0 +1,7 @@
+screenshots
+scripts
+docs
+*.bak
+*.log
+.git
+.next
