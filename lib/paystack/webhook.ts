@@ -4,6 +4,7 @@ import { renderTemplate } from '../termii/templates'
 import { recordPlatformEarning } from '../platform-earnings'
 import { processCustomerTopup, spendCustomerWallet } from '../customer-wallet'
 import { refundTransaction } from './transfer'
+import { verifyPaystackTransaction } from './init'
 
 export type PaystackEvent =
   | 'charge.success'
@@ -45,9 +46,7 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
         break
       }
 
-      // Regular order payment
-      const paidAmount = Number(data.amount)
-
+      // Regular order payment.
       // Find the pending order for this reference BEFORE crediting.
       const { data: pending } = await db
         .from('orders')
@@ -57,6 +56,26 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
         .maybeSingle()
 
       if (!pending) break
+
+      // A4 — independent re-verification before marking the order paid. The
+      // HMAC-signed payload is only a signal; confirm status + amount straight
+      // from Paystack. On a DEFINITIVE negative (Paystack does not say success)
+      // we never mark the order paid. On a TRANSIENT verify error we fall back
+      // to the authenticated payload amount — HMAC already proves authenticity,
+      // so a Paystack API hiccup must not strand a genuinely-paid order — but we
+      // log it. The exact `paidAmount === expectedCharge` check below is the
+      // real money guard either way.
+      let paidAmount = Number(data.amount)
+      try {
+        const verified = await verifyPaystackTransaction(reference)
+        if (verified.status !== 'success') {
+          console.warn(`[webhook] order charge ${reference} not 'success' on verify (status=${verified.status}) — not marking paid`)
+          break
+        }
+        paidAmount = Number(verified.amount)
+      } catch (err) {
+        console.error(`[webhook] order verify failed for ${reference}, falling back to signed payload amount:`, err)
+      }
 
       // The card only ever pays the NON-wallet portion. For a plain PAYSTACK
       // order wallet_amount_kobo is 0 so this equals total_amount; for a SPLIT
@@ -385,8 +404,39 @@ async function handleWalletTopup(
   metadata: Record<string, unknown>
 ): Promise<void> {
   const customerId = metadata.customer_id as string | undefined
-  const amountKobo = Number(data.amount ?? 0)
-  if (!customerId || !Number.isFinite(amountKobo) || amountKobo <= 0) return
+  if (!customerId) return
+
+  // A4 — independent re-verification. The webhook payload is HMAC-authenticated
+  // but is still only a *signal*: re-fetch the transaction from Paystack and
+  // credit ONLY the amount Paystack itself confirms it received. Never trust the
+  // payload's `data.amount` for money-in. processCustomerTopup is idempotent on
+  // `reference`, so if this drops (no webhook retry) the top-up can be safely
+  // re-driven later without double-crediting.
+  let verified: Awaited<ReturnType<typeof verifyPaystackTransaction>>
+  try {
+    verified = await verifyPaystackTransaction(reference)
+  } catch (err) {
+    console.error(`[webhook] top-up verify failed for ${reference}:`, err)
+    const adminPhone = process.env.ADMIN_PHONE
+    if (adminPhone) {
+      void sendWhatsAppWithFallback({
+        to: adminPhone,
+        message:
+          `⚠️ Wallet top-up ${reference}: could not verify with Paystack.\n` +
+          `NOT credited — verify the transaction and credit manually.`,
+      }).catch(() => {})
+    }
+    return
+  }
+
+  // Definitive negative — Paystack does not say this charge succeeded. Do not credit.
+  if (verified.status !== 'success') {
+    console.warn(`[webhook] top-up ${reference} not 'success' on verify (status=${verified.status}) — skipping credit`)
+    return
+  }
+
+  const amountKobo = Number(verified.amount ?? 0)
+  if (!Number.isFinite(amountKobo) || amountKobo <= 0) return
 
   // processCustomerTopup recomputes the bonus from settings (never trusts the
   // client-supplied metadata bonus) and credits both TOPUP + TOPUP_BONUS rows

@@ -5,8 +5,18 @@ import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { formatPrice } from '@/lib/wallet'
 
 // Called daily at 6am by Vercel cron.
-// Compares sum of all wallet_balances against Paystack account balance.
-// If divergence > ₦100 (10,000 kobo): freezes all withdrawals and alerts admin.
+//
+// The dangerous condition is a SHORTFALL: the real money in Paystack is less
+// than what we OWE users (vendor/rider wallets + customer wallet float). That
+// means user-owed funds aren't actually in the bank → freeze withdrawals.
+//
+// A SURPLUS (Paystack >= liabilities) is benign and expected — the float also
+// holds in-flight order money (paid, not yet released to anyone) and retained
+// platform revenue. The old code compared the full Paystack balance to ONLY the
+// vendor/rider wallet total and froze on ANY difference > ₦100, so in production
+// it would auto-freeze every payout the moment a customer topped up or an order
+// was paid. Comparing against true liabilities and freezing only on shortfall
+// fixes that false-freeze.
 
 const TOLERANCE_KOBO = 10_000 // ₦100
 
@@ -41,20 +51,41 @@ export async function POST(req: NextRequest) {
 
   const db = createSupabaseAdmin()
 
-  // Sum all wallet balances
-  const { data: sumRaw, error: sumError } = await db
+  // Liability leg 1: vendor/rider wallets — money earned but not yet withdrawn
+  // (held + available, i.e. total_balance).
+  const { data: vrRaw, error: vrError } = await db
     .from('wallet_balances')
     .select('total_balance')
 
-  if (sumError) {
-    console.error('[cron/wallet-reconciliation] Sum query failed:', sumError.message)
+  if (vrError) {
+    console.error('[cron/wallet-reconciliation] wallet_balances query failed:', vrError.message)
     return NextResponse.json({ error: 'DB query failed' }, { status: 500 })
   }
 
-  const walletTotal = (sumRaw ?? []).reduce(
+  const vendorRiderTotal = (vrRaw ?? []).reduce(
     (acc, row) => acc + Number((row as { total_balance: number }).total_balance),
     0
   )
+
+  // Liability leg 2: customer wallet float — money customers loaded but haven't
+  // spent yet. This is real custodied money sitting in Paystack and MUST be
+  // counted, otherwise reconciliation under-states what we owe.
+  const { data: cwRaw, error: cwError } = await db
+    .from('customer_wallets')
+    .select('balance_kobo')
+
+  if (cwError) {
+    console.error('[cron/wallet-reconciliation] customer_wallets query failed:', cwError.message)
+    return NextResponse.json({ error: 'DB query failed' }, { status: 500 })
+  }
+
+  const customerFloat = (cwRaw ?? []).reduce(
+    (acc, row) => acc + Number((row as { balance_kobo: number }).balance_kobo),
+    0
+  )
+
+  // Total money we OWE users and must be able to pay out at any moment.
+  const liabilities = vendorRiderTotal + customerFloat
 
   // Get Paystack balance
   let paystackBalance: number
@@ -72,10 +103,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch Paystack balance' }, { status: 502 })
   }
 
-  const difference = Math.abs(paystackBalance - walletTotal)
+  // Shortfall (positive) = we owe more than Paystack is holding → DANGER.
+  // Surplus (negative)   = float exceeds liabilities (in-flight orders + retained
+  //                        platform revenue) → benign, never freeze on this.
+  const shortfall = liabilities - paystackBalance
 
-  if (difference > TOLERANCE_KOBO) {
-    // CRITICAL: freeze all withdrawals and alert admin
+  if (shortfall > TOLERANCE_KOBO) {
+    // CRITICAL: real shortfall — freeze all withdrawals and alert admin
     await db
       .from('settings')
       .upsert({ id: 'withdrawals_frozen', value: true }, { onConflict: 'id' })
@@ -84,7 +118,14 @@ export async function POST(req: NextRequest) {
     if (adminPhone) {
       sendWhatsAppWithFallback({
         to: adminPhone,
-        message: `🚨 URGENT: Wallet reconciliation FAILED!\n\nWallet total: ${formatPrice(walletTotal)}\nPaystack balance: ${formatPrice(paystackBalance)}\nDifference: ${formatPrice(difference)}\n\nAll withdrawals have been frozen. Investigate immediately.`,
+        message:
+          `🚨 URGENT: Wallet reconciliation SHORTFALL!\n\n` +
+          `Owed to users: ${formatPrice(liabilities)}\n` +
+          `  • vendor/rider: ${formatPrice(vendorRiderTotal)}\n` +
+          `  • customer float: ${formatPrice(customerFloat)}\n` +
+          `Paystack balance: ${formatPrice(paystackBalance)}\n` +
+          `Shortfall: ${formatPrice(shortfall)}\n\n` +
+          `All withdrawals have been frozen. Investigate immediately.`,
       }).catch(() => {})
     }
 
@@ -93,39 +134,48 @@ export async function POST(req: NextRequest) {
       actor_role: 'system',
       action:     'RECONCILIATION_FAILURE',
       new_value:  {
-        wallet_total:      walletTotal,
-        paystack_balance:  paystackBalance,
-        difference_kobo:   difference,
+        liabilities,
+        vendor_rider_total: vendorRiderTotal,
+        customer_float:     customerFloat,
+        paystack_balance:   paystackBalance,
+        shortfall_kobo:     shortfall,
         withdrawals_frozen: true,
       },
     })
 
-    console.error(`[cron/wallet-reconciliation] MISMATCH: wallet=${walletTotal} paystack=${paystackBalance} diff=${difference}`)
+    console.error(`[cron/wallet-reconciliation] SHORTFALL: owed=${liabilities} paystack=${paystackBalance} shortfall=${shortfall}`)
     return NextResponse.json({
-      status:    'MISMATCH',
-      wallet:    walletTotal,
-      paystack:  paystackBalance,
-      difference,
-      frozen:    true,
+      status:     'SHORTFALL',
+      liabilities,
+      vendor_rider_total: vendorRiderTotal,
+      customer_float:     customerFloat,
+      paystack:           paystackBalance,
+      shortfall,
+      frozen:             true,
     })
   }
 
-  // All good — log success
+  // Healthy — Paystack covers all user liabilities. Surplus is expected.
+  const surplus = paystackBalance - liabilities
   await audit({
     actor_id:   'cron',
     actor_role: 'system',
     action:     'RECONCILIATION_SUCCESS',
     new_value:  {
-      wallet_total:     walletTotal,
-      paystack_balance: paystackBalance,
-      difference_kobo:  difference,
+      liabilities,
+      vendor_rider_total: vendorRiderTotal,
+      customer_float:     customerFloat,
+      paystack_balance:   paystackBalance,
+      surplus_kobo:       surplus,
     },
   })
 
   return NextResponse.json({
-    status:    'OK',
-    wallet:    walletTotal,
-    paystack:  paystackBalance,
-    difference,
+    status:     'OK',
+    liabilities,
+    vendor_rider_total: vendorRiderTotal,
+    customer_float:     customerFloat,
+    paystack:           paystackBalance,
+    surplus,
   })
 }

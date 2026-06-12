@@ -102,9 +102,24 @@ export default function VendorDashboard() {
 
   useEffect(() => {
     load()
-    // Notification API is absent in iOS Safari (non-PWA) — guard or the page
-    // throws at load and the whole dashboard fails to render ("page couldn't load").
-    if (typeof Notification !== 'undefined') Notification.requestPermission().catch(() => {})
+    // iOS Safari has TWO failure modes here, both of which throw at mount and
+    // make the dashboard fail to render ("page couldn't load"):
+    //   1. Non-PWA tabs: `Notification` is undefined entirely.
+    //   2. Several iOS versions: `Notification` IS defined but its legacy
+    //      requestPermission() returns undefined (callback API), so chaining
+    //      `.catch` on it throws TypeError.
+    // Guard the type, confirm the method exists, and only chain `.catch` when the
+    // call actually returned a thenable. Whole thing wrapped so it can't crash.
+    try {
+      if (typeof Notification !== 'undefined' && typeof Notification.requestPermission === 'function') {
+        const res = Notification.requestPermission()
+        if (res && typeof (res as Promise<unknown>).catch === 'function') {
+          ;(res as Promise<unknown>).catch(() => {})
+        }
+      }
+    } catch {
+      // Notifications unsupported on this browser — non-fatal.
+    }
   }, [load])
 
   // Live updates via polling. This app authenticates with a custom JWT in an
