@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { freezeWallet } from '@/lib/wallet'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -17,6 +18,9 @@ export async function POST(req: NextRequest) {
   if (!['admin', 'super_admin'].includes(session.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+
+  const rl = await rateLimitGeneric(`wallet-freeze:${session.userId ?? session.phone}`, 20, 60)
+  if (!rl.success) return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 })
 
   const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)

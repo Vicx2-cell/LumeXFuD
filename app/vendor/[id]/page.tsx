@@ -53,7 +53,7 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
   const menuWithAddons: MenuItem[] = baseItems.map((i) => ({ ...i, addons: byItem.get(i.id) ?? [] }))
 
   return (
-    <main className="min-h-dvh pb-32" style={{ background: '#0A0A0B' }}>
+    <main className="lx-page pb-32">
       <VendorMenuClient vendor={vendor as VendorInfo} menu={menuWithAddons} />
       <BottomNav />
     </main>

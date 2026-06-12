@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 
 const schema = z.object({
   account_number: z.string().length(10).regex(/^\d{10}$/),
-  bank_code:      z.string().min(3).max(10),
+  bank_code:      z.string().min(3).max(10).regex(/^\d{3,10}$/),
 })
 
 export async function POST(req: NextRequest) {
@@ -12,6 +13,13 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['vendor', 'rider'].includes(session.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // Proxies a paid Paystack name-resolve call — cap at 5 / 10 min per user to
+  // stop bank-account enumeration and cost abuse.
+  const rl = await rateLimitGeneric(`wallet-verifyacct:${session.userId ?? session.phone}`, 5, 600)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many attempts. Please wait a few minutes and try again.' }, { status: 429 })
   }
 
   const body = await req.json().catch(() => null)

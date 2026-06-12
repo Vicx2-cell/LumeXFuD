@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/nav-bottom'
 import { ProfileClient } from './profile-client'
+import { FaceIdSetup } from '@/components/face-id-setup'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +28,7 @@ export default async function ProfilePage() {
       // Gamification (XP, streaks, badges) was removed from the MVP — those
       // tables no longer exist. Pass empty so the profile renders cleanly.
       return (
-        <main className="min-h-dvh pb-24" style={{ background: '#0A0A0B' }}>
+        <main className="lx-page pb-24">
           <ProfileClient profile={profile} xp={null} badges={[]} phone={session.phone} />
           <BottomNav />
         </main>
@@ -36,13 +37,21 @@ export default async function ProfilePage() {
   }
 
   return (
-    <main className="min-h-dvh pb-24" style={{ background: '#0A0A0B' }}>
-      <div className="max-w-lg mx-auto px-4 py-8">
+    <main className="lx-page pb-24">
+      <div className="max-w-lg mx-auto px-4 py-8 lx-enter">
         <h1 className="text-xl font-bold mb-4">Profile</h1>
-        <p className="text-sm text-white/60">Role: {session.role}</p>
-        <p className="text-sm text-white/60 mt-1">{session.phone}</p>
+        <div className="glass-thin p-5 space-y-1">
+          <p className="text-sm text-white/60">Role: <span className="text-white/85 capitalize">{session.role}</span></p>
+          <p className="text-sm text-white/60 tabular-nums">{session.phone}</p>
+        </div>
+
+        <div className="glass-thin p-4 mt-4 space-y-3">
+          <h3 className="text-sm font-semibold text-white/70">Security</h3>
+          <FaceIdSetup />
+        </div>
+
         <form action="/api/auth/logout" method="POST" className="mt-6">
-          <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-medium" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
+          <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-red-500/20" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
             Sign out
           </button>
         </form>

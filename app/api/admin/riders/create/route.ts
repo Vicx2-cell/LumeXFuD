@@ -3,6 +3,13 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
 import { generateTempPin, hashSecret } from '@/lib/pin-auth'
+import { rateLimitGeneric } from '@/lib/rate-limit'
+import { z } from 'zod'
+
+const createRiderInput = z.object({
+  full_name: z.string().min(1).max(100).transform((s) => s.trim()),
+  phone:     z.string().min(7).max(20),
+})
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,9 +19,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const rl = await rateLimitGeneric(`admin-rider-create:${user.userId ?? user.phone}`, 20, 60)
+    if (!rl.success) return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 })
+
     const body = await req.json()
-    const { full_name, phone } = body
-    if (!full_name || !phone) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    const parsed = createRiderInput.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Missing or invalid required fields' }, { status: 400 })
+    }
+    const { full_name, phone } = parsed.data
 
     let normalized: string
     try {

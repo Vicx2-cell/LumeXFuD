@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 
 export async function POST(
   _req: NextRequest,
@@ -13,6 +14,9 @@ export async function POST(
   if (!session || session.role !== 'customer') {
     return NextResponse.json({ error: 'Customer only' }, { status: 403 })
   }
+
+  const rl = await rateLimitGeneric(`order-confirm:${session.userId ?? session.phone}`, 30, 60)
+  if (!rl.success) return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429 })
 
   const db = createSupabaseAdmin()
 

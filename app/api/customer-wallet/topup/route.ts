@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
   // Rate limit: each top-up spins up a Paystack transaction — cap at 10 / 10 min
   // per user to stop init spam. No-ops if Upstash is unset.
-  const rl = await rateLimitGeneric(`cwallet-topup:${session.userId ?? session.phone}`, 10, 600)
+  const rl = await rateLimitGeneric(`cwallet-topup:${session.userId ?? session.phone}`, 10, 600, true)
   if (!rl.success) {
     return NextResponse.json({ error: 'Too many top-up attempts. Please wait and try again.' }, { status: 429 })
   }
@@ -83,7 +83,9 @@ export async function POST(req: NextRequest) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      email:     `${session.phone.replace('+', '')}@lumexfud.local`,
+      // ".local" is not a real TLD — Paystack rejects it ("Invalid Email
+      // Address Passed"). Use the platform's real domain so top-ups succeed.
+      email:     `${session.phone.replace('+', '')}@lumexfud.com.ng`,
       amount:    amountKobo,
       reference,
       callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/profile/wallet?topup=success`,

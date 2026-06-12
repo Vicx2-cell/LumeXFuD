@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { createTransferRecipient, initiateTransfer } from '@/lib/paystack/transfer'
 import { superAudit } from '@/lib/audit'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 import crypto from 'crypto'
 
@@ -42,6 +43,12 @@ export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  // Founder payout — very strict cap (3 / 10 min) even though it's super-admin only.
+  const rl = await rateLimitGeneric(`super-withdraw:${session.userId ?? session.phone}`, 3, 600, true)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many withdrawal attempts. Please wait a few minutes and try again.' }, { status: 429 })
+  }
 
   let body: unknown
   try {

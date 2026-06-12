@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSession, setCookieOptions } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { normalizePhone } from '@/lib/phone'
 import { loginPinInput } from '@/lib/validators'
 import { compareSecret, findAuthUserByPhone, getRoleRedirect, hashSecret, AUTH_USER_COLUMNS, type AuthUserRow } from '@/lib/pin-auth'
 import { rateLimitPinLogin } from '@/lib/rate-limit'
+import { signMfaPending, MFA_COOKIE, shortCookie } from '@/lib/webauthn'
 
 const LOCKOUT_MINUTES = 30
 
@@ -38,7 +40,17 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { phone, pin } = loginPinInput.parse(body)
-    const normalizedPhone = phone.trim()
+
+    // Canonicalize to E.164 BEFORE the rate-limit key. Keying on the raw input
+    // would let an attacker dodge the cap by varying format (+234.../0.../spaces)
+    // to land in separate Upstash buckets. normalizePhone throws on garbage —
+    // treat that as a bad login rather than leaking a distinct error.
+    let normalizedPhone: string
+    try {
+      normalizedPhone = normalizePhone(phone)
+    } catch {
+      return NextResponse.json({ error: 'Invalid phone or PIN' }, { status: 400 })
+    }
 
     const limit = await rateLimitPinLogin(normalizedPhone)
     if (!limit.success) {
@@ -53,7 +65,21 @@ export async function POST(req: NextRequest) {
     if (!user) {
       user = await ensureSuperAdminBootstrap(normalizedPhone, pin)
     }
-    if (!user || !user.user.login_pin_hash) {
+    if (!user) {
+      // No account anywhere (customer/vendor/rider/admin). Per product decision
+      // we surface this clearly so new users are guided to sign up — knowingly
+      // accepting the account-enumeration trade-off this opens. Still run a dummy
+      // compare to keep response timing close to the wrong-PIN path.
+      await compareSecret(pin, null)
+      return NextResponse.json(
+        { error: "This number isn't registered yet.", unregistered: true },
+        { status: 404 }
+      )
+    }
+    if (!user.user.login_pin_hash) {
+      // Account EXISTS but has no PIN set — a registered row in an unusual state.
+      // Keep the generic message: it's not "unregistered" (don't push them to
+      // re-register, which would collide with the existing row).
       await compareSecret(pin, null)
       return NextResponse.json({ error: 'Invalid phone or PIN' }, { status: 400 })
     }
@@ -91,6 +117,25 @@ export async function POST(req: NextRequest) {
       pin_attempts: 0,
       pin_locked_until: null,
     }).eq('id', user.user.id)
+
+    // ── Second factor (Face ID / Touch ID) ──────────────────────────────────
+    // If this account has enrolled a passkey, the correct PIN is only step 1.
+    // Issue a short-lived, signed "PIN passed" token instead of a session, and
+    // require a WebAuthn assertion (see /api/auth/webauthn/login-*) before any
+    // session exists. Accounts with no passkey log in with PIN alone (opt-in).
+    const { data: passkeys } = await db
+      .from('webauthn_credentials')
+      .select('id')
+      .eq('user_id', user.user.id)
+      .eq('user_role', user.role)
+      .limit(1)
+
+    if (passkeys && passkeys.length > 0) {
+      const mfaToken = await signMfaPending({ userId: user.user.id, role: user.role, phone: user.user.phone })
+      const res = NextResponse.json({ webauthn_required: true })
+      res.cookies.set(MFA_COOKIE, mfaToken, shortCookie())
+      return res
+    }
 
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
     const userAgent = req.headers.get('user-agent') ?? undefined

@@ -29,6 +29,8 @@ export default function AdminRiders() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [toast, setToast] = useState('')
+  const [removeTarget, setRemoveTarget] = useState<RiderRow | null>(null)
+  const [removing, setRemoving] = useState(false)
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -63,8 +65,49 @@ export default function AdminRiders() {
     setActionLoading(null)
   }
 
+  async function confirmRemove() {
+    if (!removeTarget) return
+    setRemoving(true)
+    const res = await fetch(`/api/admin/riders/${removeTarget.id}`, { method: 'DELETE' })
+    const d = await res.json() as { error?: string }
+    if (res.ok) {
+      showToast(`${removeTarget.full_name} removed`)
+      setRemoveTarget(null)
+      await fetchRiders()
+    } else {
+      showToast(d.error ?? 'Could not remove rider')
+    }
+    setRemoving(false)
+  }
+
   return (
-    <div className="min-h-dvh px-4 py-8" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page px-4 py-8 overflow-hidden">
+      {/* Remove confirmation */}
+      {removeTarget && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center lx-scrim px-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => !removing && setRemoveTarget(null)}>
+          <div className="lx-sheet sm:lx-scale-in glass-thick w-full max-w-sm p-6 space-y-4" style={{ borderRadius: 24 }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <span className="flex items-center justify-center w-11 h-11 rounded-2xl shrink-0" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+              </span>
+              <div>
+                <h3 className="font-semibold text-lg">Remove rider?</h3>
+                <p className="text-sm text-white/55">{removeTarget.full_name}</p>
+              </div>
+            </div>
+            <p className="text-sm text-white/60">
+              This signs <strong>{removeTarget.full_name}</strong> out and stops new deliveries. Their delivery history and wallet records are kept.
+            </p>
+            <button onClick={confirmRemove} disabled={removing} className="w-full py-3.5 rounded-xl font-semibold disabled:opacity-50" style={{ background: '#EF4444', color: '#fff' }}>
+              {removing ? 'Removing…' : 'Yes, remove rider'}
+            </button>
+            <button onClick={() => setRemoveTarget(null)} disabled={removing} className="w-full py-2.5 text-sm text-white/55 hover:text-white/80 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium"
           style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
@@ -154,6 +197,11 @@ export default function AdminRiders() {
                       {actionLoading === r.id + 'unsuspend' ? '…' : 'Unsuspend'}
                     </button>
                   )}
+                  <button onClick={() => setRemoveTarget(r)}
+                    className="ml-auto px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-red-500/20"
+                    style={{ background: 'rgba(239,68,68,0.08)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    Remove
+                  </button>
                 </div>
               </div>
             ))}

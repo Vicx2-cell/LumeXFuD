@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Admin only' }, { status: 403 })
   }
 
-  const rl = await rateLimitGeneric(`refund:${session.phone}`, 20, 300)
+  const rl = await rateLimitGeneric(`refund:${session.phone}`, 20, 300, true)
   if (!rl.success) {
     return NextResponse.json({ error: 'Too many refund requests. Please slow down.' }, { status: 429 })
   }

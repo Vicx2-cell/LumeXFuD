@@ -8,6 +8,7 @@ import { createTransferRecipient, initiateTransfer } from '@/lib/paystack/transf
 import { decryptField } from '@/lib/crypto'
 import { audit } from '@/lib/audit'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 import type { WalletBalance } from '@/lib/wallet'
 import crypto from 'crypto'
@@ -27,6 +28,13 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['vendor', 'rider'].includes(session.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // Money out — very strict cap per user (3 / 10 min) to blunt account-takeover
+  // payout drains. No-ops if Upstash is unset.
+  const rl = await rateLimitGeneric(`wallet-withdraw:${session.userId ?? session.phone}`, 3, 600, true)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many withdrawal attempts. Please wait a few minutes and try again.' }, { status: 429 })
   }
 
   const body = await req.json().catch(() => null)

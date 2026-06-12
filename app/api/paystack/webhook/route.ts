@@ -26,13 +26,35 @@ export async function POST(req: NextRequest) {
   }
 
   const { event, data } = payload
-  const reference = (data?.reference as string) ?? (data?.transfer_code as string) ?? ''
+
+  // Idempotency key. processed_webhooks is UNIQUE(reference, event), so this
+  // string only needs to be stable across Paystack's retries of the SAME event
+  // and distinct between different resources of the same event type.
+  //
+  // The old `data.reference ?? data.transfer_code` chain returned '' for events
+  // that carry their id elsewhere — refund.processed / refund.failed put it in
+  // `transaction_reference` / `id`, never `reference`. Every such event then
+  // collapsed to ('', 'refund.processed'): the first was recorded and ALL later
+  // ones hit the unique constraint and were silently dropped as "already
+  // processed", so refund status updates after the first never applied.
+  //
+  // Paystack stamps a unique resource `id` on every event's data object
+  // (transaction / transfer / refund id), so prefer it; fall back to the
+  // human-readable refs for older/edge payloads. `||` (not `??`) so an empty
+  // string also falls through.
+  const dedupeRef =
+    (data?.id != null ? String(data.id) : '') ||
+    (data?.reference as string) ||
+    (data?.transfer_code as string) ||
+    (data?.transaction_reference as string) ||
+    (data?.refund_reference as string) ||
+    ''
 
   // 4. Check idempotency — return 200 if already processed
   const db = createSupabaseAdmin()
   try {
     await db.from('processed_webhooks').insert({
-      reference,
+      reference: dedupeRef,
       event,
       payload,
     })

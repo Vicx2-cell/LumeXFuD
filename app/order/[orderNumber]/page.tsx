@@ -29,24 +29,35 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNum
 
   if (!order) notFound()
 
-  // BOLA check: customer must own this order (or admin)
-  if (session) {
-    if (session.role === 'customer') {
-      const { data: customer } = await db
-        .from('customers')
-        .select('id')
-        .eq('phone', session.phone)
-        .single()
-      if (!customer || customer.id !== order.customer_id) {
-        redirect('/')
-      }
-    }
-  } else if (!order.guest_phone) {
+  // BOLA/IDOR check. Order numbers are sequential (LXF-2026-XXXXXX) and thus
+  // enumerable, so this page must bind the viewer to THIS order — not merely
+  // require any session. Previously a guest order rendered to anyone, and any
+  // vendor/rider session could read any order by number; both are closed here.
+  if (!session) {
+    // No public view, even for legacy guest orders — log in and prove ownership.
     redirect(`/auth?next=/order/${orderNumber}`)
   }
 
+  let authorized = false
+  if (session.role === 'admin' || session.role === 'super_admin') {
+    authorized = true // staff act across all orders
+  } else if (session.role === 'customer') {
+    const { data: customer } = await db
+      .from('customers')
+      .select('id')
+      .eq('phone', session.phone)
+      .single()
+    authorized = !!customer && customer.id === order.customer_id
+  } else if (session.role === 'vendor') {
+    authorized = !!session.userId && session.userId === order.vendor_id
+  } else if (session.role === 'rider') {
+    authorized = !!session.userId && session.userId === order.rider_id
+  }
+
+  if (!authorized) redirect('/')
+
   return (
-    <main className="min-h-dvh pb-24" style={{ background: '#0A0A0B' }}>
+    <main className="lx-page pb-24 overflow-hidden">
       <OrderStatusClient order={order as unknown as OrderDetail} />
       <BottomNav />
     </main>

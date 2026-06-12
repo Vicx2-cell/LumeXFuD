@@ -5,6 +5,7 @@ import { disputeInput } from '@/lib/validators'
 import { audit } from '@/lib/audit'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 
 const DISPUTE_WINDOW_MS = 15 * 60 * 1000
 
@@ -17,6 +18,9 @@ export async function POST(
   if (!session || session.role !== 'customer') {
     return NextResponse.json({ error: 'Customer only' }, { status: 403 })
   }
+
+  const rl = await rateLimitGeneric(`order-dispute:${session.userId ?? session.phone}`, 30, 60)
+  if (!rl.success) return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429 })
 
   let body: unknown
   try {

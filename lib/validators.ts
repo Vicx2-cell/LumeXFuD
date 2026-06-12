@@ -27,6 +27,10 @@ export const createOrderInput = z.object({
   delivery_address: z.string().min(5).max(500),
   delivery_instructions: z.string().max(300).optional(),
   tip_amount: z.number().int().min(0).max(50000).optional().default(0),
+  // How the customer intends to pay. The wallet split is ALWAYS recomputed
+  // server-side from the live balance — any client-sent wallet amount is
+  // ignored (rule #4/#19). PAYSTACK is the safe default.
+  payment_method: z.enum(['PAYSTACK', 'WALLET', 'SPLIT']).optional().default('PAYSTACK'),
 })
 
 export const orderStatusInput = z.object({
@@ -72,12 +76,12 @@ export const withdrawInput = z.object({
 
 export const verifyAccountInput = z.object({
   account_number: z.string().length(10).regex(/^\d{10}$/),
-  bank_code:      z.string().min(3).max(10),
+  bank_code:      z.string().min(3).max(10).regex(/^\d{3,10}$/),
 })
 
 export const saveBankInput = z.object({
   account_number: z.string().length(10).regex(/^\d{10}$/),
-  bank_code:      z.string().min(3).max(10),
+  bank_code:      z.string().min(3).max(10).regex(/^\d{3,10}$/),
   bank_name:      z.string().min(2).max(100),
   account_name:   z.string().min(2).max(200),
   wallet_pin:     z.string().length(4).regex(/^\d{4}$/),

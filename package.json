@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@sentry/nextjs": "10.53.1",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.1",
-    "@upstash/ratelimit": "2.0.8",
+    "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "bcryptjs": "2.4.3",
     "file-type": "19.6.0",

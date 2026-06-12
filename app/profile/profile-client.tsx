@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/back-button'
+import { FaceIdSetup } from '@/components/face-id-setup'
 import type { CustomerProfile, XPData, BadgeItem } from './page'
 
 const KEYPAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'] as const
@@ -205,15 +206,14 @@ export function ProfileClient({
 
   return (
     <>
-      <div className="sticky top-0 z-40 border-b border-white/8 px-4 py-3"
-        style={{ background: 'rgba(10,10,11,0.95)', backdropFilter: 'blur(20px)' }}>
+      <div className="sticky top-0 z-40 glass-thin px-4 py-3" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <BackButton />
           <h1 className="font-semibold">Profile</h1>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-5 space-y-5">
+      <div className="max-w-lg mx-auto px-4 py-5 space-y-5 lx-enter">
         {/* Gamification panel */}
         {xp && (
           <div className="rounded-2xl p-5 space-y-4"
@@ -270,7 +270,7 @@ export function ProfileClient({
 
         {/* Badges */}
         {badges.length > 0 && (
-          <div className="rounded-2xl p-4" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
             <h3 className="text-sm font-semibold text-white/70 mb-3">Your badges</h3>
             <div className="flex flex-wrap gap-2">
               {badges.map((b) => (
@@ -288,7 +288,7 @@ export function ProfileClient({
         )}
 
         {/* Edit profile */}
-        <div className="rounded-2xl p-4 space-y-4" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="rounded-2xl p-4 space-y-4" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
           <h3 className="text-sm font-semibold text-white/70">Your details</h3>
           <div>
             <label className="block text-xs text-white/50 mb-1.5">Phone</label>
@@ -335,15 +335,15 @@ export function ProfileClient({
           <button
             onClick={handleSave}
             disabled={saving}
-            className="w-full rounded-xl py-3.5 font-semibold text-sm disabled:opacity-50"
-            style={{ background: '#F5A623', color: '#000' }}
+            className="lx-btn-amber w-full py-3.5 text-sm flex items-center justify-center gap-2"
           >
-            {saved ? '✓ Saved!' : saving ? 'Saving…' : 'Save changes'}
+            {saved && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>}
+            {saved ? 'Saved!' : saving ? 'Saving…' : 'Save changes'}
           </button>
         </div>
 
         {/* Security — PIN management */}
-        <div className="rounded-2xl p-4 space-y-3" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
           <h3 className="text-sm font-semibold text-white/70">Security</h3>
 
           {pinSuccess && (
@@ -352,18 +352,20 @@ export function ProfileClient({
 
           {pinFlow === 'idle' && (
             <div className="space-y-2">
+              {/* Face ID / Touch ID — optional second factor */}
+              <FaceIdSetup />
               <button
                 onClick={() => { resetPinFlow(); setPinFlow('change-current') }}
-                className="block w-full text-left text-sm text-white/60 hover:text-white py-1"
+                className="block w-full text-left text-sm text-white/65 hover:text-white py-1.5 transition-colors"
               >
-                🔑 Change login PIN
+                Change login PIN
               </button>
               <button
                 onClick={() => { resetPinFlow(); setPinFlow('remove') }}
-                className="block w-full text-left text-sm py-1"
+                className="block w-full text-left text-sm py-1.5"
                 style={{ color: '#ef4444' }}
               >
-                🗑️ Remove login PIN
+                Remove login PIN
               </button>
             </div>
           )}
@@ -402,22 +404,22 @@ export function ProfileClient({
         </div>
 
         {/* NDPR links */}
-        <div className="rounded-2xl p-4 space-y-3" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
           <h3 className="text-sm font-semibold text-white/70">Privacy & data</h3>
-          <a href="/api/auth/export" className="block text-sm text-white/60 hover:text-white py-1">
-            📥 Export my data (NDPR)
+          <a href="/api/auth/export" className="block text-sm text-white/65 hover:text-white py-1.5 transition-colors">
+            Export my data (NDPR)
           </a>
-          <a href="/privacy" className="block text-sm text-white/60 hover:text-white py-1">
-            📄 Privacy policy
+          <a href="/privacy" className="block text-sm text-white/65 hover:text-white py-1.5 transition-colors">
+            Privacy policy
           </a>
-          <a href="/terms" className="block text-sm text-white/60 hover:text-white py-1">
-            📋 Terms of service
+          <a href="/terms" className="block text-sm text-white/65 hover:text-white py-1.5 transition-colors">
+            Terms of service
           </a>
           <button
-            className="block text-sm py-1 w-full text-left"
+            className="block text-sm py-1.5 w-full text-left"
             style={{ color: '#ef4444' }}
           >
-            🗑️ Delete account
+            Delete account
           </button>
         </div>
 

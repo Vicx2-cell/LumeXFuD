@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 
 interface PinInputProps {
   value: string
@@ -10,6 +10,15 @@ interface PinInputProps {
   disabled?: boolean
   label?: string
   length?: number
+  /** When true, plays the success burst (caller sets this right before navigating away). */
+  success?: boolean
+}
+
+/** Small haptic helper — no-ops where the Vibration API is unavailable (iOS Safari, desktop). */
+function buzz(pattern: number | number[]) {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    try { navigator.vibrate(pattern) } catch { /* ignore */ }
+  }
 }
 
 export default function PinInput({
@@ -20,106 +29,128 @@ export default function PinInput({
   disabled,
   label,
   length = 6,
+  success = false,
 }: PinInputProps) {
-  const [focusedIndex, setFocusedIndex] = useState<number | null>(null)
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [focused, setFocused] = useState(false)
+  // Bumped each time a new error arrives so the shake animation re-triggers.
+  const [shakeKey, setShakeKey] = useState(0)
+  const prevErr = useRef('')
 
-  // Ensure inputRefs length matches length prop
+  // Autofocus so the keypad / keyboard is ready immediately (iPhone-unlock feel).
   useEffect(() => {
-    inputRefs.current = inputRefs.current.slice(0, length)
-  }, [length])
+    if (!disabled) inputRef.current?.focus()
+  }, [disabled])
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
-    if (e.key === 'Backspace' && !value[index] && index > 0) {
-      // Focus previous input on backspace if current is empty
-      inputRefs.current[index - 1]?.focus()
+  // Re-arm shake + error haptic whenever a fresh error appears.
+  useEffect(() => {
+    if (error && error !== prevErr.current) {
+      setShakeKey((k) => k + 1)
+      buzz([0, 35, 40, 35])
     }
-  }
+    prevErr.current = error ?? ''
+  }, [error])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
-    const val = e.target.value
-    if (!/^\d*$/.test(val)) return // Only allow digits
+  // Success haptic.
+  useEffect(() => {
+    if (success) buzz(30)
+  }, [success])
 
-    const newValue = value.split('')
-    // Take only the last character if multiple are pasted or typed
-    newValue[index] = val.slice(-1)
-    const updatedValue = newValue.join('').slice(0, length)
-    
-    onChange(updatedValue)
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = e.target.value.replace(/\D/g, '').slice(0, length)
+    if (next.length > value.length) buzz(8) // tap feedback on each new digit
+    onChange(next)
+    if (next.length === length && onComplete) onComplete(next)
+  }, [length, onChange, onComplete, value.length])
 
-    // Auto-focus next input
-    if (val && index < length - 1) {
-      inputRefs.current[index + 1]?.focus()
-    }
-
-    // Check if complete
-    if (updatedValue.length === length && onComplete && val) {
-      onComplete(updatedValue)
-    }
-  }
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault()
-    if (disabled) return
-
-    const pastedData = e.clipboardData.getData('text').slice(0, length)
-    if (!/^\d+$/.test(pastedData)) return
-
-    onChange(pastedData)
-    
-    // Focus the last input or the next available one
-    const nextIndex = Math.min(pastedData.length, length - 1)
-    inputRefs.current[nextIndex]?.focus()
-
-    if (pastedData.length === length && onComplete) {
-      onComplete(pastedData)
-    }
-  }
+  const cells = Array.from({ length })
 
   return (
     <div className="space-y-4">
       {label && (
-        <label className="block text-center text-xs font-medium text-white/60 mb-2">
+        <label
+          htmlFor="lx-pin"
+          className="block text-center text-xs font-medium text-white/60"
+        >
           {label}
         </label>
       )}
-      
-      <div className="flex justify-center gap-3">
-        {Array.from({ length }).map((_, i) => (
-          <input
-            key={i}
-            ref={(el) => { inputRefs.current[i] = el }}
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={1}
-            value={value[i] || ''}
-            onChange={(e) => handleChange(e, i)}
-            onKeyDown={(e) => handleKeyDown(e, i)}
-            onPaste={handlePaste}
-            onFocus={() => setFocusedIndex(i)}
-            onBlur={() => setFocusedIndex(null)}
-            disabled={disabled}
-            className="w-14 h-16 text-center text-2xl font-bold rounded-xl transition-all outline-none"
-            style={{
-              background: '#111113',
-              border: `1px solid ${
-                error 
-                  ? '#ef4444' 
-                  : focusedIndex === i 
-                    ? '#F5A623' 
-                    : 'rgba(255,255,255,0.1)'
-              }`,
-              color: '#fff',
-              boxShadow: focusedIndex === i ? '0 0 0 1px rgba(245, 166, 35, 0.2)' : 'none'
-            }}
-          />
-        ))}
-      </div>
 
-      {error && (
-        <p className="text-center text-sm text-red-400 mt-2">{error}</p>
-      )}
+      {/* The whole row is a label for the hidden input — tap anywhere to type. */}
+      <label
+        htmlFor="lx-pin"
+        key={shakeKey}
+        className={`flex justify-center gap-3 cursor-text ${error ? 'lx-shake' : ''}`}
+        aria-hidden="true"
+      >
+        {cells.map((_, i) => {
+          const filled = i < value.length
+          const active = focused && i === value.length && !success
+          const borderColor = success
+            ? '#34d399'
+            : error
+              ? '#ef4444'
+              : active
+                ? '#F5A623'
+                : 'rgba(255,255,255,0.12)'
+          return (
+            <div
+              key={i}
+              className="relative flex items-center justify-center w-12 h-14 rounded-2xl transition-colors"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                border: `1.5px solid ${borderColor}`,
+                boxShadow: active ? '0 0 0 4px rgba(245,166,35,0.18)' : 'inset 0 1px 0 rgba(255,255,255,0.06)',
+              }}
+            >
+              {filled && (
+                <span
+                  className="lx-pop block rounded-full"
+                  style={{
+                    width: 14,
+                    height: 14,
+                    background: success ? '#34d399' : '#F5A623',
+                    boxShadow: `0 0 12px ${success ? 'rgba(52,211,153,0.6)' : 'rgba(245,166,35,0.6)'}`,
+                  }}
+                />
+              )}
+              {active && !filled && (
+                <span className="block w-0.5 h-6 rounded-full bg-amber-400/70 animate-pulse" />
+              )}
+            </div>
+          )
+        })}
+      </label>
+
+      {/* Real input — visually hidden but focusable & screen-reader friendly. */}
+      <input
+        ref={inputRef}
+        id="lx-pin"
+        type="text"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        pattern="[0-9]*"
+        maxLength={length}
+        value={value}
+        onChange={handleChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        disabled={disabled}
+        aria-label={label ?? 'PIN'}
+        aria-invalid={!!error}
+        className="absolute opacity-0 w-px h-px -z-10"
+        style={{ left: -9999 }}
+      />
+
+      <p className="text-center text-sm min-h-[1.25rem]" aria-live="polite" role="status">
+        {error
+          ? <span className="text-red-400">{error}</span>
+          : success
+            ? <span className="text-emerald-400">Unlocked ✓</span>
+            : null}
+      </p>
     </div>
   )
 }

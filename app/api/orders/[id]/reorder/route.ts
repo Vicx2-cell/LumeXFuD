@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 
 export async function POST(
   _req: NextRequest,
@@ -9,6 +10,9 @@ export async function POST(
   const { id } = await params
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const rl = await rateLimitGeneric(`order-reorder:${session.userId ?? session.phone}`, 30, 60)
+  if (!rl.success) return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429 })
 
   const db = createSupabaseAdmin()
 

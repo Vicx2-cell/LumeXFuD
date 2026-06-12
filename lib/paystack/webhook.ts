@@ -2,7 +2,8 @@ import { createSupabaseAdmin } from '../supabase/server'
 import { sendWhatsAppWithFallback } from '../termii/whatsapp'
 import { renderTemplate } from '../termii/templates'
 import { recordPlatformEarning } from '../platform-earnings'
-import { processCustomerTopup } from '../customer-wallet'
+import { processCustomerTopup, spendCustomerWallet } from '../customer-wallet'
+import { refundTransaction } from './transfer'
 
 export type PaystackEvent =
   | 'charge.success'
@@ -45,6 +46,96 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
       }
 
       // Regular order payment
+      const paidAmount = Number(data.amount)
+
+      // Find the pending order for this reference BEFORE crediting.
+      const { data: pending } = await db
+        .from('orders')
+        .select('id, order_number, vendor_id, customer_id, total_amount, subtotal, wallet_amount_kobo, payment_method')
+        .eq('paystack_reference', reference)
+        .eq('payment_status', 'PENDING')
+        .maybeSingle()
+
+      if (!pending) break
+
+      // The card only ever pays the NON-wallet portion. For a plain PAYSTACK
+      // order wallet_amount_kobo is 0 so this equals total_amount; for a SPLIT
+      // it's the remainder after the wallet. A mismatch means reference reuse, a
+      // partial charge, or config drift — never credit; alert for manual review.
+      const walletPortion = Number(pending.wallet_amount_kobo) || 0
+      const expectedCharge = Number(pending.total_amount) - walletPortion
+      if (!Number.isFinite(paidAmount) || paidAmount !== expectedCharge) {
+        console.error(
+          `[webhook] amount mismatch on ${reference}: charged ${paidAmount}, expected ${expectedCharge}`
+        )
+        const adminPhone = process.env.ADMIN_PHONE
+        if (adminPhone) {
+          void sendWhatsAppWithFallback({
+            to: adminPhone,
+            message:
+              `⚠️ Payment amount mismatch on order ${pending.order_number}\n` +
+              `Charged: ₦${Math.round((Number.isFinite(paidAmount) ? paidAmount : 0) / 100)}\n` +
+              `Expected: ₦${Math.round(expectedCharge / 100)}\n` +
+              `Order NOT marked paid. Manual review needed.`,
+          }).catch(() => {})
+        }
+        break
+      }
+
+      // SPLIT: the card remainder is confirmed — debit the wallet portion now.
+      // This is the single commit point for split orders, so an abandoned
+      // checkout never touched the wallet. If the wallet can no longer cover its
+      // part (spent elsewhere since checkout) we must not half-pay the order:
+      // refund the card remainder, cancel, and alert — never mark it paid.
+      if (pending.payment_method === 'SPLIT' && walletPortion > 0 && pending.customer_id) {
+        let spendOk = false
+        try {
+          const spend = await spendCustomerWallet({
+            customerId:  pending.customer_id,
+            amountKobo:  walletPortion,
+            orderId:     pending.id,
+            orderNumber: pending.order_number,
+            reference:   `CWUSE-${pending.id}`,
+          })
+          spendOk = spend.success
+        } catch (err) {
+          console.error(`[webhook] split wallet debit RPC error on ${reference}:`, err)
+        }
+
+        if (!spendOk) {
+          let refundOk = true
+          try {
+            await refundTransaction(reference, paidAmount)
+          } catch (refundErr) {
+            refundOk = false
+            console.error(`[webhook] split refund failed on ${reference}:`, refundErr)
+          }
+          await db
+            .from('orders')
+            .update({ status: 'CANCELLED', payment_status: 'FAILED', updated_at: new Date().toISOString() })
+            .eq('id', pending.id)
+            .eq('payment_status', 'PENDING')
+          await db.from('refunds').insert({
+            order_id:                       pending.id,
+            paystack_transaction_reference: reference,
+            amount_kobo:                    paidAmount,
+            reason:                         'Split payment: wallet portion could not be debited',
+            status:                         refundOk ? 'PROCESSING' : 'NEEDS_ATTENTION',
+            triggered_by:                   'SYSTEM_WEBHOOK',
+          })
+          const adminPhone = process.env.ADMIN_PHONE
+          if (adminPhone) {
+            void sendWhatsAppWithFallback({
+              to: adminPhone,
+              message:
+                `⚠️ Split order ${pending.order_number}: wallet debit failed after card charged.\n` +
+                `Card portion ₦${Math.round(paidAmount / 100)} ${refundOk ? 'refund initiated' : 'REFUND FAILED — refund manually'}.`,
+            }).catch(() => {})
+          }
+          break
+        }
+      }
+
       const { data: order, error } = await db
         .from('orders')
         .update({ payment_status: 'PAID', status: 'PENDING', updated_at: new Date().toISOString() })
@@ -146,13 +237,36 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
         .single()
 
       if (txn) {
-        // Refund balance to wallet
-        await db.rpc('credit_wallet', {
+        // Restore the debited balance. credit_wallet is atomic (FOR UPDATE) and
+        // idempotent on the reference, so a duplicate transfer.failed /
+        // transfer.reversed pair can't double-credit. If it fails (e.g. wallet
+        // row missing), the money is stuck debited — alert an admin loudly
+        // rather than swallowing it.
+        const { data: restored, error: creditErr } = await db.rpc('credit_wallet', {
           p_user_id: txn.user_id,
           p_user_type: txn.user_type,
           p_amount: txn.amount,
           p_reference: `refund-${transferCode}`,
         })
+
+        if (creditErr || restored !== true) {
+          console.error(
+            `[webhook] credit_wallet reversal FAILED for ${txn.user_type} ${txn.user_id} ` +
+            `(${txn.amount} kobo, transfer ${transferCode}):`, creditErr?.message ?? 'returned false'
+          )
+          const adminPhone = process.env.ADMIN_PHONE
+          if (adminPhone) {
+            void sendWhatsAppWithFallback({
+              to: adminPhone,
+              message:
+                `🚨 Payout reversal NOT credited back.\n` +
+                `${txn.user_type} ${txn.user_id}\n` +
+                `Amount: ₦${Math.round(Number(txn.amount) / 100)}\n` +
+                `Transfer: ${transferCode}\n` +
+                `Wallet balance must be restored manually.`,
+            }).catch(() => {})
+          }
+        }
       }
       break
     }

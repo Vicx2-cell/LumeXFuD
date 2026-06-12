@@ -33,3 +33,5 @@ ALTER TABLE menu_item_addons ENABLE ROW LEVEL SECURITY;
 -- accurate even if the add-on is later edited or removed.
 ALTER TABLE order_items
   ADD COLUMN IF NOT EXISTS addons JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+

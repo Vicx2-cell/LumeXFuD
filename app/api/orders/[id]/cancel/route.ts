@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { refundTransaction } from '@/lib/paystack/transfer'
-import { recordPlatformEarning } from '@/lib/platform-earnings'
+import { refundOrderPayments } from '@/lib/order-refund'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 
 const CANCELLABLE_STATUSES = ['PENDING_PAYMENT', 'PENDING', 'VENDOR_ACCEPTED']
 
@@ -18,6 +18,9 @@ export async function POST(
     return NextResponse.json({ error: 'Customer only' }, { status: 403 })
   }
 
+  const rl = await rateLimitGeneric(`order-cancel:${session.userId ?? session.phone}`, 30, 60)
+  if (!rl.success) return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429 })
+
   const db = createSupabaseAdmin()
 
   const { data: customer } = await db
@@ -30,7 +33,7 @@ export async function POST(
 
   const { data: order, error } = await db
     .from('orders')
-    .select('id, order_number, status, payment_status, paystack_reference, customer_id, preparing_at, total_amount')
+    .select('id, order_number, status, payment_status, paystack_reference, customer_id, preparing_at, total_amount, wallet_amount_kobo')
     .eq('id', id)
     .eq('customer_id', customer.id)
     .single()
@@ -54,39 +57,31 @@ export async function POST(
     .update({ status: 'CANCELLED', cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq('id', id)
 
-  // Refund if paid — record a refunds ledger row + platform cost so every
-  // refund is traceable (rule #30), consistent with the auto-cancel cron.
-  if (order.payment_status === 'PAID' && order.paystack_reference) {
-    const amountKobo = order.total_amount as number
-    let refundOk = true
-    try {
-      await refundTransaction(order.paystack_reference as string, amountKobo)
-    } catch (refundErr) {
-      refundOk = false
-      console.error(`[orders/cancel] refund failed for order ${order.id}:`, refundErr)
-    }
-
-    await db.from('refunds').insert({
-      order_id:                       order.id,
-      paystack_transaction_reference: order.paystack_reference,
-      amount_kobo:                    amountKobo,
-      reason:                         'Customer cancelled order',
-      status:                         refundOk ? 'PROCESSING' : 'NEEDS_ATTENTION',
-      triggered_by:                   session.phone,
+  // Refund if paid — wallet portion back to the wallet, card portion via
+  // Paystack (rule #30). The order is already claimed CANCELLED above, so this
+  // runs at most once. A still-unpaid order (PENDING_PAYMENT) has payment_status
+  // PENDING and skips this entirely — for a SPLIT that means the wallet, debited
+  // only in the webhook, was never touched.
+  if (order.payment_status === 'PAID') {
+    const { walletOk, paystackOk } = await refundOrderPayments({
+      order: {
+        id:                 order.id as string,
+        order_number:       order.order_number as string,
+        customer_id:        order.customer_id as string | null,
+        total_amount:       order.total_amount as number,
+        wallet_amount_kobo: (order.wallet_amount_kobo as number) ?? 0,
+        paystack_reference: order.paystack_reference as string | null,
+      },
+      reason:        'Customer cancelled order',
+      triggeredBy:   session.phone,
+      customerPhone: customer.phone as string,
     })
 
-    if (refundOk) {
+    if (walletOk && paystackOk) {
       await db
         .from('orders')
         .update({ payment_status: 'REFUNDED', updated_at: new Date().toISOString() })
         .eq('id', id)
-
-      void recordPlatformEarning({
-        type:        'REFUND_COST',
-        amount_kobo: -amountKobo,
-        order_id:    order.id as string,
-        description: `Customer-cancel refund — order ${order.order_number as string}`,
-      })
     }
   }
 

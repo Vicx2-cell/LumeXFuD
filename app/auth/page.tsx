@@ -2,6 +2,7 @@
 
 import { useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { startAuthentication } from '@simplewebauthn/browser'
 import PinInput from '@/components/auth/PinInput'
 
 export default function AuthPage() {
@@ -21,11 +22,53 @@ function LoginForm() {
   const [pin,     setPin]     = useState('')
   const [error,   setError]   = useState('')
   const [loading, setLoading] = useState(false)
-  const [step,    setStep]    = useState<'phone' | 'pin'>('phone')
+  const [success, setSuccess] = useState(false)
+  const [step,    setStep]    = useState<'phone' | 'pin' | 'mfa'>('phone')
+  const [notRegistered, setNotRegistered] = useState(false)
+  const [mfaError, setMfaError] = useState('')
+  const [mfaBusy,  setMfaBusy]  = useState(false)
+
+  const goRegister = useCallback(() => {
+    router.push(`/auth/register?phone=${encodeURIComponent(phone)}`)
+  }, [phone, router])
+
+  const runWebAuthn = useCallback(async () => {
+    setMfaBusy(true)
+    setMfaError('')
+    try {
+      const optRes = await fetch('/api/auth/webauthn/login-options', { method: 'POST' })
+      const options = await optRes.json()
+      if (!optRes.ok) {
+        setMfaError(options.error ?? 'Could not start Face ID')
+        return
+      }
+      const assertion = await startAuthentication({ optionsJSON: options })
+      const verRes = await fetch('/api/auth/webauthn/login-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assertion),
+      })
+      const data = await verRes.json() as { error?: string; redirect_path?: string }
+      if (!verRes.ok) {
+        setMfaError(data.error ?? 'Face ID failed. Try again.')
+        return
+      }
+      setSuccess(true)
+      setTimeout(() => router.push(data.redirect_path ?? nextPath), 650)
+    } catch (e) {
+      const name = (e as { name?: string })?.name
+      setMfaError(name === 'NotAllowedError'
+        ? 'Face ID was cancelled or timed out.'
+        : 'Face ID is not available on this device.')
+    } finally {
+      setMfaBusy(false)
+    }
+  }, [nextPath, router])
 
   const submitLogin = useCallback(async (pinValue: string) => {
     if (pinValue.length !== 6) return
     setError('')
+    setNotRegistered(false)
     setLoading(true)
     try {
       const res  = await fetch('/api/auth/login', {
@@ -33,165 +76,236 @@ function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ phone, pin: pinValue }),
       })
-      const data = await res.json() as {
+      // Parse defensively: a non-JSON response (e.g. an HTML error/redirect page)
+      // must surface as a real error, not throw into the "Connection error" catch.
+      const data = await res.json().catch(() => ({})) as {
         error?: string
         role?: string
         redirect_path?: string
         pin_reset_pending?: boolean
+        webauthn_required?: boolean
+        unregistered?: boolean
       }
       if (!res.ok) {
         setPin('')
         setError(data.error ?? 'Invalid phone or PIN')
+        setNotRegistered(Boolean(data.unregistered))
         return
       }
-      if (data.pin_reset_pending) {
-        router.push('/auth/setup')
+      // PIN ok but this account has Face ID enrolled → step up to the second
+      // factor before any session is issued.
+      if (data.webauthn_required) {
+        setStep('mfa')
+        void runWebAuthn()
         return
       }
-      router.push(data.redirect_path ?? nextPath)
+      // Success: play the unlock burst, then navigate.
+      setSuccess(true)
+      setTimeout(() => {
+        if (data.pin_reset_pending) router.push('/auth/setup')
+        else router.push(data.redirect_path ?? nextPath)
+      }, 650)
     } catch {
       setPin('')
       setError('Connection error. Please try again.')
     } finally {
       setLoading(false)
     }
-  }, [phone, nextPath, router])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone, nextPath, router, runWebAuthn])
 
   function handlePhoneContinue() {
     if (phone.length < 13) return
     setPin('')
     setError('')
+    setNotRegistered(false)
     setStep('pin')
   }
 
   return (
-    <div
-      className="min-h-dvh flex flex-col items-center justify-center px-5 py-12"
-      style={{ background: '#0A0A0B' }}
-    >
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="text-center mb-10">
+    <main className="lx-page flex flex-col items-center justify-center px-5 py-12 overflow-hidden">
+      <div className="lx-orb lx-orb--amber" aria-hidden="true" />
+      <div className="lx-orb lx-orb--indigo" aria-hidden="true" />
+
+      <div className="relative z-10 w-full max-w-sm lx-enter">
+        {/* Logo + heading */}
+        <div className="text-center mb-8">
           <span
             className="inline-block px-4 py-1.5 rounded-lg font-bold text-sm"
-            style={{ background: '#F5A623', color: '#000' }}
+            style={{ background: '#F5A623', color: '#000', boxShadow: '0 0 24px rgba(245,166,35,0.4)' }}
           >
             LumeX Fud
           </span>
-          <h1 className="text-2xl font-bold mt-4 tracking-tight">Campus life, simplified.</h1>
-          <p className="text-sm text-white/40 mt-1">
-            {step === 'phone' ? 'Sign in with your phone number and PIN' : 'Enter your 6-digit PIN'}
+          <h1 className="text-[28px] leading-tight font-bold mt-5 tracking-tight">
+            Campus life, simplified.
+          </h1>
+          <p className="text-sm text-white/45 mt-2">
+            {step === 'phone' ? 'Sign in with your phone number and PIN' : 'Enter your 6-digit PIN to unlock'}
           </p>
         </div>
 
-        {/* ── Phone step ── */}
-        {step === 'phone' && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-white/60 mb-2">
-                Phone number
-              </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => {
-                  let val = e.target.value
-                  if (!val.startsWith('+234')) val = '+234' + val.replace(/^\+?234?/, '')
-                  setPhone(val)
-                }}
-                placeholder="+2348012345678"
-                className="w-full rounded-xl px-4 py-3.5 text-base outline-none"
-                style={{
-                  background: '#111113',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#fff',
-                }}
-                autoComplete="tel"
-                inputMode="tel"
-              />
-            </div>
+        {/* Glass card */}
+        <div className="glass p-6">
+          {/* ── Phone step ── */}
+          {step === 'phone' && (
+            <div className="space-y-5">
+              <div>
+                <label htmlFor="lx-phone" className="block text-xs font-medium text-white/60 mb-2">
+                  Phone number
+                </label>
+                <input
+                  id="lx-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => {
+                    let val = e.target.value
+                    if (!val.startsWith('+234')) val = '+234' + val.replace(/^\+?234?/, '')
+                    setPhone(val)
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handlePhoneContinue() }}
+                  placeholder="+2348012345678"
+                  className="w-full rounded-xl px-4 py-3.5 text-base outline-none transition-colors focus:border-amber-400"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#fff',
+                  }}
+                  autoComplete="tel"
+                  inputMode="tel"
+                />
+              </div>
 
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+              {error && <p className="text-red-400 text-sm" role="alert">{error}</p>}
 
-            <button
-              onClick={handlePhoneContinue}
-              disabled={phone.length < 13}
-              className="w-full rounded-xl py-4 font-semibold text-base transition-opacity disabled:opacity-50"
-              style={{ background: '#F5A623', color: '#000', minHeight: 56 }}
-            >
-              Login
-            </button>
-
-            <button
-              onClick={() => router.push('/auth/forgot-pin')}
-              className="w-full py-2.5 text-sm text-center"
-              style={{ color: '#F5A623' }}
-            >
-              Forgot PIN?
-            </button>
-
-            <p className="text-center text-sm text-white/40 pt-1">
-              New here?{' '}
               <button
-                onClick={() => router.push('/auth/register')}
-                className="font-medium"
-                style={{ color: '#F5A623' }}
+                onClick={handlePhoneContinue}
+                disabled={phone.length < 13}
+                className="lx-btn-amber w-full py-4 text-base"
+                style={{ minHeight: 56 }}
+                aria-label="Continue to PIN entry"
               >
-                Create account →
+                Continue
               </button>
-            </p>
-          </div>
-        )}
 
-        {/* ── PIN step ── */}
-        {step === 'pin' && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <p className="text-sm text-white/50">{phone}</p>
-            </div>
-
-            <PinInput
-              value={pin}
-              onChange={(v) => { setPin(v); setError('') }}
-              onComplete={submitLogin}
-              error={error}
-              disabled={loading}
-              label="Enter your PIN"
-            />
-
-            {loading && (
-              <p className="text-center text-sm text-white/40">Verifying…</p>
-            )}
-
-            <div className="space-y-2 pt-1">
               <button
                 onClick={() => router.push('/auth/forgot-pin')}
-                className="w-full py-2.5 text-sm text-center"
+                className="w-full py-2 text-sm text-center hover:opacity-80 transition-opacity"
                 style={{ color: '#F5A623' }}
               >
                 Forgot PIN?
               </button>
+            </div>
+          )}
+
+          {/* ── PIN step ── */}
+          {step === 'pin' && (
+            <div className="space-y-6">
+              <p className="text-center text-sm text-white/50 tabular-nums">{phone}</p>
+
+              <PinInput
+                value={pin}
+                onChange={(v) => { setPin(v); setError(''); setNotRegistered(false) }}
+                onComplete={submitLogin}
+                error={error}
+                success={success}
+                disabled={loading || success}
+                label="Enter your PIN"
+              />
+
+              {loading && !success && (
+                <p className="text-center text-sm text-white/40">Verifying…</p>
+              )}
+
+              {notRegistered && !success && (
+                <div
+                  className="rounded-xl p-4 text-center space-y-3"
+                  style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.2)' }}
+                >
+                  <p className="text-sm text-white/70">
+                    No account is registered with <span className="tabular-nums text-white/90">{phone}</span>.
+                  </p>
+                  <button onClick={goRegister} className="lx-btn-amber w-full py-3.5">
+                    Create an account →
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-1 pt-1">
+                <button
+                  onClick={() => router.push('/auth/forgot-pin')}
+                  className="w-full py-2 text-sm text-center hover:opacity-80 transition-opacity"
+                  style={{ color: '#F5A623' }}
+                  disabled={success}
+                >
+                  Forgot PIN?
+                </button>
+                <button
+                  onClick={() => { setPin(''); setError(''); setNotRegistered(false); setStep('phone') }}
+                  className="w-full py-2 text-sm text-white/35 text-center hover:text-white/60 transition-colors"
+                  disabled={success}
+                >
+                  ← Change number
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Face ID / Touch ID step (second factor) ── */}
+          {step === 'mfa' && (
+            <div className="space-y-6 text-center">
+              <div className="flex flex-col items-center gap-3">
+                <div
+                  className={`relative flex items-center justify-center w-20 h-20 rounded-3xl ${mfaBusy ? 'animate-pulse' : ''}`}
+                  style={{ background: 'rgba(245,166,35,0.12)', border: '1px solid rgba(245,166,35,0.3)', boxShadow: success ? '0 0 30px rgba(52,211,153,0.5)' : '0 0 30px rgba(245,166,35,0.25)' }}
+                >
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={success ? '#34d399' : '#F5A623'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4 8V6a2 2 0 0 1 2-2h2"/><path d="M4 16v2a2 2 0 0 0 2 2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/><path d="M16 20h2a2 2 0 0 0 2-2v-2"/>
+                    <path d="M9 9h.01"/><path d="M15 9h.01"/><path d="M9.5 15a3.5 3.5 0 0 0 5 0"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-semibold">{success ? 'Verified ✓' : "Confirm it's you"}</p>
+                  <p className="text-sm text-white/45 mt-1">
+                    {success ? 'Signing you in…' : 'Use Face ID or Touch ID to finish signing in.'}
+                  </p>
+                </div>
+              </div>
+
+              {mfaError && <p className="text-red-400 text-sm" role="alert">{mfaError}</p>}
+
+              {!success && (
+                <button
+                  onClick={() => void runWebAuthn()}
+                  disabled={mfaBusy}
+                  className="lx-btn-amber w-full py-3.5"
+                >
+                  {mfaBusy ? 'Waiting for Face ID…' : 'Try Face ID again'}
+                </button>
+              )}
+
               <button
-                onClick={() => { setPin(''); setError(''); setStep('phone') }}
-                className="w-full py-2 text-sm text-white/30 text-center"
+                onClick={() => { setPin(''); setError(''); setMfaError(''); setStep('phone') }}
+                className="w-full py-2 text-sm text-white/35 text-center hover:text-white/60 transition-colors"
+                disabled={success}
               >
-                ← Change number
+                ← Start over
               </button>
             </div>
+          )}
+        </div>
 
-            <p className="text-center text-sm text-white/40">
-              New here?{' '}
-              <button
-                onClick={() => router.push('/auth/register')}
-                className="font-medium"
-                style={{ color: '#F5A623' }}
-              >
-                Create account →
-              </button>
-            </p>
-          </div>
-        )}
+        {/* New-account link sits below the card on both steps */}
+        <p className="text-center text-sm text-white/45 pt-5">
+          New here?{' '}
+          <button
+            onClick={() => router.push('/auth/register')}
+            className="font-semibold hover:opacity-80 transition-opacity"
+            style={{ color: '#F5A623' }}
+          >
+            Create account →
+          </button>
+        </p>
       </div>
-    </div>
+    </main>
   )
 }

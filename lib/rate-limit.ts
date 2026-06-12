@@ -19,16 +19,34 @@ function makeRatelimit(requests: number, windowSeconds: number): Ratelimit | nul
 
 export type RateLimitResult = { success: boolean; remaining: number; reset: number }
 
-async function check(limiter: Ratelimit | null, key: string): Promise<RateLimitResult> {
-  if (!limiter) return { success: true, remaining: 999, reset: 0 }
-  const result = await limiter.limit(key)
-  return { success: result.success, remaining: result.remaining, reset: result.reset }
+// failClosed: when the limiter itself errors (Redis outage / bad token), should
+// the request be allowed (open) or blocked (closed)? Default OPEN — a Redis blip
+// must never 500 a login or payment. Pass `true` only where an unmetered request
+// has a real external cost (e.g. a Termii SMS), so a blip can't drain credits.
+async function check(limiter: Ratelimit | null, key: string, failClosed = false): Promise<RateLimitResult> {
+  if (!limiter) {
+    // Limiter unconfigured (no Upstash env). Same open/closed decision applies.
+    return failClosed
+      ? { success: false, remaining: 0, reset: 0 }
+      : { success: true, remaining: 999, reset: 0 }
+  }
+  try {
+    const result = await limiter.limit(key)
+    return { success: result.success, remaining: result.remaining, reset: result.reset }
+  } catch (err) {
+    console.error(`[rate-limit] limiter error — failing ${failClosed ? 'CLOSED' : 'open'}:`, err)
+    return failClosed
+      ? { success: false, remaining: 0, reset: 0 }
+      : { success: true, remaining: 999, reset: 0 }
+  }
 }
 
-// 3 OTP sends per phone per hour
+// 3 OTP sends per phone per hour. Fails CLOSED: each send costs a Termii SMS, so
+// if Redis is unavailable we'd rather block (user retries) than leave the
+// endpoint unmetered and burn credits.
 const _otpSendLimiter = makeRatelimit(3, 3600)
 export async function rateLimitOtpSend(phone: string): Promise<RateLimitResult> {
-  return check(_otpSendLimiter, `otp:send:${phone}`)
+  return check(_otpSendLimiter, `otp:send:${phone}`, true)
 }
 
 // 5 OTP verify attempts per phone per 15 minutes
@@ -61,8 +79,19 @@ export async function rateLimitForgotPinRecoveryCode(phone: string): Promise<Rat
   return check(_forgotPinRecoveryCodeLimiter, `forgot:recovery:${phone}`)
 }
 
-// Generic: N requests per window (seconds)
-export async function rateLimitGeneric(key: string, requests: number, windowSeconds: number): Promise<RateLimitResult> {
+// Generic: N requests per window (seconds).
+//
+// failClosed: default OPEN so a Redis blip can't 500 ordinary requests. Pass
+// `true` on money-movement routes (order create, withdraw, top-up, bank change,
+// refund) where an unmetered request has a real financial cost — there we'd
+// rather reject (the user retries) than let a Redis outage silently disable the
+// velocity cap that blunts payout drains and checkout/charge spam.
+export async function rateLimitGeneric(
+  key: string,
+  requests: number,
+  windowSeconds: number,
+  failClosed = false,
+): Promise<RateLimitResult> {
   const limiter = makeRatelimit(requests, windowSeconds)
-  return check(limiter, key)
+  return check(limiter, key, failClosed)
 }

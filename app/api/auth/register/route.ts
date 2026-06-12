@@ -6,9 +6,16 @@ import { normalizePhone } from '@/lib/phone'
 import { registerInput } from '@/lib/validators'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { compareSecret, findAuthUserByPhone, generateRecoveryCode, hashSecret, normalizeSecurityAnswer, validatePin } from '@/lib/pin-auth'
+import { getFeature } from '@/lib/features'
+import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 
 export async function POST(req: NextRequest) {
   try {
+    // Feature flag: a super admin can close new sign-ups platform-wide.
+    if (!(await getFeature('signups'))) {
+      return NextResponse.json({ error: 'New sign-ups are currently closed.' }, { status: 503 })
+    }
+
     // Unauthenticated endpoint — rate limit per IP (5 / hour) to curb mass
     // account creation. No-ops if Upstash is unset.
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
@@ -28,6 +35,42 @@ export async function POST(req: NextRequest) {
 
     validatePin(data.pin)
     const normalizedPhone = normalizePhone(data.phone)
+
+    // Privileged numbers must NEVER be self-registered through this public route,
+    // regardless of the phone_verification flag. The super admin bootstraps via
+    // login (ensureSuperAdminBootstrap) and operational admins are provisioned in
+    // the super-admin panel. Without this, turning phone_verification OFF would
+    // let anyone who knows SUPER_ADMIN_PHONE register it and be handed super_admin
+    // below — OTP was previously the only thing preventing that.
+    const privilegedPhones = new Set<string>()
+    for (const raw of [process.env.SUPER_ADMIN_PHONE, process.env.ADMIN_PHONE]) {
+      if (!raw) continue
+      privilegedPhones.add(raw)                    // match the env value as written
+      try { privilegedPhones.add(normalizePhone(raw)) } catch { /* keep raw only */ }
+    }
+    if (privilegedPhones.has(normalizedPhone)) {
+      return NextResponse.json({ error: 'This number cannot be registered here.' }, { status: 403 })
+    }
+
+    // Phone ownership must be proven first: /register/send-code → verify-code
+    // sets a signed cookie bound to this exact number. No cookie, expired, or a
+    // mismatch (they changed the number after verifying) → block.
+    //
+    // A super admin can disable this gate (feature: phone_verification) while OTP
+    // delivery is down so onboarding isn't blocked — accounts created then have an
+    // unverified phone (an accepted, reversible trade-off). Enforced server-side;
+    // the client step is just UX.
+    const verificationEnforced = await getFeature('phone_verification')
+    if (verificationEnforced) {
+      const phoneVerified = await verifyPhoneVerified(req.cookies.get(PHONE_VERIFIED_COOKIE)?.value, normalizedPhone)
+      if (!phoneVerified) {
+        return NextResponse.json(
+          { error: 'Please verify your phone number first.', phone_unverified: true },
+          { status: 403 }
+        )
+      }
+    }
+
     const existing = await findAuthUserByPhone(normalizedPhone)
     if (existing) {
       return NextResponse.json({ error: 'Phone is already registered' }, { status: 409 })
@@ -45,6 +88,10 @@ export async function POST(req: NextRequest) {
     const insertData = {
       phone: normalizedPhone,
       name: data.name,
+      // Stamp whether the phone was actually proven. FALSE means the account was
+      // created while phone_verification was off (OTP down) — flag it for
+      // re-verification once OTP returns. (migration 029)
+      phone_verified: verificationEnforced,
       login_pin_hash: pinHash,
       pin_attempts: 0,
       pin_locked_until: null,
@@ -70,6 +117,8 @@ export async function POST(req: NextRequest) {
 
     const res = NextResponse.json({ success: true, recovery_code: recoveryCode })
     res.cookies.set('session', token, setCookieOptions(role))
+    // Burn the phone-verified cookie — single use.
+    res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
     return res
   } catch (error) {
     if (error instanceof ZodError) {

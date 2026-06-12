@@ -3,6 +3,7 @@ import { getCurrentUser, COOKIE_NAME } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { audit } from '@/lib/audit'
 import { maskPhone } from '@/lib/phone'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 
 // DELETE /api/auth/account — NDPR account deletion
 export async function DELETE(req: NextRequest) {
@@ -13,6 +14,9 @@ export async function DELETE(req: NextRequest) {
   if (user.role !== 'customer') {
     return NextResponse.json({ error: 'Only customer accounts can be deleted via this endpoint' }, { status: 403 })
   }
+
+  const rl = await rateLimitGeneric(`auth-account-delete:${user.userId ?? user.phone}`, 20, 60)
+  if (!rl.success) return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 })
 
   const db = createSupabaseAdmin()
 
@@ -82,6 +86,9 @@ export async function GET(_req: NextRequest) {
   if (user.role !== 'customer') {
     return NextResponse.json({ error: 'Data export only available for customer accounts' }, { status: 403 })
   }
+
+  const rl = await rateLimitGeneric(`auth-account-export:${user.userId ?? user.phone}`, 20, 60)
+  if (!rl.success) return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 })
 
   const db = createSupabaseAdmin()
 

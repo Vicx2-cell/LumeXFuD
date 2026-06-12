@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { removePinLoginInput } from '@/lib/validators'
 import { compareSecret, findAuthUserByPhone, logPinResetAudit } from '@/lib/pin-auth'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 
 // POST /api/auth/remove-pin
 // Removes the user's PIN (login falls back to OTP/recovery). Requires the
@@ -13,6 +14,13 @@ export async function POST(req: NextRequest) {
     const userSession = await getCurrentUser()
     if (!userSession) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    // Confirms the current PIN to disable PIN login — cap at 5 / 15 min so this
+    // can't be used to brute-force the current PIN.
+    const rl = await rateLimitGeneric(`auth-removepin:${userSession.userId ?? userSession.phone}`, 5, 900)
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Too many attempts. Please wait and try again.' }, { status: 429 })
     }
 
     const body = await req.json()

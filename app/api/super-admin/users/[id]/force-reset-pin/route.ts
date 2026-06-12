@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { hashSecret, logPinResetAudit, validatePin } from '@/lib/pin-auth'
 import { audit, superAudit } from '@/lib/audit'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 
 const bodySchema = z.object({
@@ -47,6 +48,12 @@ export async function POST(
     const superAdminPhone = process.env.SUPER_ADMIN_PHONE
     if (!superAdminPhone || session.phone !== superAdminPhone) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Super-admin force reset that mints a temp PIN — cap (5 / 15 min).
+    const rl = await rateLimitGeneric(`super-resetpin:${session.userId ?? session.phone}`, 5, 900)
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Too many reset attempts. Please wait and try again.' }, { status: 429 })
     }
 
     const { id: targetUserId } = await params

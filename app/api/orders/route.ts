@@ -4,7 +4,11 @@ import { getCurrentUser } from '@/lib/session'
 import { createOrderInput } from '@/lib/validators'
 import { generateOrderNumber } from '@/lib/order-number'
 import { initializePaystackTransaction } from '@/lib/paystack/init'
+import { spendCustomerWallet } from '@/lib/customer-wallet'
+import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { renderTemplate } from '@/lib/termii/templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { getFeature } from '@/lib/features'
 
 // Allowed delivery types from settings
 const DELIVERY_FEES: Record<string, number> = {
@@ -18,9 +22,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
   }
 
+  // Feature flag: ordering can be paused platform-wide by a super admin.
+  if (!(await getFeature('ordering'))) {
+    return NextResponse.json({ error: 'Ordering is temporarily paused. Please check back soon.' }, { status: 503 })
+  }
+
   // Rate limit: each order create spins up a Paystack transaction — cap bursts
   // per user (15 / 5 min) to stop checkout spam. No-ops if Upstash is unset.
-  const rl = await rateLimitGeneric(`order:create:${session.userId ?? session.phone}`, 15, 300)
+  const rl = await rateLimitGeneric(`order:create:${session.userId ?? session.phone}`, 15, 300, true)
   if (!rl.success) {
     return NextResponse.json({ error: 'Too many orders in a short time. Please wait a moment and try again.' }, { status: 429 })
   }
@@ -37,7 +46,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid order data', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { vendor_id, items, delivery_type, delivery_address, delivery_instructions, tip_amount } = parsed.data
+  const { vendor_id, items, delivery_type, delivery_address, delivery_instructions, tip_amount, payment_method } = parsed.data
   const db = createSupabaseAdmin()
 
   // Validate vendor
@@ -169,7 +178,10 @@ export async function POST(req: NextRequest) {
 
   const customerId: string | null = c?.id ?? null
   const customerPhone = session.phone
-  const customerEmail = `${session.phone.replace('+', '')}@lumex.fud`
+  // Paystack validates the email's TLD — ".fud" is not a real TLD and is
+  // rejected ("Invalid Email Address Passed"), which fails EVERY order. Use the
+  // platform's real domain so the placeholder address always passes.
+  const customerEmail = `${session.phone.replace('+', '')}@lumexfud.com.ng`
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
@@ -179,6 +191,29 @@ export async function POST(req: NextRequest) {
   // fail, so we never open a second Paystack transaction for the same intent.
   // Absent header → random key (no cross-request dedup, but no regression).
   const idempotencyKey = req.headers.get('idempotency-key')?.trim() || crypto.randomUUID()
+
+  // ── Resolve the payment split SERVER-SIDE ───────────────────────────────────
+  // Never trust a client-supplied wallet amount (rule #4/#19): we read the live
+  // wallet balance and decide how much it covers ourselves.
+  //   walletApply === total → WALLET (paid here, no Paystack)
+  //   0 < walletApply < total → SPLIT (wallet debited in the webhook, card pays rest)
+  //   walletApply === 0       → PAYSTACK (card pays everything)
+  let walletApply = 0
+  let resolvedMethod: 'PAYSTACK' | 'WALLET' | 'SPLIT' = 'PAYSTACK'
+  if ((payment_method === 'WALLET' || payment_method === 'SPLIT') && customerId) {
+    const { data: cwRow } = await db
+      .from('customer_wallets')
+      .select('balance_kobo, is_frozen')
+      .eq('customer_id', customerId)
+      .maybeSingle()
+    const cw = cwRow as { balance_kobo: number; is_frozen: boolean } | null
+    const bal = cw && !cw.is_frozen ? Number(cw.balance_kobo) : 0
+    walletApply = Math.max(0, Math.min(bal, totalAmount))
+    if (walletApply >= totalAmount) { walletApply = totalAmount; resolvedMethod = 'WALLET' }
+    else if (walletApply > 0) { resolvedMethod = 'SPLIT' }
+    else { resolvedMethod = 'PAYSTACK' }
+  }
+  const paystackAmount = totalAmount - walletApply
 
   const { data: order, error: orderError } = await db
     .from('orders')
@@ -197,6 +232,8 @@ export async function POST(req: NextRequest) {
       rider_delivery_cut: riderCut,
       tip_amount: tipKobo,
       total_amount: totalAmount,
+      payment_method: resolvedMethod,
+      wallet_amount_kobo: walletApply,
       paystack_reference: orderNumber,
       idempotency_key: idempotencyKey,
       payment_status: 'PENDING',
@@ -235,37 +272,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
   }
 
-  // Initialize Paystack now that the order (and its idempotency key) is reserved.
-  let paystackResult
-  try {
-    paystackResult = await initializePaystackTransaction({
-      email: customerEmail,
-      amount: totalAmount,
-      reference: orderNumber,
-      callback_url: `${appUrl}/order/${orderNumber}`,
-      metadata: {
-        order_number: orderNumber,
-        customer_phone: customerPhone,
-        vendor_id,
-      },
-    })
-  } catch (err) {
-    // No charge was created — drop the reserved order so the customer can retry.
-    console.error('[orders] Paystack init failed, rolling back order:', err)
-    await db.from('orders').delete().eq('id', order.id)
-    return NextResponse.json({ error: 'Could not start payment. Please try again.' }, { status: 502 })
-  }
-
-  // Persist the authorization so a duplicate request can replay it (above).
-  await db
-    .from('orders')
-    .update({
-      paystack_authorization_url: paystackResult.authorization_url,
-      paystack_access_code: paystackResult.access_code,
-    })
-    .eq('id', order.id)
-
-  // Insert order items with price SNAPSHOTS
+  // Insert order items with price SNAPSHOTS — every payment path needs these,
+  // so do it before branching (and roll them back with the order on failure).
   const orderItems = items.map((item, idx) => {
     const menuItem = itemMap.get(item.menu_item_id)!
     const picked = chosenAddons[idx]
@@ -281,12 +289,122 @@ export async function POST(req: NextRequest) {
       addons: picked,                        // [{name, price_kobo}] snapshot
     }
   })
-
   await db.from('order_items').insert(orderItems)
+
+  // ── WALLET (full): debit now, mark paid, hand the order to the vendor ───────
+  // No Paystack charge and therefore no webhook will ever fire for this order,
+  // so the whole payment must settle here. spend_customer_wallet is atomic and
+  // idempotent per order (CWUSE-<id>).
+  if (resolvedMethod === 'WALLET') {
+    let spend: { success: boolean; errorMsg: string | null }
+    try {
+      spend = await spendCustomerWallet({
+        customerId:  customerId!,
+        amountKobo:  walletApply,
+        orderId:     order.id,
+        orderNumber,
+        reference:   `CWUSE-${order.id}`,
+      })
+    } catch (err) {
+      console.error('[orders] wallet debit RPC error:', err)
+      spend = { success: false, errorMsg: 'Wallet payment failed' }
+    }
+
+    if (!spend.success) {
+      // Nothing was charged — drop the reserved order + items so the customer
+      // can retry or pick another method (e.g. balance changed since checkout).
+      await db.from('order_items').delete().eq('order_id', order.id)
+      await db.from('orders').delete().eq('id', order.id)
+      return NextResponse.json({ error: spend.errorMsg ?? 'Wallet payment failed' }, { status: 400 })
+    }
+
+    // Paid in full from wallet → make the order visible to the vendor, mirroring
+    // the charge.success webhook. Guard the flip so it only happens once.
+    await db
+      .from('orders')
+      .update({ payment_status: 'PAID', status: 'PENDING', updated_at: new Date().toISOString() })
+      .eq('id', order.id)
+      .eq('payment_status', 'PENDING')
+
+    await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, totalAmount, appUrl)
+
+    return NextResponse.json({ order_number: orderNumber, payment_method: 'WALLET', paid: true })
+  }
+
+  // ── PAYSTACK or SPLIT: charge the remaining amount via Paystack ─────────────
+  // For SPLIT the wallet portion is debited in the charge.success webhook (a
+  // single commit point), so an abandoned checkout never touches the wallet.
+  let paystackResult
+  try {
+    paystackResult = await initializePaystackTransaction({
+      email: customerEmail,
+      amount: paystackAmount,
+      reference: orderNumber,
+      callback_url: `${appUrl}/order/${orderNumber}`,
+      metadata: {
+        order_number: orderNumber,
+        customer_phone: customerPhone,
+        vendor_id,
+      },
+    })
+  } catch (err) {
+    // No charge was created — drop the reserved order + items so the customer can retry.
+    console.error('[orders] Paystack init failed, rolling back order:', err)
+    await db.from('order_items').delete().eq('order_id', order.id)
+    await db.from('orders').delete().eq('id', order.id)
+    return NextResponse.json({ error: 'Could not start payment. Please try again.' }, { status: 502 })
+  }
+
+  // Persist the authorization so a duplicate request can replay it (above).
+  await db
+    .from('orders')
+    .update({
+      paystack_authorization_url: paystackResult.authorization_url,
+      paystack_access_code: paystackResult.access_code,
+    })
+    .eq('id', order.id)
 
   return NextResponse.json({
     order_number: orderNumber,
     authorization_url: paystackResult.authorization_url,
     access_code: paystackResult.access_code,
   })
+}
+
+// Notify the vendor of a freshly-paid order. Mirrors the charge.success webhook
+// path so wallet-paid orders surface in the vendor dashboard the same way.
+async function notifyVendorNewOrder(
+  db: ReturnType<typeof createSupabaseAdmin>,
+  orderId: string,
+  vendorId: string,
+  orderNumber: string,
+  totalAmount: number,
+  appUrl: string,
+): Promise<void> {
+  const { data: vendor } = await db
+    .from('vendors')
+    .select('phone, shop_name')
+    .eq('id', vendorId)
+    .single()
+  if (!vendor) return
+
+  const { data: items } = await db
+    .from('order_items')
+    .select('name, quantity')
+    .eq('order_id', orderId)
+
+  const itemsSummary = (items ?? [])
+    .map((i: { name: string; quantity: number }) => `${i.name} x${i.quantity}`)
+    .join(', ')
+
+  void sendWhatsAppWithFallback({
+    to: vendor.phone as string,
+    message: renderTemplate('ORDER_PENDING', {
+      order_number: orderNumber,
+      total: Math.round(totalAmount / 100),
+      customer_first_name: 'Customer',
+      items_summary: itemsSummary,
+      dashboard_url: `${appUrl}/vendor-dashboard`,
+    }),
+  }).catch(() => {})
 }

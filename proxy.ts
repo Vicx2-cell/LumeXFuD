@@ -29,16 +29,25 @@ const ROLE_TABLE: Record<string, string> = {
 // Public routes that logged-in users should be redirected away from
 const LANDING_ROUTES = new Set(['/', '/auth/register', '/auth/forgot-pin'])
 
-// ─── Content-Security-Policy (per-request nonce) ──────────────────────────────
-// A static header cannot carry a per-request nonce, so the CSP is built here.
-// 'strict-dynamic' lets scripts loaded by our nonced scripts (e.g. Paystack's
-// own dynamically-injected scripts) run, while https://js.paystack.co remains a
-// fallback for browsers that ignore strict-dynamic. The nonce is exposed to the
-// app via the x-nonce request header so <Script nonce={...}> can read it.
-function buildCsp(nonce: string): string {
+// ─── Content-Security-Policy ──────────────────────────────────────────────────
+// NOTE: nonce + 'strict-dynamic' was tried and BROKE production. Next.js only
+// injects the per-request nonce into its <script> tags when a route is
+// *dynamically* rendered; statically-prerendered pages (most of this app) ship
+// their framework chunks and inline bootstrap scripts WITHOUT a nonce. With
+// 'strict-dynamic' present, browsers ignore 'self', so every un-nonced
+// /_next/static chunk and inline script was blocked and the app loaded zero
+// client JS (no cart, no checkout, no login). See scripts/live-flow.mjs.
+//
+// Fix: drop 'strict-dynamic'/nonce from script-src so 'self' covers same-origin
+// chunks and 'unsafe-inline' covers Next's inline scripts. The nonce is still
+// generated and forwarded as x-nonce for any future dynamic <Script nonce>.
+// Hardening follow-up: move security-sensitive routes to dynamic rendering and
+// restore nonce+strict-dynamic there. XSS risk is mitigated by React escaping,
+// no dangerouslySetInnerHTML in audited paths, and lib/security sanitize().
+function buildCsp(_nonce: string): string {
   const isProd = process.env.NODE_ENV === 'production'
   const scriptSrc = isProd
-    ? `'self' 'nonce-${nonce}' 'strict-dynamic' https://js.paystack.co`
+    ? `'self' 'unsafe-inline' https://js.paystack.co`
     : `'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co`
   return [
     "default-src 'self'",
@@ -142,7 +151,14 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   // CRITICAL: explicit matcher prevents CVE-2026-44575 (.rsc segment bypass)
+  //
+  // `api` is excluded wholesale: API routes authenticate themselves with
+  // getCurrentUser() and must ALWAYS return their own JSON. If the proxy runs on
+  // them, a request carrying a stale/expired `session` cookie hits the invalid-
+  // token branch and gets 307-redirected to /auth (an HTML page) — the client's
+  // res.json() then throws and surfaces as a bogus "Connection error" on login.
+  // CSP only matters for document responses, so dropping it on /api is harmless.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/paystack/webhook|icons|manifest.json|sw.js).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api|icons|manifest.json|sw.js).*)',
   ],
 }

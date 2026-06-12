@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { refundTransaction } from '@/lib/paystack/transfer'
-import { recordPlatformEarning } from '@/lib/platform-earnings'
+import { refundOrderPayments } from '@/lib/order-refund'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { audit } from '@/lib/audit'
 
@@ -16,6 +15,7 @@ interface PendingOrder {
   order_number: string
   customer_id: string | null
   total_amount: number
+  wallet_amount_kobo: number | null
   paystack_reference: string
   payment_status: string
 }
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   const { data: ordersRaw, error } = await db
     .from('orders')
-    .select('id, order_number, customer_id, total_amount, paystack_reference, payment_status')
+    .select('id, order_number, customer_id, total_amount, wallet_amount_kobo, paystack_reference, payment_status')
     .eq('status', 'PENDING')
     .lte('created_at', fiveMinAgo)
     .limit(50)
@@ -64,39 +64,29 @@ export async function POST(req: NextRequest) {
       }
 
       // Refund the customer (payment already collected). The order is already
-      // claimed as CANCELLED above (prevents double-processing), so a refund
-      // failure here must NOT be swallowed — record it as NEEDS_ATTENTION so an
-      // admin can retry, rather than leaving an un-refunded paid order with no trace.
+      // claimed as CANCELLED above (prevents double-processing). Refund both
+      // money sources — wallet portion back to the wallet, card portion via
+      // Paystack — so a wallet/split order isn't left un-refunded. A failure is
+      // recorded as NEEDS_ATTENTION inside the helper rather than swallowed.
       if (order.payment_status === 'PAID') {
-        let refundOk = true
-        try {
-          await refundTransaction(order.paystack_reference, order.total_amount)
-        } catch (refundErr) {
-          refundOk = false
-          console.error(`[cron/vendor-auto-cancel] refund failed for order ${order.id}:`, refundErr)
-        }
-
-        await db.from('refunds').insert({
-          order_id:                       order.id,
-          paystack_transaction_reference: order.paystack_reference,
-          amount_kobo:                    order.total_amount,
-          reason:                         'Vendor did not accept within 5 minutes',
-          status:                         refundOk ? 'PROCESSING' : 'NEEDS_ATTENTION',
-          triggered_by:                   'SYSTEM_AUTO_CANCEL',
+        const { walletOk, paystackOk } = await refundOrderPayments({
+          order: {
+            id:                 order.id,
+            order_number:       order.order_number,
+            customer_id:        order.customer_id,
+            total_amount:       order.total_amount,
+            wallet_amount_kobo: order.wallet_amount_kobo ?? 0,
+            paystack_reference: order.paystack_reference,
+          },
+          reason:      'Vendor did not accept within 5 minutes',
+          triggeredBy: 'SYSTEM_AUTO_CANCEL',
         })
 
-        if (refundOk) {
+        if (walletOk && paystackOk) {
           await db
             .from('orders')
             .update({ payment_status: 'REFUNDED', updated_at: new Date().toISOString() })
             .eq('id', order.id)
-
-          void recordPlatformEarning({
-            type:        'REFUND_COST',
-            amount_kobo: -order.total_amount,
-            order_id:    order.id,
-            description: `Auto-cancel refund — order ${order.order_number}`,
-          })
         }
       }
 

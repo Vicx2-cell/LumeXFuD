@@ -1,6 +1,7 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/nav-bottom'
 import { BackButton } from '@/components/back-button'
+import { getFeature } from '@/lib/features'
 import { LeaderboardTabs, type Board, type LeaderEntry } from './leaderboard-client'
 
 // Realtime keeps an open board fresh; this is just a fallback re-fetch interval.
@@ -57,6 +58,22 @@ async function fetchTab(
 }
 
 export default async function LeaderboardPage() {
+  // Super admin can switch the leaderboard off platform-wide.
+  if (!(await getFeature('leaderboard'))) {
+    return (
+      <main className="lx-page pb-24 flex flex-col items-center justify-center text-center px-6 overflow-hidden">
+        <div className="relative z-10 lx-enter">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/><path d="M4 22h16"/></svg>
+          </div>
+          <p className="font-semibold text-white/80">Leaderboard is taking a break</p>
+          <p className="text-sm text-white/45 mt-1">Check back soon.</p>
+        </div>
+        <BottomNav />
+      </main>
+    )
+  }
+
   const db = createSupabaseAdmin()
 
   // Three independent ranking queries — one per tab. Lifetime totals, single
@@ -70,11 +87,8 @@ export default async function LeaderboardPage() {
   const board: Board = { customers, vendors, riders }
 
   return (
-    <main className="min-h-dvh pb-24" style={{ background: '#0A0A0B' }}>
-      <div
-        className="sticky top-0 z-40 border-b border-white/8 px-4 py-3"
-        style={{ background: 'rgba(10,10,11,0.95)', backdropFilter: 'blur(20px)' }}
-      >
+    <main className="lx-page pb-24 overflow-hidden">
+      <div className="sticky top-0 z-40 glass-thin px-4 py-3" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <BackButton />
           <div>

@@ -6,6 +6,7 @@ import { audit } from '@/lib/audit'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
 import { recordOrderCompletedEarnings } from '@/lib/platform-earnings'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 import type { OrderStatus } from '@/types'
 
 // Whitelist: [from, to, allowed roles]
@@ -45,6 +46,9 @@ export async function PATCH(
   const { id } = await params
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const rl = await rateLimitGeneric(`order-status:${session.userId ?? session.phone}`, 30, 60)
+  if (!rl.success) return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429 })
 
   let body: unknown
   try {

@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import RecoveryCodeDisplay from '@/components/auth/RecoveryCodeDisplay'
 import SecurityQuestionSelect from '@/components/auth/SecurityQuestionSelect'
 import { SECURITY_QUESTIONS } from '@/lib/pin-auth'
 import { BackButton } from '@/components/back-button'
+import { useFeatures } from '@/lib/use-features'
 
 const initialForm = {
   name: '',
@@ -20,11 +21,31 @@ const initialForm = {
 
 export default function RegisterPage() {
   const router = useRouter()
+  // When a super admin turns phone_verification OFF (e.g. OTP delivery down),
+  // skip the verify step entirely. Defaults to required until flags load.
+  const features = useFeatures()
+  const verificationRequired = features.phone_verification !== false
   const [form, setForm] = useState(initialForm)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [recoveryCode, setRecoveryCode] = useState('')
   const [savedCode, setSavedCode] = useState(false)
+
+  // Phone-ownership verification (sign-up only).
+  const [code, setCode] = useState('')
+  const [codeSent, setCodeSent] = useState(false)
+  const [phoneVerified, setPhoneVerified] = useState(false)
+  const [vBusy, setVBusy] = useState(false)
+  const [vError, setVError] = useState('')
+  const [vNote, setVNote] = useState('')
+
+  // Prefill the phone when arriving from the login screen's "not registered"
+  // prompt (/auth/register?phone=+234...). Client-only — avoids needing a
+  // useSearchParams Suspense boundary.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get('phone')
+    if (p && p.startsWith('+')) setForm((current) => ({ ...current, phone: p }))
+  }, [])
 
   const question2Options = useMemo(
     () => SECURITY_QUESTIONS.filter((question) => question !== form.question_1),
@@ -34,10 +55,66 @@ export default function RegisterPage() {
   const handleChange = (field: keyof typeof initialForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }))
     setError('')
+    // Changing the number invalidates any prior verification (the cookie is
+    // bound to a specific phone), so reset the verification UI.
+    if (field === 'phone') {
+      setCodeSent(false)
+      setPhoneVerified(false)
+      setCode('')
+      setVError('')
+      setVNote('')
+    }
+  }
+
+  const sendCode = async () => {
+    setVError('')
+    setVNote('')
+    if (form.phone.length < 13) { setVError('Enter your phone number first.'); return }
+    setVBusy(true)
+    try {
+      const res = await fetch('/api/auth/register/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: form.phone }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setVError(data.error ?? 'Could not send the code.'); return }
+      setCodeSent(true)
+      setVNote('Code sent — check WhatsApp or SMS.')
+    } catch {
+      setVError('Network error. Please try again.')
+    } finally {
+      setVBusy(false)
+    }
+  }
+
+  const verifyCode = async () => {
+    setVError('')
+    setVNote('')
+    if (code.length !== 6) { setVError('Enter the 6-digit code.'); return }
+    setVBusy(true)
+    try {
+      const res = await fetch('/api/auth/register/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: form.phone, code }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setVError(data.error ?? 'Verification failed.'); return }
+      setPhoneVerified(true)
+    } catch {
+      setVError('Network error. Please try again.')
+    } finally {
+      setVBusy(false)
+    }
   }
 
   const handleRegister = async () => {
     setError('')
+    if (verificationRequired && !phoneVerified) {
+      setError('Please verify your phone number first.')
+      return
+    }
     if (form.pin !== form.confirm_pin) {
       setError('PIN confirmation does not match.')
       return
@@ -151,6 +228,60 @@ export default function RegisterPage() {
             />
           </label>
 
+          {/* Phone ownership verification — hidden when a super admin disables
+              the phone_verification flag (OTP delivery down). */}
+          {verificationRequired && (phoneVerified ? (
+            <div className="flex items-center gap-2 text-sm" style={{ color: '#34d399' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
+              Phone number verified
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-[#0f0f11] p-4 space-y-3">
+              {!codeSent ? (
+                <button
+                  type="button"
+                  onClick={sendCode}
+                  disabled={vBusy || form.phone.length < 13}
+                  className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 py-3 text-sm font-semibold text-amber-400 disabled:opacity-50"
+                >
+                  {vBusy ? 'Sending…' : 'Send verification code'}
+                </button>
+              ) : (
+                <>
+                  <p className="text-xs text-white/50">Enter the 6-digit code sent to {form.phone}.</p>
+                  <div className="flex gap-2">
+                    <input
+                      value={code}
+                      onChange={(event) => { setCode(event.target.value.replace(/[^0-9]/g, '').slice(0, 6)); setVError('') }}
+                      className="flex-1 rounded-xl border border-white/10 bg-[#111113] px-4 py-3 text-center text-white tracking-[0.4em] outline-none"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={verifyCode}
+                      disabled={vBusy || code.length !== 6}
+                      className="rounded-xl bg-amber-500 px-5 text-sm font-semibold text-black disabled:opacity-50"
+                    >
+                      {vBusy ? '…' : 'Verify'}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={sendCode}
+                    disabled={vBusy}
+                    className="text-xs text-white/40 hover:text-white/70 transition-colors disabled:opacity-50"
+                  >
+                    Resend code
+                  </button>
+                </>
+              )}
+              {vNote && <p className="text-xs" style={{ color: '#34d399' }}>{vNote}</p>}
+              {vError && <p className="text-xs text-red-400">{vError}</p>}
+            </div>
+          ))}
+
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm text-white/70">
               <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Choose PIN</span>
@@ -216,10 +347,10 @@ export default function RegisterPage() {
           <button
             type="button"
             onClick={handleRegister}
-            disabled={loading}
+            disabled={loading || (verificationRequired && !phoneVerified)}
             className="w-full rounded-2xl bg-amber-500 py-4 text-sm font-semibold text-black disabled:opacity-50"
           >
-            {loading ? 'Creating account…' : 'Create account'}
+            {loading ? 'Creating account…' : (verificationRequired && !phoneVerified) ? 'Verify your phone to continue' : 'Create account'}
           </button>
 
           <p className="text-center text-sm text-white/40">

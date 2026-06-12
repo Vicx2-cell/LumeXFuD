@@ -12,12 +12,19 @@ import {
   normalizeSecurityAnswer,
   validatePin,
 } from '@/lib/pin-auth'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
     const userSession = await getCurrentUser()
     if (!userSession) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    // Sets the PIN + security answers + recovery code — cap at 5 / 15 min per user.
+    const rl = await rateLimitGeneric(`auth-setup:${userSession.userId ?? userSession.phone}`, 5, 900)
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Too many attempts. Please wait and try again.' }, { status: 429 })
     }
 
     const body = await req.json()

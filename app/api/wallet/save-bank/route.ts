@@ -5,12 +5,13 @@ import { verifyWalletPin } from '@/lib/wallet'
 import { encryptField } from '@/lib/crypto'
 import { audit } from '@/lib/audit'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 import type { WalletBalance } from '@/lib/wallet'
 
 const schema = z.object({
   account_number: z.string().length(10).regex(/^\d{10}$/),
-  bank_code:      z.string().min(3).max(10),
+  bank_code:      z.string().min(3).max(10).regex(/^\d{3,10}$/),
   bank_name:      z.string().min(2).max(100),
   account_name:   z.string().min(2).max(200),
   wallet_pin:     z.string().length(4).regex(/^\d{4}$/),
@@ -21,6 +22,12 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['vendor', 'rider'].includes(session.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // Changing the payout bank is account-takeover sensitive — cap at 5 / 10 min.
+  const rl = await rateLimitGeneric(`wallet-savebank:${session.userId ?? session.phone}`, 5, 600, true)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many attempts. Please wait a few minutes and try again.' }, { status: 429 })
   }
 
   const body = await req.json().catch(() => null)

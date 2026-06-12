@@ -26,6 +26,20 @@ type BeforeInstallPromptEvent = Event & {
 type NavigatorStandalone = Navigator & { standalone?: boolean }
 
 const DISMISS_KEY = 'lumex-install-dismissed'
+const VISIT_KEY = 'lumex-visits'
+
+// Count visits so the install banner only appears from the SECOND visit on —
+// prompting on the very first visit is too aggressive. Storage-blocked browsers
+// fall back to treating each load as a fresh first visit (banner stays hidden).
+function recordVisitAndCount(): number {
+  try {
+    const n = (parseInt(localStorage.getItem(VISIT_KEY) ?? '0', 10) || 0) + 1
+    localStorage.setItem(VISIT_KEY, String(n))
+    return n
+  } catch {
+    return 1
+  }
+}
 
 // localStorage access throws (not just on write) when site data is blocked —
 // Firefox strict mode, some in-app webviews. Treat any failure as "not dismissed".
@@ -71,11 +85,14 @@ function InstallPrompt() {
     if (isStandalone()) return
     if (wasDismissed()) return
 
+    // Only prompt from the second visit onward.
+    const secondVisit = recordVisitAndCount() >= 2
+
     // Android / desktop Chromium: capture the native prompt and show our own UI.
     const onBeforeInstall = (e: Event) => {
       e.preventDefault()
       setDeferred(e as BeforeInstallPromptEvent)
-      setVisible(true)
+      if (secondVisit) setVisible(true)
     }
     window.addEventListener('beforeinstallprompt', onBeforeInstall)
 
@@ -87,7 +104,7 @@ function InstallPrompt() {
     window.addEventListener('appinstalled', onInstalled)
 
     // iOS Safari fires no beforeinstallprompt — offer the manual A2HS guide.
-    if (isIOS()) setVisible(true)
+    if (isIOS() && secondVisit) setVisible(true)
 
     return () => {
       window.removeEventListener('beforeinstallprompt', onBeforeInstall)
@@ -202,11 +219,55 @@ function InstallPrompt() {
   )
 }
 
+// ─── Offline banner ──────────────────────────────────────────────────────────
+// Subtle, non-blocking amber pill at the top while the device is offline. Never
+// a modal — the user can keep browsing cached pages. Driven by navigator.onLine
+// plus the online/offline events.
+function OfflineBanner() {
+  const [offline, setOffline] = useState(false)
+
+  useEffect(() => {
+    const update = () => setOffline(!navigator.onLine)
+    update()
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => {
+      window.removeEventListener('online', update)
+      window.removeEventListener('offline', update)
+    }
+  }, [])
+
+  if (!offline) return null
+
+  return (
+    <div
+      className="fixed inset-x-0 top-0 z-[70] px-4 pointer-events-none"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}
+      role="status"
+      aria-live="polite"
+    >
+      <div
+        className="max-w-lg mx-auto flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-medium"
+        style={{
+          background: 'rgba(245,166,35,0.15)',
+          border: '1px solid rgba(245,166,35,0.3)',
+          color: '#F5A623',
+          backdropFilter: 'blur(12px)',
+        }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#F5A623' }} />
+        You&apos;re offline — showing saved data
+      </div>
+    </div>
+  )
+}
+
 export function PWA() {
   return (
     <>
       <ServiceWorkerRegister />
       <InstallPrompt />
+      <OfflineBanner />
     </>
   )
 }

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { superAudit } from '@/lib/audit'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 
 // settings is id-keyed (TEXT PK) with a JSONB `value`. `value` can be any JSON
 // shape (e.g. {"amount_kobo": N}, {"value": N}, {"open":"07:00"}), so it's
@@ -30,6 +31,9 @@ export async function PATCH(req: NextRequest) {
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const rl = await rateLimitGeneric(`super-settings:${session.userId ?? session.phone}`, 20, 60)
+  if (!rl.success) return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 })
 
   let body: unknown
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid body' }, { status: 400 }) }

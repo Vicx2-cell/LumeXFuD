@@ -3,12 +3,20 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { regenerateRecoveryCodeInput } from '@/lib/validators'
 import { compareSecret, findAuthUserByPhone, generateRecoveryCode, hashSecret, logPinResetAudit } from '@/lib/pin-auth'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
     const userSession = await getCurrentUser()
     if (!userSession) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    // Requires the current PIN to mint a new recovery code — cap at 5 / 15 min
+    // so it can't be used to brute-force the current PIN.
+    const rl = await rateLimitGeneric(`auth-regenrecovery:${userSession.userId ?? userSession.phone}`, 5, 900)
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Too many attempts. Please wait and try again.' }, { status: 429 })
     }
 
     const body = await req.json()

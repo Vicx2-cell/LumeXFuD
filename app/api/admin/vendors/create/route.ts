@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
 import { generateTempPin, hashSecret } from '@/lib/pin-auth'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 
 const createVendorInput = z.object({
@@ -20,6 +21,9 @@ export async function POST(req: NextRequest) {
     if (!['admin', 'super_admin'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+
+    const rl = await rateLimitGeneric(`admin-vendor-create:${user.userId ?? user.phone}`, 20, 60)
+    if (!rl.success) return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 })
 
     const body = await req.json()
     const parsed = createVendorInput.safeParse(body)

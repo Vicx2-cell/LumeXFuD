@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
 import { generateTempPin, hashSecret } from '@/lib/pin-auth'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 
 const createTeamInput = z.object({
@@ -15,6 +16,9 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     if (user.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const rl = await rateLimitGeneric(`super-team-create:${user.userId ?? user.phone}`, 20, 60)
+    if (!rl.success) return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 })
 
     const body = await req.json()
     const parsed = createTeamInput.safeParse(body)

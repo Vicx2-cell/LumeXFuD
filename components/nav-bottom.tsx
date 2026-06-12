@@ -3,18 +3,23 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useCart } from './cart-context'
+import { useFeatures } from '@/lib/use-features'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Home', icon: HomeIcon },
   { href: '/orders', label: 'Orders', icon: OrdersIcon },
   { href: '/cart', label: 'Cart', icon: CartIcon, showBadge: true },
-  { href: '/leaderboard', label: 'Ranks', icon: TrophyIcon },
+  { href: '/leaderboard', label: 'Ranks', icon: TrophyIcon, feature: 'leaderboard' },
   { href: '/profile', label: 'Profile', icon: ProfileIcon },
 ]
 
 export function BottomNav() {
   const pathname = usePathname()
   const { totalItems } = useCart()
+  const features = useFeatures()
+
+  // Hide any nav item whose feature flag is turned off.
+  const items = NAV_ITEMS.filter((i) => !i.feature || features[i.feature] !== false)
 
   return (
     <nav
@@ -26,7 +31,7 @@ export function BottomNav() {
       }}
     >
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
-        {NAV_ITEMS.map(({ href, label, icon: Icon, showBadge }) => {
+        {items.map(({ href, label, icon: Icon, showBadge }) => {
           const active = pathname === href
           return (
             <Link

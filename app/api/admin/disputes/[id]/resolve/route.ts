@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { resolveDisputeInput } from '@/lib/validators'
-import { refundTransaction } from '@/lib/paystack/transfer'
-import { recordPlatformEarning } from '@/lib/platform-earnings'
+import { refundOrderPayments } from '@/lib/order-refund'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 
@@ -32,7 +31,7 @@ export async function POST(
   const db = createSupabaseAdmin()
   const { data: order } = await db
     .from('orders')
-    .select('id, order_number, status, total_amount, payment_status, paystack_reference')
+    .select('id, order_number, status, total_amount, payment_status, paystack_reference, customer_id, wallet_amount_kobo')
     .eq('id', id)
     .single()
 
@@ -43,35 +42,22 @@ export async function POST(
   const newStatus = parsed.data.resolution === 'REFUND' ? 'REFUNDED' : 'COMPLETED'
   const now = new Date().toISOString()
 
-  // Resolving in the customer's favour must actually move money — issue the
-  // Paystack refund and record a ledger row, not just flip the status.
-  if (parsed.data.resolution === 'REFUND' && order.payment_status === 'PAID' && order.paystack_reference) {
-    const amountKobo = order.total_amount as number
-    let refundOk = true
-    try {
-      await refundTransaction(order.paystack_reference as string, amountKobo)
-    } catch (refundErr) {
-      refundOk = false
-      console.error(`[disputes/resolve] refund failed for order ${order.id}:`, refundErr)
-    }
-
-    await db.from('refunds').insert({
-      order_id:                       order.id,
-      paystack_transaction_reference: order.paystack_reference,
-      amount_kobo:                    amountKobo,
-      reason:                         `Dispute resolved for customer${parsed.data.notes ? `: ${parsed.data.notes}` : ''}`,
-      status:                         refundOk ? 'PROCESSING' : 'NEEDS_ATTENTION',
-      triggered_by:                   session.phone,
+  // Resolving in the customer's favour must actually move money — refund both
+  // sources the order was paid from (wallet portion to wallet, card portion via
+  // Paystack), not just flip the status.
+  if (parsed.data.resolution === 'REFUND' && order.payment_status === 'PAID') {
+    await refundOrderPayments({
+      order: {
+        id:                 order.id as string,
+        order_number:       order.order_number as string,
+        customer_id:        order.customer_id as string | null,
+        total_amount:       order.total_amount as number,
+        wallet_amount_kobo: (order.wallet_amount_kobo as number) ?? 0,
+        paystack_reference: order.paystack_reference as string | null,
+      },
+      reason:      `Dispute resolved for customer${parsed.data.notes ? `: ${parsed.data.notes}` : ''}`,
+      triggeredBy: session.phone,
     })
-
-    if (refundOk) {
-      void recordPlatformEarning({
-        type:        'REFUND_COST',
-        amount_kobo: -amountKobo,
-        order_id:    order.id as string,
-        description: `Dispute refund — order ${order.order_number as string}`,
-      })
-    }
   }
 
   await db.from('orders').update({

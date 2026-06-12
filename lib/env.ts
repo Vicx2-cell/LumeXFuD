@@ -28,6 +28,18 @@ export function validateEnv(): void {
     throw new Error('JWT_SECRET must be at least 32 characters')
   }
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-    console.warn('[env] UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN not set — rate limiting is DISABLED. PIN brute-force protection is off.')
+    // Rate limiting fails OPEN without Upstash (lib/rate-limit.ts), which turns
+    // off PIN brute-force / OTP / withdrawal-velocity protection — a stated
+    // non-negotiable (rule #10). Tolerable in local dev, but a prod deploy must
+    // never ship with this off: fail fast instead of silently being insecure.
+    const message =
+      '[env] UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN not set — rate limiting is DISABLED. PIN brute-force protection is off.'
+    // Fail fast on a real hosted deploy (Vercel sets VERCEL=1 in build+runtime)
+    // so we can never ship to production with brute-force protection off. Local
+    // dev / local prod builds (VERCEL unset) keep the soft warning.
+    if (process.env.VERCEL) {
+      throw new Error(message + ' Set Upstash Redis credentials in the Vercel project before deploying.')
+    }
+    console.warn(message)
   }
 }

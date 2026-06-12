@@ -38,12 +38,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For navigation requests: network-first, fall back to offline page
+  // For navigation requests: network-first; cache successful pages so a
+  // previously-visited page (homepage, /orders, a vendor page) still loads
+  // offline. Fall back to the cached copy, then the offline page.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() =>
-        caches.match(OFFLINE_URL).then((r) => r ?? new Response('Offline', { status: 503 }))
-      )
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match(request).then((cached) =>
+            cached ??
+            caches.match(OFFLINE_URL).then((r) => r ?? new Response('Offline', { status: 503 }))
+          )
+        )
     );
     return;
   }

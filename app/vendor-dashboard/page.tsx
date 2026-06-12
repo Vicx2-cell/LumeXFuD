@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { formatPrice } from '@/lib/money'
 import { BackButton } from '@/components/back-button'
+import { LogoutButton } from '@/components/logout-button'
 
 interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
 interface VendorOrder {
@@ -76,7 +76,7 @@ export default function VendorDashboard() {
     }
   }, [])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isPoll = false) => {
     try {
       const res = await fetch('/api/vendor/orders')
       if (res.status === 401) { router.push('/auth'); return }
@@ -85,37 +85,40 @@ export default function VendorDashboard() {
       setVendor(data.vendor)
       setOrders(data.orders)
       setRecent(data.recent)
-      data.orders.forEach((o) => knownIds.current.add(o.id))
+
+      // Detect newly-arrived active orders → alert (sound + notification).
+      // Skip on the first load so the existing backlog doesn't beep.
+      if (isPoll) {
+        const hasNew = data.orders.some(
+          (o) => ACTIVE.includes(o.status) && !knownIds.current.has(o.id),
+        )
+        if (hasNew) alert()
+      }
+      knownIds.current = new Set(data.orders.map((o) => o.id))
     } finally {
       setLoading(false)
     }
-  }, [router])
+  }, [router, alert])
 
   useEffect(() => {
     load()
     Notification.requestPermission().catch(() => {})
   }, [load])
 
+  // Live updates via polling. This app authenticates with a custom JWT in an
+  // httpOnly cookie, so the anon Supabase browser client has no session and
+  // Realtime delivers nothing under the orders RLS policies (which key off
+  // auth.jwt()->>'phone'). Poll the service-role API instead, and refetch
+  // immediately whenever the tab regains focus so it feels live.
   useEffect(() => {
-    if (!vendor?.id) return
-    const supabase = createSupabaseBrowserClient()
-    const ch = supabase
-      .channel(`vendor-${vendor.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `vendor_id=eq.${vendor.id}` }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const o = payload.new as VendorOrder
-          if (!knownIds.current.has(o.id)) {
-            knownIds.current.add(o.id)
-            setOrders((prev) => [o, ...prev])
-            alert()
-          }
-        } else if (payload.eventType === 'UPDATE') {
-          setOrders((prev) => prev.map((o) => o.id === payload.new.id ? { ...o, ...(payload.new as Partial<VendorOrder>) } : o))
-        }
-      })
-      .subscribe()
-    return () => { void supabase.removeChannel(ch) }
-  }, [vendor?.id, alert])
+    const id = setInterval(() => { void load(true) }, 12000)
+    const onVisible = () => { if (document.visibilityState === 'visible') void load(true) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [load])
 
   const setStatus = async (status: 'OPEN' | 'BUSY' | 'CLOSED') => {
     if (!vendor) return
@@ -158,9 +161,10 @@ export default function VendorDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-dvh flex items-center justify-center" style={{ background: '#0A0A0B' }}>
+      <div className="lx-page flex items-center justify-center">
         <div className="space-y-3 w-full max-w-lg px-4">
-          {[1, 2, 3].map((i) => <div key={i} className="h-28 rounded-2xl animate-pulse" style={{ background: 'rgba(255,255,255,0.05)' }} />)}
+          <div className="lx-skeleton h-16" style={{ borderRadius: 16 }} />
+          {[1, 2, 3].map((i) => <div key={i} className="lx-skeleton h-28" style={{ borderRadius: 20 }} />)}
         </div>
       </div>
     )
@@ -169,9 +173,9 @@ export default function VendorDashboard() {
   const active = orders.filter((o) => ACTIVE.includes(o.status))
 
   return (
-    <div className="min-h-dvh pb-10" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page pb-10 overflow-hidden">
       {/* Header */}
-      <div className="sticky top-0 z-40 border-b border-white/8" style={{ background: 'rgba(10,10,11,0.95)', backdropFilter: 'blur(20px)' }}>
+      <div className="sticky top-0 z-40 glass-thin" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BackButton />
@@ -183,17 +187,19 @@ export default function VendorDashboard() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => router.push('/vendor-dashboard/menu')}
-              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors flex items-center gap-1.5"
               style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.25)' }}
             >
-              🍽️ Menu
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
+              Menu
             </button>
             <button
               onClick={() => router.push('/vendor-dashboard/earnings')}
-              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors flex items-center gap-1.5"
               style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.25)' }}
             >
-              💰 Earnings
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              Earnings
             </button>
             <span
               className="text-xs font-semibold px-3 py-1.5 rounded-full"
@@ -205,13 +211,14 @@ export default function VendorDashboard() {
             >
               {vendor?.status}
             </span>
+            <LogoutButton />
           </div>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-5">
+      <div className="max-w-lg mx-auto px-4 py-4 space-y-5 lx-enter">
         {/* Status Controls */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+        <div className="glass-thin p-4 space-y-3">
           <p className="text-xs text-white/40 uppercase tracking-widest">Shop Status</p>
           <div className="grid grid-cols-3 gap-2">
             {(['OPEN', 'BUSY', 'CLOSED'] as const).map((s) => {
@@ -275,9 +282,12 @@ export default function VendorDashboard() {
           </div>
 
           {active.length === 0 ? (
-            <div className="rounded-2xl border border-white/8 py-10 text-center">
-              <p className="text-3xl mb-2">🍽️</p>
-              <p className="text-sm text-white/30">No active orders</p>
+            <div className="glass-thin py-12 text-center">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
+              </div>
+              <p className="text-sm font-medium text-white/75">All caught up</p>
+              <p className="text-xs text-white/40 mt-1">New orders will pop up here with a sound.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -330,11 +340,10 @@ function OrderCard({
 
   return (
     <div
-      className="rounded-2xl p-4 space-y-3"
+      className="glass-thin p-4 space-y-3 lx-enter"
       style={{
-        background: 'rgba(255,255,255,0.04)',
         border: `1px solid ${order.status === 'PENDING' ? 'rgba(245,166,35,0.5)' : 'rgba(255,255,255,0.08)'}`,
-        boxShadow: order.status === 'PENDING' ? '0 0 20px rgba(245,166,35,0.08)' : 'none',
+        boxShadow: order.status === 'PENDING' ? '0 0 24px rgba(245,166,35,0.12), inset 0 1px 0 rgba(255,255,255,0.06)' : undefined,
       }}
     >
       <div className="flex items-start justify-between gap-2">
