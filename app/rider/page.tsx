@@ -116,7 +116,7 @@ export default function RiderDashboard() {
         if (incoming.length > 0 && prevAvailableIds.current.size > 0) {
           beep()
           if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-          if (Notification.permission === 'granted') {
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
             new Notification('New order available!', {
               body: `${incoming[0].vendors?.shop_name ?? 'Order'} — ${formatPrice(incoming[0].rider_delivery_cut)}`,
               icon: '/icon-192.png',
@@ -138,7 +138,9 @@ export default function RiderDashboard() {
 
   useEffect(() => {
     fetchData()
-    if (Notification.permission === 'default') {
+    // Notification API is absent in iOS Safari (non-PWA) — guard or the page
+    // throws at load and the rider dashboard fails to render ("page couldn't load").
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission()
     }
   }, [fetchData])

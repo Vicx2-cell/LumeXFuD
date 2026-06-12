@@ -68,7 +68,7 @@ export default function VendorDashboard() {
       audioCtx.current = ctx
       beep(ctx)
     } catch {}
-    if (Notification.permission === 'granted') {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       new Notification('New Order — LumeX Fud', {
         body: 'A new order is waiting for you',
         icon: '/icon-192.png',
@@ -102,7 +102,9 @@ export default function VendorDashboard() {
 
   useEffect(() => {
     load()
-    Notification.requestPermission().catch(() => {})
+    // Notification API is absent in iOS Safari (non-PWA) — guard or the page
+    // throws at load and the whole dashboard fails to render ("page couldn't load").
+    if (typeof Notification !== 'undefined') Notification.requestPermission().catch(() => {})
   }, [load])
 
   // Live updates via polling. This app authenticates with a custom JWT in an
