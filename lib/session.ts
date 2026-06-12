@@ -209,7 +209,14 @@ export function setCookieOptions(role: SessionRole) {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict' as const,
+    // 'lax' (not 'strict'): Strict withholds the session cookie on top-level
+    // navigations that don't originate from the site itself — Home Screen / PWA
+    // launches and links opened from other apps (WhatsApp, Messages). On iOS that
+    // meant the dashboard loaded without the cookie, the proxy saw no auth, and
+    // the page failed to load while desktop (same-site navigation) worked. Lax
+    // still blocks CSRF on cross-site POSTs/subresources but sends the cookie on
+    // top-level GET navigations.
+    sameSite: 'lax' as const,
     maxAge: SESSION_DURATIONS[role],
     path: '/',
   }
