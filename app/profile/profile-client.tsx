@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/back-button'
 import { FaceIdSetup } from '@/components/face-id-setup'
@@ -214,6 +215,22 @@ export function ProfileClient({
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-5 space-y-5 lx-enter">
+        {/* LumeX Wallet — primary entry point (customers had no way to reach it) */}
+        <Link
+          href="/profile/wallet"
+          className="flex items-center gap-3 rounded-2xl p-4 transition-colors"
+          style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.25)' }}
+        >
+          <span className="text-2xl">💰</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold" style={{ color: '#F5A623' }}>LumeX Wallet</p>
+            <p className="text-xs text-white/50">Load money, get 5% bonus, checkout faster</p>
+          </div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </Link>
+
         {/* Gamification panel */}
         {xp && (
           <div className="rounded-2xl p-5 space-y-4"

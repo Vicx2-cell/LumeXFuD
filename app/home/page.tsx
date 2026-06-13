@@ -54,16 +54,27 @@ export default async function CustomerHomePage() {
               <h1 className="text-base font-semibold leading-tight">What are you eating today?</h1>
             </div>
           </div>
-          <a
-            href="/profile"
-            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
-            aria-label="Profile"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </a>
+          <div className="flex items-center gap-2">
+            <a
+              href="/profile/wallet"
+              className="h-9 px-3 rounded-full flex items-center gap-1.5"
+              style={{ background: 'rgba(245,166,35,0.14)', border: '1px solid rgba(245,166,35,0.3)' }}
+              aria-label="Wallet"
+            >
+              <span className="text-sm">💰</span>
+              <span className="text-xs font-semibold" style={{ color: '#F5A623' }}>Wallet</span>
+            </a>
+            <a
+              href="/profile"
+              className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
+              aria-label="Profile"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </a>
+          </div>
         </div>
       </div>
 

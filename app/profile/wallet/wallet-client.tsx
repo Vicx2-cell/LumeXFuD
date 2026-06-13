@@ -95,13 +95,39 @@ export default function CustomerWalletClient() {
   useEffect(() => { loadWallet() }, [loadWallet])
   useEffect(() => { loadTxs(txPage) }, [loadTxs, txPage])
 
-  // Show success toast if redirected from Paystack
+  // After returning from Paystack, the wallet is credited by an ASYNC webhook
+  // that often hasn't finished by the time this page loads — so a single fetch
+  // shows the old balance and the top-up + 5% bonus look like they "didn't work".
+  // Poll the balance for a few seconds until it goes up, refreshing the tx list
+  // too so the TOPUP and TOPUP_BONUS rows appear.
   useEffect(() => {
-    if (searchParams.get('topup') === 'success') {
-      showToast('🎉 Top-up processing! Your wallet will update shortly.')
-      loadWallet()
+    if (searchParams.get('topup') !== 'success') return
+    showToast('🎉 Top-up received! Crediting your wallet…')
+    let cancelled = false
+    let attempts = 0
+    let baseline: number | null = null
+    const poll = async () => {
+      if (cancelled) return
+      attempts++
+      try {
+        const res = await fetch('/api/customer-wallet/balance')
+        if (res.ok) {
+          const w = (await res.json()) as WalletData
+          setWallet(w)
+          void loadTxs(1)
+          if (baseline === null) {
+            baseline = w.balance_kobo
+          } else if (w.balance_kobo > baseline) {
+            showToast('🎉 Wallet topped up — 5% bonus added!')
+            return
+          }
+        }
+      } catch { /* transient — retry */ }
+      if (attempts < 8) setTimeout(poll, 2500)
     }
-  }, [searchParams, loadWallet])
+    void poll()
+    return () => { cancelled = true }
+  }, [searchParams, loadTxs])
 
   // ── Bonus preview ─────────────────────────────────────────────────────────
 

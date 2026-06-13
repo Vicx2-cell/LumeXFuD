@@ -1,16 +1,20 @@
-const CACHE_NAME = 'lumexfud-v1';
-const OFFLINE_URL = '/offline';
+const CACHE_NAME = 'lumexfud-v4';
 
-// Assets to pre-cache on install
+// Pre-cache only assets that are SAME for everyone and never redirect.
+// IMPORTANT: do NOT precache "/" — for a logged-in user the auth proxy
+// 307-redirects "/", and Cache.addAll() rejects on a redirected response, which
+// made the whole SW install fail (so a fixed SW could never take over).
 const PRECACHE = [
-  '/',
   '/offline',
   '/manifest.json',
 ];
 
 self.addEventListener('install', (event) => {
+  // allSettled (not addAll) so one missing/redirecting asset can't abort install.
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE))
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.allSettled(PRECACHE.map((u) => cache.add(u)))
+    )
   );
   self.skipWaiting();
 });
@@ -28,7 +32,17 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Never intercept API calls, Supabase, or Paystack
+  // CRITICAL: never intercept NAVIGATIONS. Page loads (incl. the auth proxy's
+  // 307 redirects) are handled natively by the browser, exactly like desktop.
+  // Intercepting them and returning the (redirected) response is what older iOS
+  // WebKit rejects with "page couldn't load" — so we stay out of navigations
+  // entirely. This means no branded offline page on a cold navigation; that's an
+  // acceptable trade for the dashboards actually loading on iPhone.
+  if (request.mode === 'navigate') {
+    return;
+  }
+
+  // Never intercept API calls or third-party hosts.
   if (
     url.pathname.startsWith('/api/') ||
     url.hostname.includes('supabase') ||
@@ -38,30 +52,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For navigation requests: network-first; cache successful pages so a
-  // previously-visited page (homepage, /orders, a vendor page) still loads
-  // offline. Fall back to the cached copy, then the offline page.
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((c) => c.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() =>
-          caches.match(request).then((cached) =>
-            cached ??
-            caches.match(OFFLINE_URL).then((r) => r ?? new Response('Offline', { status: 503 }))
-          )
-        )
-    );
-    return;
-  }
-
-  // For static assets: cache-first
+  // Static, content-hashed assets: cache-first (safe — these never redirect).
   if (
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.startsWith('/icons/') ||
@@ -73,7 +64,7 @@ self.addEventListener('fetch', (event) => {
       caches.match(request).then((cached) => {
         if (cached) return cached;
         return fetch(request).then((response) => {
-          if (response.ok) {
+          if (response.ok && !response.redirected) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((c) => c.put(request, clone));
           }
