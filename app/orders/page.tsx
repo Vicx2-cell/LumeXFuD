@@ -4,7 +4,8 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { BottomNav } from '@/components/nav-bottom'
 import { BackButton } from '@/components/back-button'
-import { formatPrice } from '@/lib/money'
+import { formatPrice, formatDate } from '@/lib/money'
+import { resolveOrdersView } from '@/lib/orders-view'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,7 +53,7 @@ export default async function OrdersPage({
   const PAGE_SIZE = 20
   const offset = (page - 1) * PAGE_SIZE
 
-  const { data: orders, count } = await db
+  const { data: orders, count, error } = await db
     .from('orders')
     .select(`
       id, order_number, status, total_amount, created_at, delivery_type,
@@ -63,6 +64,7 @@ export default async function OrdersPage({
     .order('created_at', { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1)
 
+  const view = resolveOrdersView(orders, error)
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE)
 
   return (
@@ -76,7 +78,20 @@ export default async function OrdersPage({
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
-        {!orders || orders.length === 0 ? (
+        {view === 'error' ? (
+          <div className="text-center py-20">
+            <p className="text-5xl mb-4">⚠️</p>
+            <p className="font-semibold text-lg">Couldn&apos;t load your orders</p>
+            <p className="text-sm text-white/40 mt-1">Something went wrong on our end. Your orders are safe — please try again.</p>
+            <Link
+              href="/orders"
+              className="inline-block mt-6 px-6 py-3 rounded-xl font-medium"
+              style={{ background: '#F5A623', color: '#000' }}
+            >
+              Try again
+            </Link>
+          </div>
+        ) : view === 'empty' ? (
           <div className="text-center py-20">
             <p className="text-5xl mb-4">📋</p>
             <p className="font-semibold text-lg">No orders yet</p>
@@ -90,7 +105,7 @@ export default async function OrdersPage({
             </Link>
           </div>
         ) : (
-          orders.map((order) => {
+          orders!.map((order) => {
             const vendorRaw = order.vendors
             const vendor = (Array.isArray(vendorRaw) ? vendorRaw[0] : vendorRaw) as { shop_name: string; logo_url: string | null } | null
             const statusColor = STATUS_COLORS[order.status as string] ?? 'rgba(255,255,255,0.4)'
@@ -116,21 +131,18 @@ export default async function OrdersPage({
                 </div>
                 <div className="flex items-center justify-between mt-3">
                   <p className="text-sm text-white/60">
-                    {new Date(order.created_at as string).toLocaleDateString('en-NG', {
-                      day: 'numeric', month: 'short', year: 'numeric',
-                    })}
+                    {formatDate(order.created_at as string)}
                   </p>
                   <p className="font-semibold text-sm">{formatPrice(order.total_amount as number)}</p>
                 </div>
                 {order.status === 'COMPLETED' && (
                   <div className="mt-3 border-t border-white/5 pt-3">
-                    <button
-                      onClick={(e) => e.preventDefault()}
-                      className="text-xs text-white/50"
-                      aria-label="Reorder"
-                    >
-                      🔁 Order again
-                    </button>
+                    {/* Non-interactive label: this is a Server Component, so it
+                        cannot carry an onClick (doing so threw "Event handlers
+                        cannot be passed to Client Component props" → 500 on every
+                        list with a completed order). Tapping the card opens the
+                        order, where reorder lives. */}
+                    <span className="text-xs text-white/50">🔁 Order again</span>
                   </div>
                 )}
               </Link>

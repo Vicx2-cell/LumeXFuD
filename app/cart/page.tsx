@@ -88,6 +88,7 @@ export default function CartPage() {
   }
 
   async function handleCheckout() {
+    if (loading) return // guard against double-submit before the disabled state paints
     if (!address.trim()) { setError('Please enter a delivery address'); return }
     setError(''); setLoading(true)
 
@@ -374,7 +375,7 @@ export default function CartPage() {
                     LumeX Wallet
                   </p>
                   <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                    Load money for faster checkout + 5% bonus →
+                    Load money for faster checkout + 1% bonus →
                   </p>
                 </div>
                 <span className="text-white/30 text-sm">→</span>
