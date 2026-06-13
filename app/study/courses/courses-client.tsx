@@ -120,7 +120,7 @@ function SelectionHeader({ sel }: { sel: CompleteSelection }) {
 }
 
 function CcmasFootnote({ sel }: { sel: CompleteSelection }) {
-  const lowConfidence = programmeById(sel.programmeId)?.confidence === 'low'
+  const lowConfidence = (programmeById(sel.programmeId)?.confidence ?? 1) < 0.5
   return (
     <div className="rounded-xl px-3 py-2.5 glass-thin space-y-1.5" style={{ borderRadius: 12 }}>
       <p className="text-xs text-white/55 leading-relaxed">
@@ -222,13 +222,22 @@ function CourseCard({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold" style={{ color: selected ? '#F5A623' : '#fff' }}>{course.code}</p>
-            {course.confidence !== 'high' && (
+            {course.status === 'draft' && (
               <span
                 className="text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
                 style={{ background: 'rgba(245,166,35,0.12)', color: 'rgba(245,166,35,0.85)' }}
                 title="ABSU may set a different code, unit count or semester — confirm with your department."
               >
                 confirm code
+              </span>
+            )}
+            {course.status === 'absu_verified' && (
+              <span
+                className="text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
+                style={{ background: 'rgba(52,211,153,0.14)', color: 'rgba(52,211,153,0.95)' }}
+                title="Confirmed by an ABSU course rep / students."
+              >
+                ✓ confirmed
               </span>
             )}
           </div>

@@ -18,6 +18,7 @@ import {
   coursesFor,
   totalCreditUnits,
   CCMAS_SOURCE_URL,
+  isVerified,
   type CatalogSelection,
 } from './catalog'
 
@@ -54,11 +55,13 @@ describe('catalog scaffold', () => {
     expect(new Set(programmeIds).size).toBe(programmeIds.length)
   })
 
-  it('seeds every row as unverified with a confidence (human-verify gate, §7.6)', () => {
+  it('seeds every structural row as draft — never AI-verified (human gate)', () => {
     const programmes = listFaculties().flatMap((f) => programmesForFaculty(f.id))
-    expect(programmes.every((p) => p.verified === false)).toBe(true)
-    expect(programmes.every((p) => ['low', 'medium', 'high'].includes(p.confidence))).toBe(true)
-    expect(listFaculties().every((f) => f.verified === false)).toBe(true)
+    expect(programmes.every((p) => p.status === 'draft')).toBe(true)
+    expect(programmes.every((p) => p.confidence >= 0 && p.confidence <= 1)).toBe(true)
+    // The integrity rule: nothing seeded is ever truly verified.
+    expect(programmes.every((p) => isVerified(p.status) === false)).toBe(true)
+    expect(listFaculties().every((f) => f.status === 'draft' && !isVerified(f.status))).toBe(true)
   })
 })
 
@@ -162,11 +165,13 @@ describe('course catalog (scaffold)', () => {
     expect(courses.every((c) => c.programmeId === 'chemistry' && c.level === 200 && c.semester === 1)).toBe(true)
   })
 
-  it('marks every scaffold row unverified and cites the CCMAS source', () => {
+  it('never marks a scaffold row truly verified, and cites the CCMAS source', () => {
     const courses = coursesFor('biochemistry', 200, 1)
     expect(courses.map((c) => c.code)).toContain('BCH 201')
-    expect(courses.every((c) => c.verified === false)).toBe(true)
+    // national_verified core + draft discipline rows — but none absu_verified.
+    expect(courses.every((c) => isVerified(c.status) === false)).toBe(true)
     expect(courses.every((c) => c.sourceUrl === CCMAS_SOURCE_URL)).toBe(true)
+    expect(courses.find((c) => c.code === 'BCH 201')?.status).toBe('draft')
   })
 
   it('returns an empty list for a bucket with no core and no scaffold data', () => {
@@ -175,13 +180,14 @@ describe('course catalog (scaffold)', () => {
     expect(coursesFor('mathematics', 300, 2)).toEqual([])
   })
 
-  it('includes the CCMAS national core for every programme, at high confidence', () => {
+  it('includes the CCMAS national core for every programme as national_verified', () => {
     // 'law' has no discipline scaffold, so it sees national core only.
     const law100 = coursesFor('law', 100, 1)
     const gst = law100.find((c) => c.code === 'GST 111')
     expect(gst).toBeDefined()
-    expect(gst?.confidence).toBe('high')
-    expect(gst?.verified).toBe(false)
+    expect(gst?.status).toBe('national_verified')
+    expect(gst?.confidence).toBeGreaterThanOrEqual(0.8)
+    expect(gst ? isVerified(gst.status) : true).toBe(false) // national core is NOT absu-verified
     // ENT 211 is national core at 200 second semester.
     expect(coursesFor('chemistry', 200, 2).map((c) => c.code)).toContain('ENT 211')
   })

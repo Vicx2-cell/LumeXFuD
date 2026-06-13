@@ -13,24 +13,41 @@
 export type CourseLevel = 100 | 200 | 300 | 400 | 500
 export type Semester = 1 | 2
 
-/** How sure we are about a seeded row — drives the human-verify gate (§7.6). */
-export type Confidence = 'low' | 'medium' | 'high'
+// Verification status — a claim matched against an authority, never a naked
+// boolean. Two engines: the CCMAS national core is AI-verifiable; the ABSU 30%
+// (exact codes/units/semester) can only be confirmed by an ABSU human.
+//   national_verified — appears in the CCMAS doc. AI may set. High confidence.
+//   corroborated      — 2+ independent sources agree exactly. AI may set.
+//   draft             — single/weak source or any conflict. AI may set. Needs human.
+//   absu_verified     — confirmed by an ABSU authority/human. ONLY a human sets this.
+// RULE: verified=true is reachable ONLY via absu_verified — AI/seed can never grant it.
+export type CatalogStatus = 'national_verified' | 'corroborated' | 'draft' | 'absu_verified'
 
-export interface Faculty {
+/** Provenance carried by every catalog row. */
+export interface SourceMeta {
+  status: CatalogStatus
+  /** 0–1. AI raises confidence; only a human grants truth (absu_verified). */
+  confidence: number
+  sourceUrl: string | null
+  /** ISO timestamp the row was last checked against its source (null = seed). */
+  lastChecked: string | null
+}
+
+/** The single integrity check: a row is truly verified only if a human confirmed it. */
+export function isVerified(status: CatalogStatus): boolean {
+  return status === 'absu_verified'
+}
+
+export interface Faculty extends SourceMeta {
   id: string
   /** ABSU calls these "Colleges"; the §7.6 schema names the table `faculties`. */
   name: string
-  confidence: Confidence
-  /** Authoritative only after human review (§7.6). Seed rows are false. */
-  verified: boolean
 }
 
-export interface Programme {
+export interface Programme extends SourceMeta {
   id: string
   facultyId: string
   name: string
-  confidence: Confidence
-  verified: boolean
 }
 
 /** A (possibly partial) faculty→programme→level→semester selection. */
@@ -59,12 +76,14 @@ export const EMPTY_SELECTION: CatalogSelection = {
 export const COURSE_LEVELS: readonly CourseLevel[] = [100, 200, 300, 400, 500]
 export const SEMESTERS: readonly Semester[] = [1, 2]
 
-type SeedProgramme = { id: string; name: string; confidence?: Confidence }
+// Seed-only confidence labels (mapped to a 0–1 score by the builder below).
+type SeedConfidence = 'medium' | 'low'
+type SeedProgramme = { id: string; name: string }
 type SeedCollege = {
   id: string
   name: string
   /** Default confidence for this college's departments. */
-  programmeConfidence: Confidence
+  programmeConfidence: SeedConfidence
   programmes: ReadonlyArray<SeedProgramme>
 }
 
@@ -214,13 +233,18 @@ const FACULTIES_SEED: ReadonlyArray<SeedCollege> = [
   },
 ]
 
-// Colleges themselves are well-established (confidence: high) but still
-// verified: false until the gated step signs the whole catalog off.
+const SEED_CONFIDENCE: Record<SeedConfidence, number> = { medium: 0.7, low: 0.45 }
+
+// College/department structure is ABSU-specific, so it can only ever be
+// `absu_verified` by a human — the seed lands as `draft`. Colleges are
+// well-known (high confidence) but still draft until confirmed.
 const FACULTIES: readonly Faculty[] = FACULTIES_SEED.map((c) => ({
   id: c.id,
   name: c.name,
-  confidence: 'high',
-  verified: false,
+  status: 'draft',
+  confidence: 0.85,
+  sourceUrl: null,
+  lastChecked: null,
 }))
 
 const PROGRAMMES: readonly Programme[] = FACULTIES_SEED.flatMap((c) =>
@@ -228,8 +252,10 @@ const PROGRAMMES: readonly Programme[] = FACULTIES_SEED.flatMap((c) =>
     id: p.id,
     facultyId: c.id,
     name: p.name,
-    confidence: p.confidence ?? c.programmeConfidence,
-    verified: false,
+    status: 'draft',
+    confidence: SEED_CONFIDENCE[c.programmeConfidence],
+    sourceUrl: null,
+    lastChecked: null,
   })),
 )
 
@@ -326,7 +352,7 @@ export function summarize(sel: CompleteSelection): string {
 
 export type CourseKind = 'core' | 'elective'
 
-export interface CatalogCourse {
+export interface CatalogCourse extends SourceMeta {
   programmeId: string
   level: CourseLevel
   semester: Semester
@@ -335,30 +361,20 @@ export interface CatalogCourse {
   title: string
   creditUnits: number
   kind: CourseKind
-  /**
-   * ✓/⚠ from the curriculum framework: 'high' = grounded in the CCMAS national
-   * core (applies to every Nigerian university); 'medium'/'low' = discipline
-   * topic is reliable but the ABSU code/unit/semester needs confirming.
-   */
-  confidence: Confidence
-  /** Citation for where this row came from (shown in the UI). */
-  sourceUrl: string
-  /** Authoritative for ABSU only after human review (§7.6). Scaffold rows are false. */
-  verified: boolean
 }
 
 /** The national standard these scaffold rows are guided by (publishes per discipline). */
 export const CCMAS_SOURCE_URL = 'https://nuc-ccmas.ng'
 
-// Helper to keep the scaffold terse: every row shares the CCMAS source and is
-// unverified until a human signs off. Discipline rows default to 'medium'
-// confidence (topic reliable, ABSU code/unit to confirm).
+// Helper to keep the scaffold terse. Hand-seeded discipline rows are always
+// `draft` (single, illustrative source — the ABSU code/unit/semester must be
+// human-confirmed); confidence defaults to 0.5 (raise it for sturdier rows).
 function scaffold(
   programmeId: string,
   level: CourseLevel,
   semester: Semester,
   rows: ReadonlyArray<[code: string, title: string, creditUnits: number, kind: CourseKind]>,
-  confidence: Confidence = 'medium',
+  confidence = 0.5,
 ): CatalogCourse[] {
   return rows.map(([code, title, creditUnits, kind]) => ({
     programmeId,
@@ -368,16 +384,17 @@ function scaffold(
     title,
     creditUnits,
     kind,
+    status: 'draft',
     confidence,
     sourceUrl: CCMAS_SOURCE_URL,
-    verified: false,
+    lastChecked: null,
   }))
 }
 
-// ✓ CCMAS national core — compulsory for EVERY programme (GST/ENT). Codes are the
-// canonical CCMAS set; ABSU may renumber, so these stay verified:false but carry
-// 'high' confidence (the requirement itself is national, not ABSU-specific).
-// GST 212 / ENT 211 placement follows the worked Biochemistry track (§3).
+// ✓ CCMAS national core — compulsory for EVERY programme (GST/ENT). These appear
+// in the published CCMAS document, so they're `national_verified` (AI-settable,
+// high confidence) — but never `absu_verified`, since the exact ABSU code/semester
+// still needs a human. Placement follows the worked Biochemistry track (§3).
 type NationalCore = { level: CourseLevel; semester: Semester; code: string; title: string; creditUnits: number }
 const NATIONAL_CORE: readonly NationalCore[] = [
   { level: 100, semester: 1, code: 'GST 111', title: 'Communication in English', creditUnits: 2 },
@@ -399,14 +416,14 @@ const COURSE_SCAFFOLD: readonly CatalogCourse[] = [
     ['MTH 101', 'Elementary Mathematics I (Algebra & Trigonometry)', 2, 'core'],
     ['CHM 107', 'General Chemistry Practical I', 1, 'core'],
     ['PHY 107', 'General Physics Practical I', 1, 'core'],
-  ], 'high'),
+  ], 0.65),
   ...scaffold('biochemistry', 100, 2, [
     ['CHM 102', 'General Chemistry II (Organic)', 2, 'core'],
     ['BIO 102', 'General Biology II', 2, 'core'],
     ['PHY 102', 'General Physics II (Electricity & Magnetism)', 2, 'core'],
     ['MTH 102', 'Elementary Mathematics II (Calculus)', 2, 'core'],
     ['STA 111', 'Descriptive Statistics', 2, 'core'],
-  ], 'high'),
+  ], 0.65),
   ...scaffold('biochemistry', 200, 1, [
     ['BCH 201', 'General Biochemistry I', 3, 'core'],
     ['BCH 203', 'Chemistry of Biomolecules', 2, 'core'],
@@ -446,9 +463,10 @@ export function coursesFor(programmeId: string, level: CourseLevel, semester: Se
       title: c.title,
       creditUnits: c.creditUnits,
       kind: 'core',
-      confidence: 'high',
+      status: 'national_verified',
+      confidence: 0.9,
       sourceUrl: CCMAS_SOURCE_URL,
-      verified: false,
+      lastChecked: null,
     }),
   )
   const coreCodes = new Set(core.map((c) => c.code))
