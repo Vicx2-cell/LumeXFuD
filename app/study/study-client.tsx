@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 import {
   EMPTY_SELECTION,
@@ -23,33 +24,11 @@ import {
   type Semester,
   type Step,
 } from '@/lib/catalog'
-
-// Persist the in-progress selection so the next screen (course browse) can pick
-// it up and the student doesn't have to re-choose. Only the four ids/numbers are
-// stored — nothing sensitive, no prices.
-const STORAGE_KEY = 'lx-study-selection'
-
-function loadSelection(): CatalogSelection {
-  if (typeof window === 'undefined') return EMPTY_SELECTION
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return EMPTY_SELECTION
-    const parsed = JSON.parse(raw) as Partial<CatalogSelection>
-    // Re-apply through the validated setters so stale/garbage data is sanitized.
-    let sel: CatalogSelection = EMPTY_SELECTION
-    if (typeof parsed.facultyId === 'string') sel = selectFaculty(sel, parsed.facultyId)
-    if (typeof parsed.programmeId === 'string') sel = selectProgramme(sel, parsed.programmeId)
-    if (typeof parsed.level === 'number') sel = selectLevel(sel, parsed.level as CourseLevel)
-    if (typeof parsed.semester === 'number') sel = selectSemester(sel, parsed.semester as Semester)
-    return sel
-  } catch {
-    return EMPTY_SELECTION
-  }
-}
+import { loadSelection, saveSelection } from '@/lib/study-selection'
 
 const STEP_TITLES: Record<Exclude<Step, 'done'>, string> = {
-  faculty: 'Your faculty',
-  programme: 'Your programme',
+  faculty: 'Your college',
+  programme: 'Your department',
   level: 'Your level',
   semester: 'Which semester',
 }
@@ -97,11 +76,7 @@ export function StudySelector() {
       firstWrite.current = false
       return
     }
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sel))
-    } catch {
-      /* storage full / disabled — selection just won't persist */
-    }
+    saveSelection(sel)
   }, [sel])
 
   const step = editing ?? currentStep(sel)
@@ -139,7 +114,7 @@ export function StudySelector() {
         value={programmeById(sel.programmeId)?.name ?? null}
         active={step === 'programme'}
         locked={!sel.facultyId}
-        lockedHint="Pick your faculty first"
+        lockedHint="Pick your college first"
         onEdit={() => setEditing('programme')}
       >
         <OptionGrid>
@@ -198,9 +173,16 @@ export function StudySelector() {
           <p className="text-xs uppercase tracking-wide text-white/45">You’re all set</p>
           <p className="mt-1 text-sm font-semibold" style={{ color: '#F5A623' }}>{summarize(sel)}</p>
           <p className="mt-2 text-xs text-white/45 leading-relaxed">
-            We’ll line up the courses you should be offering this semester. Your university’s list
+            Here are the courses you should be offering this semester. Your university’s list
             may differ — you’ll be able to confirm and edit it.
           </p>
+          <Link
+            href="/study/courses"
+            className="lx-btn-amber mt-3 inline-flex items-center justify-center gap-1.5 w-full rounded-full px-4 py-3 text-sm font-semibold min-h-[44px]"
+            style={{ background: '#F5A623', color: '#000' }}
+          >
+            See my courses →
+          </Link>
         </div>
       )}
     </div>
