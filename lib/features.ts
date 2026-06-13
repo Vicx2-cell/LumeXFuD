@@ -20,6 +20,7 @@ export const FEATURES: FeatureDef[] = [
   { key: 'wallet',       label: 'LumeX Wallet',    description: 'Show wallet top-up and wallet payment at checkout.',                               default: true,  enforced: false },
   { key: 'leaderboard',  label: 'Leaderboard',     description: 'Show the campus leaderboard and its bottom-nav tab.',                              default: true,  enforced: true },
   { key: 'face_id',      label: 'Face ID login',   description: 'Allow users to enrol Face ID / Touch ID as a second factor.',                      default: true,  enforced: false },
+  { key: 'study',        label: 'Study (beta)',    description: 'Show the course-catalog study tool (faculty → programme → level → semester selector, then ask/practice). In development — off hides the /study section entirely.', default: true, enforced: true },
 ]
 
 const settingId = (key: string) => `feature.${key}`
