@@ -14,6 +14,7 @@ export interface FeatureDef {
 }
 
 export const FEATURES: FeatureDef[] = [
+  { key: 'ai',           label: 'AI features (master)', description: 'MASTER kill switch for everything that spends Anthropic credit — Chow AI, leaderboard captions, dispute concierge, Sentinel, vendor/rider AI, study ingestion, and more. OFF = zero Anthropic API calls anywhere (no credit used). Turn ON only when the account has credit.', default: false, enforced: true },
   { key: 'ordering',     label: 'Ordering',        description: 'Allow customers to place new orders. Off = checkout is paused platform-wide.', default: true,  enforced: true },
   { key: 'signups',      label: 'New sign-ups',    description: 'Allow new customer accounts to be created.',                                       default: true,  enforced: true },
   { key: 'phone_verification', label: 'Phone verification (OTP)', description: 'Require new customers to verify their phone by OTP before sign-up. Turn OFF only while OTP delivery (Termii) is unavailable — accounts created while off have an unverified phone.', default: true, enforced: true },

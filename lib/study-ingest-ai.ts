@@ -13,7 +13,7 @@ import type { IngestProgramme } from './study-ingest'
  */
 export async function studyAiEnabled(): Promise<boolean> {
   if (process.env.STUDY_AI_ENABLED === 'false') return false
-  return getFeature('study')
+  return getFeature('ai') // master AI kill switch (super-admin)
 }
 
 // Ingestion is a low-volume, accuracy-critical one-time job, so it uses the
@@ -38,7 +38,7 @@ RULES:
 
 /** Calls the grounded model and returns its raw JSON text. Returns '' if no key. */
 export async function runExtraction(programme: IngestProgramme): Promise<string> {
-  const anthropic = getAnthropic()
+  const anthropic = await getAnthropic()
   if (!anthropic) return ''
 
   const tools = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 8 }] as unknown as Anthropic.Messages.ToolUnion[]
