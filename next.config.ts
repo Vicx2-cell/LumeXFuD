@@ -16,6 +16,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   images: {
+    // Prefer AVIF (then WebP) for menu/vendor photos. This is the biggest mobile
+    // win for an image-heavy food app on metered data: AVIF is typically 20-50%
+    // smaller than WebP at equal quality, and Next negotiates per request Accept
+    // header so older clients still get WebP/original. No code changes needed —
+    // every <Image> already routes through the optimizer.
+    formats: ['image/avif', 'image/webp'],
     // Menu/vendor photos are served from the Supabase Storage public bucket.
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co', pathname: '/storage/v1/object/public/**' },
