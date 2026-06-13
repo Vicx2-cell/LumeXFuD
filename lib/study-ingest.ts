@@ -88,9 +88,10 @@ export function parseIngestedCourses(raw: unknown, programmeId: string): ParseRe
 
     const code = asString(r.code)
     const title = asString(r.title)
-    const level = r.level as CourseLevel
-    const semester = r.semester as Semester
-    const kind = asString(r.kind) as CourseKind
+    // Coerce — the model sometimes emits level/semester/units as strings ("200").
+    const level = Number(r.level) as CourseLevel
+    const semester = Number(r.semester) as Semester
+    const kind = asString(r.kind).toLowerCase() as CourseKind
     const creditUnits = typeof r.creditUnits === 'number' ? r.creditUnits : Number(r.creditUnits)
 
     if (!code || !title) {

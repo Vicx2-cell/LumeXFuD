@@ -38,15 +38,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     save: (rows) => saveCatalogCourses(db, rows),
   }
 
-  const result = await ingestDiscipline(deps, {
-    id: programme.id,
-    name: programme.name,
-    facultyName: faculty?.name ?? programme.facultyId,
-  })
+  let result
+  try {
+    result = await ingestDiscipline(deps, {
+      id: programme.id,
+      name: programme.name,
+      facultyName: faculty?.name ?? programme.facultyId,
+    })
+  } catch (e) {
+    // Surface upstream failures (e.g. Anthropic "credit balance too low",
+    // connection errors) as a clean 502 instead of a 4.8-min hang / 500.
+    const detail = e instanceof Error ? e.message : 'ingestion failed'
+    console.error(`[study-ingest] ${programme.id} failed: ${detail}`)
+    return NextResponse.json({ error: 'Ingestion failed', detail: detail.slice(0, 300) }, { status: 502 })
+  }
 
   if (result.disabled) {
     return NextResponse.json({ error: 'Study AI is disabled (kill switch)' }, { status: 503 })
   }
+
+  console.log(`[study-ingest] ${result.programmeId}: saved=${result.saved} warnings=${JSON.stringify(result.warnings.slice(0, 6))}`)
 
   // Return a compact review queue: nothing here is authoritative until a human
   // confirms it in-app (flips status → absu_verified).

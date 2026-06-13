@@ -61,6 +61,18 @@ describe('parseIngestedCourses', () => {
     expect(rows).toHaveLength(1)
   })
 
+  it('coerces string level/semester/units and lowercases kind', () => {
+    const raw = modelOutput([
+      { code: 'BCH 201', title: 'General Biochemistry I', level: '200', semester: '1', creditUnits: '3', kind: 'Core', evidence: 'national_core', sourceUrl: 'https://a' },
+    ])
+    const { rows } = parseIngestedCourses(raw, 'biochemistry')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].level).toBe(200)
+    expect(rows[0].semester).toBe(1)
+    expect(rows[0].creditUnits).toBe(3)
+    expect(rows[0].kind).toBe('core')
+  })
+
   it('returns empty + warning on unparseable output', () => {
     const { rows, warnings } = parseIngestedCourses('the model rambled with no json', 'biochemistry')
     expect(rows).toHaveLength(0)

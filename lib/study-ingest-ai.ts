@@ -49,13 +49,15 @@ export async function runExtraction(programme: IngestProgramme): Promise<string>
     },
   ]
 
-  let res = await anthropic.messages.create({ model: INGEST_MODEL, max_tokens: 8000, system: SYSTEM, tools, messages })
+  let res = await anthropic.messages.create({ model: INGEST_MODEL, max_tokens: 12000, system: SYSTEM, tools, messages })
   // Server-side web-search loop can pause_turn; re-send to resume (bounded).
   let guard = 0
-  while (res.stop_reason === 'pause_turn' && guard++ < 6) {
+  while (res.stop_reason === 'pause_turn' && guard++ < 10) {
     messages.push({ role: 'assistant', content: res.content })
-    res = await anthropic.messages.create({ model: INGEST_MODEL, max_tokens: 8000, system: SYSTEM, tools, messages })
+    res = await anthropic.messages.create({ model: INGEST_MODEL, max_tokens: 12000, system: SYSTEM, tools, messages })
   }
 
-  return res.content.map((b) => (b.type === 'text' ? b.text : '')).join('')
+  const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('')
+  console.log(`[study-ingest] ${programme.id}: stop_reason=${res.stop_reason} continuations=${guard} textChars=${text.length}`)
+  return text
 }
