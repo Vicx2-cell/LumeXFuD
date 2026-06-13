@@ -220,7 +220,18 @@ function CourseCard({
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-semibold" style={{ color: selected ? '#F5A623' : '#fff' }}>{course.code}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold" style={{ color: selected ? '#F5A623' : '#fff' }}>{course.code}</p>
+            {course.confidence !== 'high' && (
+              <span
+                className="text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
+                style={{ background: 'rgba(245,166,35,0.12)', color: 'rgba(245,166,35,0.85)' }}
+                title="ABSU may set a different code, unit count or semester — confirm with your department."
+              >
+                confirm code
+              </span>
+            )}
+          </div>
           <p className="text-sm text-white/60 truncate">{course.title}</p>
         </div>
         <span className="shrink-0 text-xs text-white/45">{course.creditUnits} units</span>

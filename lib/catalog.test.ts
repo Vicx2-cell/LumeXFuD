@@ -169,9 +169,28 @@ describe('course catalog (scaffold)', () => {
     expect(courses.every((c) => c.sourceUrl === CCMAS_SOURCE_URL)).toBe(true)
   })
 
-  it('returns an empty list for a bucket with no scaffold data', () => {
-    expect(coursesFor('chemistry', 100, 1)).toEqual([])
+  it('returns an empty list for a bucket with no core and no scaffold data', () => {
+    // 400-level has no national core, and these programmes have no scaffold there.
+    expect(coursesFor('chemistry', 400, 1)).toEqual([])
     expect(coursesFor('mathematics', 300, 2)).toEqual([])
+  })
+
+  it('includes the CCMAS national core for every programme, at high confidence', () => {
+    // 'law' has no discipline scaffold, so it sees national core only.
+    const law100 = coursesFor('law', 100, 1)
+    const gst = law100.find((c) => c.code === 'GST 111')
+    expect(gst).toBeDefined()
+    expect(gst?.confidence).toBe('high')
+    expect(gst?.verified).toBe(false)
+    // ENT 211 is national core at 200 second semester.
+    expect(coursesFor('chemistry', 200, 2).map((c) => c.code)).toContain('ENT 211')
+  })
+
+  it('lists national core first and dedupes by code', () => {
+    const bio = coursesFor('biochemistry', 200, 1)
+    expect(bio[0].code).toBe('GST 212') // core before discipline courses
+    const codes = bio.map((c) => c.code)
+    expect(new Set(codes).size).toBe(codes.length)
   })
 
   it('sums credit units', () => {

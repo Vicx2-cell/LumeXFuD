@@ -335,22 +335,30 @@ export interface CatalogCourse {
   title: string
   creditUnits: number
   kind: CourseKind
+  /**
+   * ✓/⚠ from the curriculum framework: 'high' = grounded in the CCMAS national
+   * core (applies to every Nigerian university); 'medium'/'low' = discipline
+   * topic is reliable but the ABSU code/unit/semester needs confirming.
+   */
+  confidence: Confidence
   /** Citation for where this row came from (shown in the UI). */
   sourceUrl: string
-  /** Authoritative only after human review (§7.6). Scaffold rows are false. */
+  /** Authoritative for ABSU only after human review (§7.6). Scaffold rows are false. */
   verified: boolean
 }
 
-/** The national standard these scaffold rows are guided by. */
-export const CCMAS_SOURCE_URL = 'https://www.nuc.edu.ng/ccmas/'
+/** The national standard these scaffold rows are guided by (publishes per discipline). */
+export const CCMAS_SOURCE_URL = 'https://nuc-ccmas.ng'
 
 // Helper to keep the scaffold terse: every row shares the CCMAS source and is
-// unverified until a human signs off.
+// unverified until a human signs off. Discipline rows default to 'medium'
+// confidence (topic reliable, ABSU code/unit to confirm).
 function scaffold(
   programmeId: string,
   level: CourseLevel,
   semester: Semester,
   rows: ReadonlyArray<[code: string, title: string, creditUnits: number, kind: CourseKind]>,
+  confidence: Confidence = 'medium',
 ): CatalogCourse[] {
   return rows.map(([code, title, creditUnits, kind]) => ({
     programmeId,
@@ -360,14 +368,45 @@ function scaffold(
     title,
     creditUnits,
     kind,
+    confidence,
     sourceUrl: CCMAS_SOURCE_URL,
     verified: false,
   }))
 }
 
+// ✓ CCMAS national core — compulsory for EVERY programme (GST/ENT). Codes are the
+// canonical CCMAS set; ABSU may renumber, so these stay verified:false but carry
+// 'high' confidence (the requirement itself is national, not ABSU-specific).
+// GST 212 / ENT 211 placement follows the worked Biochemistry track (§3).
+type NationalCore = { level: CourseLevel; semester: Semester; code: string; title: string; creditUnits: number }
+const NATIONAL_CORE: readonly NationalCore[] = [
+  { level: 100, semester: 1, code: 'GST 111', title: 'Communication in English', creditUnits: 2 },
+  { level: 100, semester: 2, code: 'GST 112', title: 'Nigerian Peoples and Culture', creditUnits: 2 },
+  { level: 200, semester: 1, code: 'GST 212', title: 'Philosophy, Logic and Human Existence', creditUnits: 2 },
+  { level: 200, semester: 2, code: 'ENT 211', title: 'Entrepreneurship and Innovation', creditUnits: 2 },
+  { level: 300, semester: 1, code: 'ENT 312', title: 'Venture Creation', creditUnits: 2 },
+]
+
 // Small, illustrative scaffold around the seed courses (BCH 201, CHM 213).
 // Other programmes/levels simply return an empty list until ingestion fills them.
 const COURSE_SCAFFOLD: readonly CatalogCourse[] = [
+  // Biochemistry 100 — standardised CCMAS science foundation (✓ pattern; codes
+  // to confirm, so 'high' confidence on the shape).
+  ...scaffold('biochemistry', 100, 1, [
+    ['CHM 101', 'General Chemistry I (Physical/Inorganic)', 2, 'core'],
+    ['BIO 101', 'General Biology I', 2, 'core'],
+    ['PHY 101', 'General Physics I (Mechanics)', 2, 'core'],
+    ['MTH 101', 'Elementary Mathematics I (Algebra & Trigonometry)', 2, 'core'],
+    ['CHM 107', 'General Chemistry Practical I', 1, 'core'],
+    ['PHY 107', 'General Physics Practical I', 1, 'core'],
+  ], 'high'),
+  ...scaffold('biochemistry', 100, 2, [
+    ['CHM 102', 'General Chemistry II (Organic)', 2, 'core'],
+    ['BIO 102', 'General Biology II', 2, 'core'],
+    ['PHY 102', 'General Physics II (Electricity & Magnetism)', 2, 'core'],
+    ['MTH 102', 'Elementary Mathematics II (Calculus)', 2, 'core'],
+    ['STA 111', 'Descriptive Statistics', 2, 'core'],
+  ], 'high'),
   ...scaffold('biochemistry', 200, 1, [
     ['BCH 201', 'General Biochemistry I', 3, 'core'],
     ['BCH 203', 'Chemistry of Biomolecules', 2, 'core'],
@@ -392,11 +431,31 @@ const COURSE_SCAFFOLD: readonly CatalogCourse[] = [
   ]),
 ]
 
-/** Courses a student at this programme/level/semester should be offering. */
+/**
+ * Courses a student at this programme/level/semester should be offering: the
+ * CCMAS national core (shared by every programme) first, then the discipline's
+ * own courses — with any discipline row that duplicates a core code dropped.
+ */
 export function coursesFor(programmeId: string, level: CourseLevel, semester: Semester): CatalogCourse[] {
-  return COURSE_SCAFFOLD.filter(
-    (c) => c.programmeId === programmeId && c.level === level && c.semester === semester,
+  const core: CatalogCourse[] = NATIONAL_CORE.filter((c) => c.level === level && c.semester === semester).map(
+    (c) => ({
+      programmeId,
+      level,
+      semester,
+      code: c.code,
+      title: c.title,
+      creditUnits: c.creditUnits,
+      kind: 'core',
+      confidence: 'high',
+      sourceUrl: CCMAS_SOURCE_URL,
+      verified: false,
+    }),
   )
+  const coreCodes = new Set(core.map((c) => c.code))
+  const discipline = COURSE_SCAFFOLD.filter(
+    (c) => c.programmeId === programmeId && c.level === level && c.semester === semester && !coreCodes.has(c.code),
+  )
+  return [...core, ...discipline]
 }
 
 /** Total credit units across a set of courses (for the browse-view summary). */
