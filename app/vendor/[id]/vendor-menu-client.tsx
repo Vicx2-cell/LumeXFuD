@@ -39,6 +39,8 @@ export function VendorMenuClient({ vendor, menu }: { vendor: VendorInfo; menu: M
       name: item.name,
       price_kobo: item.price_kobo,
       quantity: 1,
+      // Per-dish time, falling back to the vendor's base — so the cart ETA works.
+      prep_time_minutes: item.prep_time_minutes ?? vendor.prep_time_minutes,
       addons,
     }
   }

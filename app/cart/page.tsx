@@ -6,6 +6,7 @@ import { useCart } from '@/components/cart-context'
 import { BottomNav } from '@/components/nav-bottom'
 import { formatPrice } from '@/lib/money'
 import { useFeatures } from '@/lib/use-features'
+import { estimateOrderPrepMinutes, prepRangeLabel } from '@/lib/prep-time'
 
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
 
@@ -53,6 +54,10 @@ export default function CartPage() {
   const platformMarkup  = fees?.markup ?? 25000
   const deliveryFee     = deliveryFees[deliveryType]
   const total           = subtotal + platformMarkup + deliveryFee + tip
+
+  // Longest-dish prep estimate from the per-item times captured at add-time
+  // (falls back to a 25-min default for any item saved before that field existed).
+  const prepMinutes     = estimateOrderPrepMinutes(cart.items.map((i) => ({ prepTimeMinutes: i.prep_time_minutes ?? null })), 25)
 
   // ── Wallet payment math ────────────────────────────────────────────────────
   const walletCoversAll  = walletBalance !== null && walletBalance >= total
@@ -166,6 +171,16 @@ export default function CartPage() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-5 lx-enter">
+        {/* Estimated time — longest dish + delivery window */}
+        <div className="rounded-2xl p-3 flex items-center gap-2.5" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.22)' }}>
+          <span className="text-lg" aria-hidden="true">⏱️</span>
+          <p className="text-sm">
+            <span className="text-white/55">Estimated </span>
+            <span className="font-semibold" style={{ color: '#F5A623' }}>{prepRangeLabel(prepMinutes)}</span>
+            <span className="text-white/45"> · prep + delivery</span>
+          </p>
+        </div>
+
         {/* Items */}
         <div className="glass-thin overflow-hidden">
           {cart.items.map((item, idx) => {

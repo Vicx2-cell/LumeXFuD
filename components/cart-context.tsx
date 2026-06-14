@@ -15,6 +15,10 @@ export interface CartItem {
   price_kobo: number    // base item price; add-ons are priced separately
   quantity: number
   special_instructions?: string
+  // Effective prep minutes for this dish (its own time, or the vendor's base),
+  // captured at add-time so the cart can show a longest-dish ETA. Optional for
+  // backward-compat with carts saved before this field existed.
+  prep_time_minutes?: number
   addons: CartAddon[]
 }
 

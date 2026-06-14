@@ -25,7 +25,7 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
 
   const { data: menu } = await db
     .from('menu_items')
-    .select('id, name, description, price_kobo, image_url, category, is_available, daily_limit, sold_today, display_order')
+    .select('id, name, description, price_kobo, image_url, category, is_available, prep_time_minutes, daily_limit, sold_today, display_order')
     .eq('vendor_id', id)
     .is('deleted_at', null)
     .order('display_order', { ascending: true })
@@ -89,6 +89,7 @@ export interface MenuItem {
   image_url: string | null
   category: string
   is_available: boolean
+  prep_time_minutes: number | null
   daily_limit: number | null
   sold_today: number
   display_order: number
