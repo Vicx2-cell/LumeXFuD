@@ -7,6 +7,7 @@ import { BottomNav } from '@/components/nav-bottom'
 import { formatPrice } from '@/lib/money'
 import { useFeatures } from '@/lib/use-features'
 import { estimateOrderPrepMinutes, prepRangeLabel } from '@/lib/prep-time'
+import { formatHoursRange } from '@/lib/hours'
 import { LodgeMap, type MapLodge } from '@/components/lodge-map'
 
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
@@ -30,6 +31,7 @@ export default function CartPage() {
   const [scheduleAt,    setScheduleAt]    = useState('') // datetime-local string
   const [reorderNote,   setReorderNote]   = useState('') // "some items skipped" after Order again
   const [fees,          setFees]          = useState<{ bike: number; door: number; markup: number } | null>(null)
+  const [hoursLabel,    setHoursLabel]    = useState('7am – 10pm') // live opening hours
 
   // ── Wallet state ──────────────────────────────────────────────────────────
   const [walletBalance,    setWalletBalance]    = useState<number | null>(null)
@@ -48,8 +50,11 @@ export default function CartPage() {
   useEffect(() => {
     fetch('/api/settings/fees')
       .then((r) => r.ok ? r.json() : null)
-      .then((d: { bike_delivery_fee_kobo: number; door_delivery_fee_kobo: number; platform_markup_kobo: number } | null) => {
-        if (d) setFees({ bike: d.bike_delivery_fee_kobo, door: d.door_delivery_fee_kobo, markup: d.platform_markup_kobo })
+      .then((d: { bike_delivery_fee_kobo: number; door_delivery_fee_kobo: number; platform_markup_kobo: number; hours_open?: string; hours_close?: string } | null) => {
+        if (d) {
+          setFees({ bike: d.bike_delivery_fee_kobo, door: d.door_delivery_fee_kobo, markup: d.platform_markup_kobo })
+          if (d.hours_open && d.hours_close) setHoursLabel(formatHoursRange(d.hours_open, d.hours_close))
+        }
       })
       .catch(() => {})
 
@@ -331,7 +336,7 @@ export default function CartPage() {
                 className="w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-amber-400"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', colorScheme: 'dark' }}
               />
-              <p className="text-xs text-white/35 mt-1.5">Within opening hours (7am–10pm). You can cancel for a full refund any time before the kitchen starts.</p>
+              <p className="text-xs text-white/35 mt-1.5">Within opening hours ({hoursLabel}). You can cancel for a full refund any time before the kitchen starts.</p>
             </div>
           )}
         </div>

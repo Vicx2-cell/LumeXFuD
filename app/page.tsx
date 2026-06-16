@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { Reveal } from '@/components/reveal'
+import { getControls } from '@/lib/controls'
+import { formatHoursRange } from '@/lib/hours'
 
 export const metadata = {
   title: { absolute: 'LumeX Fud — Campus food delivery at ABSU, Uturu' },
@@ -41,7 +43,11 @@ const TrophyIcon = () => <svg {...iconProps} aria-hidden="true"><path d="M6 9H4.
 const PinIcon    = () => <svg {...iconProps} aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
 const LockIcon   = () => <svg {...iconProps} aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // Live opening hours from super-admin controls (so editing them updates the
+  // site, instead of the old hardcoded "7am – 10pm").
+  const controls = await getControls()
+  const hoursLabel = formatHoursRange(controls.hours_open, controls.hours_close)
   return (
     <div className="lx-page flex flex-col text-white overflow-hidden">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -109,7 +115,7 @@ export default function LandingPage() {
           </div>
 
           <p className="text-xs text-white/35 pt-1">
-            Platform hours: 7am – 10pm daily
+            Platform hours: {hoursLabel} daily
           </p>
         </div>
       </section>
@@ -220,7 +226,7 @@ export default function LandingPage() {
             <Link href="/terms"   className="hover:text-white/70 transition-colors">Terms</Link>
             <Link href="/privacy" className="hover:text-white/70 transition-colors">Privacy</Link>
           </div>
-          <span>Platform hours: 7am – 10pm</span>
+          <span>Platform hours: {hoursLabel}</span>
         </div>
       </footer>
 

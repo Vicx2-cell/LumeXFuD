@@ -1,4 +1,9 @@
-export default function TermsPage() {
+import { getControls } from '@/lib/controls'
+import { formatHoursRange } from '@/lib/hours'
+
+export default async function TermsPage() {
+  const controls = await getControls()
+  const hoursLabel = formatHoursRange(controls.hours_open, controls.hours_close)
   return (
     <main className="min-h-dvh px-5 py-12 max-w-2xl mx-auto" style={{ background: '#0A0A0B' }}>
       <h1 className="text-2xl font-bold mb-2">Terms of Service</h1>
@@ -13,7 +18,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-base font-semibold text-white mb-2">2. Platform hours & service</h2>
           <ul className="list-disc pl-5 space-y-1">
-            <li>LumeX Fud operates 7am – 10pm daily</li>
+            <li>LumeX Fud operates {hoursLabel} daily</li>
             <li>Minimum order is ₦500</li>
             <li>Delivery is available only within ABSU campus</li>
             <li>We are not responsible for vendor food quality, only for delivery</li>

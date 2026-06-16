@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { getControls } from '@/lib/controls'
 
 // Maps the cart's expected response keys → the id-keyed JSONB settings rows
 // seeded in 010 (each shaped {"amount_kobo": N}). Display-only; the authoritative
@@ -22,11 +23,17 @@ export async function GET() {
     byId.set(row.id, row.value)
   }
 
-  const result: Record<string, number> = {}
+  const result: Record<string, number | string> = {}
   for (const [outKey, id] of Object.entries(FEE_MAP)) {
     const v = byId.get(id)?.amount_kobo
     if (typeof v === 'number') result[outKey] = v
   }
+
+  // Public display settings the cart needs: the live opening hours (so the
+  // scheduled-order hint reflects super-admin edits instead of a hardcoded time).
+  const controls = await getControls()
+  result.hours_open = controls.hours_open
+  result.hours_close = controls.hours_close
 
   // No caching: a stale fee here means the customer is shown a price that
   // differs from the authoritative server-side calc at checkout. Prices change

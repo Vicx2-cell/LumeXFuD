@@ -371,7 +371,7 @@ export default function ForgotPinPage() {
               <li>Why you need a PIN reset</li>
             </ol>
             <p className="text-xs text-white/40">
-              We will respond within 2 hours during platform hours (7am – 10pm).
+              We will respond within 2 hours during platform opening hours.
             </p>
             <button
               type="button"
