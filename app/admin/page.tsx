@@ -58,9 +58,11 @@ const ICONS = {
   shield: svg(<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M9 12h6"/></>),
   pin:    svg(<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>),
   receipt: svg(<><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="m9 12 2 2 4-4"/></>),
+  radar:  svg(<><path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"/><path d="M4 6h.01"/><path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"/><path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"/><path d="M12 18h.01"/><path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"/><circle cx="12" cy="12" r="2"/><path d="m13.41 10.59 5.66-5.66"/></>),
 } as const
 
 const NAV_ACTIONS = [
+  { href: '/admin/live', label: 'Live Ops', icon: ICONS.radar, desc: 'Watch every active order live · flag & act on trouble' },
   { href: '/admin/vendors', label: 'Vendors', icon: ICONS.store, desc: 'Approve, suspend, manage vendors' },
   { href: '/admin/riders', label: 'Riders', icon: ICONS.bike, desc: 'Manage rider accounts' },
   { href: '/admin/orders', label: 'Orders', icon: ICONS.box, desc: 'Browse all orders' },
