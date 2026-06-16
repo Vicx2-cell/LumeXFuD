@@ -328,7 +328,7 @@ export default function RiderDashboard() {
           <p className="text-xs text-white/40 mt-0.5">available</p>
           {wallet.held_kobo > 0 && (
             <p className="text-xs text-amber-400/70 mt-2">
-              {wallet.held_balance} held (releases after 24h)
+              {wallet.held_balance} held · releases after a short hold
             </p>
           )}
           <a

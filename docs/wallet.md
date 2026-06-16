@@ -3,20 +3,23 @@
 ## Overview
 Financial infrastructure of the platform. NOT just a payout feature. Build with the same seriousness as a bank — other people's money is inside.
 
-## Hold Periods
-- **Riders**: 24 hours after delivery confirmed
-- **Vendors**: 3 days after order completed
-- **Admin**: Can freeze any wallet instantly
+## Hold Periods (current model — migration 057, see lib/wallet.ts)
+Earnings are credited to the wallet as HELD when an order completes, then released
+to AVAILABLE after a short hold. Base hold **5 hours** for both riders and vendors,
+reduced by trust tier, and **floored at 1 hour** (so a hold is never zero — there's
+always a window to lock/refund). All durations are live-tunable in `settings`
+(`hold_*_minutes`). A refund claws the earnings back (held first, then available,
+remainder as a debt repaid by future earnings). Admin can freeze any wallet instantly.
 
 ## Trust Tier System
-Affects hold time. Recalculate tier after every completed order.
+Affects hold time. Recalculated live from completed orders/deliveries on every read.
 
-| Tier | Criteria | Hold Reduction |
-|------|----------|--------|
-| Bronze | 0–49 orders/deliveries | Standard hold |
-| Silver | 50–199 | 50% reduction |
-| Gold | 200–499 | 75% reduction |
-| Diamond | 500+, rating 4.8+ | Instant release |
+| Tier | Criteria | Hold reduction | Resulting hold (5h base) |
+|------|----------|----------------|--------------------------|
+| Bronze | 0–49 orders/deliveries | 0% (standard) | ~5h |
+| Silver | 50–199 | 50% faster | ~2½h |
+| Gold | 200–499 | 75% faster | ~1¼h |
+| Diamond | 500+, rating 4.8+ | floored | ~1h (the minimum) |
 
 ## Withdrawal Flow
 1. User taps "Withdraw" — only AVAILABLE balance shown (hold expired)

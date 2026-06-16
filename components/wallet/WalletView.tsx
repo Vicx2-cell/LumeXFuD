@@ -68,10 +68,10 @@ const TIER_MAX: Record<string, number> = {
 // The full trust-tier ladder + what each means (shown in the "Trust Tiers" guide).
 // Counts = completed orders (vendor) / completed deliveries (rider).
 const TIER_CATALOG: Array<{ key: string; emoji: string; name: string; range: string; meaning: string }> = [
-  { key: 'BRONZE',  emoji: '🥉', name: 'Bronze',  range: '0–49',  meaning: 'Getting started. Your first 5 payouts hold ~1 hour for safety; instant after that.' },
-  { key: 'SILVER',  emoji: '🥈', name: 'Silver',  range: '50+',   meaning: 'Established. Instant payouts and a trusted badge on your account.' },
-  { key: 'GOLD',    emoji: '🥇', name: 'Gold',    range: '200+',  meaning: 'Top performer. Instant payouts + priority support.' },
-  { key: 'DIAMOND', emoji: '💎', name: 'Diamond', range: '500+ & 4.8★', meaning: 'Elite — the highest trust tier on LumeX.' },
+  { key: 'BRONZE',  emoji: '🥉', name: 'Bronze',  range: '0–49',  meaning: 'Getting started — earnings are held about 5 hours before you can withdraw.' },
+  { key: 'SILVER',  emoji: '🥈', name: 'Silver',  range: '50+',   meaning: 'Established — holds cut in half (about 2½ hours), plus a trusted badge.' },
+  { key: 'GOLD',    emoji: '🥇', name: 'Gold',    range: '200+',  meaning: 'Top performer — holds cut by 75% (about 1¼ hours) + priority support.' },
+  { key: 'DIAMOND', emoji: '💎', name: 'Diamond', range: '500+ & 4.8★', meaning: 'Elite — the fastest tier, the minimum 1-hour hold.' },
 ]
 
 // Friendly "unlocks in …" for the held-balance countdown.
@@ -299,7 +299,7 @@ export default function WalletView({ userType }: Props) {
                 )
               })}
             </div>
-            <p className="text-[11px] text-white/30 mt-4">Counts are your completed orders/deliveries. Holds protect against fraud on brand-new accounts only.</p>
+            <p className="text-[11px] text-white/30 mt-4">Counts are your completed orders/deliveries. Every payout is held briefly before withdrawal; higher tiers release faster.</p>
           </div>
         </div>
       )}

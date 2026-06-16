@@ -410,11 +410,13 @@ const TIER_EMOJI: Record<TrustTier, string> = {
   BRONZE: '🥉', SILVER: '🥈', GOLD: '🥇', DIAMOND: '💎',
 }
 
+// Hold benefit per tier under the current model (5h base, tier reduction, 1h
+// floor — see calculateReleaseTime). DIAMOND is the floor, not instant.
 const TIER_HOLD: Record<TrustTier, string> = {
-  BRONZE: 'Standard hold',
-  SILVER: '50% faster releases',
-  GOLD:   '75% faster releases',
-  DIAMOND: 'Instant release',
+  BRONZE: 'Standard hold (~5h)',
+  SILVER: '50% faster · ~2½h hold',
+  GOLD:   '75% faster · ~1¼h hold',
+  DIAMOND: 'Fastest · ~1h hold',
 }
 
 const NEXT_TIER: Partial<Record<TrustTier, TrustTier>> = {
