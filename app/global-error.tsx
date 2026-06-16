@@ -1,5 +1,8 @@
 'use client'
 
+import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
+
 // Catches errors thrown in the ROOT layout (where app/error.tsx can't reach).
 // Must render its own <html>/<body>. Inline styles only — no app CSS is
 // guaranteed to be present at this level.
@@ -10,6 +13,12 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => {
+    // React render errors are swallowed by the boundary — report explicitly
+    // (event is scrubbed by beforeSend before leaving the browser).
+    Sentry.captureException(error)
+  }, [error])
+
   return (
     <html lang="en">
       <body style={{ background: '#0A0A0B', color: '#fff', fontFamily: 'system-ui, sans-serif', margin: 0 }}>

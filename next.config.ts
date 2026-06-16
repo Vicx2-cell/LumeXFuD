@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 // Static security headers applied to every response (including static assets).
 // The Content-Security-Policy is NOT set here: it requires a per-request
@@ -45,4 +46,17 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Wrap with Sentry. Source-map upload only runs when SENTRY_AUTH_TOKEN (+ org/
+// project) are set — without them the build still succeeds, just without
+// readable stack traces in Sentry. `silent` keeps CI logs clean.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  // Tree-shake Sentry's debug logging out of the client bundle (replaces the
+  // deprecated `disableLogger`). No-op under Turbopack, applied under webpack.
+  webpack: { treeshake: { removeDebugLogging: true } },
+  // Avoid ad-blockers dropping client events by tunnelling through our origin.
+  tunnelRoute: "/monitoring",
+});

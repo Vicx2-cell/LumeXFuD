@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
 
 // Route-level error boundary. Without this, any client render error in a page
 // segment unmounts the tree and shows a PURE BLANK screen (this is what made the
@@ -15,6 +16,8 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error('[app error boundary]', error)
+    // Report to Sentry (scrubbed by beforeSend before leaving the browser).
+    Sentry.captureException(error)
   }, [error])
 
   return (
