@@ -17,6 +17,18 @@ const initialForm = {
 
 export default function SetupPage() {
   const router = useRouter()
+  // Optional mode (?optional=1): a user WITHOUT a PIN — e.g. someone who signed
+  // up with Google — is adding one by choice, so the page is skippable and the
+  // copy is softer. Default (no flag) = the forced first-login / PIN-reset flow,
+  // which stays mandatory. Read once at first render (client-only).
+  const [opts] = useState(() => {
+    if (typeof window === 'undefined') return { optional: false, next: '/' }
+    const q = new URLSearchParams(window.location.search)
+    const n = q.get('next')
+    const next = n && n.startsWith('/') && !n.startsWith('//') ? n : '/'
+    return { optional: q.get('optional') === '1', next }
+  })
+  const skipDest = opts.next !== '/' ? opts.next : '/home'
   const [form, setForm] = useState(initialForm)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -78,14 +90,18 @@ export default function SetupPage() {
       <div className="min-h-dvh flex items-center justify-center px-5 py-12" style={{ background: '#0A0A0B' }}>
         <div className="w-full max-w-lg space-y-6">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            <h1 className="text-2xl font-semibold text-white">Setup complete</h1>
-            <p className="mt-2 text-sm text-white/60">Your account is ready. Save your new recovery code and continue.</p>
+            <h1 className="text-2xl font-semibold text-white">{opts.optional ? 'Login PIN added' : 'Setup complete'}</h1>
+            <p className="mt-2 text-sm text-white/60">
+              {opts.optional
+                ? 'You can now also log in with your phone + PIN. Save your recovery code and continue.'
+                : 'Your account is ready. Save your new recovery code and continue.'}
+            </p>
           </div>
           <RecoveryCodeDisplay code={recoveryCode} onSaved={() => setSaved(true)} />
           <button
             type="button"
             disabled={!saved}
-            onClick={() => router.push(redirectPath)}
+            onClick={() => router.push(opts.optional ? skipDest : redirectPath)}
             className="w-full rounded-2xl bg-amber-500 py-4 text-sm font-semibold text-black disabled:opacity-50"
           >
             Continue
@@ -99,8 +115,12 @@ export default function SetupPage() {
     <div className="min-h-dvh flex items-center justify-center px-5 py-12" style={{ background: '#0A0A0B' }}>
       <div className="w-full max-w-lg space-y-6">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-          <h1 className="text-2xl font-semibold text-white">Set your permanent PIN</h1>
-          <p className="mt-2 text-sm text-white/60">Complete account setup before accessing your dashboard.</p>
+          <h1 className="text-2xl font-semibold text-white">{opts.optional ? 'Add a login PIN' : 'Set your permanent PIN'}</h1>
+          <p className="mt-2 text-sm text-white/60">
+            {opts.optional
+              ? 'Optional. Set a 6-digit PIN and security questions so you can also log in with your phone — and recover your account if you ever lose access to Google.'
+              : 'Complete account setup before accessing your dashboard.'}
+          </p>
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-5">
@@ -172,6 +192,17 @@ export default function SetupPage() {
           >
             {loading ? 'Saving…' : 'Save and continue'}
           </button>
+
+          {opts.optional && (
+            <button
+              type="button"
+              onClick={() => router.push(skipDest)}
+              disabled={loading}
+              className="w-full py-2 text-sm text-white/40 text-center hover:text-white/70 transition-colors"
+            >
+              Skip for now
+            </button>
+          )}
         </div>
       </div>
     </div>

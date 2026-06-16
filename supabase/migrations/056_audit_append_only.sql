@@ -1,5 +1,5 @@
 -- ============================================================
--- LumeX Fud — Migration 055: make audit trails APPEND-ONLY
+-- LumeX Fud — Migration 056: make audit trails APPEND-ONLY
 -- ============================================================
 -- Rule #28 / security hardening: the audit log must not be writable (mutable or
 -- deletable) by the role that triggered the action — and, in fact, by anyone.

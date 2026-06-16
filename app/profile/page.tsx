@@ -20,11 +20,16 @@ export default async function ProfilePage() {
   if (session.role === 'customer') {
     const { data: customer } = await db
       .from('customers')
-      .select('id, name, phone, hostel, room_number, dispute_count')
+      .select('id, name, phone, hostel, room_number, dispute_count, login_pin_hash')
       .eq('phone', session.phone)
       .single()
 
     profile = customer as CustomerProfile | null
+    // Whether this account has a login PIN. Google-created accounts don't set one
+    // (Google is their sign-in), so we offer them an OPTIONAL "set a PIN" entry
+    // instead of the change/remove controls (which require a current PIN). Only
+    // the boolean crosses to the client — never the hash.
+    const hasPin = !!(customer as { login_pin_hash?: string | null } | null)?.login_pin_hash
 
     if (customer) {
       // Cosmetic streaks + badges (migration 037). No XP/levels, no money.
@@ -56,7 +61,7 @@ export default async function ProfilePage() {
 
       return (
         <main className="lx-page pb-24">
-          <ProfileClient profile={profile} streak={streak} badges={badges} phone={session.phone} supportPhone={supportPhone} />
+          <ProfileClient profile={profile} streak={streak} badges={badges} phone={session.phone} supportPhone={supportPhone} hasPin={hasPin} />
           <BottomNav />
         </main>
       )

@@ -58,12 +58,14 @@ export function ProfileClient({
   badges,
   phone,
   supportPhone,
+  hasPin,
 }: {
   profile: CustomerProfile | null
   streak: StreakData | null
   badges: BadgeItem[]
   phone: string
   supportPhone?: string
+  hasPin: boolean
 }) {
   const router = useRouter()
   const [name, setName] = useState(profile?.name ?? '')
@@ -403,19 +405,38 @@ export function ProfileClient({
             <div className="space-y-2">
               {/* Face ID / Touch ID — optional second factor */}
               <FaceIdSetup />
-              <button
-                onClick={() => { resetPinFlow(); setPinFlow('change-current') }}
-                className="block w-full text-left text-sm text-white/65 hover:text-white py-1.5 transition-colors"
-              >
-                Change login PIN
-              </button>
-              <button
-                onClick={() => { resetPinFlow(); setPinFlow('remove') }}
-                className="block w-full text-left text-sm py-1.5"
-                style={{ color: '#ef4444' }}
-              >
-                Remove login PIN
-              </button>
+
+              {hasPin ? (
+                <>
+                  <button
+                    onClick={() => { resetPinFlow(); setPinFlow('change-current') }}
+                    className="block w-full text-left text-sm text-white/65 hover:text-white py-1.5 transition-colors"
+                  >
+                    Change login PIN
+                  </button>
+                  <button
+                    onClick={() => { resetPinFlow(); setPinFlow('remove') }}
+                    className="block w-full text-left text-sm py-1.5"
+                    style={{ color: '#ef4444' }}
+                  >
+                    Remove login PIN
+                  </button>
+                </>
+              ) : (
+                /* No PIN yet (e.g. signed up with Google) — offer an optional one
+                   so they also get a phone+PIN login and a recovery code, instead
+                   of relying on Google as their only way in. */
+                <Link
+                  href="/auth/setup?optional=1&next=/profile"
+                  className="block rounded-xl p-3 transition-colors"
+                  style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.25)' }}
+                >
+                  <p className="text-sm font-semibold" style={{ color: '#F5A623' }}>Set a login PIN</p>
+                  <p className="text-xs text-white/55 mt-0.5">
+                    Optional — adds phone + PIN login and a recovery code, so Google isn’t your only way in.
+                  </p>
+                </Link>
+              )}
             </div>
           )}
 

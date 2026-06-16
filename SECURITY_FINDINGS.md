@@ -3,7 +3,8 @@
 **Date:** 2026-06-16
 **Scope:** Static white-box review of API routes, auth/session primitives, payment/wallet
 logic, config, and dependencies — following the LumeX Security Playbook (Phases 0–K).
-**Method:** Analysis only. No code changed. Findings cite `file:line`.
+**Method:** White-box review, then an approved remediation pass. Findings cite `file:line`.
+Remediation (M1/M2/M4 + Phase Y tests) applied in a follow-up session — see the changelog below.
 
 > **Coverage honesty:** Every core security library and ~25 of the 119 API routes were read
 > line-by-line — specifically the money, ownership, and auth-critical paths (webhook, wallet
@@ -15,14 +16,24 @@ logic, config, and dependencies — following the LumeX Security Playbook (Phase
 
 ---
 
-## Summary table
+## Summary table (updated after remediation session)
 
 | Severity | Count | Notes |
 |----------|-------|-------|
-| Critical | 0 in code | 1 **external verification gate** (anon-key/RLS — must confirm in live Supabase) |
+| Critical | 0 in code | Anon-key/RLS gate (G1) **✅ RESOLVED** — live test returned `42501 permission denied` on `vendors` |
 | High     | 0     | — |
-| Medium   | 3     | re-auth gap (rule #28), dead un-pinned verifier, CSP `unsafe-inline` |
+| Medium   | 4     | M1 re-auth gap **✅ FIXED**; M2 dead verifier **✅ DELETED**; M4 webhook idempotency **✅ FIXED**; M3 CSP `unsafe-inline` (deferred, non-blocker) |
 | Low      | 3     | login enumeration (accepted), npm moderates, permissions-policy geolocation |
+
+### What changed in the remediation session (all tests green: 13 files / 292 tests)
+- **G1 — RESOLVED.** Live anon-key test returned `42501 permission denied` on `vendors` (RLS denying the public key as intended).
+- **M1 — FIXED.** Step-up re-authentication (fresh 6-digit login PIN) now required for any money action ≥ ₦50,000: `super-admin/withdraw`, `admin/wallet-adjust`, `paystack/refund`. New `lib/step-up.ts` (reuses login PIN hash + lockout). Audit trails made **append-only** at the DB level via `056_audit_append_only.sql` (BEFORE UPDATE/DELETE trigger that fires even for the service role) — history can no longer be altered or erased by any role/path.
+- **M2 — DELETED.** Dead `lib/auth.ts` (un-pinned verifier) removed.
+- **M4 — FIXED (newly found).** `paystack/webhook` idempotency was a no-op: supabase-js *returns* `{error}` (code 23505) on a duplicate insert rather than *throwing*, so the `try/catch` never fired and `processWebhookAsync` re-ran on every Paystack retry. Now inspects the returned error code and stops on 23505. (Double-credit was already prevented downstream; this restores the first-line dedup.)
+- **Phase Y — DONE.** `test/access-control.test.ts` + `test/webhook-and-exposure.test.ts` + `test/helpers/kit.ts`: BFLA (wrong-role→403) and unauth (→401/403) across all role-gated routes; IDOR (other-user→403/404) on every id-accepting ownership route; soft-auth routes proven to not leak; bank-column exposure guard on public vendor routes; forged-HMAC rejection; webhook idempotency; M1 step-up. `npm test` script added.
+- **Rate limiters — CONFIRMED active** on login (`rateLimitPinLogin` 5/30min/phone), signup (`rateLimitOtpSend` 3/hr/phone fail-closed + `register` 5/hr/IP).
+
+> **⚠️ Apply in live Supabase before relying on it:** migration `056_audit_append_only.sql` (this session) and `048_column_grants_lockdown.sql` (the column lockdown behind G1).
 
 **The codebase is genuinely hardened.** The playbook's highest-risk areas (BOLA/IDOR, webhook
 integrity, server-side pricing) are correctly implemented and consistently applied. The findings
@@ -30,9 +41,14 @@ below are refinements, not open doors.
 
 ---
 
-## 🔴 Go-live gate — verify in live Supabase (cannot be confirmed from code)
+## 🔴 Go-live gate — ✅ RESOLVED
 
-### G1. Confirm the anon-key / RLS lockdown is APPLIED (Playbook §3)
+### G1. Confirm the anon-key / RLS lockdown is APPLIED (Playbook §3) — ✅ RESOLVED
+**Verified:** the live Hoppscotch anon-key test returned **`42501 permission denied`** on `vendors` —
+RLS is denying the public key as designed. Keep `048_column_grants_lockdown.sql` (and now
+`056_audit_append_only.sql`) applied on every environment.
+
+<details><summary>Original finding (kept for the record)</summary>
 - **Why it's here:** Auth is custom JWT, so Supabase RLS owner-scoping is dormant; the only thing
   stopping the public `anon` key from reading tables directly is **deny-by-default RLS + column
   grants**. Migration `supabase/migrations/048_column_grants_lockdown.sql` exists in the repo, but
@@ -44,11 +60,18 @@ below are refinements, not open doors.
 - **Status:** Code side is correct (the in-app `vendors/[id]` route already excludes bank columns,
   `app/api/vendors/[id]/route.ts:13-23`). This gate is purely "is the migration live."
 
+</details>
+
 ---
 
 ## 🟠 Medium
 
-### M1. No step-up re-authentication on large money actions — violates own rule #28
+### M1. No step-up re-authentication on large money actions — ✅ FIXED
+**Fixed:** `lib/step-up.ts` requires a fresh login-PIN re-entry for any action ≥ ₦50,000, wired into
+`super-admin/withdraw`, `admin/wallet-adjust`, and `paystack/refund` (returns `{reauth_required:true}`
++ 401 without it). Audit trails are now append-only (`056_audit_append_only.sql`). Locked in by the
+"Step-up re-auth" tests. Original finding:
+
 - **Rule:** CLAUDE.md non-negotiable #28 — "Admin actions over ₦50,000 require re-authentication."
 - **Finding:** No route implements a fresh-PIN / fresh-MFA step-up. The two highest-value money
   actions rely only on session role + rate limit + audit:
@@ -61,7 +84,18 @@ below are refinements, not open doors.
 - **Fix:** Require a fresh WebAuthn assertion or PIN re-entry (signed short-TTL token, same pattern
   as `signMfaPending` in `lib/webauthn.ts`) for any money action ≥ ₦50,000.
 
-### M2. Dead, un-pinned JWT verifier in `lib/auth.ts`
+### M4. Webhook idempotency was a silent no-op — ✅ FIXED (found during Phase Y)
+- **Finding:** `app/api/paystack/webhook/route.ts` recorded the dedup key with
+  `try { await db.from('processed_webhooks').insert(...) } catch { return 200 }`. supabase-js does
+  **not throw** on a unique-constraint violation — it resolves with `{ error: { code: '23505' } }`.
+  So the `catch` never fired on a duplicate, and `processWebhookAsync` re-ran on every Paystack retry.
+- **Impact:** the reference-level dedup layer did nothing. Double-credit was still prevented by
+  downstream idempotency (RPCs keyed on reference, status-guarded `payment_status=PENDING` updates),
+  so no money was lost — but the intended first line of defence was inert.
+- **Fix:** inspect the returned error — `23505` ⇒ already processed ⇒ 200 with no side effects; other
+  insert errors are logged but non-fatal. Locked in by `test/webhook-and-exposure.test.ts`.
+
+### M2. Dead, un-pinned JWT verifier in `lib/auth.ts` — ✅ DELETED
 - **Finding:** `lib/auth.ts:17-35` defines `verifySessionToken` calling `jwtVerify(token, secret)`
   **without** `{ algorithms: ['HS256'] }`. The live verifier (`lib/session.ts:66`) correctly pins
   HS256. `lib/auth.ts` is imported **nowhere** (confirmed — only `lib/pin-auth` matches importers).
@@ -103,9 +137,9 @@ below are refinements, not open doors.
 ## ✅ Verified strong (record of what's correct)
 
 - **Webhook (Phase D):** HMAC verified on raw bytes before JSON parse, timing-safe
-  (`lib/security.ts:5-9`); idempotency via `processed_webhooks` unique insert; independent Paystack
-  re-verification + exact amount check before crediting; **not** rate-limited
-  (`app/api/paystack/webhook/route.ts`, `lib/paystack/webhook.ts`).
+  (`lib/security.ts:5-9`); idempotency via `processed_webhooks` unique insert **(now correctly
+  detected — see M4)**; independent Paystack re-verification + exact amount check before crediting;
+  **not** rate-limited (`app/api/paystack/webhook/route.ts`, `lib/paystack/webhook.ts`).
 - **Server-side pricing (Phase D):** all prices/add-ons read from DB `settings`, client values never
   trusted; wallet split resolved server-side; idempotency key bound to owner
   (`app/api/orders/route.ts:173-218, 322-325`).
@@ -130,13 +164,20 @@ below are refinements, not open doors.
 
 ---
 
-## Recommended next steps (Playbook Phases Y & Z — need your go-ahead)
+## Status of Playbook Phases Y & Z
 
-1. **G1 first** — run the anon-key test from your phone (5 min). This is the one true launch gate.
-2. **Phase Y** — write an automated access-control test suite (owner=200, other-user=403/404,
-   wrong-role=403) covering **every** `[id]`-accepting route, plus webhook-forged-HMAC-rejected and
-   payment-idempotency. This also covers the routes not individually read in this pass.
-3. **Phase Z** — fix M1 (step-up re-auth) and M2 (delete `lib/auth.ts`); defer M3 to post-launch.
+- **G1** — ✅ resolved (live anon-key test: `42501 permission denied`).
+- **Phase Y** — ✅ done. Access-control suite (`npm test`): BFLA + unauth across all role-gated
+  routes, IDOR on every id-accepting ownership route, soft-auth no-leak proof, bank-column exposure
+  guard, forged-HMAC rejection, webhook idempotency, M1 step-up. 13 files / 292 tests green.
+- **Phase Z** — ✅ M1 (step-up + append-only audit), M2 (deleted), M4 (webhook idempotency) fixed.
+  M3 (nonce CSP) intentionally deferred to post-launch per the playbook.
 
-I have not changed any code (per the playbook's "read before write" rule). Tell me which to start —
-I'd recommend **M2 (1-line delete) + Phase Y tests** now, and **M1 step-up auth** before live payouts.
+### Remaining (owner action)
+1. **Apply migrations in live Supabase:** `056_audit_append_only.sql` (this session) and confirm
+   `048_column_grants_lockdown.sql` is applied on every environment.
+2. **Wire the UI** to prompt for the login PIN when a money action returns `{ reauth_required: true }`
+   (super-admin withdraw, wallet-adjust, refund).
+3. **Post-launch:** M3 nonce-based CSP; re-run `npm audit` after each Next.js minor (L2).
+
+_Run the suite any time with `npm test`._
