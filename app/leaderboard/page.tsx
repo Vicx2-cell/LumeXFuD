@@ -7,8 +7,8 @@ import { getFeature } from '@/lib/features'
 import { getAnthropic, MODELS } from '@/lib/ai/client'
 import { LeaderboardTabs, type Board, type LeaderEntry, type Commentary } from './leaderboard-client'
 
-// Realtime keeps an open board fresh; this is just a fallback re-fetch interval.
-export const revalidate = 60
+// Always render fresh; Realtime keeps an open board live after first paint.
+export const dynamic = 'force-dynamic'
 
 type StatRow = { entity_id: string; delivered_count: number }
 

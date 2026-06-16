@@ -4,7 +4,9 @@ import { getCurrentUser } from '@/lib/session'
 import { BottomNav } from '@/components/nav-bottom'
 import { VendorMenuClient } from './vendor-menu-client'
 
-export const revalidate = 60
+// Always render fresh — a vendor's menu, prices and open/closed status must not
+// be served stale from a cached page.
+export const dynamic = 'force-dynamic'
 
 export default async function VendorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

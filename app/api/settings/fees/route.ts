@@ -28,7 +28,10 @@ export async function GET() {
     if (typeof v === 'number') result[outKey] = v
   }
 
+  // No caching: a stale fee here means the customer is shown a price that
+  // differs from the authoritative server-side calc at checkout. Prices change
+  // rarely, so always serving fresh is cheap and avoids that mismatch.
   return NextResponse.json(result, {
-    headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' },
+    headers: { 'Cache-Control': 'no-store' },
   })
 }

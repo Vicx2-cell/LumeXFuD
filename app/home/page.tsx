@@ -10,7 +10,9 @@ import { VendorCardSkeleton } from '@/components/ui/skeleton'
 import { HomepageClient } from '../homepage-client'
 import { Suspense } from 'react'
 
-export const revalidate = 30
+// Always render fresh — vendor open/closed status and the ranked list must never
+// be served stale from a cached page. (Realtime keeps it live after first paint.)
+export const dynamic = 'force-dynamic'
 
 async function getVendorsAndTrending() {
   try {
