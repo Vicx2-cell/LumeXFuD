@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { formatPrice, tierEmoji, tierHoldLabel, getNextTier, ordersToNextTier, getTierAndCount } from '@/lib/wallet'
 import type { WalletBalance } from '@/lib/wallet'
+import { settleDueDeliveriesForUser } from '@/lib/order-payout'
 
 export async function GET() {
   const session = await getCurrentUser()
@@ -14,10 +15,12 @@ export async function GET() {
   const userType = session.role === 'vendor' ? 'VENDOR' : 'RIDER'
   const db = createSupabaseAdmin()
 
-  // Self-healing release: move any DUE held funds → available right now, so the
-  // balance shown is always correct even if the 5-min release cron didn't fire.
-  // Uses the proven release_held_batch() (idempotent, SKIP LOCKED). Bank-grade
-  // rule: a user's money must never depend on a background job firing.
+  // Self-healing settlement + release: a user's money must never depend on a
+  // background job firing.
+  //   1. Settle this user's own DELIVERED orders past their 15-min window — so
+  //      earnings are HELD on every order even if the per-minute cron is down.
+  //   2. Move any DUE held funds → available (idempotent, SKIP LOCKED).
+  await settleDueDeliveriesForUser(session.userId!, userType).catch(() => {})
   await db.rpc('release_held_batch').then(() => {}, () => {})
 
   const { data: raw } = await db

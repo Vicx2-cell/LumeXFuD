@@ -3,7 +3,8 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { resolveDisputeInput } from '@/lib/validators'
 import { refundOrderPayments } from '@/lib/order-refund'
-import { completeOrderPayout } from '@/lib/order-payout'
+import { completeOrderPayout, unlockOrderHolds } from '@/lib/order-payout'
+import { reverseOrderPayout } from '@/lib/wallet'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 
@@ -61,6 +62,15 @@ export async function POST(
     })
   }
 
+  // A refund must also reverse what the rider/vendor were paid for this order —
+  // otherwise the customer is refunded AND the rider/vendor keep the money (the
+  // platform pays twice). Pulls it back from held funds first, then available;
+  // anything already withdrawn becomes a debt repaid by their future earnings.
+  // Safe even if the order was never credited (no-op). Runs for REFUND only.
+  if (parsed.data.resolution === 'REFUND') {
+    await reverseOrderPayout(order.id as string)
+  }
+
   await db.from('orders').update({
     status:         newStatus,
     payment_status: parsed.data.resolution === 'REFUND' ? 'REFUNDED' : undefined,
@@ -88,6 +98,10 @@ export async function POST(
       rider_delivery_cut: Number(order.rider_delivery_cut) || 0,
       tip_amount:         Number(order.tip_amount) || 0,
     })
+    // If the order had already been credited before the dispute, its holds were
+    // locked (release_at pushed out) when the problem was reported — release them
+    // now that it's resolved in the vendor/rider's favour.
+    await unlockOrderHolds(order.id as string).catch(() => {})
   } else if (order.rider_id) {
     await db.from('riders')
       .update({ active_order_id: null, status: 'ONLINE', last_status_update_at: now })

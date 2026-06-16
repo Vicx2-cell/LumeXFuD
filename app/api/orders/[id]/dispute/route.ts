@@ -8,6 +8,7 @@ import { renderTemplate } from '@/lib/termii/templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { getFeature } from '@/lib/features'
 import { runConcierge } from '@/lib/ai/dispute-concierge'
+import { lockOrderHolds } from '@/lib/order-payout'
 
 // Customers can report a problem up to 24h after delivery — this deliberately
 // covers orders that have already auto-COMPLETED (the old 15-min window meant a
@@ -74,6 +75,11 @@ export async function POST(
   }
 
   await db.from('orders').update({ status: 'DISPUTED', updated_at: new Date().toISOString() }).eq('id', id)
+
+  // Lock any still-held earnings for this order so they can't auto-release while
+  // the dispute is open — if it's resolved as a refund, the money is right there
+  // to claw back. Already-released funds are covered by freeze + clawback.
+  await lockOrderHolds(id).catch(() => {})
 
   await db.from('disputes').insert({
     order_id: order.id,

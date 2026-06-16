@@ -11,6 +11,40 @@ export interface PayoutOrder {
   tip_amount: number
 }
 
+// Far-future sentinel used to "lock" an order's held funds while it is disputed,
+// so release_held_batch (which only checks release_at, not order status) can't
+// auto-release money that may have to be refunded.
+const DISPUTE_LOCK_AT = '2999-01-01T00:00:00.000Z'
+
+/**
+ * Lock an order's still-held earnings when a problem is reported: push their
+ * release_at far out so they can't auto-release while the dispute is open. Only
+ * touches PENDING (still-held) holds — already-released funds are handled by
+ * freeze + clawback. Safe/idempotent.
+ */
+export async function lockOrderHolds(orderId: string): Promise<void> {
+  const db = createSupabaseAdmin()
+  await db.from('wallet_transactions')
+    .update({ release_at: DISPUTE_LOCK_AT })
+    .eq('order_id', orderId)
+    .eq('type', 'HOLD')
+    .eq('status', 'PENDING')
+}
+
+/**
+ * Unlock an order's held earnings (dispute resolved in the vendor/rider's
+ * favour): set release_at to now so the next release pass frees them. Only
+ * touches PENDING holds that are still locked in the future.
+ */
+export async function unlockOrderHolds(orderId: string): Promise<void> {
+  const db = createSupabaseAdmin()
+  await db.from('wallet_transactions')
+    .update({ release_at: new Date().toISOString() })
+    .eq('order_id', orderId)
+    .eq('type', 'HOLD')
+    .eq('status', 'PENDING')
+}
+
 /**
  * Settles a completed order: credits the vendor + rider HELD earnings and frees
  * the rider for their next job. Previously this only lived in the release-payments
@@ -72,4 +106,59 @@ export async function completeOrderPayout(order: PayoutOrder): Promise<void> {
     await db.from('orders').update({ wallet_released: false }).eq('id', order.id)
     console.error(`[order-payout] crediting failed for ${order.order_number}:`, err)
   }
+}
+
+/**
+ * On-demand settlement backstop. Auto-completes a user's own DELIVERED orders
+ * whose 15-min window has elapsed and credits the held earnings — so money is
+ * held on EVERY order even if the per-minute release-payments cron isn't firing
+ * (the cron has been unreliable). Mirrors the cron's core, scoped to one user so
+ * it's cheap to call from hot paths (e.g. the wallet balance check). Idempotent:
+ * the optimistic DELIVERED→COMPLETED lock + completeOrderPayout's wallet_released
+ * claim guarantee each order settles exactly once. Never throws.
+ */
+export async function settleDueDeliveriesForUser(
+  userId: string,
+  userType: 'VENDOR' | 'RIDER'
+): Promise<number> {
+  const db = createSupabaseAdmin()
+  const column = userType === 'VENDOR' ? 'vendor_id' : 'rider_id'
+  const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+
+  const { data: due } = await db
+    .from('orders')
+    .select('id, order_number, vendor_id, rider_id, subtotal, rider_delivery_cut, tip_amount')
+    .eq('status', 'DELIVERED')
+    .eq('wallet_released', false)
+    .lte('delivered_at', fifteenMinAgo)
+    .eq(column, userId)
+    .limit(20)
+
+  let settled = 0
+  for (const o of (due ?? []) as Array<PayoutOrder>) {
+    try {
+      // Claim the completion first (optimistic lock on DELIVERED) so two callers
+      // can't both settle the same order.
+      const now = new Date().toISOString()
+      const { data: claimed } = await db
+        .from('orders')
+        .update({ status: 'COMPLETED', completed_at: now, rider_payment_status: 'HELD', updated_at: now })
+        .eq('id', o.id)
+        .eq('status', 'DELIVERED')
+        .select('id')
+      if (!claimed || claimed.length === 0) continue
+
+      await completeOrderPayout({
+        id: o.id, order_number: o.order_number,
+        vendor_id: o.vendor_id, rider_id: o.rider_id,
+        subtotal: Number(o.subtotal) || 0,
+        rider_delivery_cut: Number(o.rider_delivery_cut) || 0,
+        tip_amount: Number(o.tip_amount) || 0,
+      })
+      settled++
+    } catch (err) {
+      console.error(`[settleDueDeliveries] failed for ${o.order_number}:`, err)
+    }
+  }
+  return settled
 }

@@ -60,31 +60,38 @@ function addHours(date: Date, hours: number): Date {
   return new Date(date.getTime() + hours * 3_600_000)
 }
 
-// ─── Hold policy ("Fast & Fair") ──────────────────────────────────────────────
-// The customer dispute window (15 min) is already over by the time wallets are
-// credited (credit happens at COMPLETED), and most NG payments are bank
-// transfer/USSD (no chargebacks). So a long blanket hold protects against almost
-// nothing for ESTABLISHED accounts — it just delays people who did the work.
-// We therefore pay trusted riders/vendors almost instantly and reserve a real
-// hold only for brand-new accounts (collusion-fraud window). Trust tiers shrink
-// the established hold further; DIAMOND is instant.
+// ─── Hold policy ──────────────────────────────────────────────────────────────
+// Every completed order credits the rider + vendor as a HOLD (locked) before it
+// becomes withdrawable. The hold is short — long blanket holds just delay people
+// who did the work — but it is NEVER zero, and a refund can always reclaim the
+// money (held funds are pulled straight back; anything already withdrawn becomes
+// a debt repaid by future earnings — see reverse_order_payout / clawback_owed).
+//
+// Duration model: a BASE hold (5h) is reduced by the account's trust tier
+// (BRONZE 0% … DIAMOND 100%) and then FLOORED, so even the most-trusted account
+// is held at least `floorMin` (1h). This gives:
+//   BRONZE 5h · SILVER 2h30 · GOLD 1h15 · DIAMOND 1h
+// New accounts (< newAccountThreshold orders) are BRONZE by definition, so they
+// naturally get the full base hold (the new-account fraud window).
 //
 // All durations are in MINUTES and overridable live via the settings table
 // (see getHoldPolicy) so the super-admin can tune without a redeploy.
 export interface HoldPolicy {
-  riderBaseMin: number       // established rider — basically instant + tiny buffer
+  riderBaseMin: number       // base hold before tier reduction
   riderNewMin: number        // rider's first `newAccountThreshold` deliveries
-  vendorBaseMin: number      // established vendor — same-day
+  vendorBaseMin: number      // base hold before tier reduction
   vendorNewMin: number       // vendor's first `newAccountThreshold` orders
   newAccountThreshold: number
+  floorMin: number           // hard minimum hold after tier reduction (never below)
 }
 
 export const DEFAULT_HOLD_POLICY: HoldPolicy = {
-  riderBaseMin: 5,           // ~instant (5-min settle buffer)
-  riderNewMin: 6 * 60,       // 6h for new riders
-  vendorBaseMin: 12 * 60,    // same-day (12h) for established vendors
-  vendorNewMin: 24 * 60,     // 24h for new vendors
+  riderBaseMin: 5 * 60,      // 5h base
+  riderNewMin: 5 * 60,       // new riders: full base
+  vendorBaseMin: 5 * 60,     // 5h base
+  vendorNewMin: 5 * 60,      // new vendors: full base
   newAccountThreshold: 5,
+  floorMin: 60,              // never release faster than 1h
 }
 
 // Established accounts earn a tier reduction on their base hold. New-account
@@ -110,19 +117,22 @@ export function calculateReleaseTime(
   if (!isNew) {
     minutes = Math.round(minutes * (1 - TIER_REDUCTION[tier]))
   }
+  // Floor it: even an instant-tier (DIAMOND) account is held at least floorMin,
+  // so there is always a window to freeze/lock funds when a problem is reported.
+  minutes = Math.max(policy.floorMin, minutes)
   return new Date(deliveredAt.getTime() + minutes * 60_000)
 }
 
 // Reads hold overrides from the settings table, falling back to defaults for any
 // missing key. Setting ids: hold_rider_base_minutes, hold_rider_new_minutes,
-// hold_vendor_base_minutes, hold_vendor_new_minutes (value {"minutes": N}) and
-// hold_new_account_threshold (value {"count": N}).
+// hold_vendor_base_minutes, hold_vendor_new_minutes, hold_floor_minutes
+// (value {"minutes": N}) and hold_new_account_threshold (value {"count": N}).
 export async function getHoldPolicy(): Promise<HoldPolicy> {
   const db = createSupabaseAdmin()
   const { data } = await db.from('settings').select('id, value').in('id', [
     'hold_rider_base_minutes', 'hold_rider_new_minutes',
     'hold_vendor_base_minutes', 'hold_vendor_new_minutes',
-    'hold_new_account_threshold',
+    'hold_floor_minutes', 'hold_new_account_threshold',
   ])
   const m = new Map<string, { minutes?: number; count?: number }>()
   for (const r of (data ?? []) as Array<{ id: string; value: { minutes?: number; count?: number } }>) m.set(r.id, r.value)
@@ -136,6 +146,7 @@ export async function getHoldPolicy(): Promise<HoldPolicy> {
     vendorBaseMin:       num('hold_vendor_base_minutes', 'minutes', DEFAULT_HOLD_POLICY.vendorBaseMin),
     vendorNewMin:        num('hold_vendor_new_minutes', 'minutes', DEFAULT_HOLD_POLICY.vendorNewMin),
     newAccountThreshold: num('hold_new_account_threshold', 'count', DEFAULT_HOLD_POLICY.newAccountThreshold),
+    floorMin:            num('hold_floor_minutes', 'minutes', DEFAULT_HOLD_POLICY.floorMin),
   }
 }
 
@@ -224,6 +235,23 @@ export async function creditWalletHeld(params: {
 
   if (error) throw new Error(`credit_wallet_held failed: ${error.message}`)
   return data as string
+}
+
+// ─── Refund clawback: reverse an order's rider/vendor earnings ────────────────
+// Called when a dispute is resolved in the customer's favour (REFUND). Pulls the
+// money back from held funds first, then available; anything already withdrawn
+// becomes a debt (clawback_owed) that future earnings repay. Idempotent per
+// (user, order). Returns the number of wallet credits reversed (0 if the order
+// was refunded before it was ever credited). Never throws on a missing RPC —
+// callers should not have their refund flow blocked by a clawback failure.
+export async function reverseOrderPayout(orderId: string): Promise<number> {
+  const db = createSupabaseAdmin()
+  const { data, error } = await db.rpc('reverse_order_payout', { p_order_id: orderId })
+  if (error) {
+    console.error(`[reverseOrderPayout] failed for order ${orderId}:`, error.message)
+    return 0
+  }
+  return (data as number) ?? 0
 }
 
 // ─── Atomic debit: calls the Postgres RPC ─────────────────────────────────────
