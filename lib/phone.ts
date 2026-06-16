@@ -24,6 +24,21 @@ export function normalizePhone(input: string): string {
   return parsed.format('E.164')
 }
 
+/**
+ * Normalize to E.164, returning null instead of throwing on invalid/empty input.
+ * Use when comparing configured phones (env vars) that may be stored in any
+ * format (08.., 234.., +234.., stray whitespace) so the comparison is
+ * format-agnostic rather than a brittle raw-string match.
+ */
+export function safeNormalizePhone(input: string | undefined | null): string | null {
+  if (!input) return null
+  try {
+    return normalizePhone(input)
+  } catch {
+    return null
+  }
+}
+
 /** Mask phone for logging: +2348012345678 → +234801*****78 */
 export function maskPhone(phone: string): string {
   if (phone.length < 6) return '***'

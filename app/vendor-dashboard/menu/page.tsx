@@ -17,6 +17,7 @@ interface MenuItem {
   image_url: string | null
   category: string
   is_available: boolean
+  prep_time_minutes: number | null
   display_order: number
   addons: Addon[]
 }
@@ -29,11 +30,12 @@ interface FormState {
   description: string
   image_url: string
   is_available: boolean
+  prep: string // per-item prep minutes; '' = use the shop's base time
   addons: FormAddon[]
 }
 
 const emptyForm: FormState = {
-  name: '', price: '', category: 'RICE', description: '', image_url: '', is_available: true, addons: [],
+  name: '', price: '', category: 'RICE', description: '', image_url: '', is_available: true, prep: '', addons: [],
 }
 
 export default function VendorMenuPage() {
@@ -45,6 +47,7 @@ export default function VendorMenuPage() {
   const [form, setForm] = useState<FormState>(emptyForm)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [describing, setDescribing] = useState(false)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
@@ -76,6 +79,7 @@ export default function VendorMenuPage() {
       description: item.description ?? '',
       image_url: item.image_url ?? '',
       is_available: item.is_available,
+      prep: item.prep_time_minutes != null ? String(item.prep_time_minutes) : '',
       addons: item.addons.map((a) => ({ name: a.name, price: String(Math.round(a.price_kobo / 100)) })),
     })
     setError('')
@@ -99,6 +103,28 @@ export default function VendorMenuPage() {
     }
   }
 
+  // Draft a description with AI from the item name (+ its photo, if uploaded).
+  // Fills the field; the vendor still reviews/edits before saving.
+  async function describeWithAI() {
+    if (!form.name.trim()) { setError('Add the item name first'); return }
+    setDescribing(true)
+    setError('')
+    try {
+      const res = await fetch('/api/vendor-ai/describe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: form.name.trim(), category: form.category, image_url: form.image_url || undefined }),
+      })
+      const d = await res.json() as { description?: string; error?: string }
+      if (!res.ok || !d.description) { setError(d.error ?? 'Could not write a description'); return }
+      setForm((f) => ({ ...f, description: d.description! }))
+    } catch {
+      setError('Network error')
+    } finally {
+      setDescribing(false)
+    }
+  }
+
   async function save() {
     const priceNaira = parseInt(form.price, 10)
     if (!form.name.trim()) { setError('Name is required'); return }
@@ -117,6 +143,7 @@ export default function VendorMenuPage() {
       description: form.description.trim() || undefined,
       image_url: form.image_url || undefined,
       is_available: form.is_available,
+      prep_time_minutes: form.prep.trim() === '' ? null : parseInt(form.prep, 10),
       addons: form.addons.map((a) => ({ name: a.name.trim(), price_naira: parseInt(a.price, 10) })),
     }
     try {
@@ -182,7 +209,7 @@ export default function VendorMenuPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.name}</p>
                   <p className="text-sm font-semibold mt-0.5" style={{ color: '#F5A623' }}>{formatPrice(item.price_kobo)}</p>
-                  <p className="text-xs text-white/30 mt-0.5">{item.category}{item.addons.length > 0 ? ` · ${item.addons.length} add-on${item.addons.length === 1 ? '' : 's'}` : ''}</p>
+                  <p className="text-xs text-white/30 mt-0.5">{item.category}{item.prep_time_minutes != null ? ` · ${item.prep_time_minutes} min` : ''}{item.addons.length > 0 ? ` · ${item.addons.length} add-on${item.addons.length === 1 ? '' : 's'}` : ''}</p>
                   <div className="flex gap-3 mt-2">
                     <button onClick={() => openEdit(item)} className="text-xs font-medium" style={{ color: '#F5A623' }}>Edit</button>
                     <button onClick={() => removeItem(item)} className="text-xs font-medium text-red-400">Delete</button>
@@ -234,9 +261,19 @@ export default function VendorMenuPage() {
                 </select>
               </Field>
             </div>
-            <Field label="Description (optional)">
-              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value.slice(0, 300) })} rows={2} placeholder="Smoky party jollof with…" className={inputCls} />
+            <Field label="Prep time (min)">
+              <input value={form.prep} inputMode="numeric" onChange={(e) => setForm({ ...form, prep: e.target.value.replace(/[^0-9]/g, '').slice(0, 3) })} placeholder="How long this dish takes — leave blank to use your shop default" className={inputCls} />
             </Field>
+            <div className="block">
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-xs uppercase tracking-[0.18em] text-white/40">Description (optional)</span>
+                <button type="button" onClick={describeWithAI} disabled={describing || !form.name.trim()}
+                  className="text-xs font-semibold disabled:opacity-40" style={{ color: '#F5A623' }}>
+                  {describing ? 'Writing…' : (form.image_url ? '✨ Write from photo' : '✨ Write with AI')}
+                </button>
+              </div>
+              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value.slice(0, 300) })} rows={2} placeholder="Smoky party jollof with…" className={inputCls} />
+            </div>
 
             {/* Add-ons */}
             <div>

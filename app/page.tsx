@@ -2,8 +2,33 @@ import Link from 'next/link'
 import { Reveal } from '@/components/reveal'
 
 export const metadata = {
-  title: 'LumeX Fud — Campus life, simplified.',
-  description: 'Order food from your favourite ABSU campus restaurants. Fast delivery to your hostel, live tracking, and rewards every time you order.',
+  title: { absolute: 'LumeX Fud — Campus food delivery at ABSU, Uturu' },
+  description: 'Order food from your favourite ABSU campus restaurants. Fast delivery to your hostel, live tracking, and secure digital payment.',
+  alternates: { canonical: '/' },
+}
+
+// Structured data so Google understands the brand "LumeX Fud" (helps the site
+// surface for brand searches and can enable a richer listing).
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': 'https://lumexfud.com.ng/#org',
+      name: 'LumeX Fud',
+      url: 'https://lumexfud.com.ng',
+      logo: 'https://lumexfud.com.ng/icons/icon-512.png',
+      description: 'Campus food delivery for Abia State University (ABSU), Uturu, Nigeria.',
+      areaServed: 'Abia State University (ABSU), Uturu, Nigeria',
+    },
+    {
+      '@type': 'WebSite',
+      '@id': 'https://lumexfud.com.ng/#website',
+      name: 'LumeX Fud',
+      url: 'https://lumexfud.com.ng',
+      publisher: { '@id': 'https://lumexfud.com.ng/#org' },
+    },
+  ],
 }
 
 /* Inline Lucide-style icons (SVG, not emoji) — consistent 1.75 stroke, amber. */
@@ -19,6 +44,7 @@ const LockIcon   = () => <svg {...iconProps} aria-hidden="true"><rect width="18"
 export default function LandingPage() {
   return (
     <div className="lx-page flex flex-col text-white overflow-hidden">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="lx-orb lx-orb--amber" aria-hidden="true" />
       <div className="lx-orb lx-orb--indigo" aria-hidden="true" />
 

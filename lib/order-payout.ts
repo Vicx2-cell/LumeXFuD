@@ -1,5 +1,5 @@
 import { createSupabaseAdmin } from './supabase/server'
-import { creditWalletHeld, getTrustTier, calculateReleaseTime } from './wallet'
+import { creditWalletHeld, getTierAndCount, calculateReleaseTime, getHoldPolicy } from './wallet'
 
 export interface PayoutOrder {
   id: string
@@ -49,20 +49,21 @@ export async function completeOrderPayout(order: PayoutOrder): Promise<void> {
   const riderAmount = (Number(order.rider_delivery_cut) || 0) + (Number(order.tip_amount) || 0)
 
   try {
+    const policy = await getHoldPolicy()
     if (order.vendor_id && vendorAmount > 0) {
-      const tier = await getTrustTier(order.vendor_id, 'VENDOR')
+      const { tier, count } = await getTierAndCount(order.vendor_id, 'VENDOR')
       await creditWalletHeld({
         userId: order.vendor_id, userType: 'VENDOR', amount: vendorAmount,
         orderId: order.id, description: `Payment for order #${order.order_number}`,
-        releaseAt: calculateReleaseTime('VENDOR', tier, now), reference: `VENDOR-${order.id}`,
+        releaseAt: calculateReleaseTime('VENDOR', tier, count, now, policy), reference: `VENDOR-${order.id}`,
       })
     }
     if (order.rider_id && riderAmount > 0) {
-      const tier = await getTrustTier(order.rider_id, 'RIDER')
+      const { tier, count } = await getTierAndCount(order.rider_id, 'RIDER')
       await creditWalletHeld({
         userId: order.rider_id, userType: 'RIDER', amount: riderAmount,
         orderId: order.id, description: `Delivery earnings for order #${order.order_number}`,
-        releaseAt: calculateReleaseTime('RIDER', tier, now), reference: `RIDER-${order.id}`,
+        releaseAt: calculateReleaseTime('RIDER', tier, count, now, policy), reference: `RIDER-${order.id}`,
       })
     }
   } catch (err) {

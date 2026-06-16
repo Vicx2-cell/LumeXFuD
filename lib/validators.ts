@@ -31,6 +31,14 @@ export const createOrderInput = z.object({
   // server-side from the live balance — any client-sent wallet amount is
   // ignored (rule #4/#19). PAYSTACK is the safe default.
   payment_method: z.enum(['PAYSTACK', 'WALLET', 'SPLIT']).optional().default('PAYSTACK'),
+  // Optional: schedule the meal for a future DELIVERY time (ISO 8601). Omitted /
+  // null = order now. Bounds (lead time, opening hours, max days ahead) are
+  // enforced server-side in the orders route — this only checks it's a date.
+  scheduled_for: z.string().datetime({ offset: true }).nullable().optional(),
+  // Optional GPS for the delivery (student grants browser permission). Stored
+  // non-fatally after the order is created; used for rider nav + location data.
+  delivery_latitude:  z.number().min(-90).max(90).nullable().optional(),
+  delivery_longitude: z.number().min(-180).max(180).nullable().optional(),
 })
 
 export const orderStatusInput = z.object({
@@ -45,12 +53,14 @@ export const disputeInput = z.object({
   description: z.string().max(2000).optional(),
 })
 
+// Customer rates the vendor 1–5 stars after an order (the vendor review is
+// public), and may optionally also rate the rider (private to the rider/admin).
+// Reviews are trimmed and length-capped; empty text is treated as "no review".
 export const ratingInput = z.object({
-  vendor_rating: z.number().int().min(1).max(5),
-  vendor_review: z.string().max(500).optional(),
-  rider_rating: z.number().int().min(1).max(5),
-  rider_review: z.string().max(500).optional(),
-  would_order_again: z.boolean().optional(),
+  stars: z.number().int().min(1).max(5),
+  review: z.string().trim().max(500).optional(),
+  rider_stars: z.number().int().min(1).max(5).optional(),
+  rider_review: z.string().trim().max(500).optional(),
 })
 
 export const orderMessageInput = z.object({
@@ -213,6 +223,8 @@ export const createMenuItemInput = z.object({
   description:  z.string().max(300).optional(),
   image_url:    z.string().url().max(500).optional(),
   is_available: z.boolean().optional().default(true),
+  // Per-dish prep time (minutes). Omit/null = use the vendor's base prep time.
+  prep_time_minutes: z.number().int().min(1).max(180).nullable().optional(),
   addons:       z.array(menuAddonInput).max(20).optional().default([]),
 })
 
@@ -223,6 +235,7 @@ export const updateMenuItemInput = z.object({
   description:  z.string().max(300).nullable().optional(),
   image_url:    z.string().url().max(500).nullable().optional(),
   is_available: z.boolean().optional(),
+  prep_time_minutes: z.number().int().min(1).max(180).nullable().optional(),
   // When present, replaces the item's whole add-on list.
   addons:       z.array(menuAddonInput).max(20).optional(),
 })

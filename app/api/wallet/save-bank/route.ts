@@ -85,12 +85,18 @@ export async function POST(req: NextRequest) {
     signal: AbortSignal.timeout(15_000),
   }).catch(() => null)
 
-  if (!resolveRes || !resolveRes.ok) {
-    return NextResponse.json({ error: 'Failed to re-verify account with Paystack' }, { status: 422 })
+  if (!resolveRes) {
+    return NextResponse.json({ error: 'Could not reach the bank service. Please try again.' }, { status: 502 })
   }
-  const resolveJson = (await resolveRes.json()) as { status: boolean; data?: { account_name: string } }
-  if (!resolveJson.status || !resolveJson.data?.account_name) {
-    return NextResponse.json({ error: 'Account could not be verified' }, { status: 422 })
+  const resolveJson = (await resolveRes.json().catch(() => null)) as
+    | { status?: boolean; message?: string; data?: { account_name?: string } }
+    | null
+  if (!resolveRes.ok || !resolveJson?.status || !resolveJson.data?.account_name) {
+    console.error('[save-bank] Paystack resolve failed', { httpStatus: resolveRes.status, message: resolveJson?.message })
+    return NextResponse.json(
+      { error: resolveJson?.message || 'Account could not be verified. Check the account number and bank.' },
+      { status: 422 }
+    )
   }
   const verifiedName = resolveJson.data.account_name
 

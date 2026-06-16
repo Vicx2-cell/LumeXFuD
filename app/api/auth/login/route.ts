@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSession, setCookieOptions } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { normalizePhone } from '@/lib/phone'
+import { normalizePhone, safeNormalizePhone } from '@/lib/phone'
 import { loginPinInput } from '@/lib/validators'
 import { compareSecret, findAuthUserByPhone, getRoleRedirect, hashSecret, AUTH_USER_COLUMNS, type AuthUserRow } from '@/lib/pin-auth'
 import { rateLimitPinLogin } from '@/lib/rate-limit'
 import { signMfaPending, MFA_COOKIE, shortCookie } from '@/lib/webauthn'
+import { getFeature } from '@/lib/features'
 
 const LOCKOUT_MINUTES = 30
 
@@ -13,7 +14,9 @@ const LOCKOUT_MINUTES = 30
 const SUPER_ADMIN_DEFAULT_PIN = process.env.SUPER_ADMIN_DEFAULT_PIN!
 
 async function ensureSuperAdminBootstrap(phone: string, pin: string) {
-  if (phone !== process.env.SUPER_ADMIN_PHONE) return null
+  // `phone` is already E.164; normalize the env value too so a non-E.164 config
+  // doesn't block the super-admin bootstrap.
+  if (phone !== safeNormalizePhone(process.env.SUPER_ADMIN_PHONE)) return null
   if (pin !== SUPER_ADMIN_DEFAULT_PIN) return null
   const db = createSupabaseAdmin()
   // Explicit auth columns only — never select('*') (would pull bcrypt hashes
@@ -118,17 +121,34 @@ export async function POST(req: NextRequest) {
       pin_locked_until: null,
     }).eq('id', user.user.id)
 
+    // Suspended account? Block login for any role. Degrades gracefully if
+    // migration 046 hasn't run (the select errors → no block).
+    const { data: susp } = await db.from(user.table).select('suspended_until, suspend_reason').eq('id', user.user.id).maybeSingle()
+    const su = susp as { suspended_until?: string | null; suspend_reason?: string | null } | null
+    if (su?.suspended_until && new Date(su.suspended_until).getTime() > Date.now()) {
+      return NextResponse.json(
+        { error: su.suspend_reason ? `Account suspended: ${su.suspend_reason}` : 'Your account has been suspended. Contact support.' },
+        { status: 403 },
+      )
+    }
+
     // ── Second factor (Face ID / Touch ID) ──────────────────────────────────
     // If this account has enrolled a passkey, the correct PIN is only step 1.
     // Issue a short-lived, signed "PIN passed" token instead of a session, and
     // require a WebAuthn assertion (see /api/auth/webauthn/login-*) before any
     // session exists. Accounts with no passkey log in with PIN alone (opt-in).
-    const { data: passkeys } = await db
-      .from('webauthn_credentials')
-      .select('id')
-      .eq('user_id', user.user.id)
-      .eq('user_role', user.role)
-      .limit(1)
+    // Face ID is gated by the platform feature flag. When OFF, skip the second
+    // factor entirely — even for accounts that previously enrolled a passkey —
+    // so PIN alone logs in and nobody is locked behind a disabled flow.
+    const faceIdEnabled = await getFeature('face_id')
+    const { data: passkeys } = faceIdEnabled
+      ? await db
+          .from('webauthn_credentials')
+          .select('id')
+          .eq('user_id', user.user.id)
+          .eq('user_role', user.role)
+          .limit(1)
+      : { data: null }
 
     if (passkeys && passkeys.length > 0) {
       const mfaToken = await signMfaPending({ userId: user.user.id, role: user.role, phone: user.user.phone })

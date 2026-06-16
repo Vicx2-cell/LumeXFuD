@@ -6,8 +6,14 @@ import { audit } from '@/lib/audit'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { getFeature } from '@/lib/features'
+import { runConcierge } from '@/lib/ai/dispute-concierge'
 
-const DISPUTE_WINDOW_MS = 15 * 60 * 1000
+// Customers can report a problem up to 24h after delivery — this deliberately
+// covers orders that have already auto-COMPLETED (the old 15-min window meant a
+// student who looked an hour later had no recourse). 24h tracks the rider's
+// fund-hold, so a refund decision is still financially recoverable.
+const DISPUTE_WINDOW_MS = 24 * 60 * 60 * 1000
 
 export async function POST(
   req: NextRequest,
@@ -52,12 +58,19 @@ export async function POST(
     .single()
 
   if (error || !order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
-  if (order.status !== 'DELIVERED') return NextResponse.json({ error: 'Order must be in DELIVERED status to dispute' }, { status: 400 })
 
-  // Check 15-minute window
+  // Allow reports on DELIVERED orders and on ones that have already auto-COMPLETED.
+  if (order.status !== 'DELIVERED' && order.status !== 'COMPLETED') {
+    return NextResponse.json({ error: 'You can only report a problem on a delivered order' }, { status: 400 })
+  }
+  if (!order.delivered_at) {
+    return NextResponse.json({ error: 'This order has no delivery time on record yet' }, { status: 400 })
+  }
+
+  // Window runs from the delivery moment, not from completion.
   const deliveredAt = new Date(order.delivered_at as string).getTime()
   if (Date.now() - deliveredAt > DISPUTE_WINDOW_MS) {
-    return NextResponse.json({ error: 'Dispute window has closed (15 minutes after delivery)' }, { status: 400 })
+    return NextResponse.json({ error: 'The window to report a problem has closed (24 hours after delivery)' }, { status: 400 })
   }
 
   await db.from('orders').update({ status: 'DISPUTED', updated_at: new Date().toISOString() }).eq('id', id)
@@ -76,7 +89,7 @@ export async function POST(
     last_dispute_at: new Date().toISOString(),
   }).eq('id', customer.id)
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lumexfud.com.ng'
   const { data: vendor } = await db.from('vendors').select('shop_name').eq('id', order.vendor_id).single()
   const adminPhone = process.env.ADMIN_PHONE
 
@@ -103,5 +116,26 @@ export async function POST(
     ip_address: req.headers.get('x-forwarded-for') ?? undefined,
   })
 
-  return NextResponse.json({ success: true })
+  // AI dispute concierge — Lumi replies to the student empathetically and pre-
+  // triages the case for the admin (stored on the dispute row). ADVISORY ONLY:
+  // this never moves money or changes the order state. Fully degradable — any
+  // failure just leaves the customer with the default "we're on it" message.
+  let conciergeReply: string | null = null
+  if (await getFeature('dispute_concierge')) {
+    try {
+      const result = await runConcierge(db, order.id as string)
+      if (result) {
+        conciergeReply = result.customerReply
+        await db.from('disputes').update({
+          ai_customer_reply: result.customerReply,
+          ai_triage: result.brief,
+          ai_triaged_at: new Date().toISOString(),
+        }).eq('order_id', order.id as string)
+      }
+    } catch (err) {
+      console.error('[dispute] concierge failed:', err)
+    }
+  }
+
+  return NextResponse.json({ success: true, concierge_reply: conciergeReply })
 }

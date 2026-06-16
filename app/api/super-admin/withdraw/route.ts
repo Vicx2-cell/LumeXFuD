@@ -4,6 +4,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { createTransferRecipient, initiateTransfer } from '@/lib/paystack/transfer'
 import { superAudit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { requireStepUpForAmount } from '@/lib/step-up'
 import { z } from 'zod'
 import crypto from 'crypto'
 
@@ -16,6 +17,7 @@ const withdrawSchema = z.object({
     .max(10_000_000_00, 'Maximum single withdrawal is ₦100,000'),
   note:      z.string().max(200).optional(),
   confirmed: z.boolean().default(false), // true = user accepted safety warning
+  reauth_pin: z.string().optional(),     // 6-digit login PIN — required for ≥ ₦50k (rule #28)
 })
 
 /** Fetch live NGN balance from Paystack. Returns 0 on error. */
@@ -63,6 +65,13 @@ export async function POST(req: NextRequest) {
   }
 
   const { amount_kobo, note, confirmed } = parsed.data
+
+  // Rule #28: re-authenticate (fresh login PIN) for any payout ≥ ₦50,000. A valid
+  // super-admin session alone is not enough to move founder funds.
+  const stepUp = await requireStepUpForAmount(session, amount_kobo, parsed.data.reauth_pin)
+  if (!stepUp.ok) {
+    return NextResponse.json({ error: stepUp.error, reauth_required: true }, { status: stepUp.status })
+  }
 
   // Founder bank details — required env vars
   const founderBankCode = process.env.FOUNDER_BANK_CODE

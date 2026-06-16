@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { downloadReceiptPng } from '@/lib/receipt-download'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,9 @@ interface TxRow {
   description: string
   status:      string
   created_at:  string
+  reference:     string | null
+  balance_after: string
+  receipt_code:  string
 }
 
 // ─── Top-up amount pills ──────────────────────────────────────────────────────
@@ -50,6 +54,7 @@ export default function CustomerWalletClient() {
 
   const [wallet,   setWallet]   = useState<WalletData | null>(null)
   const [txs,      setTxs]      = useState<TxRow[]>([])
+  const [openReceipt, setOpenReceipt] = useState<string | null>(null)
   const [txPage,   setTxPage]   = useState(1)
   const [txTotal,  setTxTotal]  = useState(0)
   const [loading,  setLoading]  = useState(true)
@@ -97,7 +102,7 @@ export default function CustomerWalletClient() {
 
   // After returning from Paystack, the wallet is credited by an ASYNC webhook
   // that often hasn't finished by the time this page loads — so a single fetch
-  // shows the old balance and the top-up + 5% bonus look like they "didn't work".
+  // shows the old balance and the top-up + 1% bonus look like they "didn't work".
   // Poll the balance for a few seconds until it goes up, refreshing the tx list
   // too so the TOPUP and TOPUP_BONUS rows appear.
   useEffect(() => {
@@ -118,7 +123,7 @@ export default function CustomerWalletClient() {
           if (baseline === null) {
             baseline = w.balance_kobo
           } else if (w.balance_kobo > baseline) {
-            showToast('🎉 Wallet topped up — 5% bonus added!')
+            showToast('🎉 Wallet topped up — 1% bonus added!')
             return
           }
         }
@@ -133,8 +138,8 @@ export default function CustomerWalletClient() {
 
   const updateBonusPreview = (naira: number) => {
     if (!naira || naira < 500) { setBonusPreview(null); return }
-    // 5% bonus — mirrors server setting
-    const bonusKobo = Math.floor(naira * 100 * 5 / 100)
+    // 1% bonus — mirrors server setting (wallet_topup_bonus_percent)
+    const bonusKobo = Math.floor(naira * 100 * 1 / 100)
     setBonusPreview({ bonus: bonusKobo, total: naira * 100 + bonusKobo })
   }
 
@@ -241,7 +246,7 @@ export default function CustomerWalletClient() {
           style={{ background: 'rgba(245,166,35,0.05)', border: '1px solid rgba(245,166,35,0.12)' }}>
           {[
             ['⚡', 'Instant checkout — no card entry'],
-            ['🎁', '5% bonus on every top-up'],
+            ['🎁', '1% bonus on every top-up'],
             ['🚀', 'Faster than Paystack popup'],
             ['☕', 'Perfect for daily orders'],
           ].map(([icon, text]) => (
@@ -282,7 +287,9 @@ export default function CustomerWalletClient() {
           ) : (
             <div className="divide-y divide-white/5">
               {txs.map((tx) => (
-                <div key={tx.id} className="flex items-center gap-3 px-4 py-3">
+                <div key={tx.id}>
+                <button type="button" onClick={() => setOpenReceipt((c) => c === tx.id ? null : tx.id)} aria-expanded={openReceipt === tx.id}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors active:bg-white/5">
                   <span className="text-xl w-8 text-center shrink-0">{tx.icon}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">{tx.description}</p>
@@ -295,6 +302,64 @@ export default function CustomerWalletClient() {
                   <p className={`text-sm font-semibold shrink-0 ${txColorClass(tx.sign)}`}>
                     {tx.sign}{tx.amount}
                   </p>
+                </button>
+                {openReceipt === tx.id && (
+                  <div className="mx-4 mb-3 rounded-xl p-3 lx-enter" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <p className="text-xs uppercase tracking-wide text-white/40 mb-2 font-semibold">Receipt</p>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between"><span className="text-white/50">Amount</span><span className="text-white tabular-nums">{tx.sign}{tx.amount}</span></div>
+                      <div className="flex justify-between"><span className="text-white/50">Type</span><span className="text-white">{tx.type}</span></div>
+                      <div className="flex justify-between"><span className="text-white/50">Status</span><span className="text-white">{tx.status}</span></div>
+                      <div className="flex justify-between"><span className="text-white/50">Balance after</span><span className="text-white tabular-nums">{tx.balance_after}</span></div>
+                      <div className="flex justify-between"><span className="text-white/50">Date</span><span className="text-white">{new Date(tx.created_at).toLocaleString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
+                      {tx.reference && (
+                        <div className="pt-1">
+                          <div className="flex items-center justify-between"><span className="text-white/50">Reference</span>
+                            <button onClick={() => { try { void navigator.clipboard?.writeText(tx.reference!) } catch {} }} className="text-[11px]" style={{ color: '#F5A623' }}>Copy</button>
+                          </div>
+                          <p className="text-white/80 font-mono text-[11px] break-all mt-0.5">{tx.reference}</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-white/8 flex items-center gap-2">
+                      <span className="text-green-400">🔒</span><span className="text-[11px] text-white/50">Verified</span>
+                      <span className="ml-auto font-mono text-[11px] tracking-wider" style={{ color: '#F5A623' }}>{tx.receipt_code}</span>
+                      <button onClick={() => { try { void navigator.clipboard?.writeText(tx.receipt_code) } catch {} }} className="text-[11px]" style={{ color: '#F5A623' }}>Copy</button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => downloadReceiptPng({
+                        title: 'Payment Receipt',
+                        party: 'LumeX Wallet',
+                        amountLine: `${tx.sign}${tx.amount}`,
+                        amountPositive: tx.sign === '+',
+                        rows: [
+                          ['Type', tx.type],
+                          ['Status', tx.status],
+                          ['Balance after', tx.balance_after],
+                          ['Date', new Date(tx.created_at).toLocaleString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })],
+                        ],
+                        reference: tx.reference ?? '—',
+                        code: tx.receipt_code,
+                        refName: tx.reference ?? tx.id.slice(0, 8),
+                      })}
+                      className="mt-3 w-full py-2.5 rounded-xl text-sm font-medium"
+                      style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.25)' }}
+                    >
+                      ⬇ Download receipt
+                    </button>
+                    {tx.reference && (
+                      <button
+                        type="button"
+                        onClick={() => { try { void navigator.clipboard?.writeText(`${window.location.origin}/admin/verify-receipt?r=${encodeURIComponent(tx.reference!)}&c=${encodeURIComponent(tx.receipt_code)}`) } catch {} }}
+                        className="mt-2 w-full py-2.5 rounded-xl text-sm font-medium"
+                        style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
+                      >
+                        🔗 Copy verify link (for support)
+                      </button>
+                    )}
+                  </div>
+                )}
                 </div>
               ))}
             </div>
@@ -394,7 +459,7 @@ export default function CustomerWalletClient() {
             {bonusPreview && bonusPreview.bonus > 0 && (
               <div className="mb-4 rounded-xl px-4 py-2.5 text-sm flex items-center justify-between"
                 style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.15)' }}>
-                <span style={{ color: 'rgba(255,255,255,0.6)' }}>5% bonus 🎁</span>
+                <span style={{ color: 'rgba(255,255,255,0.6)' }}>1% bonus 🎁</span>
                 <span className="font-semibold" style={{ color: '#F5A623' }}>
                   +{formatBalance(bonusPreview.bonus)} → {formatBalance(bonusPreview.total)} total
                 </span>

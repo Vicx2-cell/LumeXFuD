@@ -1,15 +1,38 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCart, cartLineKey, type CartItem, type CartAddon } from '@/components/cart-context'
 import { formatPrice } from '@/lib/money'
-import type { VendorInfo, MenuItem } from './page'
+import { vendorTrustBadges } from '@/lib/vendor-trust'
+import { VerifiedBadge } from '@/components/verified-badge'
+import type { VendorInfo, MenuItem, VendorReview } from './page'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks', 'Other']
 
-export function VendorMenuClient({ vendor, menu }: { vendor: VendorInfo; menu: MenuItem[] }) {
+function relativeDay(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
+  if (days <= 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${days} days ago`
+  if (days < 30) return `${Math.floor(days / 7)}w ago`
+  return new Date(iso).toLocaleDateString('en-NG', { month: 'short', year: 'numeric' })
+}
+
+function Stars({ value, size = 13 }: { value: number; size?: number }) {
+  return (
+    <span className="inline-flex gap-0.5" aria-label={`${value} out of 5 stars`}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <svg key={n} width={size} height={size} viewBox="0 0 24 24" fill={value >= n ? '#F5A623' : 'none'} stroke={value >= n ? '#F5A623' : 'rgba(255,255,255,0.25)'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        </svg>
+      ))}
+    </span>
+  )
+}
+
+export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false }: { vendor: VendorInfo; menu: MenuItem[]; reviews?: VendorReview[]; loggedOut?: boolean }) {
   const router = useRouter()
   const { cart, addItem, clearCart, totalItems, subtotal } = useCart()
   const [activeCategory, setActiveCategory] = useState('All')
@@ -23,6 +46,17 @@ export function VendorMenuClient({ vendor, menu }: { vendor: VendorInfo; menu: M
 
   const isPaused = vendor.paused_until && new Date(vendor.paused_until) > new Date()
   const isClosed = vendor.status === 'CLOSED' || isPaused
+
+  // Remember this vendor for a logged-out visitor (arrived via the share link) so
+  // that after ANY login/signup they're returned here — even if they reach auth
+  // by a route that didn't carry a ?next=.
+  useEffect(() => {
+    if (loggedOut) {
+      try { sessionStorage.setItem('lx_return_vendor', `/vendor/${vendor.id}`) } catch { /* ignore */ }
+    }
+  }, [loggedOut, vendor.id])
+
+  const vendorNext = encodeURIComponent(`/vendor/${vendor.id}`)
 
   const filtered = useMemo(() => {
     return menu.filter((item) => {
@@ -153,7 +187,10 @@ export function VendorMenuClient({ vendor, menu }: { vendor: VendorInfo; menu: M
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="font-semibold text-base truncate">{vendor.shop_name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="font-semibold text-base truncate">{vendor.shop_name}</h1>
+              {vendor.kyc_verified && <VerifiedBadge kind="vendor" />}
+            </div>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-xs px-2 py-0.5 rounded-full font-medium"
                 style={{ background: vendor.status === 'OPEN' ? 'rgba(34,197,94,0.15)' : vendor.status === 'BUSY' ? 'rgba(245,166,35,0.15)' : 'rgba(239,68,68,0.15)', color: vendor.status === 'OPEN' ? '#22c55e' : vendor.status === 'BUSY' ? '#F5A623' : '#ef4444' }}>
@@ -161,12 +198,29 @@ export function VendorMenuClient({ vendor, menu }: { vendor: VendorInfo; menu: M
               </span>
               <span className="text-xs text-white/40">{vendor.prep_time_minutes}–{vendor.prep_time_minutes + 10} min</span>
               {vendor.total_ratings >= 5 && <span className="text-xs text-[#F5A623]">★ {vendor.avg_rating.toFixed(1)}</span>}
+              {vendorTrustBadges(vendor).map((b) => (
+                <span key={b.label} className="text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623' }}>
+                  <span aria-hidden="true">{b.emoji}</span>{b.label}
+                </span>
+              ))}
             </div>
           </div>
         </div>
 
         {isPaused && <div className="px-4 pb-2 text-center"><span className="text-xs text-yellow-400">Temporarily paused — back soon</span></div>}
         {isClosed && vendor.status === 'CLOSED' && <div className="px-4 pb-2 text-center"><span className="text-xs text-red-400">Closed — Opens at 7am</span></div>}
+
+        {/* Logged-out visitors (e.g. arrived via the vendor's share link): one tap
+            to create an account, and they come right back to this page. */}
+        {loggedOut && (
+          <div className="mx-4 mb-2 rounded-xl px-4 py-3" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.28)' }}>
+            <p className="text-sm text-white/85 mb-2">Order to your hostel — you’ll come right back to this page.</p>
+            <div className="flex gap-2">
+              <a href={`/auth/register?next=${vendorNext}`} className="flex-1 text-center py-2 rounded-lg text-sm font-semibold" style={{ background: '#F5A623', color: '#000' }}>Create account</a>
+              <a href={`/auth?next=${vendorNext}`} className="flex-1 text-center py-2 rounded-lg text-sm font-semibold" style={{ background: 'rgba(255,255,255,0.08)', color: '#fff' }}>Log in</a>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 overflow-x-auto px-4 pb-3 scrollbar-none">
           {CATEGORIES.map((cat) => (
@@ -210,6 +264,7 @@ export function VendorMenuClient({ vendor, menu }: { vendor: VendorInfo; menu: M
                   <h3 className="font-medium text-sm leading-tight">{item.name}</h3>
                   {item.description && <p className="text-xs text-white/40 mt-0.5 line-clamp-2">{item.description}</p>}
                   <p className="font-semibold text-sm mt-1" style={{ color: '#F5A623' }}>{formatPrice(item.price_kobo)}</p>
+                  {item.prep_time_minutes != null && <p className="text-xs text-white/40 mt-0.5">⏱ {item.prep_time_minutes} min</p>}
                   {item.addons.length > 0 && <p className="text-xs text-white/30 mt-0.5">{item.addons.length} add-on{item.addons.length === 1 ? '' : 's'} available</p>}
                   {soldOut && <p className="text-xs text-red-400 mt-1">Sold out</p>}
                 </div>
@@ -226,6 +281,47 @@ export function VendorMenuClient({ vendor, menu }: { vendor: VendorInfo; menu: M
               </div>
             )
           })
+        )}
+      </div>
+
+      {/* Reviews */}
+      <div className="max-w-lg mx-auto px-4 pt-6 pb-2">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold">Reviews</h2>
+          {vendor.total_ratings > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <Stars value={Math.round(vendor.avg_rating)} />
+              <span className="text-white/70 tabular-nums">{vendor.avg_rating.toFixed(1)}</span>
+              <span className="text-white/40">({vendor.total_ratings})</span>
+            </div>
+          )}
+        </div>
+
+        {reviews.length === 0 ? (
+          <div className="glass-thin p-6 text-center">
+            <p className="text-sm text-white/55">No reviews yet</p>
+            <p className="text-xs text-white/35 mt-1">Be the first to review after your order.</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {reviews.map((r) => (
+              <div key={r.id} className="glass-thin p-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }} aria-hidden="true">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                    </div>
+                    <span className="text-sm font-medium truncate text-white/70">Anonymous</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Stars value={r.stars} />
+                    <span className="text-[11px] text-white/35">{relativeDay(r.created_at)}</span>
+                  </div>
+                </div>
+                {r.review && <p className="text-sm text-white/75 mt-2 leading-relaxed">{r.review}</p>}
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

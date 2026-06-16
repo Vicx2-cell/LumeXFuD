@@ -48,6 +48,12 @@ export async function POST(req: NextRequest) {
   const userType = session.role === 'vendor' ? 'VENDOR' : 'RIDER'
   const db = createSupabaseAdmin()
 
+  // ── 0. Self-healing release ─────────────────────────────────────────────────
+  // Release any DUE held funds → available BEFORE the balance check, so a user
+  // can always withdraw money that's past its hold even if the 5-min release cron
+  // never ran (the bug that stranded ₦100k+ for riders/vendors). Idempotent.
+  await db.rpc('release_held_batch').then(() => {}, () => {})
+
   // ── 1. Load wallet ──────────────────────────────────────────────────────────
   const { data: walletRaw } = await db
     .from('wallet_balances')

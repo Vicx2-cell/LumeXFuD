@@ -34,8 +34,18 @@ export async function sendWhatsApp({ to, message }: WhatsAppParams): Promise<Ter
 /**
  * Send WhatsApp, fall back to SMS on failure.
  * Use this for all user-facing notifications.
+ *
+ * Honors the super-admin "Pause notifications" control — when paused, this
+ * no-ops (so a cost spike or misfire can be stopped platform-wide in one tap).
+ * Every user-facing notification routes through here, so this is the one gate.
  */
 export async function sendWhatsAppWithFallback(params: WhatsAppParams): Promise<void> {
+  try {
+    const { isNotificationsPaused } = await import('../controls')
+    if (await isNotificationsPaused()) return
+  } catch {
+    // controls unreadable — fail open and still send.
+  }
   try {
     await sendWhatsApp(params)
   } catch {

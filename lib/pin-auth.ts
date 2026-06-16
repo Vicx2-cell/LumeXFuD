@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { createSupabaseAdmin } from './supabase/server'
-import { normalizePhone } from './phone'
+import { normalizePhone, safeNormalizePhone } from './phone'
 import { SessionRole } from './session'
 
 const WEAK_PINS = new Set([
@@ -129,8 +129,11 @@ export function getRoleRedirect(role: SessionRole): string {
 export async function findAuthUserByPhone(phone: string) {
   const normalized = normalizePhone(phone)
   const db = createSupabaseAdmin()
-  const superAdminPhone = process.env.SUPER_ADMIN_PHONE
-  const adminPhone = process.env.ADMIN_PHONE
+  // Normalize the configured phones too — env vars may be stored as 08.., 234..,
+  // +234.. or with stray whitespace. Comparing raw strings was making the
+  // super-admin/admin match fail, dropping them to the customer branch (→ /home).
+  const superAdminPhone = safeNormalizePhone(process.env.SUPER_ADMIN_PHONE)
+  const adminPhone = safeNormalizePhone(process.env.ADMIN_PHONE)
 
   if (superAdminPhone && normalized === superAdminPhone) {
     const { data: customer } = await db.from('customers').select(AUTH_USER_COLUMNS).eq('phone', normalized).maybeSingle()

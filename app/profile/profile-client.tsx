@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/back-button'
 import { FaceIdSetup } from '@/components/face-id-setup'
-import type { CustomerProfile, XPData, BadgeItem } from './page'
+import { LumiMemoryCard } from '@/components/lumi-memory-card'
+import type { CustomerProfile, StreakData, BadgeItem } from './page'
 
 const KEYPAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'] as const
 
@@ -51,18 +52,18 @@ function NumericKeypad({ onKey }: { onKey: (key: string) => void }) {
   )
 }
 
-const LEVEL_NAMES = ['', 'Newcomer', 'Regular', 'Foodie', 'Fanatic', 'Loyalist', 'Champion', 'Legend', 'Icon', 'Elite', 'ABSU OG']
-
 export function ProfileClient({
   profile,
-  xp,
+  streak,
   badges,
   phone,
+  supportPhone,
 }: {
   profile: CustomerProfile | null
-  xp: XPData | null
+  streak: StreakData | null
   badges: BadgeItem[]
   phone: string
+  supportPhone?: string
 }) {
   const router = useRouter()
   const [name, setName] = useState(profile?.name ?? '')
@@ -70,6 +71,23 @@ export function ProfileClient({
   const [room, setRoom] = useState(profile?.room_number ?? '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [openBadge, setOpenBadge] = useState<string | null>(null)
+  // Lumi's warm, AI-generated explanation of the tapped badge (cached server-side).
+  // One result per badge; text === null means "fetched, but no Lumi line" (AI off
+  // / error) → we just show the static description, no spinner stuck on.
+  const [lumiResult, setLumiResult] = useState<{ id: string; text: string | null } | null>(null)
+
+  useEffect(() => {
+    if (!openBadge || lumiResult?.id === openBadge) return
+    let alive = true
+    fetch(`/api/lumi/badge?id=${encodeURIComponent(openBadge)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { text: string | null } | null) => {
+        if (alive) setLumiResult({ id: openBadge, text: d?.text ?? null })
+      })
+      .catch(() => { if (alive) setLumiResult({ id: openBadge, text: null }) })
+    return () => { alive = false }
+  }, [openBadge, lumiResult?.id])
 
   // Security / PIN management
   type PinFlow = 'idle' | 'change-current' | 'change-new' | 'change-confirm' | 'remove'
@@ -203,7 +221,7 @@ export function ProfileClient({
     router.refresh()
   }
 
-  const xpToNext = xp ? (xp.level < 10 ? [100,300,600,1000,1500,2500,4000,6000,9000][xp.level - 1] : 9999) - xp.total_xp : 0
+  const hasStreak = !!streak && streak.current_streak_days > 0
 
   return (
     <>
@@ -224,83 +242,94 @@ export function ProfileClient({
           <span className="text-2xl">💰</span>
           <div className="flex-1 min-w-0">
             <p className="font-semibold" style={{ color: '#F5A623' }}>LumeX Wallet</p>
-            <p className="text-xs text-white/50">Load money, get 5% bonus, checkout faster</p>
+            <p className="text-xs text-white/50">Load money, get 1% bonus, checkout faster</p>
           </div>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </Link>
 
-        {/* Gamification panel */}
-        {xp && (
-          <div className="rounded-2xl p-5 space-y-4"
-            style={{ background: 'rgba(245,166,35,0.06)', border: '1px solid rgba(245,166,35,0.15)' }}>
-            <div className="flex justify-between items-start">
+        {/* Streak — keep the flame alive by ordering each day */}
+        {hasStreak && (
+          <div className="rounded-2xl p-5 flex items-center justify-between"
+            style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.2)' }}>
+            <div className="flex items-center gap-3">
+              <span className="text-3xl" aria-hidden="true">🔥</span>
               <div>
-                <p className="text-xs text-white/50">Your level</p>
-                <p className="text-xl font-bold mt-0.5" style={{ color: '#F5A623' }}>{LEVEL_NAMES[xp.level]}</p>
-                <p className="text-xs text-white/40 mt-0.5">Level {xp.level} • {xp.total_xp.toLocaleString()} XP</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-white/50">Weekly XP</p>
-                <p className="text-lg font-bold">{xp.weekly_xp}</p>
+                <p className="text-2xl font-bold leading-none" style={{ color: '#F5A623' }}>
+                  {streak!.current_streak_days} day{streak!.current_streak_days === 1 ? '' : 's'}
+                </p>
+                <p className="text-xs text-white/45 mt-1">Order each day to keep your streak alive</p>
               </div>
             </div>
-
-            {/* XP progress bar */}
-            {xp.level < 10 && (
-              <div>
-                <div className="flex justify-between text-xs text-white/40 mb-1.5">
-                  <span>{xp.total_xp} XP</span>
-                  <span>{xpToNext} XP to Level {xp.level + 1}</span>
-                </div>
-                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      background: '#F5A623',
-                      width: `${Math.min(100, (xp.total_xp / ([100,300,600,1000,1500,2500,4000,6000,9000][xp.level - 1] ?? 9000)) * 100)}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Streak */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🔥</span>
-                <div>
-                  <p className="text-sm font-bold">{xp.current_streak_days} day streak</p>
-                  <p className="text-xs text-white/40">Best: {xp.best_streak_days} days</p>
-                </div>
-              </div>
-              {xp.streak_freeze_count > 0 && (
-                <div className="flex items-center gap-1 text-xs text-blue-400">
-                  <span>🧊</span>
-                  <span>{xp.streak_freeze_count} freeze{xp.streak_freeze_count !== 1 ? 's' : ''}</span>
-                </div>
-              )}
+            <div className="text-right shrink-0">
+              <p className="text-xs text-white/50">Best</p>
+              <p className="text-lg font-bold tabular-nums">{streak!.best_streak_days}</p>
             </div>
           </div>
         )}
 
-        {/* Badges */}
+        {/* Badges — tap one to read what it means + when it was earned */}
         {badges.length > 0 && (
           <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
-            <h3 className="text-sm font-semibold text-white/70 mb-3">Your badges</h3>
-            <div className="flex flex-wrap gap-2">
-              {badges.map((b) => (
-                <div
-                  key={b.badge_id}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium"
-                  style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623' }}
-                  title={b.badges?.description ?? ''}
-                >
-                  {b.badges?.name ?? b.badge_id}
-                </div>
-              ))}
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-white/70">Your badges</h3>
+              <span className="text-xs text-white/35">Tap for meaning</span>
             </div>
+            <div className="flex flex-wrap gap-2">
+              {badges.map((b) => {
+                const active = openBadge === b.badge_id
+                return (
+                  <button
+                    key={b.badge_id}
+                    onClick={() => setOpenBadge(active ? null : b.badge_id)}
+                    aria-expanded={active}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95"
+                    style={{
+                      background: active ? 'rgba(245,166,35,0.22)' : 'rgba(245,166,35,0.12)',
+                      color: '#F5A623',
+                      border: `1px solid ${active ? 'rgba(245,166,35,0.5)' : 'transparent'}`,
+                    }}
+                  >
+                    {b.badges?.emoji && <span aria-hidden="true">{b.badges.emoji}</span>}
+                    <span>{b.badges?.name ?? b.badge_id}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Meaning of the tapped badge — Lumi explains it in her own voice */}
+            {(() => {
+              const b = badges.find((x) => x.badge_id === openBadge)
+              if (!b) return null
+              const settled = lumiResult?.id === openBadge
+              const hasLumi = settled && !!lumiResult!.text
+              const pending = !settled // still waiting on Lumi for this badge
+              const meaning = hasLumi ? lumiResult!.text! : (b.badges?.description ?? 'Achievement badge.')
+              return (
+                <div
+                  className="mt-3 rounded-xl p-3 lx-enter"
+                  style={{ background: 'rgba(245,166,35,0.06)', border: '1px solid rgba(245,166,35,0.15)' }}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-lg shrink-0" aria-hidden="true">{b.badges?.emoji ?? '🏅'}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: '#F5A623' }}>{b.badges?.name ?? b.badge_id}</p>
+                      <p className="text-xs text-white/70 mt-1 leading-relaxed flex items-start gap-1.5">
+                        <span aria-hidden="true" className="shrink-0">{hasLumi ? '✨' : ''}</span>
+                        <span>
+                          {meaning}
+                          {pending && <span className="text-white/35"> · Lumi is explaining…</span>}
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-white/35 mt-1.5">
+                        {hasLumi ? 'Lumi · ' : ''}Earned {new Date(b.earned_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
 
@@ -358,6 +387,9 @@ export function ProfileClient({
             {saved ? 'Saved!' : saving ? 'Saving…' : 'Save changes'}
           </button>
         </div>
+
+        {/* What Lumi remembers — user-controlled memory (NDPR + trust) */}
+        <LumiMemoryCard />
 
         {/* Security — PIN management */}
         <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
@@ -419,6 +451,30 @@ export function ProfileClient({
             </div>
           )}
         </div>
+
+        {/* Help & support — number is set by the super-admin in Controls */}
+        {supportPhone && supportPhone.trim() && (
+          <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+            <h3 className="text-sm font-semibold text-white/70">Help & support</h3>
+            <p className="text-xs text-white/45">Order issue or question? Reach the LumeX team.</p>
+            <a
+              href={`https://wa.me/${supportPhone.replace(/[^\d]/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-xl p-3 transition-colors"
+              style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)' }}
+            >
+              <span className="text-xl" aria-hidden="true">💬</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-white">Chat on WhatsApp</p>
+                <p className="text-xs text-white/50 tabular-nums">{supportPhone}</p>
+              </div>
+            </a>
+            <a href={`tel:${supportPhone.replace(/\s/g, '')}`} className="block text-sm text-white/65 hover:text-white py-1.5 transition-colors">
+              Call support
+            </a>
+          </div>
+        )}
 
         {/* NDPR links */}
         <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>

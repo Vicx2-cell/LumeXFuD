@@ -37,8 +37,12 @@ export async function POST(
   const parsed = vendorStatusInput.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
 
+  // A manual status change always clears any active pause timer — otherwise a
+  // vendor who paused by mistake stays "Paused" (paused_until in the future) even
+  // after tapping Open. Clearing it here is what actually un-pauses them.
   await db.from('vendors').update({
     status: parsed.data.status,
+    paused_until: null,
     updated_at: new Date().toISOString(),
   }).eq('id', id)
 

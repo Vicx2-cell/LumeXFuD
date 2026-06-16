@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
+import { VerifiedBadge } from '@/components/verified-badge'
 import type { OrderDetail } from './page'
 
 const DISPUTE_REASONS = [
@@ -11,6 +12,9 @@ const DISPUTE_REASONS = [
   'Food was cold or spoiled',
   'I received the wrong order',
 ]
+
+// Customers can report a problem up to 24h after delivery (mirrors the API).
+const DISPUTE_WINDOW_MS = 24 * 60 * 60 * 1000
 
 const STATUS_STEPS = [
   { key: 'PENDING_PAYMENT', label: 'Payment pending' },
@@ -31,11 +35,33 @@ function getStatusIndex(status: string): number {
   return idx === -1 ? 0 : idx
 }
 
-export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail }) {
+export function OrderStatusClient({
+  order: initialOrder,
+  canRate = false,
+  alreadyRated = false,
+  riderVerified = false,
+}: {
+  order: OrderDetail
+  canRate?: boolean
+  alreadyRated?: boolean
+  riderVerified?: boolean
+}) {
   const router = useRouter()
   const [order, setOrder] = useState(initialOrder)
   const [actionError, setActionError] = useState('')
   const [confirming, setConfirming] = useState(false)
+
+  // Vendor rating
+  const [rated, setRated] = useState(alreadyRated)
+  const [stars, setStars] = useState(0)
+  const [hoverStars, setHoverStars] = useState(0)
+  const [reviewText, setReviewText] = useState('')
+  const [rateBusy, setRateBusy] = useState(false)
+  const [rateError, setRateError] = useState('')
+  // Rider rating (only shown when the order had a rider)
+  const [riderStars, setRiderStars] = useState(0)
+  const [riderHover, setRiderHover] = useState(0)
+  const [riderReviewText, setRiderReviewText] = useState('')
 
   // Dispute form
   const [showDispute, setShowDispute] = useState(false)
@@ -43,6 +69,7 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
   const [disputeDesc, setDisputeDesc] = useState('')
   const [disputeBusy, setDisputeBusy] = useState(false)
   const [disputeError, setDisputeError] = useState('')
+  const [conciergeReply, setConciergeReply] = useState('')
 
   const statusIdx = getStatusIndex(order.status)
   const isActive = !['COMPLETED', 'CANCELLED', 'REFUNDED', 'DISPUTED'].includes(order.status)
@@ -98,8 +125,9 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason, description: disputeDesc.trim() || undefined }),
       })
-      const d = await res.json().catch(() => ({})) as { error?: string }
+      const d = await res.json().catch(() => ({})) as { error?: string; concierge_reply?: string | null }
       if (res.ok) {
+        if (d.concierge_reply) setConciergeReply(d.concierge_reply)
         setOrder((prev) => ({ ...prev, status: 'DISPUTED' }))
         setShowDispute(false)
       } else {
@@ -109,6 +137,38 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
       setDisputeError('Network error. Please try again.')
     } finally {
       setDisputeBusy(false)
+    }
+  }
+
+  async function submitRating() {
+    if (stars < 1) {
+      setRateError('Tap a star to rate first.')
+      return
+    }
+    setRateBusy(true)
+    setRateError('')
+    try {
+      const res = await fetch(`/api/orders/${order.id}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stars,
+          review: reviewText.trim() || undefined,
+          rider_stars: riderStars > 0 ? riderStars : undefined,
+          rider_review: riderStars > 0 ? (riderReviewText.trim() || undefined) : undefined,
+        }),
+      })
+      if (res.ok) {
+        setRated(true)
+      } else {
+        const d = await res.json().catch(() => ({})) as { error?: string }
+        if (res.status === 409) setRated(true) // already reviewed — just show thanks
+        else setRateError(d.error ?? 'Could not save your review. Please try again.')
+      }
+    } catch {
+      setRateError('Network error. Please try again.')
+    } finally {
+      setRateBusy(false)
     }
   }
 
@@ -129,6 +189,12 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
 
   const eta = getETA()
 
+  // "Report a problem" stays available after the order auto-completes, up to 24h
+  // after delivery — so a student who notices an issue later still has recourse.
+  const canReportProblem =
+    !!order.delivered_at &&
+    new Date().getTime() - new Date(order.delivered_at).getTime() <= DISPUTE_WINDOW_MS
+
   return (
     <>
       {/* Header */}
@@ -147,6 +213,18 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-5 space-y-5 lx-enter">
+        {/* Scheduled (prepaid pre-order) — waiting to be handed to the kitchen */}
+        {order.status === 'SCHEDULED' && order.scheduled_for && (
+          <div className="rounded-2xl p-5 text-center lx-scale-in"
+            style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.2)' }}>
+            <p className="text-xs uppercase tracking-[0.18em] text-white/50 mb-1.5">🗓️ Scheduled · Paid ✓</p>
+            <p className="text-2xl font-bold tabular-nums" style={{ color: '#F5A623' }}>
+              {new Date(order.scheduled_for).toLocaleString('en-NG', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <p className="text-xs text-white/50 mt-2">We’ll send it to the kitchen in time to arrive then. Cancel any time before that for a full refund.</p>
+          </div>
+        )}
+
         {/* ETA */}
         {eta && isActive && (
           <div className="rounded-2xl p-5 text-center lx-scale-in"
@@ -213,7 +291,10 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[10px] uppercase tracking-wide text-white/40">Your rider</p>
-              <p className="font-semibold truncate">{order.riders.full_name}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="font-semibold truncate">{order.riders.full_name}</p>
+                {riderVerified && <VerifiedBadge kind="rider" />}
+              </div>
               <a href={`tel:${order.riders.phone}`} className="text-xs text-amber-400 tabular-nums hover:underline">{order.riders.phone}</a>
             </div>
             <div className="flex gap-2 shrink-0">
@@ -246,12 +327,127 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
           </div>
         )}
 
-        {/* Dispute submitted confirmation */}
+        {/* Report a problem stays reachable after auto-completion (within 24h) */}
+        {order.status === 'COMPLETED' && canReportProblem && (
+          <button
+            onClick={() => { setShowDispute(true); setDisputeError('') }}
+            className="w-full py-3 text-sm rounded-xl transition-colors hover:bg-red-500/15"
+            style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.18)' }}
+          >
+            Something wrong with this order? Report a problem
+          </button>
+        )}
+
+        {/* Dispute submitted confirmation — Lumi's empathetic reply when available */}
         {order.status === 'DISPUTED' && (
-          <div className="rounded-2xl p-4 text-center" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <p className="text-sm font-semibold text-red-300">Problem reported</p>
-            <p className="text-xs text-white/50 mt-1">Our team is reviewing it and will reach out. You&apos;ll get an update soon.</p>
-          </div>
+          conciergeReply ? (
+            <div className="rounded-2xl p-4" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.2)' }}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span aria-hidden="true">✨</span>
+                <p className="text-xs font-semibold tracking-wide" style={{ color: '#F5A623' }}>Lumi</p>
+              </div>
+              <p className="text-sm text-white/85 leading-relaxed">{conciergeReply}</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl p-4 text-center" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <p className="text-sm font-semibold text-red-300">Problem reported</p>
+              <p className="text-xs text-white/50 mt-1">Our team is reviewing it and will reach out. You&apos;ll get an update soon.</p>
+            </div>
+          )
+        )}
+
+        {/* Rate the vendor — appears once the order is completed, until reviewed */}
+        {canRate && order.status === 'COMPLETED' && (
+          rated ? (
+            <div className="rounded-2xl p-4 text-center lx-scale-in" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+              <p className="text-sm font-semibold text-green-300">Thanks for your review</p>
+              <p className="text-xs text-white/50 mt-1">It helps other students choose where to order.</p>
+            </div>
+          ) : (
+            <div className="glass-thin p-5 lx-scale-in">
+              <h3 className="font-semibold text-center">How was {order.vendors?.shop_name ?? 'your order'}?</h3>
+              <p className="text-xs text-white/45 text-center mt-1">Your review is public and helps other students.</p>
+
+              {/* Stars */}
+              <div className="flex justify-center gap-2 mt-4" onMouseLeave={() => setHoverStars(0)}>
+                {[1, 2, 3, 4, 5].map((n) => {
+                  const active = (hoverStars || stars) >= n
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setStars(n)}
+                      onMouseEnter={() => setHoverStars(n)}
+                      className="transition-transform active:scale-90 hover:scale-110 p-1"
+                      aria-label={`${n} star${n === 1 ? '' : 's'}`}
+                      aria-pressed={stars === n}
+                    >
+                      <svg width="34" height="34" viewBox="0 0 24 24" fill={active ? '#F5A623' : 'none'} stroke={active ? '#F5A623' : 'rgba(255,255,255,0.3)'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                      </svg>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <textarea
+                value={reviewText}
+                onChange={(e) => setReviewText(e.target.value.slice(0, 500))}
+                placeholder="Add a review (optional) — what did you think of the food?"
+                rows={3}
+                className="w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none focus:border-amber-400 transition-colors mt-4"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+              />
+
+              {/* Rate the rider — only if this order had one. Optional. */}
+              {order.rider_id && (
+                <div className="mt-5 pt-4 border-t border-white/8">
+                  <p className="text-sm font-medium text-center">Rate your rider{order.riders?.full_name ? ` · ${order.riders.full_name}` : ''}</p>
+                  <p className="text-xs text-white/40 text-center mt-0.5">Optional — this stays private to the rider.</p>
+                  <div className="flex justify-center gap-2 mt-3" onMouseLeave={() => setRiderHover(0)}>
+                    {[1, 2, 3, 4, 5].map((n) => {
+                      const active = (riderHover || riderStars) >= n
+                      return (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setRiderStars((cur) => (cur === n ? 0 : n))}
+                          onMouseEnter={() => setRiderHover(n)}
+                          className="transition-transform active:scale-90 hover:scale-110 p-1"
+                          aria-label={`Rate rider ${n} star${n === 1 ? '' : 's'}`}
+                          aria-pressed={riderStars === n}
+                        >
+                          <svg width="30" height="30" viewBox="0 0 24 24" fill={active ? '#F5A623' : 'none'} stroke={active ? '#F5A623' : 'rgba(255,255,255,0.3)'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                          </svg>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {riderStars > 0 && (
+                    <textarea
+                      value={riderReviewText}
+                      onChange={(e) => setRiderReviewText(e.target.value.slice(0, 500))}
+                      placeholder="How was the delivery? (optional)"
+                      rows={2}
+                      className="w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none focus:border-amber-400 transition-colors mt-3"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                    />
+                  )}
+                </div>
+              )}
+
+              {rateError && <p className="text-sm text-red-400 mt-2 text-center">{rateError}</p>}
+
+              <button
+                onClick={submitRating}
+                disabled={rateBusy || stars < 1}
+                className="lx-btn-amber w-full py-3.5 mt-3 disabled:opacity-50"
+              >
+                {rateBusy ? 'Submitting…' : 'Submit review'}
+              </button>
+            </div>
+          )
         )}
 
         {/* Order items */}
@@ -288,7 +484,7 @@ export function OrderStatusClient({ order: initialOrder }: { order: OrderDetail 
               </button>
             </div>
 
-            <p className="text-xs text-white/45 mb-3">What went wrong? Pick one or describe it. You have 15 minutes after delivery to report.</p>
+            <p className="text-xs text-white/45 mb-3">What went wrong? Pick one or describe it. You have up to 24 hours after delivery to report.</p>
 
             <div className="space-y-2 mb-3">
               {DISPUTE_REASONS.map((r) => (

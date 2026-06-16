@@ -38,17 +38,25 @@ export async function POST(req: NextRequest) {
     signal: AbortSignal.timeout(15_000),
   }).catch(() => null)
 
-  if (!res || !res.ok) {
+  if (!res) {
     return NextResponse.json(
-      { error: 'Could not verify account. Check account number and bank.' },
-      { status: 422 }
+      { error: 'Could not reach the bank service. Check your connection and try again.' },
+      { status: 502 }
     )
   }
 
-  const json = (await res.json()) as { status: boolean; data?: { account_name: string } }
-  if (!json.status || !json.data?.account_name) {
+  const json = (await res.json().catch(() => null)) as
+    | { status?: boolean; message?: string; data?: { account_name?: string } }
+    | null
+
+  if (!res.ok || !json?.status || !json.data?.account_name) {
+    // Surface Paystack's actual reason — it tells us WHY (e.g. an un-activated
+    // Paystack business can't resolve names, test keys don't resolve real
+    // accounts, and some fintech wallets aren't resolvable). Without this the
+    // user just sees a generic "not found" and we can't diagnose.
+    console.error('[verify-account] Paystack resolve failed', { httpStatus: res.status, message: json?.message })
     return NextResponse.json(
-      { error: 'Account not found. Check account number and bank.' },
+      { error: json?.message || 'Account could not be verified. Check the account number and bank.' },
       { status: 422 }
     )
   }

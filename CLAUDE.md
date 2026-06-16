@@ -87,7 +87,7 @@ Vendor Subscription Tiers
 Holds
 • Rider payments: 24-hour hold after delivery confirmed
 • Vendor payments: 3-day hold after order completed
-• Customer dispute window: 15 minutes after DELIVERED status
+• Customer dispute window: 24 hours after DELIVERED (reports allowed even after the order auto-COMPLETES; tracks the rider fund-hold so refunds stay recoverable). The 15-min timer below is the AUTO-COMPLETE timer, not the dispute window.
 Order Status Flow (strict whitelist)
 PENDING (vendor must accept within 5 mins or auto-cancel)
  ↓
@@ -107,7 +107,7 @@ COMPLETED (auto after 15 mins, rider paid)
 Alternative paths:
 • PENDING → CANCELLED (auto-cancel timer or customer cancel)
 • VENDOR_ACCEPTED → CANCELLED (vendor rejection)
-• DELIVERED → DISPUTED (customer raises dispute within 15 mins)
+• DELIVERED/COMPLETED → DISPUTED (customer raises dispute within 24h of delivery)
 • DISPUTED → REFUNDED (admin resolves in customer favor)
 • DISPUTED → COMPLETED (admin resolves in vendor favor)
 Transitions outside this whitelist must be rejected by the API.
@@ -451,13 +451,50 @@ PIN keypad:
 The old codebase was built with these systems that are now REMOVED:
 - OTP authentication via Termii (replaced by 6-digit PIN only)
 - 4-digit PIN (upgraded to 6-digit)
-- Gamification: XP, streaks, daily rewards (fully removed)
-- docs/gamification.md references (ignore these docs)
+- Gamification XP/levels + any money rewards (daily rewards, streak/leaderboard wallet credits): still REMOVED. Do not reintroduce — money rewards would break daily wallet reconciliation.
+- Streaks + badges: RE-INTRODUCED as COSMETIC ONLY (migration 037). Order streaks (Africa/Lagos calendar days) and achievement badges, awarded by a DB trigger on the DELIVERED transition, shown on Profile, gated by the super-admin `streaks` feature flag. No XP, no levels, no money. NOT to be flagged for removal.
+- docs/gamification.md: treat as historical. The XP/level/money-reward parts do not apply; only the streak + badge concepts were revived (cosmetically).
 - docs/messaging.md in-app order messaging (removed from MVP)
-- docs/ratings.md (removed from MVP)
+- docs/ratings.md: treat as historical. RE-INTRODUCED (migrations 043 + 044): after a delivered/completed order, the customer rates the VENDOR 1–5 stars with an optional PUBLIC written review, and may also rate the RIDER 1–5 with an optional review that is PRIVATE to the rider + admin. One immutable ratings row per order holds both. A DB trigger keeps vendors.avg_rating/total_ratings AND riders.avg_rating/total_ratings in sync. Public reviews show "Anonymous" (identity recoverable server-side via customer_id + audit log). Vendors see their reviews at /vendor-dashboard/reviews, riders at /rider/reviews, admins moderate (+delete) at /admin/reviews. Gated by the super-admin `reviews` feature flag. XP/money rewards stay REMOVED. NOT to be flagged for removal.
 - docs/vendor-ranking.md scoring algorithm (simplified)
 - Guest checkout (removed)
 - send-otp and verify-otp API routes (replaced by PIN auth)
 - login_pin_hash 4-digit (now 6-digit everywhere)
 
 The auditor must flag ALL of the above for removal or update.
+
+---
+
+## Launch Counter (migration 054)
+
+A pre-launch "X of 500 students onboard before we go live" progress widget, super-admin gated.
+
+### Data layer (`feature_flags` + `feature_flag_audit`, migration 054)
+Kept SEPARATE from the settings-based feature catalog (`lib/features.ts`) because the spec
+requires its own toggle audit trail.
+- `feature_flags`: `id, key (unique), enabled (bool default false), config (jsonb), updated_by, updated_at`.
+  Seeded row: `key='launch_counter', enabled=false, config={"goal":500}`.
+- `feature_flag_audit`: `id, flag_key, old_value (jsonb), new_value (jsonb), changed_by, changed_at` —
+  one row per toggle.
+- RLS enabled on both, deny-by-default for `anon`/`authenticated`; all access is via service role
+  in API-route code (auth enforced in code, never via RLS), consistent with the rest of the platform.
+- `lib/launch-counter.ts` holds the flag read, the Upstash-cached customer count (60s TTL, key
+  `launch_counter:count`), and the cache invalidator.
+
+### Endpoints
+- `GET /api/launch-counter` — any authenticated role (customer/vendor/rider/admin). Returns ONLY
+  `{ enabled, count, goal }` (aggregate integers, no PII). When the flag is off, returns
+  `{ enabled:false }` and skips the count. `count` = non-deleted customers, served from the 60s
+  Redis cache (DB COUNT only on a miss). Rate-limited 30 req/min per session/IP (this route only).
+- `GET /api/admin/stats` — **super-admin only (in-code role check, 403 otherwise)**. Returns
+  `{ customers, vendors, riders }` counts regardless of the launch_counter flag.
+- `POST /api/admin/feature-flags` — **super-admin only**. Body `{ key, enabled?, config? }`,
+  Zod `.strict()` (rejects unknown fields); `config = { goal:int }`. Merges over the existing row,
+  writes a `feature_flag_audit` row (+ `super_audit_logs`) with `changed_by = admin id`, and
+  invalidates the Redis count cache. `GET ?key=` returns the current flag for the admin UI.
+
+### UI
+- `<LaunchCounter />` (`components/launch-counter.tsx`) — client widget mounted on the customer
+  home, vendor dashboard, and rider dashboard. Renders nothing unless `enabled`.
+- `/super-admin/launch-counter` — on/off toggle + editable goal + live account counts.
+

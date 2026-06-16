@@ -6,6 +6,13 @@ import { processWebhookAsync, type PaystackWebhookPayload } from '@/lib/paystack
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  // ⚠️ NEVER gate this route on a system control / kill switch (LumeX Control
+  // spec). Reconciliation MUST always run — even in `maintenance`, `paused`, or
+  // when payouts are `frozen` — because customers may have ALREADY paid for
+  // in-flight orders and Paystack will keep retrying until we 200. Adding a flag
+  // that can switch this off would strand paid orders and break wallet
+  // reconciliation. Do not "helpfully" add one.
+
   // 1. READ raw body BEFORE parsing JSON (HMAC needs raw bytes)
   const rawBody = await req.text()
   const signature = req.headers.get('x-paystack-signature') ?? ''
@@ -50,16 +57,30 @@ export async function POST(req: NextRequest) {
     (data?.refund_reference as string) ||
     ''
 
-  // 4. Check idempotency — return 200 if already processed
+  // 4. Check idempotency — return 200 if already processed.
+  //
+  // IMPORTANT: supabase-js does NOT throw on a unique-constraint violation — it
+  // RESOLVES with `{ error }` (Postgres code 23505). The previous try/catch only
+  // caught genuinely-thrown (network) errors, so a duplicate insert fell through
+  // and re-ran processWebhookAsync on every Paystack retry. We now inspect the
+  // returned error: 23505 means this (reference, event) is already recorded —
+  // stop and 200. Any other insert error is logged but NOT fatal (the downstream
+  // handlers are themselves idempotent), so a transient DB hiccup can't strand a
+  // genuinely-paid order.
   const db = createSupabaseAdmin()
   try {
-    await db.from('processed_webhooks').insert({
+    const { error: insErr } = await db.from('processed_webhooks').insert({
       reference: dedupeRef,
       event,
       payload,
     })
+    if (insErr) {
+      if (insErr.code === '23505') return new NextResponse(null, { status: 200 })
+      console.error('[webhook] processed_webhooks insert error (continuing):', insErr.message)
+    }
   } catch {
-    // UNIQUE constraint violation = already processed
+    // Thrown (network) error recording the webhook — treat as already-processed
+    // and let Paystack retry rather than risk double side effects this attempt.
     return new NextResponse(null, { status: 200 })
   }
 

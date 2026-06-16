@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { createSupabaseAdmin } from './supabase/server'
+import { safeNormalizePhone } from './phone'
 
 export type SessionRole = 'customer' | 'vendor' | 'rider' | 'admin' | 'super_admin'
 
@@ -88,8 +89,13 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
 export async function detectRole(phone: string): Promise<DetectRoleResult> {
   const db = createSupabaseAdmin()
 
+  // Normalize configured phones (env may be 08../234../+234.. or have whitespace)
+  // so the role match is format-agnostic, not a brittle raw-string compare.
+  const superAdminPhone = safeNormalizePhone(process.env.SUPER_ADMIN_PHONE)
+  const adminPhone = safeNormalizePhone(process.env.ADMIN_PHONE)
+
   // 1. Super admin (stored in customers table)
-  if (phone === process.env.SUPER_ADMIN_PHONE) {
+  if (superAdminPhone && phone === superAdminPhone) {
     const { data: customer, error } = await db
       .from('customers')
       .select('id')
@@ -99,7 +105,7 @@ export async function detectRole(phone: string): Promise<DetectRoleResult> {
   }
 
   // 2. Admin (operational admin stored in customers table)
-  if (phone === process.env.ADMIN_PHONE) {
+  if (adminPhone && phone === adminPhone) {
     const { data: customer, error } = await db
       .from('customers')
       .select('id')

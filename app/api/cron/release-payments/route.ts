@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import {
   creditWalletHeld,
-  getTrustTier,
+  getTierAndCount,
   calculateReleaseTime,
+  getHoldPolicy,
   formatPrice,
 } from '@/lib/wallet'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { completeOrderPayout } from '@/lib/order-payout'
+import { getPayoutsMode } from '@/lib/controls'
 
 // Called every minute by Vercel cron.
 // Finds DELIVERED orders whose 15-min dispute window has passed,
@@ -27,6 +30,16 @@ interface OrderRow {
 }
 
 interface RiderRow { id: string; phone: string; full_name: string; total_deliveries: number }
+
+interface PayoutRow {
+  id: string
+  order_number: string
+  vendor_id: string | null
+  rider_id: string | null
+  subtotal: number
+  rider_delivery_cut: number
+  tip_amount: number
+}
 
 // ─── Milestone bonus helpers ──────────────────────────────────────────────────
 
@@ -144,7 +157,46 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // ── Payouts kill switch ───────────────────────────────────────────────────
+  // The single enforcement point for `payouts.mode` (LumeX Control spec). `auto`
+  // is the only state that releases funds. `manual`/`frozen` stop ALL crediting —
+  // including the self-heal pass — so an emergency freeze means zero funds move.
+  // Fails CLOSED: if controls are unreadable, getPayoutsMode() returns 'frozen'.
+  const payoutsMode = await getPayoutsMode()
+  if (payoutsMode !== 'auto') {
+    return NextResponse.json({ skipped: true, reason: `payouts ${payoutsMode}`, processed: 0, healed: 0 })
+  }
+
   const db = createSupabaseAdmin()
+
+  // ── Self-heal pass ──────────────────────────────────────────────────────────
+  // Orders that reached COMPLETED but whose wallet was never released: the credit
+  // failed at completion time (e.g. the credit_wallet_held ON CONFLICT erroring
+  // on a missing unique index) and completeOrderPayout unwound wallet_released to
+  // false. Retry them every tick — completeOrderPayout is idempotent (claims
+  // wallet_released atomically), so once the underlying cause is fixed these
+  // self-credit on the next run instead of stranding the vendor/rider forever.
+  let healed = 0
+  const { data: strandedRaw } = await db
+    .from('orders')
+    .select('id, order_number, vendor_id, rider_id, subtotal, rider_delivery_cut, tip_amount')
+    .eq('status', 'COMPLETED')
+    .eq('wallet_released', false)
+    .limit(50)
+  for (const o of (strandedRaw ?? []) as Array<PayoutRow>) {
+    try {
+      await completeOrderPayout({
+        id: o.id, order_number: o.order_number,
+        vendor_id: o.vendor_id, rider_id: o.rider_id,
+        subtotal: Number(o.subtotal) || 0,
+        rider_delivery_cut: Number(o.rider_delivery_cut) || 0,
+        tip_amount: Number(o.tip_amount) || 0,
+      })
+      healed++
+    } catch (err) {
+      console.error(`[cron/release-payments] self-heal failed for ${o.order_number}:`, err)
+    }
+  }
 
   // Find DELIVERED orders ready for wallet crediting (15-min window has passed)
   const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
@@ -165,11 +217,12 @@ export async function POST(req: NextRequest) {
 
   const orders = (ordersRaw ?? []) as unknown as OrderRow[]
   if (orders.length === 0) {
-    return NextResponse.json({ processed: 0 })
+    return NextResponse.json({ processed: 0, healed })
   }
 
-  // Prefetch settings once
+  // Prefetch settings + hold policy once
   const settings = await getSettings(db)
+  const holdPolicy = await getHoldPolicy()
 
   let processed = 0
   let failed = 0
@@ -178,14 +231,14 @@ export async function POST(req: NextRequest) {
     try {
       const deliveredAt = order.delivered_at ? new Date(order.delivered_at) : new Date()
 
-      // Get trust tiers for accurate hold periods
-      const [vendorTier, riderTier] = await Promise.all([
-        getTrustTier(order.vendor_id, 'VENDOR'),
-        getTrustTier(order.rider_id, 'RIDER'),
+      // Tier + completed count drive the Fast & Fair hold (new accounts held longer)
+      const [vendor, rider] = await Promise.all([
+        getTierAndCount(order.vendor_id, 'VENDOR'),
+        getTierAndCount(order.rider_id, 'RIDER'),
       ])
 
-      const vendorReleaseCalc = calculateReleaseTime('VENDOR', vendorTier, deliveredAt)
-      const riderReleaseCalc  = calculateReleaseTime('RIDER',  riderTier,  deliveredAt)
+      const vendorReleaseCalc = calculateReleaseTime('VENDOR', vendor.tier, vendor.count, deliveredAt, holdPolicy)
+      const riderReleaseCalc  = calculateReleaseTime('RIDER',  rider.tier,  rider.count,  deliveredAt, holdPolicy)
       const vendorReleaseAt   = new Date(Math.max(Date.now(), vendorReleaseCalc.getTime()))
       const riderReleaseAt    = new Date(Math.max(Date.now(), riderReleaseCalc.getTime()))
 
@@ -279,5 +332,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ processed, failed })
+  return NextResponse.json({ processed, failed, healed })
 }

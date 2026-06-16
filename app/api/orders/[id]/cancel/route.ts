@@ -5,17 +5,24 @@ import { refundOrderPayments } from '@/lib/order-refund'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { audit } from '@/lib/audit'
 
-const CANCELLABLE_STATUSES = ['PENDING_PAYMENT', 'PENDING', 'VENDOR_ACCEPTED']
+const CANCELLABLE_STATUSES = ['PENDING_PAYMENT', 'SCHEDULED', 'PENDING', 'VENDOR_ACCEPTED']
 
+// POST /api/orders/[id]/cancel
+// A customer cancels their own order, a VENDOR rejects an order placed with them
+// (the "Decline" button — previously this route was customer-only, so vendor
+// rejection silently 403'd), or staff cancels any. Refunds the customer if the
+// order was already paid.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
   const session = await getCurrentUser()
-  if (!session || session.role !== 'customer') {
-    return NextResponse.json({ error: 'Customer only' }, { status: 403 })
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!['customer', 'vendor', 'admin', 'super_admin'].includes(session.role)) {
+    return NextResponse.json({ error: 'Not allowed' }, { status: 403 })
   }
 
   const rl = await rateLimitGeneric(`order-cancel:${session.userId ?? session.phone}`, 30, 60)
@@ -23,45 +30,66 @@ export async function POST(
 
   const db = createSupabaseAdmin()
 
-  const { data: customer } = await db
-    .from('customers')
-    .select('id, phone')
-    .eq('phone', session.phone)
-    .single()
-
-  if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
-
   const { data: order, error } = await db
     .from('orders')
-    .select('id, order_number, status, payment_status, paystack_reference, customer_id, preparing_at, total_amount, wallet_amount_kobo')
+    .select('id, order_number, status, payment_status, paystack_reference, customer_id, vendor_id, preparing_at, total_amount, wallet_amount_kobo')
     .eq('id', id)
-    .eq('customer_id', customer.id)
     .single()
 
   if (error || !order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
+  // Ownership (BOLA): customer cancels only their own, vendor rejects only orders
+  // placed with them, staff can cancel anything.
+  let authorized = false
+  if (session.role === 'admin' || session.role === 'super_admin') {
+    authorized = true
+  } else if (session.role === 'vendor') {
+    authorized = !!session.userId && session.userId === order.vendor_id
+  } else if (session.role === 'customer') {
+    const { data: customer } = await db.from('customers').select('id').eq('phone', session.phone).maybeSingle()
+    authorized = !!customer && customer.id === order.customer_id
+  }
+  if (!authorized) return NextResponse.json({ error: 'Not your order' }, { status: 403 })
+
   if (!CANCELLABLE_STATUSES.includes(order.status as string)) {
-    return NextResponse.json(
-      { error: 'Order cannot be cancelled at this stage' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Order cannot be cancelled at this stage' }, { status: 400 })
   }
 
-  // VENDOR_ACCEPTED → only if not yet PREPARING
+  // Once cooking has started, no one can cancel a VENDOR_ACCEPTED order.
   if (order.status === 'VENDOR_ACCEPTED' && order.preparing_at) {
-    return NextResponse.json({ error: 'Cannot cancel after vendor started preparing' }, { status: 400 })
+    return NextResponse.json({ error: 'Cannot cancel after the vendor started preparing' }, { status: 400 })
   }
 
-  await db
-    .from('orders')
-    .update({ status: 'CANCELLED', cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq('id', id)
+  const byVendor = session.role === 'vendor'
+  const reason = byVendor
+    ? 'Vendor could not accept this order'
+    : session.role === 'customer'
+      ? 'Customer cancelled order'
+      : 'Cancelled by admin'
 
-  // Refund if paid — wallet portion back to the wallet, card portion via
-  // Paystack (rule #30). The order is already claimed CANCELLED above, so this
-  // runs at most once. A still-unpaid order (PENDING_PAYMENT) has payment_status
-  // PENDING and skips this entirely — for a SPLIT that means the wallet, debited
-  // only in the webhook, was never touched.
+  // Optimistic claim — only the first caller flips it to CANCELLED, so the refund
+  // below runs at most once even if customer-cancel and vendor-reject race.
+  const now = new Date().toISOString()
+  const { data: claimed } = await db
+    .from('orders')
+    .update({ status: 'CANCELLED', cancelled_at: now, updated_at: now })
+    .eq('id', id)
+    .eq('status', order.status)
+    .select('id')
+
+  if (!claimed || claimed.length === 0) {
+    return NextResponse.json({ error: 'Order was already updated' }, { status: 409 })
+  }
+
+  // Customer phone — for the refund notification + the cancellation message.
+  let customerPhone: string | null = null
+  if (order.customer_id) {
+    const { data: cust } = await db.from('customers').select('phone').eq('id', order.customer_id).maybeSingle()
+    customerPhone = (cust?.phone as string) ?? null
+  }
+
+  // Refund if paid — wallet portion back to the wallet, card portion via Paystack
+  // (rule #30). The CANCELLED claim above means this runs once.
   if (order.payment_status === 'PAID') {
     const { walletOk, paystackOk } = await refundOrderPayments({
       order: {
@@ -72,9 +100,9 @@ export async function POST(
         wallet_amount_kobo: (order.wallet_amount_kobo as number) ?? 0,
         paystack_reference: order.paystack_reference as string | null,
       },
-      reason:        'Customer cancelled order',
+      reason,
       triggeredBy:   session.phone,
-      customerPhone: customer.phone as string,
+      customerPhone: customerPhone ?? undefined,
     })
 
     if (walletOk && paystackOk) {
@@ -85,13 +113,33 @@ export async function POST(
     }
   }
 
-  void sendWhatsAppWithFallback({
-    to: customer.phone as string,
-    message: renderTemplate('CANCELLED', {
-      order_number: order.order_number as string,
-      cancellation_reason: 'You cancelled this order.',
-    }),
-  }).catch(() => {})
+  // Tell the customer (they need to know — especially when a vendor rejected it).
+  if (customerPhone) {
+    void sendWhatsAppWithFallback({
+      to: customerPhone,
+      message: renderTemplate('CANCELLED', {
+        order_number: order.order_number as string,
+        cancellation_reason: byVendor
+          ? 'The vendor could not take your order, so it was cancelled. Any payment is being refunded.'
+          : session.role === 'customer'
+            ? 'You cancelled this order.'
+            : 'Your order was cancelled. Any payment is being refunded.',
+      }),
+    }).catch(() => {})
+  }
+
+  // Audit staff/vendor cancellations (customer self-cancel isn't an admin action).
+  if (session.role !== 'customer') {
+    await audit({
+      actor_id: session.phone,
+      actor_role: session.role,
+      action: 'order_cancelled',
+      target_table: 'orders',
+      target_id: id,
+      new_value: { reason, by: session.role },
+      ip_address: req.headers.get('x-forwarded-for') ?? undefined,
+    })
+  }
 
   return NextResponse.json({ success: true })
 }

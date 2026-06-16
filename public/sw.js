@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lumexfud-v4';
+const CACHE_NAME = 'lumexfud-v7';
 
 // Pre-cache only assets that are SAME for everyone and never redirect.
 // IMPORTANT: do NOT precache "/" — for a logged-in user the auth proxy

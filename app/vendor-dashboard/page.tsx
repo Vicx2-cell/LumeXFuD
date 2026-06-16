@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
 import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
+import { DemandBanner } from '@/components/demand-banner'
+import { KycPanel } from '@/components/kyc-panel'
+import { LaunchCounter } from '@/components/launch-counter'
 
 interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
 interface VendorOrder {
@@ -145,7 +148,9 @@ export default function VendorDashboard() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       })
-      setVendor((v) => v ? { ...v, status } : v)
+      // Clear the pause timer locally too (backend clears it) so tapping OPEN
+      // after a mistaken pause immediately un-pauses without a refresh.
+      setVendor((v) => v ? { ...v, status, paused_until: null } : v)
     } finally { setStatusBusy(false) }
   }
 
@@ -201,7 +206,7 @@ export default function VendorDashboard() {
               <p className="font-semibold text-white leading-tight">{vendor?.shop_name ?? '—'}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             <button
               onClick={() => router.push('/vendor-dashboard/menu')}
               className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors flex items-center gap-1.5"
@@ -217,6 +222,14 @@ export default function VendorDashboard() {
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
               Earnings
+            </button>
+            <button
+              onClick={() => router.push('/vendor-dashboard/reviews')}
+              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors flex items-center gap-1.5"
+              style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.25)' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              Reviews
             </button>
             <span
               className="text-xs font-semibold px-3 py-1.5 rounded-full"
@@ -234,6 +247,22 @@ export default function VendorDashboard() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-5 lx-enter">
+        {/* Launch counter — self-hides unless the super-admin flag is on */}
+        <LaunchCounter />
+
+        {/* Next-hour demand outlook — prep ahead (self-hides until enough history) */}
+        <DemandBanner />
+
+        {/* KYC verification — upload & track documents, verified badge */}
+        <KycPanel role="vendor" />
+
+        {/* Compact entry to the dedicated share page (keeps the dashboard light) */}
+        <button onClick={() => router.push('/vendor-dashboard/share')}
+          className="w-full glass-thin px-4 py-3 flex items-center justify-between text-left">
+          <span className="text-sm font-medium text-white/80">📲 Share your store link</span>
+          <span style={{ color: '#F5A623' }}>→</span>
+        </button>
+
         {/* Status Controls */}
         <div className="glass-thin p-4 space-y-3">
           <p className="text-xs text-white/40 uppercase tracking-widest">Shop Status</p>
@@ -338,6 +367,11 @@ export default function VendorDashboard() {
             </div>
           </section>
         )}
+
+        {/* Always-reachable logout at the end of the page */}
+        <div className="pt-2 flex justify-center">
+          <LogoutButton />
+        </div>
       </div>
     </div>
   )

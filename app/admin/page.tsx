@@ -8,7 +8,7 @@ import { LogoutButton } from '@/components/logout-button'
 
 interface DashboardMetrics {
   orders_today: number
-  profit_per_order_kobo: number
+  avg_profit_kobo: number
   avg_delivery_minutes: number | null
   riders_online: number
   active_disputes: number
@@ -54,6 +54,10 @@ const ICONS = {
   plus:   svg(<><path d="M5 12h14"/><path d="M12 5v14"/></>),
   wallet: svg(<><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></>),
   log:    svg(<><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></>),
+  star:   svg(<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>),
+  shield: svg(<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M9 12h6"/></>),
+  pin:    svg(<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>),
+  receipt: svg(<><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="m9 12 2 2 4-4"/></>),
 } as const
 
 const NAV_ACTIONS = [
@@ -61,6 +65,11 @@ const NAV_ACTIONS = [
   { href: '/admin/riders', label: 'Riders', icon: ICONS.bike, desc: 'Manage rider accounts' },
   { href: '/admin/orders', label: 'Orders', icon: ICONS.box, desc: 'Browse all orders' },
   { href: '/admin/disputes', label: 'Disputes', icon: ICONS.alert, desc: 'Resolve customer disputes' },
+  { href: '/admin/reviews', label: 'Reviews', icon: ICONS.star, desc: 'Screen & remove vendor reviews' },
+  { href: '/admin/accounts', label: 'Accounts', icon: ICONS.shield, desc: 'Suspend accounts · adjust wallets' },
+  { href: '/admin/lodges', label: 'Lodges', icon: ICONS.pin, desc: 'Add & verify ABSU lodge locations' },
+  { href: '/admin/verify-receipt', label: 'Verify Receipt', icon: ICONS.receipt, desc: 'Check a wallet receipt is genuine' },
+  { href: '/admin/kyc', label: 'KYC Review', icon: ICONS.shield, desc: 'Approve vendor & rider documents' },
   { href: '/admin/vendors/new', label: 'Add Vendor', icon: ICONS.plus, desc: 'Create vendor with temp PIN' },
   { href: '/admin/riders/new', label: 'Add Rider', icon: ICONS.plus, desc: 'Onboard a new rider' },
   { href: '/admin/wallets', label: 'Wallets', icon: ICONS.wallet, desc: 'Freeze/unfreeze, float status' },
@@ -156,9 +165,9 @@ export default function AdminDashboard() {
             />
             <MetricCard
               label="Profit / order"
-              value={metrics.profit_per_order_kobo > 0 ? formatPrice(metrics.profit_per_order_kobo) : '—'}
+              value={metrics.avg_profit_kobo > 0 ? formatPrice(metrics.avg_profit_kobo) : '—'}
               sub="Must be positive"
-              status={profitStatus(metrics.profit_per_order_kobo)}
+              status={profitStatus(metrics.avg_profit_kobo)}
             />
             <MetricCard
               label="Avg delivery"

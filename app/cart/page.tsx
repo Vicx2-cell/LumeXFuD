@@ -7,6 +7,7 @@ import { BottomNav } from '@/components/nav-bottom'
 import { formatPrice } from '@/lib/money'
 import { useFeatures } from '@/lib/use-features'
 import { estimateOrderPrepMinutes, prepRangeLabel } from '@/lib/prep-time'
+import { LodgeMap, type MapLodge } from '@/components/lodge-map'
 
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
 
@@ -23,12 +24,26 @@ export default function CartPage() {
   const [tip,           setTip]           = useState(0)
   const [loading,       setLoading]       = useState(false)
   const [error,         setError]         = useState('')
+  const [feeInfo,       setFeeInfo]       = useState(false)
+  const [deliveryInfo,  setDeliveryInfo]  = useState(false)
+  const [scheduleOn,    setScheduleOn]    = useState(false)
+  const [scheduleAt,    setScheduleAt]    = useState('') // datetime-local string
+  const [reorderNote,   setReorderNote]   = useState('') // "some items skipped" after Order again
   const [fees,          setFees]          = useState<{ bike: number; door: number; markup: number } | null>(null)
 
   // ── Wallet state ──────────────────────────────────────────────────────────
   const [walletBalance,    setWalletBalance]    = useState<number | null>(null)
+  const [walletFrozen,     setWalletFrozen]     = useState(false)
   const [walletLoading,    setWalletLoading]    = useState(true)
   const [paymentMethod,    setPaymentMethod]    = useState<PaymentMethod>('PAYSTACK')
+  // Saved delivery addresses (learned over time from past orders).
+  const [savedAddresses,   setSavedAddresses]   = useState<string[]>([])
+  // Verified ABSU lodges that have coordinates (for the pick-on-map picker).
+  const [mapLodges,        setMapLodges]        = useState<MapLodge[]>([])
+  const [showMap,          setShowMap]          = useState(false)
+  // GPS for this delivery (from "use my location" or a map/lodge pin). Cleared
+  // when the address is hand-edited so coords never mismatch the text.
+  const [coords,           setCoords]           = useState<{ lat: number; lng: number } | null>(null)
 
   useEffect(() => {
     fetch('/api/settings/fees')
@@ -38,16 +53,44 @@ export default function CartPage() {
       })
       .catch(() => {})
 
-    // Load customer wallet balance
+    // Load customer wallet balance — keep it even when 0 so Wallet is always an
+    // explicit choice next to Paystack (with a top-up prompt when short). A frozen
+    // wallet can't pay, so it's flagged and not selectable.
     fetch('/api/customer-wallet/balance')
       .then((r) => r.ok ? r.json() : null)
       .then((d: { balance_kobo: number; is_frozen: boolean } | null) => {
-        if (d && !d.is_frozen && d.balance_kobo > 0) {
-          setWalletBalance(d.balance_kobo)
+        if (d) {
+          setWalletFrozen(!!d.is_frozen)
+          if (!d.is_frozen) setWalletBalance(d.balance_kobo ?? 0)
         }
       })
       .catch(() => {})
       .finally(() => setWalletLoading(false))
+
+    // Delivery suggestions = the customer's own learned lodges first, then the
+    // admin-verified ABSU lodge catalog. Pre-fill the customer's most-used.
+    Promise.all([
+      fetch('/api/customer/addresses').then((r) => r.ok ? r.json() : null).catch(() => null),
+      fetch('/api/lodges').then((r) => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([addrRes, lodgeRes]: [{ addresses?: string[] } | null, { lodges?: MapLodge[] } | null]) => {
+      const personal = addrRes?.addresses ?? []
+      const lodges = lodgeRes?.lodges ?? []
+      const catalog = lodges.map((l) => l.area ? `${l.name} (${l.area})` : l.name)
+      const merged: string[] = [...personal]
+      for (const l of catalog) if (!merged.includes(l)) merged.push(l)
+      setSavedAddresses(merged)
+      setMapLodges(lodges.filter((l) => l.latitude != null && l.longitude != null))
+      if (personal.length > 0) setAddress((cur) => cur || personal[0])
+    }).catch(() => {})
+
+    // Surface any items "Order again" had to drop (no longer on the menu).
+    try {
+      const skipped = sessionStorage.getItem('reorder_skipped')
+      if (skipped) {
+        setReorderNote(`Some items were unavailable and left out: ${skipped}`)
+        sessionStorage.removeItem('reorder_skipped')
+      }
+    } catch { /* ignore */ }
   }, [])
 
   const deliveryFees    = fees ? { BIKE: fees.bike, DOOR: fees.door } : { BIKE: 50000, DOOR: 100000 }
@@ -60,12 +103,27 @@ export default function CartPage() {
   const prepMinutes     = estimateOrderPrepMinutes(cart.items.map((i) => ({ prepTimeMinutes: i.prep_time_minutes ?? null })), 25)
 
   // ── Wallet payment math ────────────────────────────────────────────────────
-  const walletCoversAll  = walletBalance !== null && walletBalance >= total
-  const walletAmount     = walletBalance !== null ? Math.min(walletBalance, total) : 0
+  const walletUsable     = walletBalance !== null && walletBalance > 0
+  const walletCoversAll  = walletUsable && walletBalance! >= total
+  const walletAmount     = walletUsable ? Math.min(walletBalance!, total) : 0
   const paystackAmount   = Math.max(0, total - walletAmount)
+  const topUpNeeded      = Math.max(0, total - (walletBalance ?? 0))
 
+  // Resolve the chosen method to what will actually run: wallet covers all →
+  // WALLET; partial → SPLIT; empty wallet but "wallet" tapped → PAYSTACK.
   const effectivePaymentMethod: PaymentMethod =
-    paymentMethod === 'WALLET' && !walletCoversAll ? 'SPLIT' : paymentMethod
+    paymentMethod === 'WALLET'
+      ? (walletCoversAll ? 'WALLET' : walletAmount > 0 ? 'SPLIT' : 'PAYSTACK')
+      : 'PAYSTACK'
+
+  // Scheduling bounds for the datetime-local picker (local-time strings). ~1h
+  // minimum lead so there's room for prep + delivery; up to 7 days ahead.
+  const toLocalInput = (d: Date) => {
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+  }
+  const scheduleMin = toLocalInput(new Date(Date.now() + 60 * 60_000))
+  const scheduleMax = toLocalInput(new Date(Date.now() + 7 * 86_400_000))
 
   if (totalItems === 0) {
     return (
@@ -95,6 +153,7 @@ export default function CartPage() {
   async function handleCheckout() {
     if (loading) return // guard against double-submit before the disabled state paints
     if (!address.trim()) { setError('Please enter a delivery address'); return }
+    if (scheduleOn && !scheduleAt) { setError('Pick a date and time for your scheduled order'); return }
     setError(''); setLoading(true)
 
     try {
@@ -115,6 +174,9 @@ export default function CartPage() {
           tip_amount:            tip,
           payment_method:        effectivePaymentMethod,
           wallet_amount_kobo:    effectivePaymentMethod !== 'PAYSTACK' ? walletAmount : 0,
+          scheduled_for:         scheduleOn && scheduleAt ? new Date(scheduleAt).toISOString() : undefined,
+          delivery_latitude:     coords?.lat,
+          delivery_longitude:    coords?.lng,
         }),
       })
 
@@ -237,13 +299,88 @@ export default function CartPage() {
           </div>
         </div>
 
+        {/* Schedule for later */}
+        <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white/80 flex items-center gap-1.5">
+                <span aria-hidden="true">🗓️</span> Schedule for later
+              </p>
+              <p className="text-xs text-white/45 mt-0.5">Pre-order now, pay now, and we’ll time it to arrive when you want.</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={scheduleOn}
+              onClick={() => setScheduleOn((v) => !v)}
+              className="relative w-12 h-7 rounded-full transition-colors shrink-0"
+              style={{ background: scheduleOn ? '#F5A623' : 'rgba(255,255,255,0.15)' }}
+            >
+              <span className="absolute top-1 w-5 h-5 rounded-full bg-white transition-all" style={{ left: scheduleOn ? 26 : 4 }} />
+            </button>
+          </div>
+          {scheduleOn && (
+            <div className="mt-3 lx-enter">
+              <label className="text-xs text-white/50 block mb-1">Deliver at</label>
+              <input
+                type="datetime-local"
+                value={scheduleAt}
+                min={scheduleMin}
+                max={scheduleMax}
+                onChange={(e) => setScheduleAt(e.target.value)}
+                className="w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-amber-400"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', colorScheme: 'dark' }}
+              />
+              <p className="text-xs text-white/35 mt-1.5">Within opening hours (7am–10pm). You can cancel for a full refund any time before the kitchen starts.</p>
+            </div>
+          )}
+        </div>
+
         {/* Address */}
         <div>
           <label className="block text-sm font-medium text-white/70 mb-2">Delivery address</label>
-          <input type="text" value={address} onChange={(e) => setAddress(e.target.value)}
+          <input type="text" value={address} onChange={(e) => { setAddress(e.target.value); setCoords(null) }}
             placeholder="Hall/hostel, room number..."
             className="w-full rounded-xl px-4 py-3 text-sm outline-none focus:border-amber-400 transition-colors"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+          {/* Saved lodges — learned from past orders + verified ABSU catalog; tap to reuse. */}
+          {savedAddresses.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1 mt-2 scrollbar-none">
+              {savedAddresses.map((a) => (
+                <button key={a} type="button" onClick={() => setAddress(a)}
+                  className="shrink-0 px-3 py-1.5 rounded-full text-xs transition-colors"
+                  style={{
+                    background: address === a ? 'rgba(245,166,35,0.15)' : 'rgba(255,255,255,0.06)',
+                    color: address === a ? '#F5A623' : 'rgba(255,255,255,0.6)',
+                    border: `1px solid ${address === a ? 'rgba(245,166,35,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                  }}>
+                  📍 {a.length > 28 ? a.slice(0, 28) + '…' : a}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* Pick a lodge on the ABSU map */}
+          {mapLodges.length > 0 && (
+            <div className="mt-2">
+              <button type="button" onClick={() => setShowMap((v) => !v)} className="text-xs font-medium" style={{ color: '#F5A623' }}>
+                🗺️ {showMap ? 'Hide map' : 'Pick your lodge on the map'}
+              </button>
+              {showMap && (
+                <div className="mt-2 lx-enter">
+                  <LodgeMap
+                    lodges={mapLodges}
+                    height={240}
+                    onSelect={(lo) => {
+                      setAddress(lo.area ? `${lo.name} (${lo.area})` : lo.name)
+                      if (lo.latitude != null && lo.longitude != null) setCoords({ lat: lo.latitude, lng: lo.longitude })
+                      setShowMap(false)
+                    }}
+                  />
+                  <p className="text-xs text-white/35 mt-1">Tap your lodge’s 📍 pin to set it as your delivery address.</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Instructions */}
@@ -276,126 +413,97 @@ export default function CartPage() {
           </div>
         </div>
 
-        {/* ── LumeX Wallet section ─────────────────────────────── */}
-        {!walletLoading && features.wallet !== false && (
-          <div className="glass-thin overflow-hidden">
-            {walletBalance !== null && walletBalance > 0 ? (
+        {/* ── Payment method: Wallet vs Paystack (always a clear choice) ── */}
+        {/* The whole selector shows regardless of the wallet flag; only the WALLET
+            row is gated on it, so Paystack is never hidden (card must always work). */}
+        {!walletLoading && (
+          <div>
+            <h3 className="text-sm font-medium text-white/70 mb-3">Pay with</h3>
+            <div className="glass-thin overflow-hidden">
+              {/* Wallet choice — only when the wallet feature is enabled */}
+              {features.wallet !== false && (
               <>
-                {/* Wallet option */}
-                <button
-                  onClick={() => setPaymentMethod(paymentMethod === 'PAYSTACK' ? 'WALLET' : 'PAYSTACK')}
-                  className="w-full px-4 py-4 flex items-start gap-3 text-left"
-                >
-                  <div className="mt-0.5">
-                    <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
-                      style={{
-                        borderColor: paymentMethod !== 'PAYSTACK' ? '#F5A623' : 'rgba(255,255,255,0.3)',
-                        background:  paymentMethod !== 'PAYSTACK' ? '#F5A623' : 'transparent',
-                      }}>
-                      {paymentMethod !== 'PAYSTACK' && (
-                        <div className="w-2 h-2 rounded-full bg-black" />
-                      )}
-                    </div>
+              <button
+                onClick={() => { if (walletUsable) setPaymentMethod('WALLET'); else router.push('/profile/wallet') }}
+                disabled={walletFrozen}
+                className="w-full px-4 py-4 flex items-start gap-3 text-left disabled:opacity-50"
+              >
+                <div className="mt-0.5">
+                  <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
+                    style={{
+                      borderColor: paymentMethod === 'WALLET' && walletUsable ? '#F5A623' : 'rgba(255,255,255,0.3)',
+                      background:  paymentMethod === 'WALLET' && walletUsable ? '#F5A623' : 'transparent',
+                    }}>
+                    {paymentMethod === 'WALLET' && walletUsable && <div className="w-2 h-2 rounded-full bg-black" />}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-medium text-sm flex items-center gap-1.5">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
-                        LumeX Wallet
-                      </span>
-                      <span className="text-xs px-1.5 py-0.5 rounded font-medium"
-                        style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }}>Faster</span>
-                    </div>
-                    <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                      Balance: {formatPrice(walletBalance)}
-                    </p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-medium text-sm flex items-center gap-1.5">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+                      LumeX Wallet
+                    </span>
+                    {walletUsable && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }}>Faster</span>}
                   </div>
-                </button>
+                  <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                    {walletFrozen ? 'Wallet frozen — contact support'
+                      : walletBalance === null ? 'Balance unavailable'
+                      : `Balance: ${formatPrice(walletBalance)}`}
+                  </p>
+                </div>
+              </button>
 
-                {/* Wallet cover breakdown (shown when wallet is selected) */}
-                {paymentMethod !== 'PAYSTACK' && (
-                  <div className="px-4 pb-4">
-                    {walletCoversAll ? (
-                      <div className="rounded-xl p-3 text-sm"
-                        style={{ background: 'rgba(74,222,128,0.07)', border: '1px solid rgba(74,222,128,0.15)' }}>
-                        <div className="flex justify-between mb-1">
-                          <span className="text-white/60">Order total</span>
-                          <span className="font-medium">{formatPrice(total)}</span>
-                        </div>
-                        <div className="flex justify-between mb-1">
-                          <span className="text-white/60">Wallet covers</span>
-                          <span className="text-green-400 font-medium flex items-center gap-1">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
-                            Full amount
-                          </span>
-                        </div>
-                        <div className="flex justify-between pt-2 border-t border-white/8">
-                          <span className="text-white/60">Balance after</span>
-                          <span className="font-semibold">{formatPrice(walletBalance - total)}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="rounded-xl p-3 text-sm"
-                        style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.15)' }}>
-                        <p className="text-xs mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                          Your wallet ({formatPrice(walletBalance)}) covers part of this order
-                        </p>
-                        <div className="flex justify-between mb-1">
-                          <span className="text-white/60">From wallet</span>
-                          <span className="font-medium text-amber-400">{formatPrice(walletAmount)}</span>
-                        </div>
-                        <div className="flex justify-between pt-2 border-t border-white/8">
-                          <span className="text-white/60">Pay via Paystack</span>
-                          <span className="font-semibold">{formatPrice(paystackAmount)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+              {/* Wallet selected: cover breakdown */}
+              {paymentMethod === 'WALLET' && walletUsable && (
+                <div className="px-4 pb-4">
+                  {walletCoversAll ? (
+                    <div className="rounded-xl p-3 text-sm" style={{ background: 'rgba(74,222,128,0.07)', border: '1px solid rgba(74,222,128,0.15)' }}>
+                      <div className="flex justify-between mb-1"><span className="text-white/60">Wallet covers</span><span className="text-green-400 font-medium">Full amount</span></div>
+                      <div className="flex justify-between pt-2 border-t border-white/8"><span className="text-white/60">Balance after</span><span className="font-semibold">{formatPrice(walletBalance! - total)}</span></div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl p-3 text-sm" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.15)' }}>
+                      <div className="flex justify-between mb-1"><span className="text-white/60">From wallet</span><span className="font-medium text-amber-400">{formatPrice(walletAmount)}</span></div>
+                      <div className="flex justify-between mb-2"><span className="text-white/60">Rest via Paystack</span><span className="font-semibold">{formatPrice(paystackAmount)}</span></div>
+                      <button type="button" onClick={() => router.push('/profile/wallet')} className="text-xs font-medium" style={{ color: '#F5A623' }}>
+                        Top up {formatPrice(topUpNeeded)} to pay fully from wallet →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
-                {/* Divider + Paystack option */}
-                <div className="border-t border-white/5">
-                  <button
-                    onClick={() => setPaymentMethod('PAYSTACK')}
-                    className="w-full px-4 py-4 flex items-center gap-3 text-left"
-                  >
-                    <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
-                      style={{
-                        borderColor: paymentMethod === 'PAYSTACK' ? '#F5A623' : 'rgba(255,255,255,0.3)',
-                        background:  paymentMethod === 'PAYSTACK' ? '#F5A623' : 'transparent',
-                      }}>
-                      {paymentMethod === 'PAYSTACK' && (
-                        <div className="w-2 h-2 rounded-full bg-black" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm flex items-center gap-1.5">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-                        Card / Transfer / USSD
-                      </p>
-                      <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>Pay with Paystack</p>
-                    </div>
+              {/* Empty wallet: prompt to top up */}
+              {!walletUsable && !walletFrozen && (
+                <div className="px-4 pb-4 -mt-2">
+                  <button type="button" onClick={() => router.push('/profile/wallet')} className="text-xs font-medium" style={{ color: '#F5A623' }}>
+                    Top up to pay with wallet + get 1% bonus →
                   </button>
                 </div>
+              )}
               </>
-            ) : (
-              /* No wallet balance — subtle upsell */
-              <button
-                onClick={() => router.push('/profile/wallet')}
-                className="w-full px-4 py-4 flex items-center justify-between text-left"
-              >
-                <div>
-                  <p className="text-sm font-medium flex items-center gap-1.5">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
-                    LumeX Wallet
-                  </p>
-                  <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                    Load money for faster checkout + 1% bonus →
-                  </p>
-                </div>
-                <span className="text-white/30 text-sm">→</span>
-              </button>
-            )}
+              )}
+
+              {/* Paystack choice */}
+              <div className="border-t border-white/5">
+                <button onClick={() => setPaymentMethod('PAYSTACK')} className="w-full px-4 py-4 flex items-center gap-3 text-left">
+                  <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
+                    style={{
+                      borderColor: effectivePaymentMethod === 'PAYSTACK' ? '#F5A623' : 'rgba(255,255,255,0.3)',
+                      background:  effectivePaymentMethod === 'PAYSTACK' ? '#F5A623' : 'transparent',
+                    }}>
+                    {effectivePaymentMethod === 'PAYSTACK' && <div className="w-2 h-2 rounded-full bg-black" />}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm flex items-center gap-1.5">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                      Card / Transfer / USSD
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>Pay with Paystack</p>
+                  </div>
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -405,13 +513,47 @@ export default function CartPage() {
             <span className="text-white/60">Subtotal</span>
             <span>{formatPrice(subtotal)}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-white/60">Platform fee</span>
-            <span>{formatPrice(platformMarkup)}</span>
+          <div>
+            <button
+              type="button"
+              onClick={() => setFeeInfo((v) => !v)}
+              aria-expanded={feeInfo}
+              className="flex justify-between text-sm w-full text-left transition-opacity active:opacity-60"
+            >
+              <span className="text-white/60 inline-flex items-center gap-1.5">
+                Platform fee
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/35" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
+                </svg>
+              </span>
+              <span>{formatPrice(platformMarkup)}</span>
+            </button>
+            {feeInfo && (
+              <p className="text-xs text-white/45 mt-1.5 leading-relaxed lx-enter">
+                That’s <span className="text-white/70 font-medium">{platformMarkup.toLocaleString('en-NG')} kobo</span> 😅 — relax, just <span className="text-white/70 font-medium">{formatPrice(platformMarkup)}</span>, flat. Never a percentage. It runs your live tracking, reliable riders and real support. 🧡
+              </p>
+            )}
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-white/60">Delivery ({deliveryType.toLowerCase()})</span>
-            <span>{formatPrice(deliveryFee)}</span>
+          <div>
+            <button
+              type="button"
+              onClick={() => setDeliveryInfo((v) => !v)}
+              aria-expanded={deliveryInfo}
+              className="flex justify-between text-sm w-full text-left transition-opacity active:opacity-60"
+            >
+              <span className="text-white/60 inline-flex items-center gap-1.5">
+                Delivery ({deliveryType.toLowerCase()})
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/35" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
+                </svg>
+              </span>
+              <span>{formatPrice(deliveryFee)}</span>
+            </button>
+            {deliveryInfo && (
+              <p className="text-xs text-white/45 mt-1.5 leading-relaxed lx-enter">
+                Almost all of this goes straight to your rider — the person braving sun and traffic to reach your door. Worth every naira. 🛵
+              </p>
+            )}
           </div>
           {tip > 0 && (
             <div className="flex justify-between text-sm">
@@ -439,6 +581,12 @@ export default function CartPage() {
           </div>
         </div>
 
+        {reorderNote && (
+          <div className="rounded-xl p-3 text-sm" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)', color: '#F5A623' }}>
+            {reorderNote}
+          </div>
+        )}
+
         {error && (
           <div className="rounded-xl p-3 text-sm text-red-400" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
             {error}
@@ -456,11 +604,13 @@ export default function CartPage() {
             style={{ minHeight: 56, borderRadius: 16 }}
           >
             {loading ? 'Processing…' : (
-              effectivePaymentMethod === 'WALLET'
-                ? `Pay ${formatPrice(total)} from Wallet`
-                : effectivePaymentMethod === 'SPLIT'
-                  ? `Pay ${formatPrice(paystackAmount)} + Wallet ${formatPrice(walletAmount)}`
-                  : `Pay ${formatPrice(total)}`
+              (scheduleOn ? '🗓️ Schedule · ' : '') + (
+                effectivePaymentMethod === 'WALLET'
+                  ? `Pay ${formatPrice(total)} from Wallet`
+                  : effectivePaymentMethod === 'SPLIT'
+                    ? `Pay ${formatPrice(paystackAmount)} + Wallet ${formatPrice(walletAmount)}`
+                    : `Pay ${formatPrice(total)}`
+              )
             )}
           </button>
         </div>

@@ -3,6 +3,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { refundOrderPayments } from '@/lib/order-refund'
 import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { audit } from '@/lib/audit'
+import { getControls } from '@/lib/controls'
 
 // Called every minute by Vercel cron (vercel.json: "*/1 * * * *").
 // A vendor must accept a PENDING order within 5 minutes. Past that, the
@@ -27,13 +28,24 @@ export async function POST(req: NextRequest) {
   }
 
   const db = createSupabaseAdmin()
-  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
 
+  // `orders.autoCancelMinutes` (LumeX Control spec) — single enforcement point.
+  // 0 = disabled (never auto-cancel). Defaults to 5 min if unset.
+  const autoCancelMinutes = (await getControls()).auto_cancel_minutes
+  if (autoCancelMinutes <= 0) {
+    return NextResponse.json({ cancelled: 0, skipped: 'auto-cancel disabled' })
+  }
+  const cutoff = new Date(Date.now() - autoCancelMinutes * 60 * 1000).toISOString()
+
+  // Measure the accept window from when the order ENTERED pending (pending_since),
+  // not created_at — otherwise a just-released SCHEDULED order (created hours ago)
+  // would be auto-cancelled the instant it reaches the vendor. Older rows have no
+  // pending_since, so fall back to created_at for them.
   const { data: ordersRaw, error } = await db
     .from('orders')
     .select('id, order_number, customer_id, total_amount, wallet_amount_kobo, paystack_reference, payment_status')
     .eq('status', 'PENDING')
-    .lte('created_at', fiveMinAgo)
+    .or(`pending_since.lte.${cutoff},and(pending_since.is.null,created_at.lte.${cutoff})`)
     .limit(50)
 
   if (error) {
@@ -78,7 +90,7 @@ export async function POST(req: NextRequest) {
             wallet_amount_kobo: order.wallet_amount_kobo ?? 0,
             paystack_reference: order.paystack_reference,
           },
-          reason:      'Vendor did not accept within 5 minutes',
+          reason:      `Vendor did not accept within ${autoCancelMinutes} minutes`,
           triggeredBy: 'SYSTEM_AUTO_CANCEL',
         })
 

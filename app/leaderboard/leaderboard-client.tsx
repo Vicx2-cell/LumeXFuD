@@ -4,14 +4,23 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
-export type LeaderEntry = { rank: number; name: string; count: number }
+export type LeaderEntry = {
+  rank: number
+  name: string
+  count: number
+  // Top badge the person publicly carries (customers only) — a visible flex.
+  badge?: { emoji: string; name: string }
+}
 export type Board = {
   customers: LeaderEntry[]
   vendors: LeaderEntry[]
   riders: LeaderEntry[]
+  streaks: LeaderEntry[]
 }
+export type Commentary = { customers: string; vendors: string; riders: string; streaks: string }
 
 const TABS = [
+  { key: 'streaks', label: '🔥 Streaks', unit: 'day', empty: 'No active streaks. Order daily to top this board.' },
   { key: 'customers', label: 'Orderers', unit: 'order', empty: 'No orders yet. Be the first!' },
   { key: 'vendors', label: 'Vendors', unit: 'order', empty: 'No vendor has completed an order yet.' },
   { key: 'riders', label: 'Riders', unit: 'delivery', empty: 'No deliveries yet.' },
@@ -31,9 +40,18 @@ function plural(unit: string, n: number): string {
   return unit === 'delivery' ? 'deliveries' : `${unit}s`
 }
 
-export function LeaderboardTabs({ board }: { board: Board }) {
+export function LeaderboardTabs({
+  board,
+  commentary,
+  showStreaks = true,
+}: {
+  board: Board
+  commentary?: Commentary
+  showStreaks?: boolean
+}) {
   const router = useRouter()
-  const [active, setActive] = useState<TabKey>('customers')
+  const visibleTabs = showStreaks ? TABS : TABS.filter((t) => t.key !== 'streaks')
+  const [active, setActive] = useState<TabKey>(showStreaks ? 'streaks' : 'customers')
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Realtime: leaderboard_stats is anon-readable (public counts), so the browser
@@ -63,12 +81,13 @@ export function LeaderboardTabs({ board }: { board: Board }) {
 
   const tab = TABS.find((t) => t.key === active)!
   const entries = board[active]
+  const isStreak = active === 'streaks'
 
   return (
     <div className="max-w-lg mx-auto px-4 py-5">
       {/* Tab switcher */}
       <div className="glass-thin flex gap-1 p-1 mb-5" style={{ borderRadius: 16 }}>
-        {TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const isActive = t.key === active
           return (
             <button
@@ -87,6 +106,15 @@ export function LeaderboardTabs({ board }: { board: Board }) {
           )
         })}
       </div>
+
+      {/* AI caption for the active tab */}
+      {commentary && entries.length > 0 && (
+        <div className="flex items-start gap-2 mb-4 px-3.5 py-2.5 rounded-2xl"
+          style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.18)' }}>
+          <span className="text-sm shrink-0">✨</span>
+          <p className="text-sm leading-snug" style={{ color: 'rgba(255,255,255,0.85)' }}>{commentary[active]}</p>
+        </div>
+      )}
 
       {/* Ranked list */}
       <div className="space-y-3 lx-stagger" key={active}>
@@ -120,14 +148,21 @@ export function LeaderboardTabs({ board }: { board: Board }) {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{entry.name}</p>
+                <p className="font-semibold text-sm truncate flex items-center gap-1.5">
+                  <span className="truncate">{entry.name}</span>
+                  {entry.badge && (
+                    <span className="shrink-0" title={entry.badge.name} aria-label={entry.badge.name}>
+                      {entry.badge.emoji}
+                    </span>
+                  )}
+                </p>
                 <p className="text-xs text-white/45 mt-0.5 tabular-nums">
                   {entry.count} {plural(tab.unit, entry.count)}
                 </p>
               </div>
               <div className="text-right shrink-0">
                 <p className="font-bold text-base tabular-nums" style={{ color: '#F5A623' }}>
-                  {entry.count}
+                  {isStreak ? `🔥 ${entry.count}` : entry.count}
                 </p>
               </div>
             </div>

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { formatPrice, tierEmoji, tierHoldLabel, getNextTier, ordersToNextTier } from '@/lib/wallet'
-import type { WalletBalance, TrustTier } from '@/lib/wallet'
+import { formatPrice, tierEmoji, tierHoldLabel, getNextTier, ordersToNextTier, getTierAndCount } from '@/lib/wallet'
+import type { WalletBalance } from '@/lib/wallet'
 
 export async function GET() {
   const session = await getCurrentUser()
@@ -13,6 +13,12 @@ export async function GET() {
 
   const userType = session.role === 'vendor' ? 'VENDOR' : 'RIDER'
   const db = createSupabaseAdmin()
+
+  // Self-healing release: move any DUE held funds → available right now, so the
+  // balance shown is always correct even if the 5-min release cron didn't fire.
+  // Uses the proven release_held_batch() (idempotent, SKIP LOCKED). Bank-grade
+  // rule: a user's money must never depend on a background job firing.
+  await db.rpc('release_held_batch').then(() => {}, () => {})
 
   const { data: raw } = await db
     .from('wallet_balances')
@@ -27,18 +33,11 @@ export async function GET() {
     .maybeSingle()
 
   const wallet = raw as unknown as WalletBalance | null
-  const tier = (wallet?.trust_tier ?? 'BRONZE') as TrustTier
 
-  // Count for tier progress bar
-  const countField = userType === 'VENDOR' ? 'total_ratings' : 'total_deliveries'
-  const { data: userRow } = await db
-    .from(userType === 'VENDOR' ? 'vendors' : 'riders')
-    .select(`avg_rating, ${countField}`)
-    .eq('id', session.userId!)
-    .maybeSingle()
-
-  const ur = userRow as unknown as Record<string, unknown> | null
-  const totalCount = Number(ur?.[countField] ?? 0)
+  // Tier + experience count computed LIVE from the same source the hold logic
+  // uses (completed orders for vendors, deliveries for riders) — so the tier
+  // badge and progress bar always match the actual payout speed.
+  const { tier, count: totalCount } = await getTierAndCount(session.userId!, userType)
   const nextTier = getNextTier(tier)
   const ordersToNext = ordersToNextTier(totalCount, tier)
 

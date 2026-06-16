@@ -24,7 +24,7 @@ export interface PaystackWebhookPayload {
 export async function processWebhookAsync(payload: PaystackWebhookPayload): Promise<void> {
   const { event, data } = payload
   const db = createSupabaseAdmin()
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lumexfud.com.ng'
 
   switch (event) {
     case 'charge.success': {
@@ -50,7 +50,7 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
       // Find the pending order for this reference BEFORE crediting.
       const { data: pending } = await db
         .from('orders')
-        .select('id, order_number, vendor_id, customer_id, total_amount, subtotal, wallet_amount_kobo, payment_method')
+        .select('id, order_number, vendor_id, customer_id, total_amount, subtotal, wallet_amount_kobo, payment_method, scheduled_for, scheduled_release_at')
         .eq('paystack_reference', reference)
         .eq('payment_status', 'PENDING')
         .maybeSingle()
@@ -155,15 +155,32 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
         }
       }
 
+      // SCHEDULED (pre-order): park as PAID + SCHEDULED — the release cron hands
+      // it to the vendor at scheduled_release_at, so DON'T notify now. If the
+      // release time has already passed (slow payment), fall through to a normal
+      // immediate PENDING release. pending_since drives the auto-cancel clock.
+      const nowIso = new Date().toISOString()
+      const releaseInFuture =
+        !!pending.scheduled_for &&
+        !!pending.scheduled_release_at &&
+        new Date(pending.scheduled_release_at as string).getTime() > Date.now()
+
       const { data: order, error } = await db
         .from('orders')
-        .update({ payment_status: 'PAID', status: 'PENDING', updated_at: new Date().toISOString() })
+        .update(
+          releaseInFuture
+            ? { payment_status: 'PAID', status: 'SCHEDULED', updated_at: nowIso }
+            : { payment_status: 'PAID', status: 'PENDING', pending_since: nowIso, updated_at: nowIso },
+        )
         .eq('paystack_reference', reference)
         .eq('payment_status', 'PENDING')
         .select('id, order_number, vendor_id, customer_id, total_amount, subtotal')
         .single()
 
       if (error || !order) break
+
+      // Scheduled orders are handed to the vendor later by the release cron.
+      if (releaseInFuture) break
 
       // Notify vendor
       const { data: vendor } = await db

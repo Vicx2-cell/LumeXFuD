@@ -167,7 +167,7 @@ async function sendNotificationForStatus(
   order: Record<string, unknown>,
   db: ReturnType<typeof createSupabaseAdmin>
 ): Promise<void> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lumexfud.com.ng'
   const orderNumber = order.order_number as string
 
   const getCustomerPhone = async (): Promise<string | null> => {

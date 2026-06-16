@@ -9,6 +9,7 @@ import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { getFeature } from '@/lib/features'
+import { getControls, withinHours } from '@/lib/controls'
 
 // Allowed delivery types from settings
 const DELIVERY_FEES: Record<string, number> = {
@@ -25,6 +26,15 @@ export async function POST(req: NextRequest) {
   // Feature flag: ordering can be paused platform-wide by a super admin.
   if (!(await getFeature('ordering'))) {
     return NextResponse.json({ error: 'Ordering is temporarily paused. Please check back soon.' }, { status: 503 })
+  }
+
+  // Emergency controls: maintenance mode + (optional) opening-hours enforcement.
+  const controls = await getControls()
+  if (controls.maintenance_enabled) {
+    return NextResponse.json({ error: controls.maintenance_message }, { status: 503 })
+  }
+  if (!withinHours(controls)) {
+    return NextResponse.json({ error: `LumeX is open ${controls.hours_open}–${controls.hours_close}. Please order during opening hours.` }, { status: 503 })
   }
 
   // Rate limit: each order create spins up a Paystack transaction — cap bursts
@@ -46,7 +56,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid order data', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { vendor_id, items, delivery_type, delivery_address, delivery_instructions, tip_amount, payment_method } = parsed.data
+  const { vendor_id, items, delivery_type, delivery_address, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude } = parsed.data
+  const isScheduled = !!scheduled_for
+  const hasCoords = typeof delivery_latitude === 'number' && typeof delivery_longitude === 'number'
   const db = createSupabaseAdmin()
 
   // Validate vendor
@@ -63,8 +75,48 @@ export async function POST(req: NextRequest) {
   if (!vendor.is_active) {
     return NextResponse.json({ error: 'Vendor is not active' }, { status: 400 })
   }
-  if (vendor.status === 'CLOSED') {
+  // A currently-CLOSED vendor can still take a SCHEDULED order for later.
+  if (vendor.status === 'CLOSED' && !isScheduled) {
     return NextResponse.json({ error: 'Vendor is currently closed' }, { status: 400 })
+  }
+
+  // ── Scheduling validation (prepaid pre-order) ───────────────────────────────
+  // scheduled_for is the desired DELIVERY time. We hand the order to the vendor at
+  // scheduled_release_at = delivery − prep − buffer, so it's prepared to arrive on
+  // time. Bounds: enough lead, within delivery hours, not too far ahead.
+  const DELIVERY_BUFFER_MIN = 15
+  const SCHEDULE_MARGIN_MIN = 20
+  const SCHEDULE_MAX_DAYS = 7
+  let scheduledForIso: string | null = null
+  let scheduledReleaseIso: string | null = null
+  if (isScheduled) {
+    const when = new Date(scheduled_for!)
+    if (Number.isNaN(when.getTime())) {
+      return NextResponse.json({ error: 'Invalid schedule time' }, { status: 400 })
+    }
+    const prep = Number(vendor.prep_time_minutes) || 25
+    const requiredLeadMs = (prep + DELIVERY_BUFFER_MIN + SCHEDULE_MARGIN_MIN) * 60_000
+    if (when.getTime() < Date.now() + requiredLeadMs) {
+      return NextResponse.json(
+        { error: `Please schedule at least ${Math.ceil(requiredLeadMs / 60_000)} minutes from now.` },
+        { status: 400 },
+      )
+    }
+    if (when.getTime() > Date.now() + SCHEDULE_MAX_DAYS * 86_400_000) {
+      return NextResponse.json({ error: `You can schedule up to ${SCHEDULE_MAX_DAYS} days ahead.` }, { status: 400 })
+    }
+    // Delivery time must fall within platform opening hours (Africa/Lagos).
+    const hm = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(when)
+    if (hm < controls.hours_open || hm >= controls.hours_close) {
+      return NextResponse.json(
+        { error: `LumeX delivers ${controls.hours_open}–${controls.hours_close}. Pick a time in that window.` },
+        { status: 400 },
+      )
+    }
+    scheduledForIso = when.toISOString()
+    scheduledReleaseIso = new Date(when.getTime() - (prep + DELIVERY_BUFFER_MIN) * 60_000).toISOString()
   }
 
   // Validate all menu items belong to vendor and are available
@@ -172,9 +224,20 @@ export async function POST(req: NextRequest) {
 
   const { data: c } = await db
     .from('customers')
-    .select('id, phone')
+    .select('id, phone, suspended_until, suspend_reason')
     .eq('phone', session.phone)
     .single()
+
+  // Suspended account → can't place orders. (suspended_until far in the future =
+  // indefinite suspension; degrades gracefully if migration 046 hasn't run.)
+  const suspendedUntil = (c as { suspended_until?: string | null } | null)?.suspended_until
+  if (suspendedUntil && new Date(suspendedUntil).getTime() > Date.now()) {
+    const reason = (c as { suspend_reason?: string | null } | null)?.suspend_reason
+    return NextResponse.json(
+      { error: reason ? `Your account is suspended: ${reason}` : 'Your account is suspended. Contact support.' },
+      { status: 403 },
+    )
+  }
 
   const customerId: string | null = c?.id ?? null
   const customerPhone = session.phone
@@ -183,7 +246,7 @@ export async function POST(req: NextRequest) {
   // platform's real domain so the placeholder address always passes.
   const customerEmail = `${session.phone.replace('+', '')}@lumexfud.com.ng`
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lumexfud.com.ng'
 
   // Idempotency: a client-supplied key dedupes a double-tapped checkout. We
   // RESERVE it by inserting the order row BEFORE talking to Paystack — the
@@ -238,6 +301,8 @@ export async function POST(req: NextRequest) {
       idempotency_key: idempotencyKey,
       payment_status: 'PENDING',
       rider_payment_status: 'PENDING',
+      scheduled_for: scheduledForIso,
+      scheduled_release_at: scheduledReleaseIso,
     })
     .select('id')
     .single()
@@ -291,6 +356,28 @@ export async function POST(req: NextRequest) {
   })
   await db.from('order_items').insert(orderItems)
 
+  // Remember this lodge so the cart can pre-fill it next time (fire-and-forget;
+  // no-ops if migration 050 hasn't run). The system "gets used to" where the
+  // customer orders by bumping a per-address use count, and pins it if the
+  // student shared GPS (migration 052).
+  if (customerId) {
+    db.rpc('remember_customer_address', {
+      p_customer_id: customerId,
+      p_address: delivery_address,
+      ...(hasCoords ? { p_lat: delivery_latitude, p_lng: delivery_longitude } : {}),
+    }).then(() => {}, () => {})
+  }
+
+  // Stamp the delivery GPS on the order for rider navigation. Separate, NON-fatal
+  // update (never in the main insert) so an order can't fail if migration 052
+  // hasn't run yet — a missing column just makes this no-op.
+  if (hasCoords) {
+    db.from('orders')
+      .update({ delivery_latitude, delivery_longitude })
+      .eq('id', order.id)
+      .then(() => {}, () => {})
+  }
+
   // ── WALLET (full): debit now, mark paid, hand the order to the vendor ───────
   // No Paystack charge and therefore no webhook will ever fire for this order,
   // so the whole payment must settle here. spend_customer_wallet is atomic and
@@ -318,17 +405,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: spend.errorMsg ?? 'Wallet payment failed' }, { status: 400 })
     }
 
-    // Paid in full from wallet → make the order visible to the vendor, mirroring
-    // the charge.success webhook. Guard the flip so it only happens once.
+    // Paid in full from wallet. For a SCHEDULED order: park it as PAID + SCHEDULED
+    // and DON'T notify the vendor — the release cron hands it over at the right
+    // time. For an immediate order: make it visible to the vendor now (mirrors the
+    // charge.success webhook), stamping pending_since for the auto-cancel clock.
+    const now = new Date().toISOString()
     await db
       .from('orders')
-      .update({ payment_status: 'PAID', status: 'PENDING', updated_at: new Date().toISOString() })
+      .update(
+        isScheduled
+          ? { payment_status: 'PAID', status: 'SCHEDULED', updated_at: now }
+          : { payment_status: 'PAID', status: 'PENDING', pending_since: now, updated_at: now },
+      )
       .eq('id', order.id)
       .eq('payment_status', 'PENDING')
 
-    await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, totalAmount, appUrl)
+    if (!isScheduled) {
+      await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, totalAmount, appUrl)
+    }
 
-    return NextResponse.json({ order_number: orderNumber, payment_method: 'WALLET', paid: true })
+    return NextResponse.json({ order_number: orderNumber, payment_method: 'WALLET', paid: true, scheduled: isScheduled })
   }
 
   // ── PAYSTACK or SPLIT: charge the remaining amount via Paystack ─────────────

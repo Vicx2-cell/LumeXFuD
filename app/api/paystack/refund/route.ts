@@ -8,6 +8,7 @@ import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
 import { renderTemplate } from '@/lib/termii/templates'
 import { recordPlatformEarning } from '@/lib/platform-earnings'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { requireStepUpForAmount } from '@/lib/step-up'
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
@@ -52,6 +53,13 @@ export async function POST(req: NextRequest) {
   const refundAmount = amount ?? (order.total_amount as number)
   if (refundAmount > (order.total_amount as number)) {
     return NextResponse.json({ error: 'Refund exceeds order total' }, { status: 400 })
+  }
+
+  // Rule #28: re-authenticate (fresh login PIN) for any refund ≥ ₦50,000.
+  const reauthPin = (body as Record<string, unknown> | null)?.reauth_pin
+  const stepUp = await requireStepUpForAmount(session, refundAmount, reauthPin)
+  if (!stepUp.ok) {
+    return NextResponse.json({ error: stepUp.error, reauth_required: true }, { status: stepUp.status })
   }
 
   // Trigger Paystack refund

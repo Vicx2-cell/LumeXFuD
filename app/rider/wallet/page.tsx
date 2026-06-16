@@ -1,6 +1,7 @@
 ﻿import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/session'
 import WalletView from '@/components/wallet/WalletView'
+import { RiderAssistant } from '@/components/rider-assistant'
 
 export default async function RiderWalletPage() {
   const session = await getCurrentUser()
@@ -19,6 +20,7 @@ export default async function RiderWalletPage() {
         <h1 className="text-white font-semibold text-lg">My Wallet</h1>
       </div>
       <WalletView userType="RIDER" />
+      <RiderAssistant />
     </main>
   )
 }

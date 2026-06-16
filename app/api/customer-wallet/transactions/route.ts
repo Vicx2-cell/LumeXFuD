@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { customerTxIcon, customerTxSign, formatPrice } from '@/lib/customer-wallet'
 import type { CustomerWalletTx } from '@/lib/customer-wallet'
+import { receiptCode } from '@/lib/receipt'
 
 // GET /api/customer-wallet/transactions?page=1&limit=20
 // Returns paginated customer wallet transaction history.
@@ -58,7 +59,10 @@ export async function GET(req: NextRequest) {
     description: tx.description,
     order_id:    tx.order_id,
     status:      tx.status,
+    reference:   tx.reference,
+    balance_after: formatPrice(tx.balance_after_kobo),
     created_at:  tx.created_at,
+    receipt_code: receiptCode({ id: tx.id, reference: tx.reference, amount: tx.amount_kobo, type: tx.type, created_at: tx.created_at }),
   }))
 
   return NextResponse.json({

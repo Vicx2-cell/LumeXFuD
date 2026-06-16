@@ -1,37 +1,24 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { VendorData } from './home/page'
+import { vendorTrustBadges } from '@/lib/vendor-trust'
+import { VerifiedBadge } from '@/components/verified-badge'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks']
 
 export function HomepageClient({ initialVendors }: { initialVendors: VendorData[] }) {
-  const [vendors, setVendors] = useState<VendorData[]>(initialVendors)
+  // NOTE: realtime vendor-status subscription temporarily removed while isolating
+  // the iOS "page couldn't load" crash on /home. Vendors are server-rendered
+  // (revalidate 30), so the list still works without it.
+  const [vendors] = useState<VendorData[]>(initialVendors)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
 
-  // Realtime: subscribe to vendors table for live status updates
-  useEffect(() => {
-    const supabase = createSupabaseBrowserClient()
-    const channel = supabase
-      .channel('vendors-status')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vendors' }, (payload) => {
-        setVendors((prev) =>
-          prev.map((v) =>
-            v.id === payload.new.id ? { ...v, ...(payload.new as Partial<VendorData>) } : v
-          )
-        )
-      })
-      .subscribe()
-
-    return () => { void supabase.removeChannel(channel) }
-  }, [])
-
   const filtered = useMemo(() => {
-    return vendors.filter((v) => {
+    const matches = vendors.filter((v) => {
       const matchSearch =
         !search ||
         v.shop_name.toLowerCase().includes(search.toLowerCase())
@@ -39,6 +26,17 @@ export function HomepageClient({ initialVendors }: { initialVendors: VendorData[
         category === 'All' || v.category.toUpperCase() === category.toUpperCase()
       return matchSearch && matchCategory
     })
+
+    // Availability rank: OPEN first, then BUSY, then CLOSED/paused last. A stable
+    // sort preserves the server's score order within each group, so good vendors
+    // still rank high — they just never vanish when they close.
+    const rank = (v: VendorData) => {
+      const paused = v.paused_until && new Date(v.paused_until) > new Date()
+      if (v.status === 'CLOSED' || paused) return 2
+      if (v.status === 'BUSY') return 1
+      return 0
+    }
+    return matches.slice().sort((a, b) => rank(a) - rank(b))
   }, [vendors, search, category])
 
   return (
@@ -80,8 +78,8 @@ export function HomepageClient({ initialVendors }: { initialVendors: VendorData[
       {filtered.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-white/30 text-4xl mb-3">🍽️</p>
-          <p className="text-white/50 text-sm">No vendors open right now.</p>
-          <p className="text-white/30 text-xs mt-1">Check back between 7am – 10pm.</p>
+          <p className="text-white/50 text-sm">No vendors match your search.</p>
+          <p className="text-white/30 text-xs mt-1">Try a different name or category.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
@@ -97,6 +95,10 @@ export function HomepageClient({ initialVendors }: { initialVendors: VendorData[
 function VendorCard({ vendor }: { vendor: VendorData }) {
   const isPaused =
     vendor.paused_until && new Date(vendor.paused_until) > new Date()
+  const isClosed = vendor.status === 'CLOSED'
+  // Not taking orders right now — still shown, but clearly marked so customers
+  // don't tap through expecting to order.
+  const unavailable = isClosed || isPaused
 
   const statusColor =
     vendor.status === 'OPEN' ? '#22c55e' :
@@ -104,9 +106,11 @@ function VendorCard({ vendor }: { vendor: VendorData }) {
 
   const statusLabel = isPaused ? 'Paused' : vendor.status
 
+  const trust = vendorTrustBadges(vendor)
+
   return (
-    <Link href={`/vendor/${vendor.id}`} className="block rounded-2xl overflow-hidden"
-      style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.08)' }}>
+    <Link href={`/vendor/${vendor.id}`} className="lx-tap block rounded-2xl overflow-hidden"
+      style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.08)', opacity: unavailable ? 0.72 : 1 }}>
       {/* Photo */}
       <div className="relative h-40 bg-white/5">
         {vendor.shop_photo_url ? (
@@ -116,12 +120,24 @@ function VendorCard({ vendor }: { vendor: VendorData }) {
             fill
             className="object-cover"
             sizes="(max-width: 512px) 100vw, 512px"
+            style={unavailable ? { filter: 'grayscale(1)' } : undefined}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <span className="text-4xl opacity-20">🍽️</span>
           </div>
         )}
+
+        {/* Unavailable scrim + clear stamp so it's obvious at a glance */}
+        {unavailable && (
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+            <span className="px-3.5 py-1.5 rounded-full text-sm font-bold tracking-wide"
+              style={{ background: 'rgba(0,0,0,0.75)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }}>
+              {isClosed ? 'CLOSED' : 'PAUSED'}
+            </span>
+          </div>
+        )}
+
         {/* Status badge */}
         <div
           className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
@@ -136,7 +152,10 @@ function VendorCard({ vendor }: { vendor: VendorData }) {
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h2 className="font-semibold text-base leading-tight">{vendor.shop_name}</h2>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h2 className="font-semibold text-base leading-tight">{vendor.shop_name}</h2>
+              {vendor.kyc_verified && <VerifiedBadge kind="vendor" />}
+            </div>
             <p className="text-xs text-white/50 mt-0.5">{vendor.category}</p>
           </div>
           <div className="text-right shrink-0">
@@ -152,23 +171,24 @@ function VendorCard({ vendor }: { vendor: VendorData }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 mt-2">
-          <span className="text-xs text-white/40 flex items-center gap-1">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
-            {vendor.prep_time_minutes}–{vendor.prep_time_minutes + 10} min
-          </span>
-          {vendor.vendor_scores && vendor.vendor_scores[0] && (
-            <span className="text-xs px-2 py-0.5 rounded-full"
-              style={{
-                background: vendor.vendor_scores[0].visibility_tier === 'PREMIUM'
-                  ? 'rgba(245,166,35,0.15)' : 'rgba(255,255,255,0.05)',
-                color: vendor.vendor_scores[0].visibility_tier === 'PREMIUM'
-                  ? '#F5A623' : 'rgba(255,255,255,0.4)',
-              }}>
-              {vendor.vendor_scores[0].visibility_tier}
+        {unavailable ? (
+          <p className="text-xs mt-2 font-medium" style={{ color: '#ef4444' }}>
+            {isClosed ? 'Closed — not taking orders now' : 'Paused — back shortly'} · tap to view menu
+          </p>
+        ) : (
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-xs text-white/40 flex items-center gap-1">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+              {vendor.prep_time_minutes}–{vendor.prep_time_minutes + 10} min
             </span>
-          )}
-        </div>
+            {trust.map((b) => (
+              <span key={b.label} className="text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1"
+                style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623' }}>
+                <span aria-hidden="true">{b.emoji}</span>{b.label}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </Link>
   )

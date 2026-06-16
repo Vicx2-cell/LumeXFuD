@@ -1,8 +1,10 @@
 import { notFound, redirect } from 'next/navigation'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/session'
+import { getFeature } from '@/lib/features'
 import { BottomNav } from '@/components/nav-bottom'
 import { OrderStatusClient } from './order-status-client'
+import { settleOrderIfDue, type SettleableOrder } from '@/lib/order-settle'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +21,8 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNum
       subtotal, platform_markup, delivery_fee, tip_amount, total_amount,
       vendor_accepted_at, preparing_at, ready_at, rider_assigned_at,
       picked_up_at, delivered_at, completed_at, cancelled_at, created_at,
-      rider_auto_release_at, customer_id, guest_phone, vendor_id, rider_id,
+      rider_auto_release_at, scheduled_for, pending_since, wallet_amount_kobo, paystack_reference,
+      customer_id, guest_phone, vendor_id, rider_id,
       vendors ( shop_name, prep_time_minutes ),
       riders ( full_name, phone ),
       order_items ( id, name, price, quantity, subtotal, addons )
@@ -28,6 +31,15 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNum
     .single()
 
   if (!order) notFound()
+
+  // Self-healing: if this is a paid order the vendor never accepted in time,
+  // cancel + refund it now (doesn't wait on the auto-cancel cron). Reflect the
+  // new status in what we render.
+  const settledStatus = await settleOrderIfDue(order as unknown as SettleableOrder)
+  if (settledStatus) {
+    ;(order as { status: string; payment_status: string }).status = settledStatus
+    ;(order as { payment_status: string }).payment_status = 'REFUNDED'
+  }
 
   // BOLA/IDOR check. Order numbers are sequential (LXF-2026-XXXXXX) and thus
   // enumerable, so this page must bind the viewer to THIS order — not merely
@@ -56,9 +68,38 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNum
 
   if (!authorized) redirect('/')
 
+  // Rating prompt: only the order's customer can rate, and only once. Fetch both
+  // the feature flag and whether a review already exists so the client can show
+  // the prompt without an extra round-trip.
+  const reviewsEnabled = await getFeature('reviews')
+  let alreadyRated = false
+  if (reviewsEnabled && session.role === 'customer') {
+    const { data: existingRating } = await db
+      .from('ratings')
+      .select('id')
+      .eq('order_id', order.id)
+      .maybeSingle()
+    alreadyRated = !!existingRating
+  }
+  const canRate = reviewsEnabled && session.role === 'customer'
+
+  // Is the assigned rider fully KYC-verified? (one tiny marker check)
+  let riderVerified = false
+  if (order.rider_id) {
+    try {
+      const { data: mk } = await db.storage.from('kyc-faces').createSignedUrl(`complete/${order.rider_id}`, 60)
+      riderVerified = !!mk
+    } catch { /* not verified */ }
+  }
+
   return (
     <main className="lx-page pb-24 overflow-hidden">
-      <OrderStatusClient order={order as unknown as OrderDetail} />
+      <OrderStatusClient
+        order={order as unknown as OrderDetail}
+        canRate={canRate}
+        alreadyRated={alreadyRated}
+        riderVerified={riderVerified}
+      />
       <BottomNav />
     </main>
   )
@@ -86,6 +127,7 @@ export interface OrderDetail {
   cancelled_at: string | null
   created_at: string
   rider_auto_release_at: string | null
+  scheduled_for: string | null
   customer_id: string | null
   guest_phone: string | null
   vendor_id: string

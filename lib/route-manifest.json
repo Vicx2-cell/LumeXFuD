@@ -1,0 +1,661 @@
+{
+  "generated_at": "2026-06-12T23:21:35.060Z",
+  "count": 92,
+  "routes": [
+    {
+      "path": "/api/admin/audit",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/dashboard",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/disputes",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/disputes/[id]/analyze",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/disputes/[id]/resolve",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/orders",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/pin-resets",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/riders",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/riders/[id]",
+      "dynamic": true,
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/admin/riders/create",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/users/[id]/reset-pin",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/vendors",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/vendors/[id]",
+      "dynamic": true,
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/admin/vendors/create",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/wallets",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/auth/account",
+      "dynamic": false,
+      "methods": [
+        "DELETE",
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/auth/change-pin",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/forgot-pin/get-questions",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/forgot-pin/recovery-code",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/forgot-pin/security-answers",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/login",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/logout",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/me",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/auth/regenerate-recovery-code",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/register",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/register/send-code",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/register/verify-code",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/remove-pin",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/setup",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/webauthn/login-options",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/webauthn/login-verify",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/webauthn/register-options",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/webauthn/register-verify",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/chow-ai",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/cron/recalculate-vendor-scores",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/cron/release-payments",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/cron/reset-daily-limits",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/cron/reset-weekly-leaderboard",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/cron/sentinel",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/cron/subscription-check",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/cron/vendor-auto-cancel",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/cron/wallet-reconciliation",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/cron/wallet-release-held",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/customer-wallet/balance",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/customer-wallet/topup",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/customer-wallet/transactions",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/features",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/lumi/memory",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/orders",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/orders/[id]/cancel",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/orders/[id]/confirm",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/orders/[id]/dispute",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/orders/[id]/reorder",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/orders/[id]/status",
+      "dynamic": true,
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/orders/history",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/paystack/refund",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/paystack/webhook",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/rider-ai",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/rider/orders",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/riders/[id]/accept",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/riders/[id]/status",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/settings/fees",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/super-admin/earnings",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/super-admin/earnings/history",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/super-admin/features",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/super-admin/financials",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/super-admin/pricing",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/super-admin/sentinel",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/super-admin/settings",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/super-admin/super-audit",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/super-admin/team/create",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/super-admin/users/[id]/force-reset-pin",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/super-admin/withdraw",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/upload/menu-image",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/vendor-ai/daily-summary",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/vendor-ai/describe",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/vendor/menu",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/vendor/menu/[id]",
+      "dynamic": true,
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/vendor/orders",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/vendors",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/vendors/[id]",
+      "dynamic": true,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/vendors/[id]/pause",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/vendors/[id]/status",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/wallet/balance",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/wallet/banks",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/wallet/freeze",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/wallet/save-bank",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/wallet/set-pin",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/wallet/transactions",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/wallet/unfreeze",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/wallet/verify-account",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/wallet/withdraw",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    }
+  ]
+}

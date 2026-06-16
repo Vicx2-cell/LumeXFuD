@@ -6,10 +6,13 @@ import { BottomNav } from '@/components/nav-bottom'
 import { BackButton } from '@/components/back-button'
 import { formatPrice, formatDate } from '@/lib/money'
 import { resolveOrdersView } from '@/lib/orders-view'
+import { ReorderButton } from '@/components/reorder-button'
+import { VerifiedBadge } from '@/components/verified-badge'
 
 export const dynamic = 'force-dynamic'
 
 const STATUS_LABELS: Record<string, string> = {
+  SCHEDULED: 'Scheduled',
   PENDING: 'Waiting',
   VENDOR_ACCEPTED: 'Confirmed',
   PREPARING: 'Preparing',
@@ -24,6 +27,7 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const STATUS_COLORS: Record<string, string> = {
+  SCHEDULED: '#F5A623',
   COMPLETED: '#22c55e',
   DELIVERED: '#F5A623',
   CANCELLED: '#ef4444',
@@ -56,13 +60,20 @@ export default async function OrdersPage({
   const { data: orders, count, error } = await db
     .from('orders')
     .select(`
-      id, order_number, status, total_amount, created_at, delivery_type,
+      id, order_number, status, total_amount, created_at, delivery_type, vendor_id,
       vendors ( shop_name, logo_url )
     `, { count: 'exact' })
     .eq('customer_id', customer.id)
     .neq('status', 'PENDING_PAYMENT')
     .order('created_at', { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1)
+
+  // Which of these vendors are fully KYC-verified (one cheap storage call).
+  let verifiedVendors = new Set<string>()
+  try {
+    const { data: marks } = await db.storage.from('kyc-faces').list('complete', { limit: 1000 })
+    verifiedVendors = new Set((marks ?? []).map((m) => m.name))
+  } catch { /* no markers — no badges */ }
 
   const view = resolveOrdersView(orders, error)
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE)
@@ -119,7 +130,10 @@ export default async function OrdersPage({
               >
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-semibold text-sm">{vendor?.shop_name ?? 'Unknown vendor'}</p>
+                    <p className="font-semibold text-sm flex items-center gap-1.5">
+                      {vendor?.shop_name ?? 'Unknown vendor'}
+                      {order.vendor_id && verifiedVendors.has(order.vendor_id as string) && <VerifiedBadge kind="vendor" />}
+                    </p>
                     <p className="text-xs text-white/40 mt-0.5">#{order.order_number as string}</p>
                   </div>
                   <span
@@ -135,14 +149,11 @@ export default async function OrdersPage({
                   </p>
                   <p className="font-semibold text-sm">{formatPrice(order.total_amount as number)}</p>
                 </div>
-                {order.status === 'COMPLETED' && (
+                {(order.status === 'COMPLETED' || order.status === 'CANCELLED') && (
                   <div className="mt-3 border-t border-white/5 pt-3">
-                    {/* Non-interactive label: this is a Server Component, so it
-                        cannot carry an onClick (doing so threw "Event handlers
-                        cannot be passed to Client Component props" → 500 on every
-                        list with a completed order). Tapping the card opens the
-                        order, where reorder lives. */}
-                    <span className="text-xs text-white/50">🔁 Order again</span>
+                    {/* Client island: rebuilds the cart from this order. preventDefault
+                        inside stops the surrounding card <Link> from also navigating. */}
+                    <ReorderButton orderId={order.id as string} />
                   </div>
                 )}
               </Link>

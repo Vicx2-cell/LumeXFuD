@@ -10,16 +10,28 @@ export async function GET() {
   }
 
   const db = createSupabaseAdmin()
-  const { data: disputes } = await db
-    .from('orders')
-    .select(`
+  const base = `
       id, order_number, total_amount, delivery_address,
       created_at, delivered_at, customer_id, vendor_id,
       vendors ( shop_name ),
-      customers ( name, phone )
-    `)
+      customers ( name, phone )`
+
+  // Prefer the embed WITH the concierge fields; if migration 039 hasn't been
+  // applied yet (columns missing → query errors), fall back to the basic embed
+  // so the admin disputes page never goes blank.
+  const withTriage = await db
+    .from('orders')
+    .select(`${base}, disputes ( reason, description, customer_photo_url, ai_triage )`)
     .eq('status', 'DISPUTED')
     .order('delivered_at', { ascending: true })
 
-  return NextResponse.json({ disputes: disputes ?? [] })
+  if (!withTriage.error) return NextResponse.json({ disputes: withTriage.data ?? [] })
+
+  const fallback = await db
+    .from('orders')
+    .select(`${base}, disputes ( reason, description )`)
+    .eq('status', 'DISPUTED')
+    .order('delivered_at', { ascending: true })
+
+  return NextResponse.json({ disputes: fallback.data ?? [] })
 }

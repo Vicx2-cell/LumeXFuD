@@ -49,6 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (parsed.description !== undefined) updates.description = parsed.description
   if (parsed.image_url !== undefined) updates.image_url = parsed.image_url
   if (parsed.is_available !== undefined) updates.is_available = parsed.is_available
+  if (parsed.prep_time_minutes !== undefined) updates.prep_time_minutes = parsed.prep_time_minutes
   if (parsed.price_naira !== undefined) {
     const kobo = toKobo(parsed.price_naira)
     updates.price_kobo = kobo

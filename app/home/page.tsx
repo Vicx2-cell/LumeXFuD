@@ -2,6 +2,10 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { formatPrice } from '@/lib/money'
 import { BottomNav } from '@/components/nav-bottom'
 import { BackButton } from '@/components/back-button'
+import { Lumi } from '@/components/chow-ai'
+import { StreakNudge } from '@/components/streak-nudge'
+import { LaunchCounter } from '@/components/launch-counter'
+import { getFeature } from '@/lib/features'
 import { VendorCardSkeleton } from '@/components/ui/skeleton'
 import { HomepageClient } from '../homepage-client'
 import { Suspense } from 'react'
@@ -21,7 +25,9 @@ async function getVendorsAndTrending() {
       `)
       .eq('is_active', true)
       .is('deleted_at', null)
-      .in('status', ['OPEN', 'BUSY'])
+      // NOTE: no status filter — vendors NEVER disappear from home, even when
+      // CLOSED or paused. The client sorts the unavailable ones to the bottom
+      // and marks them clearly so customers don't waste time tapping them.
       .order('composite_score', { referencedTable: 'vendor_scores', ascending: false })
 
     const { data: trending } = await db
@@ -30,14 +36,25 @@ async function getVendorsAndTrending() {
       .eq('id', 1)
       .single()
 
-    return { vendors: vendors ?? [], trending }
+    // One cheap storage call: which vendors are fully KYC-verified (marker file).
+    let verifiedIds = new Set<string>()
+    try {
+      const { data: marks } = await db.storage.from('kyc-faces').list('complete', { limit: 1000 })
+      verifiedIds = new Set((marks ?? []).map((m) => m.name))
+    } catch { /* bucket/marker missing — just no badges */ }
+    const withVerified = (vendors ?? []).map((v) => ({ ...v, kyc_verified: verifiedIds.has(v.id as string) }))
+
+    return { vendors: withVerified, trending }
   } catch {
     return { vendors: [], trending: null }
   }
 }
 
 export default async function CustomerHomePage() {
-  const { vendors, trending } = await getVendorsAndTrending()
+  const [{ vendors, trending }, studyOn] = await Promise.all([
+    getVendorsAndTrending(),
+    getFeature('study'),
+  ])
 
   return (
     <main className="min-h-dvh pb-24" style={{ background: '#0A0A0B' }}>
@@ -51,7 +68,7 @@ export default async function CustomerHomePage() {
             <BackButton />
             <div>
               <span className="text-xs text-white/40">LumeX Fud</span>
-              <h1 className="text-base font-semibold leading-tight">What are you eating today?</h1>
+              <h1 className="text-base font-semibold leading-tight lx-foodie-text">What are you eating today?</h1>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -79,6 +96,34 @@ export default async function CustomerHomePage() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-5">
+        {/* Streak nudge — loss-aversion hook for returning customers */}
+        <StreakNudge />
+
+        {/* Launch counter — self-hides unless the super-admin flag is on */}
+        <LaunchCounter />
+
+        {/* Study entry — the course tool (separate product). Gated by the `study` flag. */}
+        {studyOn && (
+          <a
+            href="/study"
+            className="block rounded-2xl p-4"
+            style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)' }}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl shrink-0" aria-hidden="true">📚</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-white">
+                  Study <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full align-middle" style={{ background: 'rgba(99,102,241,0.25)', color: '#c7d2fe' }}>beta</span>
+                </p>
+                <p className="text-xs text-white/55 mt-0.5">Pick your department to see your courses &amp; practice.</p>
+              </div>
+              <svg className="shrink-0 opacity-50" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </div>
+          </a>
+        )}
+
         {/* Trending */}
         {trending && trending.orders_last_hour && (
           <div
@@ -100,11 +145,14 @@ export default async function CustomerHomePage() {
           </div>
         )}
 
-        <Suspense fallback={<SkeletonGrid />}>
-          <HomepageClient initialVendors={vendors as VendorData[]} />
-        </Suspense>
+        <div id="vendors" className="scroll-mt-20">
+          <Suspense fallback={<SkeletonGrid />}>
+            <HomepageClient initialVendors={vendors as VendorData[]} />
+          </Suspense>
+        </div>
       </div>
 
+      <Lumi />
       <BottomNav />
     </main>
   )
@@ -130,6 +178,7 @@ export interface VendorData {
   avg_rating: number
   total_ratings: number
   vendor_scores: Array<{ composite_score: number; visibility_tier: string }> | null
+  kyc_verified?: boolean
 }
 
 export { formatPrice }

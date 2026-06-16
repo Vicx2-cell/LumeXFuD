@@ -18,9 +18,14 @@ export const FEATURES: FeatureDef[] = [
   { key: 'ordering',     label: 'Ordering',        description: 'Allow customers to place new orders. Off = checkout is paused platform-wide.', default: true,  enforced: true },
   { key: 'signups',      label: 'New sign-ups',    description: 'Allow new customer accounts to be created.',                                       default: true,  enforced: true },
   { key: 'phone_verification', label: 'Phone verification (OTP)', description: 'Require new customers to verify their phone by OTP before sign-up. Turn OFF only while OTP delivery (Termii) is unavailable — accounts created while off have an unverified phone.', default: true, enforced: true },
+  { key: 'google_login', label: 'Continue with Google', description: 'Show the "Continue with Google" button on login + sign-up. New Google users still add and verify a phone, so we capture the same info as a phone sign-up. Needs GOOGLE_OAUTH_CLIENT_ID/SECRET set — keep OFF until configured.', default: false, enforced: true },
   { key: 'wallet',       label: 'LumeX Wallet',    description: 'Show wallet top-up and wallet payment at checkout.',                               default: true,  enforced: false },
   { key: 'leaderboard',  label: 'Leaderboard',     description: 'Show the campus leaderboard and its bottom-nav tab.',                              default: true,  enforced: true },
-  { key: 'face_id',      label: 'Face ID login',   description: 'Allow users to enrol Face ID / Touch ID as a second factor.',                      default: true,  enforced: false },
+  { key: 'streaks',      label: 'Streaks & badges', description: 'Show order streaks and achievement badges on customer profiles. Off = the panel is hidden (badges keep accruing in the background).', default: true, enforced: false },
+  { key: 'demand_forecast', label: 'Demand forecast', description: 'Show the next-hour demand outlook to vendors (prep-ahead banner) and hotspots to riders. Off = both hidden.', default: true, enforced: false },
+  { key: 'dispute_concierge', label: 'Dispute concierge', description: 'When a customer reports a problem, Lumi replies empathetically and pre-triages the case for the admin. Advisory only — never moves money. Off = plain confirmation, no AI triage.', default: true, enforced: false },
+  { key: 'reviews',      label: 'Vendor reviews',  description: 'Let customers rate vendors (1–5 stars) and leave a public written review after a completed order. Off = the rating prompt and public reviews are hidden.', default: true, enforced: true },
+  { key: 'face_id',      label: 'Face ID login',   description: 'Allow users to enrol Face ID / Touch ID as a second factor, and require it at login for enrolled accounts. Off = Face ID disabled platform-wide (PIN alone logs in).', default: false, enforced: true },
   { key: 'study',        label: 'Study (beta)',    description: 'Show the course-catalog study tool (faculty → programme → level → semester selector, then ask/practice). In development — off hides the /study section entirely.', default: true, enforced: true },
 ]
 
@@ -34,22 +39,24 @@ function coerce(value: unknown, fallback: boolean): boolean {
   return fallback
 }
 
+// In-memory cache so repeated flag reads in one request — and across requests on
+// the same serverless instance — cost ONE settings query per TTL, not one per
+// call. Flags change rarely; a toggle takes up to TTL to propagate (fine for a
+// safety/visibility switch). Only successful fetches are cached.
+let _flagCache: { at: number; values: Record<string, boolean> } | null = null
+const FLAG_TTL_MS = 20_000
+
 /** Read a single flag (server-side). Defaults to the catalog default if unset. */
 export async function getFeature(key: string): Promise<boolean> {
-  const def = FEATURES.find((f) => f.key === key)
-  const fallback = def?.default ?? true
-  try {
-    const db = createSupabaseAdmin()
-    const { data } = await db.from('settings').select('value').eq('id', settingId(key)).maybeSingle()
-    if (!data) return fallback
-    return coerce(data.value, fallback)
-  } catch {
-    return fallback
-  }
+  const all = await getAllFeatures()
+  if (key in all) return all[key]
+  return FEATURES.find((f) => f.key === key)?.default ?? true
 }
 
-/** Read every catalog flag merged with stored overrides. */
+/** Read every catalog flag merged with stored overrides (cached ~20s). */
 export async function getAllFeatures(): Promise<Record<string, boolean>> {
+  if (_flagCache && Date.now() - _flagCache.at < FLAG_TTL_MS) return _flagCache.values
+
   const out: Record<string, boolean> = {}
   for (const f of FEATURES) out[f.key] = f.default
   try {
@@ -63,8 +70,9 @@ export async function getAllFeatures(): Promise<Record<string, boolean>> {
       const def = FEATURES.find((f) => f.key === key)
       out[key] = coerce(row.value, def?.default ?? true)
     }
+    _flagCache = { at: Date.now(), values: out } // cache only a successful read
   } catch {
-    // fall back to defaults already in `out`
+    // fall back to defaults already in `out`; don't cache the failure
   }
   return out
 }

@@ -53,8 +53,12 @@ function buildCsp(_nonce: string): string {
     "default-src 'self'",
     `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://*.supabase.co",
-    "connect-src 'self' https://*.supabase.co https://api.paystack.co https://api.ng.termii.com",
+    // OSM tiles are loaded as <img> by Leaflet (the campus lodge map).
+    "img-src 'self' data: blob: https://*.supabase.co https://*.tile.openstreetmap.org",
+    // wss://*.supabase.co is REQUIRED for Supabase Realtime (live vendor status
+    // on /home, leaderboard). Without it the socket is CSP-blocked and retries in
+    // a loop, which can destabilise iOS Safari ("page couldn't load").
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.paystack.co https://api.ng.termii.com",
     "frame-src https://js.paystack.co",
     "font-src 'self'",
     "object-src 'none'",
@@ -86,11 +90,14 @@ export async function proxy(req: NextRequest) {
   const csp = buildCsp(nonce)
 
   // Forward the nonce to the app so server components / <Script> can use it.
-  // Next.js also reads the nonce from the CSP on the *request* headers to
-  // auto-apply it to its own framework <script> tags — so set it on both.
+  // NOTE: we deliberately do NOT set Content-Security-Policy on the *request*
+  // headers. Doing so makes Next.js run its CSP/nonce-aware path on every
+  // dynamically-rendered page — and since our CSP carries no nonce, that path
+  // added nothing but appeared to crash iOS Safari on dynamic pages (/home,
+  // /orders) while statically-prerendered pages (landing) were fine. The CSP is
+  // still enforced via the response header below; security is unchanged.
   const requestHeaders = new Headers(req.headers)
   requestHeaders.set('x-nonce', nonce)
-  requestHeaders.set('Content-Security-Policy', csp)
 
   // Attaches the CSP to any response we return.
   const withCsp = (res: NextResponse): NextResponse => {

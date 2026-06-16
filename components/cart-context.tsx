@@ -121,6 +121,10 @@ interface CartContextValue {
   removeItem: (id: string) => void
   setQuantity: (id: string, quantity: number) => void
   clearCart: () => void
+  // Replace the entire cart in one shot (used by "Order again" — avoids the
+  // stale-closure problem of clear-then-add, and preserves item quantities,
+  // which ADD_ITEM would otherwise reset to 1).
+  replaceCart: (state: CartState) => void
   totalItems: number
   subtotal: number
 }
@@ -166,11 +170,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'CLEAR' })
   }
 
+  // Reuses HYDRATE so the new cart is normalized (menu_item_id / addons backfill).
+  function replaceCart(state: CartState) {
+    dispatch({ type: 'HYDRATE', state })
+  }
+
   const totalItems = cart.items.reduce((sum, i) => sum + i.quantity, 0)
   const subtotal = cart.items.reduce((sum, i) => sum + lineKobo(i) * i.quantity, 0)
 
   return (
-    <CartContext.Provider value={{ cart, addItem, removeItem, setQuantity, clearCart, totalItems, subtotal }}>
+    <CartContext.Provider value={{ cart, addItem, removeItem, setQuantity, clearCart, replaceCart, totalItems, subtotal }}>
       {children}
     </CartContext.Provider>
   )

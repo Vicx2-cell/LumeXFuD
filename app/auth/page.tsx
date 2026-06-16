@@ -4,6 +4,20 @@ import { useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { startAuthentication } from '@simplewebauthn/browser'
 import PinInput from '@/components/auth/PinInput'
+import GoogleButton from '@/components/auth/GoogleButton'
+import { useFeatures } from '@/lib/use-features'
+
+// Friendly text for the ?error= slugs the Google flow can redirect back with.
+const GOOGLE_ERRORS: Record<string, string> = {
+  google_cancelled: 'Google sign-in was cancelled.',
+  google_state: 'Google sign-in could not be verified. Please try again.',
+  google_failed: "Couldn't sign in with Google. Please try again.",
+  google_unverified_email: 'Your Google email is not verified. Use a verified Google account or sign up with your phone.',
+  google_disabled: 'Google sign-in is currently turned off.',
+  google_unavailable: 'Google sign-in is not available right now.',
+  account_suspended: 'Your account has been suspended. Contact support.',
+  signups_closed: 'New sign-ups are currently closed.',
+}
 
 export default function AuthPage() {
   return (
@@ -16,7 +30,22 @@ export default function AuthPage() {
 function LoginForm() {
   const router   = useRouter()
   const params   = useSearchParams()
-  const nextPath = params.get('next') ?? '/'
+  const rawNext  = params.get('next')
+  const nextPath = rawNext ?? '/'
+  // Only treat in-app paths as a deep-link destination (avoid open-redirects).
+  const hasNext  = !!rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
+
+  const features = useFeatures()
+  const googleEnabled = features.google_login === true
+  // The Google flow redirects back here with ?error=<slug> on failure.
+  const googleError = GOOGLE_ERRORS[params.get('error') ?? ''] ?? ''
+
+  // Fallback: a vendor page (visited logged-out via a share link) stashes itself
+  // here, so we return there after auth even when no ?next= was carried through.
+  function popReturnVendor(): string | null {
+    try { const v = sessionStorage.getItem('lx_return_vendor'); if (v) { sessionStorage.removeItem('lx_return_vendor'); if (v.startsWith('/vendor/')) return v } } catch { /* ignore */ }
+    return null
+  }
 
   const [phone,   setPhone]   = useState('+234')
   const [pin,     setPin]     = useState('')
@@ -29,8 +58,10 @@ function LoginForm() {
   const [mfaBusy,  setMfaBusy]  = useState(false)
 
   const goRegister = useCallback(() => {
-    router.push(`/auth/register?phone=${encodeURIComponent(phone)}`)
-  }, [phone, router])
+    const q = new URLSearchParams({ phone })
+    if (hasNext) q.set('next', nextPath)
+    router.push(`/auth/register?${q.toString()}`)
+  }, [phone, router, hasNext, nextPath])
 
   const runWebAuthn = useCallback(async () => {
     setMfaBusy(true)
@@ -54,7 +85,9 @@ function LoginForm() {
         return
       }
       setSuccess(true)
-      setTimeout(() => router.push(data.redirect_path ?? nextPath), 650)
+      // Full navigation (see submitLogin) so the fresh session cookie is sent
+      // and we bypass any cached pre-login redirect.
+      setTimeout(() => window.location.assign(hasNext ? nextPath : (popReturnVendor() ?? data.redirect_path ?? '/')), 650)
     } catch (e) {
       const name = (e as { name?: string })?.name
       setMfaError(name === 'NotAllowedError'
@@ -63,7 +96,7 @@ function LoginForm() {
     } finally {
       setMfaBusy(false)
     }
-  }, [nextPath, router])
+  }, [nextPath, hasNext])
 
   const submitLogin = useCallback(async (pinValue: string) => {
     if (pinValue.length !== 6) return
@@ -99,11 +132,15 @@ function LoginForm() {
         void runWebAuthn()
         return
       }
-      // Success: play the unlock burst, then navigate.
+      // Success: play the unlock burst, then navigate. Use a FULL navigation
+      // (not router.push): a soft client nav can replay Next's cached
+      // pre-login "/orders → /auth" redirect and race the just-set session
+      // cookie on iOS Safari, bouncing the user back to login. A full document
+      // load always sends the fresh cookie and skips the router cache.
       setSuccess(true)
       setTimeout(() => {
-        if (data.pin_reset_pending) router.push('/auth/setup')
-        else router.push(data.redirect_path ?? nextPath)
+        const dest = data.pin_reset_pending ? '/auth/setup' : (hasNext ? nextPath : (popReturnVendor() ?? data.redirect_path ?? '/'))
+        window.location.assign(dest)
       }, 650)
     } catch {
       setPin('')
@@ -111,8 +148,7 @@ function LoginForm() {
     } finally {
       setLoading(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phone, nextPath, router, runWebAuthn])
+  }, [phone, nextPath, hasNext, runWebAuthn])
 
   function handlePhoneContinue() {
     if (phone.length < 13) return
@@ -149,6 +185,21 @@ function LoginForm() {
           {/* ── Phone step ── */}
           {step === 'phone' && (
             <div className="space-y-5">
+              {googleError && (
+                <p className="text-red-400 text-sm text-center" role="alert">{googleError}</p>
+              )}
+
+              {googleEnabled && (
+                <>
+                  <GoogleButton next={hasNext ? nextPath : undefined} />
+                  <div className="flex items-center gap-3 text-white/30 text-xs">
+                    <span className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.12)' }} />
+                    or
+                    <span className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.12)' }} />
+                  </div>
+                </>
+              )}
+
               <div>
                 <label htmlFor="lx-phone" className="block text-xs font-medium text-white/60 mb-2">
                   Phone number
@@ -298,7 +349,7 @@ function LoginForm() {
         <p className="text-center text-sm text-white/45 pt-5">
           New here?{' '}
           <button
-            onClick={() => router.push('/auth/register')}
+            onClick={() => router.push(hasNext ? `/auth/register?next=${encodeURIComponent(nextPath)}` : '/auth/register')}
             className="font-semibold hover:opacity-80 transition-opacity"
             style={{ color: '#F5A623' }}
           >

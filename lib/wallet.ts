@@ -60,25 +60,83 @@ function addHours(date: Date, hours: number): Date {
   return new Date(date.getTime() + hours * 3_600_000)
 }
 
+// ─── Hold policy ("Fast & Fair") ──────────────────────────────────────────────
+// The customer dispute window (15 min) is already over by the time wallets are
+// credited (credit happens at COMPLETED), and most NG payments are bank
+// transfer/USSD (no chargebacks). So a long blanket hold protects against almost
+// nothing for ESTABLISHED accounts — it just delays people who did the work.
+// We therefore pay trusted riders/vendors almost instantly and reserve a real
+// hold only for brand-new accounts (collusion-fraud window). Trust tiers shrink
+// the established hold further; DIAMOND is instant.
+//
+// All durations are in MINUTES and overridable live via the settings table
+// (see getHoldPolicy) so the super-admin can tune without a redeploy.
+export interface HoldPolicy {
+  riderBaseMin: number       // established rider — basically instant + tiny buffer
+  riderNewMin: number        // rider's first `newAccountThreshold` deliveries
+  vendorBaseMin: number      // established vendor — same-day
+  vendorNewMin: number       // vendor's first `newAccountThreshold` orders
+  newAccountThreshold: number
+}
+
+export const DEFAULT_HOLD_POLICY: HoldPolicy = {
+  riderBaseMin: 5,           // ~instant (5-min settle buffer)
+  riderNewMin: 6 * 60,       // 6h for new riders
+  vendorBaseMin: 12 * 60,    // same-day (12h) for established vendors
+  vendorNewMin: 24 * 60,     // 24h for new vendors
+  newAccountThreshold: 5,
+}
+
+// Established accounts earn a tier reduction on their base hold. New-account
+// holds are NOT reduced (that window exists precisely to vet new accounts).
+const TIER_REDUCTION: Record<TrustTier, number> = {
+  BRONZE: 0, SILVER: 0.5, GOLD: 0.75, DIAMOND: 1,
+}
+
 export function calculateReleaseTime(
   userType: WalletUserType,
   tier: TrustTier,
-  deliveredAt: Date
+  completedCount: number,
+  deliveredAt: Date,
+  policy: HoldPolicy = DEFAULT_HOLD_POLICY
 ): Date {
-  const riderHours: Record<TrustTier, number> = {
-    BRONZE: 24,
-    SILVER: 12,
-    GOLD: 6,
-    DIAMOND: 0,
+  const isNew = completedCount < policy.newAccountThreshold
+  let minutes: number
+  if (userType === 'RIDER') {
+    minutes = isNew ? policy.riderNewMin : policy.riderBaseMin
+  } else {
+    minutes = isNew ? policy.vendorNewMin : policy.vendorBaseMin
   }
-  const vendorHours: Record<TrustTier, number> = {
-    BRONZE: 72,
-    SILVER: 36,
-    GOLD: 18,
-    DIAMOND: 0,
+  if (!isNew) {
+    minutes = Math.round(minutes * (1 - TIER_REDUCTION[tier]))
   }
-  const hours = userType === 'RIDER' ? riderHours[tier] : vendorHours[tier]
-  return addHours(deliveredAt, hours)
+  return new Date(deliveredAt.getTime() + minutes * 60_000)
+}
+
+// Reads hold overrides from the settings table, falling back to defaults for any
+// missing key. Setting ids: hold_rider_base_minutes, hold_rider_new_minutes,
+// hold_vendor_base_minutes, hold_vendor_new_minutes (value {"minutes": N}) and
+// hold_new_account_threshold (value {"count": N}).
+export async function getHoldPolicy(): Promise<HoldPolicy> {
+  const db = createSupabaseAdmin()
+  const { data } = await db.from('settings').select('id, value').in('id', [
+    'hold_rider_base_minutes', 'hold_rider_new_minutes',
+    'hold_vendor_base_minutes', 'hold_vendor_new_minutes',
+    'hold_new_account_threshold',
+  ])
+  const m = new Map<string, { minutes?: number; count?: number }>()
+  for (const r of (data ?? []) as Array<{ id: string; value: { minutes?: number; count?: number } }>) m.set(r.id, r.value)
+  const num = (id: string, key: 'minutes' | 'count', fallback: number) => {
+    const v = m.get(id)?.[key]
+    return typeof v === 'number' && v >= 0 ? v : fallback
+  }
+  return {
+    riderBaseMin:        num('hold_rider_base_minutes', 'minutes', DEFAULT_HOLD_POLICY.riderBaseMin),
+    riderNewMin:         num('hold_rider_new_minutes', 'minutes', DEFAULT_HOLD_POLICY.riderNewMin),
+    vendorBaseMin:       num('hold_vendor_base_minutes', 'minutes', DEFAULT_HOLD_POLICY.vendorBaseMin),
+    vendorNewMin:        num('hold_vendor_new_minutes', 'minutes', DEFAULT_HOLD_POLICY.vendorNewMin),
+    newAccountThreshold: num('hold_new_account_threshold', 'count', DEFAULT_HOLD_POLICY.newAccountThreshold),
+  }
 }
 
 export function calculateTier(totalCompleted: number, avgRating: number): TrustTier {
@@ -88,20 +146,58 @@ export function calculateTier(totalCompleted: number, avgRating: number): TrustT
   return 'BRONZE'
 }
 
-export async function getTrustTier(userId: string, userType: WalletUserType): Promise<TrustTier> {
+// A wallet user's "experience" count — drives both the trust tier and the
+// new-account hold window.
+//
+//   • RIDER  → riders.total_deliveries (denormalized, accurate).
+//   • VENDOR → COUNT of COMPLETED orders.  NOT total_ratings: ratings were
+//     absent from the app for most of its life (only just re-added), so keying
+//     vendor experience on ratings pegged EVERY vendor as a brand-new account
+//     forever — permanent 24h hold + BRONZE tier no matter how many orders they
+//     had fulfilled. Completed orders are the real signal.
+export async function getExperienceCount(
+  userId: string,
+  userType: WalletUserType
+): Promise<number> {
+  const db = createSupabaseAdmin()
+  // Count REAL completed orders for both roles. riders.total_deliveries was never
+  // incremented anywhere in the app (only read), so keying rider tier/holds on it
+  // pegged every rider at 0 → permanent BRONZE + new-account hold. Counting the
+  // orders table is the accurate, self-correcting signal (matches vendors).
+  const column = userType === 'RIDER' ? 'rider_id' : 'vendor_id'
+  const { count } = await db
+    .from('orders')
+    .select('id', { count: 'exact', head: true })
+    .eq(column, userId)
+    .eq('status', 'COMPLETED')
+  return count ?? 0
+}
+
+async function getAvgRating(userId: string, userType: WalletUserType): Promise<number> {
   const db = createSupabaseAdmin()
   const table = userType === 'VENDOR' ? 'vendors' : 'riders'
-  const countField = userType === 'VENDOR' ? 'total_ratings' : 'total_deliveries'
+  const { data } = await db.from(table).select('avg_rating').eq('id', userId).maybeSingle()
+  return Number((data as { avg_rating?: number } | null)?.avg_rating ?? 0)
+}
 
-  const { data } = await db
-    .from(table)
-    .select(`avg_rating, ${countField}`)
-    .eq('id', userId)
-    .maybeSingle()
+export async function getTrustTier(userId: string, userType: WalletUserType): Promise<TrustTier> {
+  const [count, avg] = await Promise.all([
+    getExperienceCount(userId, userType),
+    getAvgRating(userId, userType),
+  ])
+  return calculateTier(count, avg)
+}
 
-  if (!data) return 'BRONZE'
-  const row = data as unknown as Record<string, unknown>
-  return calculateTier(Number(row[countField] ?? 0), Number(row.avg_rating ?? 0))
+// Tier AND experience-count together — the count drives the new-account hold.
+export async function getTierAndCount(
+  userId: string,
+  userType: WalletUserType
+): Promise<{ tier: TrustTier; count: number }> {
+  const [count, avg] = await Promise.all([
+    getExperienceCount(userId, userType),
+    getAvgRating(userId, userType),
+  ])
+  return { tier: calculateTier(count, avg), count }
 }
 
 // ─── Atomic credit: calls the Postgres RPC for SELECT FOR UPDATE safety ───────

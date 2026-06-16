@@ -115,6 +115,8 @@ export interface Rider {
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
 export type OrderStatus =
+  | 'PENDING_PAYMENT'
+  | 'SCHEDULED'
   | 'PENDING'
   | 'VENDOR_ACCEPTED'
   | 'PREPARING'
@@ -291,49 +293,45 @@ export interface VendorScore {
 
 // ─── Ratings ──────────────────────────────────────────────────────────────────
 
+// Customer rating for an order: a public vendor review (stars/review, migration
+// 043) plus an optional private rider rating (rider_stars/rider_review,
+// migration 044). One row per order; immutable.
 export interface Rating {
   id: string
   order_id: string
   customer_id: string
   vendor_id: string
+  stars: number
+  review: string | null
+  reviewer_name: string | null
   rider_id: string | null
-  vendor_rating: number
-  vendor_review: string | null
-  rider_rating: number
+  rider_stars: number | null
   rider_review: string | null
-  would_order_again: boolean | null
-  photo_url: string | null
   created_at: string
 }
 
-// ─── Gamification ─────────────────────────────────────────────────────────────
+// ─── Streaks & badges (cosmetic — no XP/levels, no money; see migration 037) ──
 
-export interface CustomerXP {
-  id: string
+export interface CustomerStreak {
   customer_id: string
-  total_xp: number
-  weekly_xp: number
-  level: number
   current_streak_days: number
   best_streak_days: number
   last_order_date: string | null
-  streak_freeze_count: number
   updated_at: string
 }
 
+export interface Badge {
+  id: string            // slug, e.g. 'weekly-warrior'
+  name: string
+  description: string
+  emoji: string
+  sort_order: number
+}
+
 export interface CustomerBadge {
-  id: string
   customer_id: string
   badge_id: string
   earned_at: string
-}
-
-export interface Badge {
-  id: string
-  name: string
-  description: string | null
-  icon_url: string | null
-  unlock_condition: string | null
 }
 
 // ─── Admin ────────────────────────────────────────────────────────────────────

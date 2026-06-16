@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { resolveDisputeInput } from '@/lib/validators'
 import { refundOrderPayments } from '@/lib/order-refund'
+import { completeOrderPayout } from '@/lib/order-payout'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 
@@ -31,7 +32,7 @@ export async function POST(
   const db = createSupabaseAdmin()
   const { data: order } = await db
     .from('orders')
-    .select('id, order_number, status, total_amount, payment_status, paystack_reference, customer_id, wallet_amount_kobo')
+    .select('id, order_number, status, total_amount, payment_status, paystack_reference, customer_id, wallet_amount_kobo, rider_id, vendor_id, subtotal, rider_delivery_cut, tip_amount')
     .eq('id', id)
     .single()
 
@@ -71,6 +72,28 @@ export async function POST(
     resolved_by: session.phone,
     resolved_at: now,
   }).eq('order_id', id)
+
+  // A disputed order never hits the normal COMPLETED → payout path, so the rider
+  // was left stuck BUSY (active_order_id was never cleared) — this is the
+  // "rider still shows busy after a refund" bug. Resolve it here:
+  //  - NO_ACTION (vendor favour → COMPLETED): pay vendor + rider AND free the rider
+  //  - REFUND (customer favour → REFUNDED): free the rider, but no payout
+  if (parsed.data.resolution === 'NO_ACTION') {
+    await completeOrderPayout({
+      id:                 order.id as string,
+      order_number:       order.order_number as string,
+      vendor_id:          (order.vendor_id as string | null) ?? null,
+      rider_id:           (order.rider_id as string | null) ?? null,
+      subtotal:           Number(order.subtotal) || 0,
+      rider_delivery_cut: Number(order.rider_delivery_cut) || 0,
+      tip_amount:         Number(order.tip_amount) || 0,
+    })
+  } else if (order.rider_id) {
+    await db.from('riders')
+      .update({ active_order_id: null, status: 'ONLINE', last_status_update_at: now })
+      .eq('id', order.rider_id as string)
+      .eq('active_order_id', order.id as string)
+  }
 
   await audit({
     actor_id: session.phone,

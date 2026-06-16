@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { getFeature } from '@/lib/features'
+import { getControls } from '@/lib/controls'
 import { BottomNav } from '@/components/nav-bottom'
 import { ProfileClient } from './profile-client'
 import { FaceIdSetup } from '@/components/face-id-setup'
@@ -25,11 +27,36 @@ export default async function ProfilePage() {
     profile = customer as CustomerProfile | null
 
     if (customer) {
-      // Gamification (XP, streaks, badges) was removed from the MVP — those
-      // tables no longer exist. Pass empty so the profile renders cleanly.
+      // Cosmetic streaks + badges (migration 037). No XP/levels, no money.
+      // The super-admin "streaks" flag only gates display — badges keep
+      // accruing via the DB trigger regardless, so toggling it on later
+      // surfaces the full earned history.
+      let streak: StreakData | null = null
+      let badges: BadgeItem[] = []
+
+      if (await getFeature('streaks')) {
+        const [{ data: streakRow }, { data: badgeRows }] = await Promise.all([
+          db
+            .from('customer_streaks')
+            .select('current_streak_days, best_streak_days')
+            .eq('customer_id', customer.id)
+            .maybeSingle(),
+          db
+            .from('customer_badges')
+            .select('badge_id, earned_at, badges(name, description, emoji)')
+            .eq('customer_id', customer.id)
+            .order('earned_at', { ascending: false }),
+        ])
+        streak = (streakRow as StreakData | null) ?? null
+        badges = (badgeRows ?? []) as unknown as BadgeItem[]
+      }
+
+      // Support contact set by the super-admin in Controls (empty = hide the card).
+      const supportPhone = (await getControls()).support_phone
+
       return (
         <main className="lx-page pb-24">
-          <ProfileClient profile={profile} xp={null} badges={[]} phone={session.phone} />
+          <ProfileClient profile={profile} streak={streak} badges={badges} phone={session.phone} supportPhone={supportPhone} />
           <BottomNav />
         </main>
       )
@@ -70,17 +97,13 @@ export interface CustomerProfile {
   dispute_count: number
 }
 
-export interface XPData {
-  total_xp: number
-  weekly_xp: number
-  level: number
+export interface StreakData {
   current_streak_days: number
   best_streak_days: number
-  streak_freeze_count: number
 }
 
 export interface BadgeItem {
   badge_id: string
   earned_at: string
-  badges: { name: string; description: string | null } | null
+  badges: { name: string; description: string | null; emoji: string | null } | null
 }

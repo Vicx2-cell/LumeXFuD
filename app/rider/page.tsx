@@ -4,6 +4,9 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { formatPrice } from '@/lib/money'
 import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
+import { RiderHotspots } from '@/components/rider-hotspots'
+import { KycPanel } from '@/components/kyc-panel'
+import { LaunchCounter } from '@/components/launch-counter'
 
 type RiderStatus = 'ONLINE' | 'OFFLINE' | 'BUSY'
 
@@ -280,6 +283,9 @@ export default function RiderDashboard() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="#F5A623" stroke="#F5A623" strokeWidth="1" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                 {rider.avg_rating?.toFixed(1) ?? '—'}
               </p>
+              <a href="/rider/reviews" className="text-xs font-medium mt-1.5 inline-block" style={{ color: '#F5A623' }}>
+                See your reviews →
+              </a>
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -301,6 +307,12 @@ export default function RiderDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Launch counter — self-hides unless the super-admin flag is on */}
+      <div className="mx-4 mb-5"><LaunchCounter /></div>
+
+      {/* KYC verification — upload & track documents, verified badge */}
+      <div className="mx-4 mb-5"><KycPanel role="rider" /></div>
 
       {/* Wallet card */}
       {wallet && (
@@ -402,6 +414,9 @@ export default function RiderDashboard() {
         </div>
       )}
 
+      {/* Hotspots — where to position before orders drop (online riders only) */}
+      {isOnline && !current && <RiderHotspots />}
+
       {/* Available orders */}
       <div className="mx-4">
         <div className="flex items-center justify-between mb-3">
@@ -473,6 +488,11 @@ export default function RiderDashboard() {
             ))}
           </div>
         )}
+
+        {/* Always-reachable logout at the end of the page */}
+        <div className="pt-2 pb-6 flex justify-center">
+          <LogoutButton />
+        </div>
       </div>
     </main>
   )

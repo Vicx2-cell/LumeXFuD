@@ -4,6 +4,13 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
 
+interface DisputeRow {
+  reason: string
+  description: string | null
+  customer_photo_url: string | null
+  ai_triage: DisputeBrief | null
+}
+
 interface DisputeOrder {
   id: string
   order_number: string
@@ -14,6 +21,30 @@ interface DisputeOrder {
   created_at: string
   vendors: { shop_name: string; phone: string } | null
   customers: { name: string | null; phone: string } | null
+  disputes: DisputeRow[] | DisputeRow | null
+}
+
+/** orders→disputes embeds as an array (or object); normalise to the single row. */
+function disputeRow(d: DisputeOrder): DisputeRow | null {
+  if (!d.disputes) return null
+  return Array.isArray(d.disputes) ? (d.disputes[0] ?? null) : d.disputes
+}
+
+interface DisputeBrief {
+  summary: string
+  customer_claim: string
+  key_facts: string[]
+  risk_flags: string[]
+  suggested_resolution: 'REFUND' | 'NO_ACTION' | 'PARTIAL' | 'NEEDS_MORE_INFO'
+  confidence: 'high' | 'medium' | 'low'
+  reasoning: string
+}
+
+const RESOLUTION_META: Record<DisputeBrief['suggested_resolution'], { label: string; color: string }> = {
+  REFUND:         { label: 'Lean: Refund customer', color: '#EF4444' },
+  NO_ACTION:      { label: 'Lean: No action (favour vendor)', color: '#22C55E' },
+  PARTIAL:        { label: 'Lean: Partial / goodwill', color: '#F5A623' },
+  NEEDS_MORE_INFO:{ label: 'Needs more info', color: 'rgba(255,255,255,0.6)' },
 }
 
 export default function AdminDisputes() {
@@ -22,6 +53,8 @@ export default function AdminDisputes() {
   const [loading, setLoading] = useState(true)
   const [resolving, setResolving] = useState<string | null>(null)
   const [toast, setToast] = useState('')
+  const [briefs, setBriefs] = useState<Record<string, DisputeBrief>>({})
+  const [analyzing, setAnalyzing] = useState<string | null>(null)
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -38,6 +71,20 @@ export default function AdminDisputes() {
   }
 
   useEffect(() => { fetchDisputes() }, [])
+
+  async function analyze(orderId: string) {
+    setAnalyzing(orderId)
+    try {
+      const res = await fetch(`/api/admin/disputes/${orderId}/analyze`, { method: 'POST' })
+      const d = await res.json() as { brief?: DisputeBrief; error?: string }
+      if (res.ok && d.brief) setBriefs((b) => ({ ...b, [orderId]: d.brief! }))
+      else showToast(d.error ?? 'Could not analyze this dispute')
+    } catch {
+      showToast('Network error — try again')
+    } finally {
+      setAnalyzing(null)
+    }
+  }
 
   async function resolve(orderId: string, resolution: 'REFUND' | 'NO_ACTION') {
     setResolving(orderId + resolution)
@@ -103,6 +150,9 @@ export default function AdminDisputes() {
             {disputes.map((d) => {
               const deliveredAt = d.delivered_at ? new Date(d.delivered_at) : null
               const ageMinutes = deliveredAt ? Math.round((Date.now() - deliveredAt.getTime()) / 60000) : null
+              const row = disputeRow(d)
+              // Prefer a freshly re-run analysis; otherwise the concierge's stored triage.
+              const brief = briefs[d.id] ?? row?.ai_triage ?? null
 
               return (
                 <div key={d.id} className="rounded-2xl p-4" style={{ background: '#111113', border: '1px solid rgba(239,68,68,0.2)' }}>
@@ -139,6 +189,32 @@ export default function AdminDisputes() {
                     </div>
                   </div>
 
+                  {/* What the customer reported (+ optional photo) */}
+                  {row && (row.reason || row.description || row.customer_photo_url) && (
+                    <div className="mb-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                      <p className="text-[11px] uppercase tracking-wide text-white/35 mb-1">Customer reported</p>
+                      {row.reason && <p className="text-sm text-white/85">{row.reason}</p>}
+                      {row.description && <p className="text-xs text-white/55 mt-1">{row.description}</p>}
+                      {row.customer_photo_url && (
+                        <a href={row.customer_photo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-amber-400 mt-1.5 inline-block">View photo →</a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* AI triage — the concierge's read is shown automatically; re-run is optional */}
+                  {brief ? (
+                    <DisputeBriefPanel brief={brief} />
+                  ) : (
+                    <button
+                      onClick={() => analyze(d.id)}
+                      disabled={analyzing !== null}
+                      className="w-full mb-3 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
+                      style={{ background: 'rgba(245,166,35,0.1)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.25)' }}
+                    >
+                      {analyzing === d.id ? 'Analyzing…' : '🤖 AI analysis'}
+                    </button>
+                  )}
+
                   {/* Resolution actions */}
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -164,6 +240,42 @@ export default function AdminDisputes() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function DisputeBriefPanel({ brief }: { brief: DisputeBrief }) {
+  const meta = RESOLUTION_META[brief.suggested_resolution]
+  return (
+    <div className="mb-3 rounded-xl p-3 space-y-2.5" style={{ background: 'rgba(245,166,35,0.06)', border: '1px solid rgba(245,166,35,0.2)' }}>
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-bold tracking-wide" style={{ color: '#F5A623' }}>🤖 AI ANALYSIS</span>
+        <span className="text-[10px] text-white/30">advisory · you decide</span>
+      </div>
+
+      <p className="text-sm text-white/85">{brief.summary}</p>
+
+      {brief.key_facts.length > 0 && (
+        <ul className="space-y-1">
+          {brief.key_facts.map((f, i) => (
+            <li key={i} className="text-xs text-white/60 flex gap-1.5"><span className="text-white/30">•</span><span>{f}</span></li>
+          ))}
+        </ul>
+      )}
+
+      {brief.risk_flags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {brief.risk_flags.map((flag, i) => (
+            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171' }}>⚠ {flag}</span>
+          ))}
+        </div>
+      )}
+
+      <div className="pt-1 border-t border-white/8 flex items-center justify-between">
+        <span className="text-sm font-semibold" style={{ color: meta.color }}>{meta.label}</span>
+        <span className="text-[11px] text-white/40">{brief.confidence} confidence</span>
+      </div>
+      <p className="text-xs text-white/55 leading-relaxed">{brief.reasoning}</p>
     </div>
   )
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { createSession, setCookieOptions, type SessionRole } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { normalizePhone } from '@/lib/phone'
+import { normalizePhone, safeNormalizePhone } from '@/lib/phone'
 import { registerInput } from '@/lib/validators'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { compareSecret, findAuthUserByPhone, generateRecoveryCode, hashSecret, normalizeSecurityAnswer, validatePin } from '@/lib/pin-auth'
@@ -111,8 +111,10 @@ export async function POST(req: NextRequest) {
 
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
     const userAgent = req.headers.get('user-agent') ?? undefined
-    // If the registering phone matches SUPER_ADMIN_PHONE, grant super_admin role
-    const role: SessionRole = normalizedPhone === process.env.SUPER_ADMIN_PHONE ? 'super_admin' : 'customer'
+    // If the registering phone matches SUPER_ADMIN_PHONE, grant super_admin role.
+    // (In practice the privileged-phone guard above already 403s this number, so
+    // this is belt-and-braces; normalize the env value to stay format-agnostic.)
+    const role: SessionRole = normalizedPhone === safeNormalizePhone(process.env.SUPER_ADMIN_PHONE) ? 'super_admin' : 'customer'
     const { token } = await createSession(user.id, normalizedPhone, role, ipAddress, userAgent)
 
     const res = NextResponse.json({ success: true, recovery_code: recoveryCode })

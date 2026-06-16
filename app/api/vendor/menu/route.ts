@@ -24,7 +24,7 @@ export async function GET() {
   const db = createSupabaseAdmin()
   const { data: items } = await db
     .from('menu_items')
-    .select('id, name, description, price_kobo, image_url, category, is_available, display_order')
+    .select('id, name, description, price_kobo, image_url, category, is_available, prep_time_minutes, display_order')
     .eq('vendor_id', session.userId!)
     .is('deleted_at', null)
     .order('display_order', { ascending: true })
@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
       description:  parsed.description ?? null,
       image_url:    parsed.image_url ?? null,
       is_available: parsed.is_available ?? true,
+      prep_time_minutes: parsed.prep_time_minutes ?? null,
     })
     .select('id')
     .single()

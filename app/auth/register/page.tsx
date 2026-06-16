@@ -7,6 +7,7 @@ import SecurityQuestionSelect from '@/components/auth/SecurityQuestionSelect'
 import { SECURITY_QUESTIONS } from '@/lib/pin-auth'
 import { BackButton } from '@/components/back-button'
 import { useFeatures } from '@/lib/use-features'
+import GoogleButton from '@/components/auth/GoogleButton'
 
 const initialForm = {
   name: '',
@@ -25,11 +26,14 @@ export default function RegisterPage() {
   // skip the verify step entirely. Defaults to required until flags load.
   const features = useFeatures()
   const verificationRequired = features.phone_verification !== false
+  const googleEnabled = features.google_login === true
   const [form, setForm] = useState(initialForm)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [recoveryCode, setRecoveryCode] = useState('')
   const [savedCode, setSavedCode] = useState(false)
+  // Deep-link destination (e.g. a vendor's store link) — land here after signup.
+  const [nextPath, setNextPath] = useState('/')
 
   // Phone-ownership verification (sign-up only).
   const [code, setCode] = useState('')
@@ -43,8 +47,11 @@ export default function RegisterPage() {
   // prompt (/auth/register?phone=+234...). Client-only — avoids needing a
   // useSearchParams Suspense boundary.
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search).get('phone')
+    const q = new URLSearchParams(window.location.search)
+    const p = q.get('phone')
     if (p && p.startsWith('+')) setForm((current) => ({ ...current, phone: p }))
+    const n = q.get('next')
+    if (n && n.startsWith('/') && !n.startsWith('//')) setNextPath(n)
   }, [])
 
   const question2Options = useMemo(
@@ -173,10 +180,16 @@ export default function RegisterPage() {
             <button
               type="button"
               disabled={!savedCode}
-              onClick={() => router.push('/')}
+              onClick={() => {
+                let dest = nextPath
+                if (dest === '/') {
+                  try { const v = sessionStorage.getItem('lx_return_vendor'); if (v && v.startsWith('/vendor/')) { sessionStorage.removeItem('lx_return_vendor'); dest = v } } catch { /* ignore */ }
+                }
+                router.push(dest)
+              }}
               className="rounded-2xl bg-amber-500 py-4 text-sm font-semibold text-black disabled:opacity-50"
             >
-              Continue to homepage
+              {nextPath === '/' ? 'Continue' : 'Continue'}
             </button>
           </div>
         </div>
@@ -194,6 +207,20 @@ export default function RegisterPage() {
             Secure your account with a PIN, security questions and a recovery code.
           </p>
         </div>
+
+        {googleEnabled && (
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-4">
+            <GoogleButton next={nextPath} label="Sign up with Google" />
+            <p className="text-center text-xs text-white/40">
+              Fastest way in — you’ll just add and verify your phone number after.
+            </p>
+            <div className="flex items-center gap-3 text-white/30 text-xs">
+              <span className="h-px flex-1 bg-white/10" />
+              or sign up with your phone
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
+          </div>
+        )}
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-5">
           <label className="block text-sm text-white/70">

@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { formatPrice, humanizeTx, txSign, txIcon } from '@/lib/wallet'
 import type { WalletTransaction, WalletBalance } from '@/lib/wallet'
+import { receiptCode } from '@/lib/receipt'
 
 export async function GET(req: NextRequest) {
   const session = await getCurrentUser()
@@ -62,7 +63,10 @@ export async function GET(req: NextRequest) {
     release_at:  tx.release_at,
     order_id:    tx.order_id,
     reference:   tx.reference,
+    balance_after: formatPrice(tx.balance_after),
     created_at:  tx.created_at,
+    // Tamper-evident verification stamp for this receipt.
+    receipt_code: receiptCode({ id: tx.id, reference: tx.reference, amount: tx.amount, type: tx.type, created_at: tx.created_at }),
   }))
 
   return NextResponse.json({

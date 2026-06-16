@@ -10,9 +10,36 @@ function ServiceWorkerRegister() {
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') return
     if (!('serviceWorker' in navigator)) return
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      /* registration is best-effort; the app works without it */
-    })
+    const sw = navigator.serviceWorker
+
+    // Auto-update: when a NEW service worker takes control (a deploy shipped a
+    // changed sw.js), reload once to the fresh app — no manual cache-clearing.
+    // The SW calls skipWaiting()+clients.claim(), so a new one activates and
+    // fires controllerchange. We skip the very first install (no prior
+    // controller) so a fresh visit doesn't reload needlessly.
+    const hadController = !!sw.controller
+    let reloaded = false
+    const onControllerChange = () => {
+      if (reloaded || !hadController) return
+      reloaded = true
+      window.location.reload()
+    }
+    sw.addEventListener('controllerchange', onControllerChange)
+
+    let reg: ServiceWorkerRegistration | null = null
+    sw.register('/sw.js')
+      .then((r) => { reg = r; return r.update() })
+      .catch(() => { /* best-effort; the app works without the SW */ })
+
+    // Re-check for a newer SW every time the app is brought to the foreground
+    // (how a home-screen PWA is typically relaunched), so updates land promptly.
+    const onVisible = () => { if (document.visibilityState === 'visible') reg?.update().catch(() => {}) }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      sw.removeEventListener('controllerchange', onControllerChange)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
   return null
 }
@@ -262,10 +289,27 @@ function OfflineBanner() {
   )
 }
 
+// Platform-tiered glass: tag the document `lx-rich` ONLY on non-iOS, fine-pointer
+// devices (laptops/desktops) so they get the heavy backdrop-filter blur. Phones
+// (iOS + Android, touch) keep the safe baseline radii — iOS never gets `lx-rich`,
+// so the heavy blur can never crash Safari's renderer ("page couldn't load").
+function PlatformClass() {
+  useEffect(() => {
+    const ua = navigator.userAgent
+    const isIOS =
+      /iphone|ipad|ipod/i.test(ua) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+    if (!isIOS && finePointer) document.documentElement.classList.add('lx-rich')
+  }, [])
+  return null
+}
+
 export function PWA() {
   return (
     <>
       <ServiceWorkerRegister />
+      <PlatformClass />
       <InstallPrompt />
       <OfflineBanner />
     </>

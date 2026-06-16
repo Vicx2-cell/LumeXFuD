@@ -72,8 +72,11 @@ export async function POST(req: NextRequest) {
 
   const hash = await hashWalletPin(pin)
 
-  // Upsert wallet_balances row with new PIN hash
-  await db
+  // Upsert wallet_balances row with new PIN hash. Surface DB errors —
+  // previously this was fire-and-forget, so a failed write (e.g. the missing
+  // (user_id,user_type) unique constraint, migration 032) returned success
+  // while the PIN never saved, leaving users re-prompted forever.
+  const { error: upsertErr } = await db
     .from('wallet_balances')
     .upsert(
       {
@@ -86,6 +89,11 @@ export async function POST(req: NextRequest) {
       },
       { onConflict: 'user_id,user_type' }
     )
+
+  if (upsertErr) {
+    console.error('[wallet/set-pin] upsert failed:', upsertErr.message)
+    return NextResponse.json({ error: 'Could not save PIN. Please try again.' }, { status: 500 })
+  }
 
   await audit({
     actor_id:     session.phone,

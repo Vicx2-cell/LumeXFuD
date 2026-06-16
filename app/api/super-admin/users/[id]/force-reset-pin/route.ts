@@ -3,6 +3,7 @@ import { randomInt } from 'crypto'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { hashSecret, logPinResetAudit, validatePin } from '@/lib/pin-auth'
+import { safeNormalizePhone } from '@/lib/phone'
 import { audit, superAudit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
@@ -44,8 +45,10 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Verify caller is actually the super admin by phone match
-    const superAdminPhone = process.env.SUPER_ADMIN_PHONE
+    // Verify caller is actually the super admin by phone match (normalize the
+    // env value — session.phone is canonical E.164, so a non-E.164 config would
+    // otherwise wrongly 403 the legitimate super admin).
+    const superAdminPhone = safeNormalizePhone(process.env.SUPER_ADMIN_PHONE)
     if (!superAdminPhone || session.phone !== superAdminPhone) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
