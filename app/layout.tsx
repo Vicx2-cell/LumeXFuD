@@ -2,8 +2,16 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { validateEnv } from '@/lib/env'
 import { Providers } from '@/components/providers'
+import { FeaturesProvider } from '@/lib/use-features'
+import { getAllFeatures } from '@/lib/features'
 
 if (process.env.NODE_ENV !== 'test') validateEnv()
+
+// Feature flags are resolved per request in the layout below, so pages must not
+// be statically prerendered with build-time flag values. This makes the app
+// render on demand — disabled features never reach the browser, and a toggle
+// takes effect on the next navigation/reload.
+export const dynamic = 'force-dynamic'
 
 const SITE_URL = 'https://lumexfud.com.ng'
 const SITE_DESC =
@@ -69,11 +77,18 @@ export const viewport: Viewport = {
   interactiveWidget: 'resizes-content',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Resolve feature flags on the server so disabled features are never rendered
+  // into the HTML (no client-side "appear then disappear" flash). getAllFeatures
+  // is ~20s cached and fails safe to catalog defaults, so this is one cheap read
+  // per request. Reading it here makes pages render per-request (dynamic).
+  const features = await getAllFeatures()
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <FeaturesProvider initial={features}>
+          <Providers>{children}</Providers>
+        </FeaturesProvider>
       </body>
     </html>
   )
