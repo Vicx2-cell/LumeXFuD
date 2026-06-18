@@ -10,7 +10,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SRC = process.argv[2] || path.join(process.env.USERPROFILE || process.env.HOME, 'Downloads', 'preview.webp')
 
 const out = (p) => path.join(root, 'public', p)
-const png = (size) => sharp(SRC).resize(size, size, { fit: 'cover' }).png().toBuffer()
+// ensureAlpha → RGBA output. Turbopack's .ico decoder rejects RGB-only PNGs
+// ("The PNG is not in RGBA format!"), and the amber fill stays fully opaque,
+// so iOS won't blacken the apple-touch icon.
+const png = (size) => sharp(SRC).resize(size, size, { fit: 'cover' }).ensureAlpha().png().toBuffer()
 
 // Pack several PNG frames into a single multi-size .ico so browsers render a
 // purpose-built 16/32/48 tab icon instead of squashing the 192px PWA icon
