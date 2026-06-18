@@ -62,7 +62,10 @@ export const metadata: Metadata = {
       { url: '/icons/icon-192.png?v=2', sizes: '192x192', type: 'image/png' },
       { url: '/icons/icon-512.png?v=2', sizes: '512x512', type: 'image/png' },
     ],
-    apple: '/icons/apple-touch-icon.png?v=2',
+    // Clean URL, no query string: iOS Safari often fails to load an
+    // apple-touch-icon with a query and then shows a black page-screenshot
+    // instead. Served from the root, where iOS also looks by convention.
+    apple: '/apple-touch-icon.png',
   },
 }
 

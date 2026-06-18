@@ -11,9 +11,13 @@ const SRC = process.argv[2] || path.join(process.env.USERPROFILE || process.env.
 
 const out = (p) => path.join(root, 'public', p)
 // ensureAlpha → RGBA output. Turbopack's .ico decoder rejects RGB-only PNGs
-// ("The PNG is not in RGBA format!"), and the amber fill stays fully opaque,
-// so iOS won't blacken the apple-touch icon.
+// ("The PNG is not in RGBA format!").
 const png = (size) => sharp(SRC).resize(size, size, { fit: 'cover' }).ensureAlpha().png().toBuffer()
+// Apple touch icon: NO alpha channel at all. iOS composites any alpha onto
+// black and, when the icon fails to load, falls back to a black screenshot of
+// the page — so flatten onto a solid background to keep the home-screen icon
+// reliably amber.
+const flatPng = (size) => sharp(SRC).resize(size, size, { fit: 'cover' }).flatten({ background: '#F5A623' }).png().toBuffer()
 
 // Pack several PNG frames into a single multi-size .ico so browsers render a
 // purpose-built 16/32/48 tab icon instead of squashing the 192px PWA icon
@@ -45,8 +49,12 @@ async function run() {
   // (well within Android's inner-80% safe zone), so a straight edge-to-edge
   // resize is correct — no extra padding (which would only add a seam).
   await writeFile(out('icons/icon-512-maskable.png'), await png(512))
-  // apple-touch-icon: solid amber fill, no transparency (iOS blackens alpha).
-  await writeFile(out('icons/apple-touch-icon.png'), await png(180))
+  // apple-touch-icon: flattened (no alpha). Written to the site root too —
+  // iOS checks /apple-touch-icon.png by convention, and a fresh root path also
+  // sidesteps any icon iOS cached under the old /icons/ URL.
+  const apple = await flatPng(180)
+  await writeFile(out('icons/apple-touch-icon.png'), apple)
+  await writeFile(out('apple-touch-icon.png'), apple)
 
   // Browser-tab favicon: multi-size .ico served at /favicon.ico by Next.
   const ico = buildIco([
