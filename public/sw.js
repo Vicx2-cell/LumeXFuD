@@ -1,7 +1,7 @@
 // Bump on every release that must reach already-installed PWAs: a changed sw.js
 // triggers install→activate (purging old caches) and a controllerchange reload
 // in components/pwa.tsx, so clients pick up the new app instead of stale assets.
-const CACHE_NAME = 'lumexfud-v8';
+const CACHE_NAME = 'lumexfud-v9';
 
 // Pre-cache only assets that are SAME for everyone and never redirect.
 // IMPORTANT: do NOT precache "/" — for a logged-in user the auth proxy
@@ -50,7 +50,7 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/api/') ||
     url.hostname.includes('supabase') ||
     url.hostname.includes('paystack') ||
-    url.hostname.includes('termii')
+    url.hostname.includes('sendchamp')
   ) {
     return;
   }
