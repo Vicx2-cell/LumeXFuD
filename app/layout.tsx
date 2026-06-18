@@ -39,13 +39,13 @@ export const metadata: Metadata = {
     url: SITE_URL,
     title: 'LumeX Fud — Campus life, simplified.',
     description: SITE_DESC,
-    images: [{ url: '/icons/icon-512.png', width: 512, height: 512, alt: 'LumeX Fud' }],
+    images: [{ url: '/icons/icon-512-v2.png', width: 512, height: 512, alt: 'LumeX Fud' }],
   },
   twitter: {
     card: 'summary',
     title: 'LumeX Fud — Campus life, simplified.',
     description: SITE_DESC,
-    images: ['/icons/icon-512.png'],
+    images: ['/icons/icon-512-v2.png'],
   },
   robots: {
     index: true,
@@ -59,8 +59,8 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/icons/icon-192.png?v=2', sizes: '192x192', type: 'image/png' },
-      { url: '/icons/icon-512.png?v=2', sizes: '512x512', type: 'image/png' },
+      { url: '/icons/icon-192-v2.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512-v2.png', sizes: '512x512', type: 'image/png' },
     ],
     // Clean URL, no query string: iOS Safari often fails to load an
     // apple-touch-icon with a query and then shows a black page-screenshot

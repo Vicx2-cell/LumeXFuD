@@ -19,7 +19,7 @@ const jsonLd = {
       '@id': 'https://lumexfud.com.ng/#org',
       name: 'LumeX Fud',
       url: 'https://lumexfud.com.ng',
-      logo: 'https://lumexfud.com.ng/icons/icon-512.png',
+      logo: 'https://lumexfud.com.ng/icons/icon-512-v2.png',
       description: 'Campus food delivery for Abia State University (ABSU), Uturu, Nigeria.',
       areaServed: 'Abia State University (ABSU), Uturu, Nigeria',
     },

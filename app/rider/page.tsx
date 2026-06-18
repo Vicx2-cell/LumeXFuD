@@ -122,7 +122,7 @@ export default function RiderDashboard() {
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
             new Notification('New order available!', {
               body: `${incoming[0].vendors?.shop_name ?? 'Order'} — ${formatPrice(incoming[0].rider_delivery_cut)}`,
-              icon: '/icon-192.png',
+              icon: '/icons/icon-192-v2.png',
             })
           }
         }

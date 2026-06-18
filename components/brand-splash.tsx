@@ -34,7 +34,7 @@ export function BrandSplash() {
       <div className="lx-splash__inner">
         {/* Decorative, instant-paint: a plain img avoids the optimizer round-trip. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icons/icon-512.png" alt="" width={96} height={96} className="lx-splash__mark" />
+        <img src="/icons/icon-512-v2.png" alt="" width={96} height={96} className="lx-splash__mark" />
         <div className="lx-splash__word">
           LumeX<span className="lx-splash__word-amber"> Fud</span>
         </div>

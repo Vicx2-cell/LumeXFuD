@@ -74,7 +74,7 @@ export default function VendorDashboard() {
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       new Notification('New Order — LumeX Fud', {
         body: 'A new order is waiting for you',
-        icon: '/icon-192.png',
+        icon: '/icons/icon-192-v2.png',
       })
     }
   }, [])

@@ -20,7 +20,7 @@ export function BrandLogo({
 }) {
   return (
     <Image
-      src="/icons/icon-512.png"
+      src="/icons/icon-512-v2.png"
       alt="LumeX Fud"
       width={size}
       height={size}
