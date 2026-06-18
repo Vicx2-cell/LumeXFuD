@@ -46,12 +46,15 @@ async function run() {
   // the brand changes, BUMP the suffix and update the references (manifest,
   // layout metadata, components) — a brand-new URL is the only bulletproof way
   // to stop Android's WebAPK minter / any HTTP cache from serving a stale icon.
-  await writeFile(out('icons/icon-192-v2.png'), await png(192))
-  await writeFile(out('icons/icon-512-v2.png'), await png(512))
+  // FLATTENED (no alpha): a transparent pixel in a maskable/adaptive icon lets
+  // the launcher's background layer (manifest background_color) show through as
+  // black. Flattening guarantees a solid amber field behind the X.
+  await writeFile(out('icons/icon-192-v2.png'), await flatPng(192))
+  await writeFile(out('icons/icon-512-v2.png'), await flatPng(512))
   // Maskable: the logo already keeps the X inside a generous amber margin
   // (well within Android's inner-80% safe zone), so a straight edge-to-edge
   // resize is correct — no extra padding (which would only add a seam).
-  await writeFile(out('icons/icon-maskable-512-v2.png'), await png(512))
+  await writeFile(out('icons/icon-maskable-512-v2.png'), await flatPng(512))
   // apple-touch-icon: flattened (no alpha). Written to the site root too —
   // iOS checks /apple-touch-icon.png by convention, and a fresh root path also
   // sidesteps any icon iOS cached under the old /icons/ URL.
