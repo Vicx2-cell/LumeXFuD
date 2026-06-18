@@ -4,6 +4,7 @@
   "description": "Campus food delivery for ABSU",
   "start_url": "/",
   "scope": "/",
+  "id": "/?app=lumex-amber",
   "display": "standalone",
   "background_color": "#F5A623",
   "theme_color": "#0A0A0B",
