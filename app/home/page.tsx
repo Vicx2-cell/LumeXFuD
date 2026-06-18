@@ -2,6 +2,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { formatPrice } from '@/lib/money'
 import { BottomNav } from '@/components/nav-bottom'
 import { BackButton } from '@/components/back-button'
+import { BrandLogo } from '@/components/brand-logo'
 import { Lumi } from '@/components/chow-ai'
 import { StreakNudge } from '@/components/streak-nudge'
 import { LaunchCounter } from '@/components/launch-counter'
@@ -68,6 +69,7 @@ export default async function CustomerHomePage() {
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BackButton />
+            <BrandLogo size={34} rounded={10} />
             <div>
               <span className="text-xs text-white/40">LumeX Fud</span>
               <h1 className="text-base font-semibold leading-tight lx-foodie-text">What are you eating today?</h1>

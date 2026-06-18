@@ -1,7 +1,8 @@
 // One-off: regenerate all app icons / favicons from the brand logo.
 // Source is the amber X mark (crossed cutlery + sparkle).
-// Run: node scripts/gen-icons.mjs
+// Run: node scripts/gen-icons.mjs [path-to-source-image]
 import sharp from 'sharp'
+import { writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -9,24 +10,48 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SRC = process.argv[2] || path.join(process.env.USERPROFILE || process.env.HOME, 'Downloads', 'preview.webp')
 
 const out = (p) => path.join(root, 'public', p)
+const png = (size) => sharp(SRC).resize(size, size, { fit: 'cover' }).png().toBuffer()
 
-async function square(size) {
-  return sharp(SRC).resize(size, size, { fit: 'cover' }).png()
+// Pack several PNG frames into a single multi-size .ico so browsers render a
+// purpose-built 16/32/48 tab icon instead of squashing the 192px PWA icon
+// (which looks like a colourless blob at favicon size).
+function buildIco(frames) {
+  const header = Buffer.alloc(6)
+  header.writeUInt16LE(1, 2)            // type: icon
+  header.writeUInt16LE(frames.length, 4)
+  const dir = Buffer.alloc(frames.length * 16)
+  let offset = 6 + dir.length
+  frames.forEach((f, i) => {
+    const o = i * 16
+    dir.writeUInt8(f.size >= 256 ? 0 : f.size, o)     // width  (0 == 256)
+    dir.writeUInt8(f.size >= 256 ? 0 : f.size, o + 1) // height
+    dir.writeUInt16LE(1, o + 4)         // colour planes
+    dir.writeUInt16LE(32, o + 6)        // bits per pixel
+    dir.writeUInt32LE(f.buf.length, o + 8)
+    dir.writeUInt32LE(offset, o + 12)
+    offset += f.buf.length
+  })
+  return Buffer.concat([header, dir, ...frames.map((f) => f.buf)])
 }
 
 async function run() {
-  await (await square(192)).toFile(out('icons/icon-192.png'))
-  await (await square(512)).toFile(out('icons/icon-512.png'))
+  // PWA / Android / iOS icons.
+  await writeFile(out('icons/icon-192.png'), await png(192))
+  await writeFile(out('icons/icon-512.png'), await png(512))
   // Maskable: the logo already keeps the X inside a generous amber margin
   // (well within Android's inner-80% safe zone), so a straight edge-to-edge
   // resize is correct — no extra padding (which would only add a seam).
-  await (await square(512)).toFile(out('icons/icon-512-maskable.png'))
-  await (await square(180)).toFile(out('icons/apple-touch-icon.png'))
+  await writeFile(out('icons/icon-512-maskable.png'), await png(512))
+  // apple-touch-icon: solid amber fill, no transparency (iOS blackens alpha).
+  await writeFile(out('icons/apple-touch-icon.png'), await png(180))
 
-  // Browser-tab favicon via Next App Router conventions: app/icon.png is
-  // auto-served as the favicon, app/apple-icon.png as the iOS touch icon.
-  await (await square(512)).toFile(path.join(root, 'app', 'icon.png'))
-  await (await square(180)).toFile(path.join(root, 'app', 'apple-icon.png'))
+  // Browser-tab favicon: multi-size .ico served at /favicon.ico by Next.
+  const ico = buildIco([
+    { size: 16, buf: await png(16) },
+    { size: 32, buf: await png(32) },
+    { size: 48, buf: await png(48) },
+  ])
+  await writeFile(path.join(root, 'app', 'favicon.ico'), ico)
 
   console.log('Icons regenerated from', SRC)
 }

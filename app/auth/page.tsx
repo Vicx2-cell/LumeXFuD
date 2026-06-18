@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { startAuthentication } from '@simplewebauthn/browser'
 import PinInput from '@/components/auth/PinInput'
 import GoogleButton from '@/components/auth/GoogleButton'
+import { BrandLogo } from '@/components/brand-logo'
 import { useFeatures } from '@/lib/use-features'
 
 // Friendly text for the ?error= slugs the Google flow can redirect back with.
@@ -86,8 +87,10 @@ function LoginForm() {
       }
       setSuccess(true)
       // Full navigation (see submitLogin) so the fresh session cookie is sent
-      // and we bypass any cached pre-login redirect.
-      setTimeout(() => window.location.assign(hasNext ? nextPath : (popReturnVendor() ?? data.redirect_path ?? '/')), 650)
+      // and we bypass any cached pre-login redirect. Use the server's
+      // role-correct redirect_path (or a returning vendor share-link), never a
+      // raw `next`, so a privileged role is never dropped on /home.
+      setTimeout(() => window.location.assign(popReturnVendor() ?? data.redirect_path ?? '/'), 650)
     } catch (e) {
       const name = (e as { name?: string })?.name
       setMfaError(name === 'NotAllowedError'
@@ -96,7 +99,7 @@ function LoginForm() {
     } finally {
       setMfaBusy(false)
     }
-  }, [nextPath, hasNext])
+  }, [])
 
   const submitLogin = useCallback(async (pinValue: string) => {
     if (pinValue.length !== 6) return
@@ -107,7 +110,7 @@ function LoginForm() {
       const res  = await fetch('/api/auth/login', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ phone, pin: pinValue }),
+        body:    JSON.stringify({ phone, pin: pinValue, next: hasNext ? nextPath : undefined }),
       })
       // Parse defensively: a non-JSON response (e.g. an HTML error/redirect page)
       // must surface as a real error, not throw into the "Connection error" catch.
@@ -139,7 +142,10 @@ function LoginForm() {
       // load always sends the fresh cookie and skips the router cache.
       setSuccess(true)
       setTimeout(() => {
-        const dest = data.pin_reset_pending ? '/auth/setup' : (hasNext ? nextPath : (popReturnVendor() ?? data.redirect_path ?? '/'))
+        // Trust the server's role-validated redirect_path (it already folds in a
+        // safe `next`). A returning vendor share-link still wins. We never use a
+        // raw `next` here — that's how a privileged role got dropped on /home.
+        const dest = data.pin_reset_pending ? '/auth/setup' : (popReturnVendor() ?? data.redirect_path ?? '/')
         window.location.assign(dest)
       }, 650)
     } catch {
@@ -166,12 +172,12 @@ function LoginForm() {
       <div className="relative z-10 w-full max-w-sm lx-enter">
         {/* Logo + heading */}
         <div className="text-center mb-8">
-          <span
-            className="inline-block px-4 py-1.5 rounded-lg font-bold text-sm"
-            style={{ background: '#F5A623', color: '#000', boxShadow: '0 0 24px rgba(245,166,35,0.4)' }}
-          >
-            LumeX Fud
-          </span>
+          <div className="flex flex-col items-center gap-2.5">
+            <BrandLogo size={68} rounded={20} priority className="lx-pop" style={{ boxShadow: '0 10px 40px rgba(245,166,35,0.45)' }} />
+            <span className="font-bold text-sm tracking-tight text-white/90">
+              LumeX <span style={{ color: '#F5A623' }}>Fud</span>
+            </span>
+          </div>
           <h1 className="text-[28px] leading-tight font-bold mt-5 tracking-tight">
             Campus life, simplified.
           </h1>
