@@ -1,15 +1,16 @@
 // Bump on every release that must reach already-installed PWAs: a changed sw.js
 // triggers install→activate (purging old caches) and a controllerchange reload
 // in components/pwa.tsx, so clients pick up the new app instead of stale assets.
-const CACHE_NAME = 'lumexfud-v9';
+const CACHE_NAME = 'lumexfud-v10';
 
 // Pre-cache only assets that are SAME for everyone and never redirect.
 // IMPORTANT: do NOT precache "/" — for a logged-in user the auth proxy
 // 307-redirects "/", and Cache.addAll() rejects on a redirected response, which
 // made the whole SW install fail (so a fixed SW could never take over).
+// NOTE: manifest.json is intentionally NOT precached — it's served network-first
+// below so a new logo/icon set reaches the device on the next online load.
 const PRECACHE = [
   '/offline',
-  '/manifest.json',
 ];
 
 self.addEventListener('install', (event) => {
@@ -55,14 +56,35 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static, content-hashed assets: cache-first (safe — these never redirect).
+  // Brand / app-shell assets (icons, manifest, loose images): NETWORK-FIRST.
+  // Cache-first here is what kept serving the OLD black launcher icon after a
+  // rebrand — the SW shadowed the freshly deployed PNGs. Now we always try the
+  // network (so a new logo reaches the device immediately) and only fall back
+  // to cache when offline.
   if (
-    url.pathname.startsWith('/_next/static/') ||
+    url.pathname === '/manifest.json' ||
     url.pathname.startsWith('/icons/') ||
     url.pathname.endsWith('.svg') ||
     url.pathname.endsWith('.png') ||
     url.pathname.endsWith('.ico')
   ) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok && !response.redirected) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Content-hashed build assets: cache-first (immutable, filename changes on
+  // every build — safe to serve from cache and never goes stale).
+  if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
