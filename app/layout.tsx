@@ -62,10 +62,11 @@ export const metadata: Metadata = {
       { url: '/icons/icon-192-v2.png', sizes: '192x192', type: 'image/png' },
       { url: '/icons/icon-512-v2.png', sizes: '512x512', type: 'image/png' },
     ],
-    // Clean URL, no query string: iOS Safari often fails to load an
-    // apple-touch-icon with a query and then shows a black page-screenshot
-    // instead. Served from the root, where iOS also looks by convention.
-    apple: '/apple-touch-icon.png',
+    // Versioned URL (no query string — iOS Safari mishandles query strings on
+    // touch icons). iOS caches the touch icon hard by URL and won't refetch the
+    // same path on a re-add, so a fresh filename is the only reliable way to
+    // push a new icon to an iPhone home screen.
+    apple: [{ url: '/icons/apple-touch-icon-v2.png', sizes: '180x180', type: 'image/png' }],
   },
 }
 

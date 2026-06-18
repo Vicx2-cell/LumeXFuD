@@ -55,10 +55,13 @@ async function run() {
   // (well within Android's inner-80% safe zone), so a straight edge-to-edge
   // resize is correct — no extra padding (which would only add a seam).
   await writeFile(out('icons/icon-maskable-512-v2.png'), await flatPng(512))
-  // apple-touch-icon: flattened (no alpha). Written to the site root too —
-  // iOS checks /apple-touch-icon.png by convention, and a fresh root path also
-  // sidesteps any icon iOS cached under the old /icons/ URL.
+  // apple-touch-icon: flattened (no alpha — iOS fills any transparency with
+  // black). iOS caches this resource HARD, keyed by URL, and a re-add will not
+  // refetch the same URL — so the home-screen link points at a VERSIONED file
+  // (-v2) that iOS has never cached. When rebranding, bump the suffix here AND
+  // in app/layout.tsx. Root + /icons/ copies cover iOS's by-convention probing.
   const apple = await flatPng(180)
+  await writeFile(out('icons/apple-touch-icon-v2.png'), apple)
   await writeFile(out('icons/apple-touch-icon.png'), apple)
   await writeFile(out('apple-touch-icon.png'), apple)
 
