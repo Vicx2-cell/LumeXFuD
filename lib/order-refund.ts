@@ -51,6 +51,41 @@ export async function refundOrderPayments(params: {
   const walletPortion = Math.max(0, Math.min(Number(order.wallet_amount_kobo) || 0, total))
   const paystackPortion = total - walletPortion
 
+  // ── GROUP SPLIT order: each participant paid their OWN share from their wallet
+  // (group_order_collect), so refund EACH of them their share — not the single
+  // host's wallet_amount_kobo. Without this, only the host got money back.
+  const { data: splitRows } = await db
+    .from('customer_wallet_transactions')
+    .select('customer_id, amount_kobo')
+    .eq('order_id', order.id)
+    .eq('type', 'GROUP_SPLIT')
+    .like('reference', 'CWSPLIT-%')
+  if (splitRows && splitRows.length > 0) {
+    // Per-member idempotency: skip anyone already refunded for this order.
+    const { data: doneRows } = await db
+      .from('customer_wallet_transactions').select('reference').eq('order_id', order.id).eq('type', 'REFUND')
+    const done = new Set((doneRows ?? []).map((r) => (r as { reference: string }).reference))
+    const rows = splitRows as Array<{ customer_id: string; amount_kobo: number }>
+    const ids = Array.from(new Set(rows.map((s) => s.customer_id)))
+    const { data: phoneRows } = await db.from('customers').select('id, phone').in('id', ids)
+    const phoneMap = new Map((phoneRows ?? []).map((p) => [(p as { id: string }).id, (p as { phone: string }).phone]))
+    let allOk = true
+    for (const s of rows) {
+      const reference = `CWREFUND-${order.id}-${s.customer_id.slice(0, 8)}`
+      if (done.has(reference)) continue
+      const ok = await refundToCustomerWallet({
+        customerId: s.customer_id,
+        amountKobo: Number(s.amount_kobo),
+        orderId: order.id,
+        reference,
+        reason,
+        customerPhone: phoneMap.get(s.customer_id),
+      })
+      if (!ok) allOk = false
+    }
+    return { walletPortion: total, paystackPortion: 0, walletOk: allOk, paystackOk: true }
+  }
+
   let walletOk = true
   let paystackOk = true
 
