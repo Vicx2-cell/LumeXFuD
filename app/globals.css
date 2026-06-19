@@ -48,16 +48,16 @@ h1, h2, h3, h4, .lx-display {
 .lx-page {
   position: relative;
   min-height: 100dvh;
-  /* Layered: film-grain · gradient-mesh glow · dot-grid · base.
-     All are background layers, so they always sit behind content (no stacking
-     surprises, contrast stays intact). Grain is blended via background-blend-mode. */
+  /* Clean deep black with a warm amber bloom up top + a cool indigo wash at the
+     bottom, over a barely-there dot grid. NO film-grain on this base tier — on
+     phones (which get no blend-mode) the grain rendered as a flat grey "ash"
+     wash. The grain returns only on the desktop .lx-rich tier, where blend-mode
+     integrates it instead of muddying the black. */
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E"),
-    radial-gradient(ellipse 70% 55% at 18% 12%, rgba(245,166,35,0.13) 0%, transparent 58%),
-    radial-gradient(ellipse 65% 55% at 85% 88%, rgba(99,102,241,0.09) 0%, transparent 60%),
-    radial-gradient(ellipse 90% 60% at 50% 50%, rgba(245,166,35,0.03) 0%, transparent 70%),
-    radial-gradient(rgba(255,255,255,0.022) 1px, transparent 1px);
-  background-size: 160px 160px, auto, auto, auto, 22px 22px;
+    radial-gradient(ellipse 95% 55% at 10% -8%, rgba(245,166,35,0.22) 0%, transparent 52%),
+    radial-gradient(ellipse 85% 60% at 95% 108%, rgba(99,102,241,0.13) 0%, transparent 60%),
+    radial-gradient(rgba(255,255,255,0.018) 1px, transparent 1px);
+  background-size: auto, auto, 24px 24px;
   background-color: var(--color-bg);
   /* background-blend-mode (overlay) is GPU-expensive and crashes iOS Safari when
      combined with the orbs/glass — moved to the desktop-only .lx-rich tier. */

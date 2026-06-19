@@ -197,6 +197,9 @@ export default function VendorDashboard() {
   }
 
   const active = orders.filter((o) => ACTIVE.includes(o.status))
+  const pendingCount = orders.filter((o) => o.status === 'PENDING').length
+  const prepCount = orders.filter((o) => o.status === 'VENDOR_ACCEPTED' || o.status === 'PREPARING').length
+  const readyCount = orders.filter((o) => o.status === 'READY').length
 
   return (
     <div className="lx-page pb-10 overflow-hidden">
@@ -210,42 +213,20 @@ export default function VendorDashboard() {
               <p className="font-semibold text-white leading-tight">{vendor?.shop_name ?? '—'}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <button
-              onClick={() => router.push('/vendor-dashboard/menu')}
-              className="lx-card-amber lx-amber text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
-              Menu
-            </button>
-            <button
-              onClick={() => router.push('/vendor-dashboard/earnings')}
-              className="lx-card-amber lx-amber text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              Earnings
-            </button>
-            <button
-              onClick={() => router.push('/vendor-dashboard/reviews')}
-              className="lx-card-amber lx-amber text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-              Reviews
-            </button>
+          <div className="flex items-center gap-2 shrink-0">
             <Badge
-              className="px-3 py-1.5"
               color={vendor?.status === 'OPEN' ? 'var(--lx-green)' : vendor?.status === 'BUSY' ? 'var(--color-amber)' : 'rgba(255,255,255,0.45)'}
             >
-              {vendor?.status}
+              {vendor?.status === 'OPEN' ? '● Open' : vendor?.status === 'BUSY' ? '● Busy' : '● Closed'}
             </Badge>
             <LogoutButton />
           </div>
         </div>
       </div>
 
-      <div className="max-w-lg lg:max-w-5xl mx-auto px-4 py-4 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:items-start lx-enter">
-        {/* Controls — sidebar on desktop (right column), top stack on mobile */}
-        <div className="space-y-5 lg:col-start-2">
+      <div className="max-w-lg lg:max-w-5xl mx-auto px-4 py-4 flex flex-col gap-5 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:items-start lx-enter">
+        {/* Controls — sidebar on desktop (right), BELOW the orders on mobile */}
+        <div className="space-y-5 order-2 lg:order-none lg:col-start-2">
         {/* Launch counter — self-hides unless the super-admin flag is on */}
         <LaunchCounter />
 
@@ -326,8 +307,39 @@ export default function VendorDashboard() {
         )}
         </div>
 
-        {/* Orders — main column on desktop (left, wide) */}
-        <div className="space-y-5 mt-5 lg:mt-0 lg:col-start-1 lg:row-start-1">
+        {/* Orders — FIRST on mobile, left column on desktop */}
+        <div className="space-y-4 order-1 lg:order-none lg:col-start-1 lg:row-start-1">
+          {/* Quick actions */}
+          <div className="grid grid-cols-3 gap-2.5">
+            {[
+              { label: 'Menu', href: '/vendor-dashboard/menu', icon: <><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></> },
+              { label: 'Earnings', href: '/vendor-dashboard/earnings', icon: <><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></> },
+              { label: 'Reviews', href: '/vendor-dashboard/reviews', icon: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/> },
+            ].map((a) => (
+              <button key={a.label} onClick={() => router.push(a.href)}
+                className="glass-thin lx-tap flex flex-col items-center gap-2 py-3.5 rounded-2xl">
+                <span className="lx-icon-badge w-9 h-9 rounded-xl">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{a.icon}</svg>
+                </span>
+                <span className="text-xs font-semibold text-white/85">{a.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Order pipeline at a glance */}
+          <div className="grid grid-cols-3 gap-2.5">
+            {[
+              { label: 'New', value: pendingCount, color: 'var(--color-amber)' },
+              { label: 'Preparing', value: prepCount, color: 'var(--lx-violet)' },
+              { label: 'Ready', value: readyCount, color: 'var(--lx-green)' },
+            ].map((s) => (
+              <div key={s.label} className="glass-thin rounded-2xl px-3 py-3 text-center">
+                <p className="lx-display text-2xl font-bold tabular-nums leading-none" style={{ color: s.value > 0 ? s.color : 'rgba(255,255,255,0.25)' }}>{s.value}</p>
+                <p className="text-[11px] text-white/45 mt-1.5">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
         {/* Active Orders */}
         <section>
           <div className="flex items-center gap-2 mb-3">
@@ -404,12 +416,13 @@ function OrderCard({
 
   return (
     <div
-      className="glass-thin p-4 space-y-3 lx-enter"
+      className="glass-thin p-4 pl-5 space-y-3 lx-enter relative overflow-hidden"
       style={{
         border: `1px solid ${order.status === 'PENDING' ? 'rgba(245,166,35,0.5)' : 'rgba(255,255,255,0.08)'}`,
         boxShadow: order.status === 'PENDING' ? '0 0 24px rgba(245,166,35,0.12), inset 0 1px 0 rgba(255,255,255,0.06)' : undefined,
       }}
     >
+      <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: STATUS_COLOR[order.status] ?? 'rgba(255,255,255,0.2)' }} />
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="font-semibold text-white">{order.order_number}</p>
