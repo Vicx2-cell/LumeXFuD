@@ -8,6 +8,7 @@ import { getFeature } from '@/lib/features'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { verifySocialPending, SOCIAL_PENDING_COOKIE, shortCookieOptions } from '@/lib/google-oauth'
+import { isPhoneBlocked } from '@/lib/blocklist'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Enter your name').max(80),
@@ -71,8 +72,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'This number cannot be registered here.' }, { status: 403 })
     }
 
+    // Banned numbers can never re-register (super-admin blocklist, migration 063).
+    if (await isPhoneBlocked(normalizedPhone)) {
+      return NextResponse.json({ error: 'This number cannot be registered.', blocked: true }, { status: 403 })
+    }
+
     // Phone ownership: when the phone_verification flag is on (OTP working), the
-    // user must have proven this exact number via /api/auth/register/verify-code,
+    // user must have proven this exact number via /api/auth/otp/verify,
     // which set the signed phone_verified cookie. Same trade-off as /register:
     // off = accounts created with an unverified phone.
     const verificationEnforced = await getFeature('phone_verification')

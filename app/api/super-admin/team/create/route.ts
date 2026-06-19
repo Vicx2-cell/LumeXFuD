@@ -6,6 +6,7 @@ import { generateTempPin, hashSecret } from '@/lib/pin-auth'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { getFeature } from '@/lib/features'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
+import { isPhoneBlocked } from '@/lib/blocklist'
 import { z } from 'zod'
 
 const createTeamInput = z.object({
@@ -29,6 +30,12 @@ export async function POST(req: NextRequest) {
 
     let normalized: string
     try { normalized = normalizePhone(phone) } catch { return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 }) }
+
+    // A banned number can never be re-added — enforced directly here so it holds
+    // even when phone_verification is OFF and the OTP gate below is skipped (mig 063).
+    if (await isPhoneBlocked(normalized)) {
+      return NextResponse.json({ error: 'This number is banned and cannot be added.' }, { status: 403 })
+    }
 
     // Phone ownership must be proven by OTP first — the super admin sends a code to
     // the new admin's number and enters it back. The signed `phone_verified` cookie

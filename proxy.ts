@@ -58,7 +58,7 @@ function buildCsp(_nonce: string): string {
     // wss://*.supabase.co is REQUIRED for Supabase Realtime (live vendor status
     // on /home, leaderboard). Without it the socket is CSP-blocked and retries in
     // a loop, which can destabilise iOS Safari ("page couldn't load").
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.paystack.co https://api.ng.termii.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.paystack.co https://api.sendchamp.com",
     "frame-src https://js.paystack.co",
     "font-src 'self'",
     "object-src 'none'",
@@ -124,6 +124,20 @@ export async function proxy(req: NextRequest) {
       const guard = PROTECTED.find((p) => p.pattern.test(pathname))
 
       if (guard) {
+        // PANIC lockdown: every role except super_admin is locked out of all
+        // protected pages. Send them to /auth (login refuses non-super while
+        // locked). Fail-open — a controls read error must never lock anyone out.
+        if (session.role !== 'super_admin') {
+          try {
+            const { isLockedDown } = await import('./lib/controls')
+            if (await isLockedDown()) {
+              const lockedUrl = new URL('/auth', req.url)
+              lockedUrl.searchParams.set('locked', '1')
+              return redirect(lockedUrl)
+            }
+          } catch { /* controls unreadable — do not lock out */ }
+        }
+
         // Redirect to setup if account PIN setup is incomplete
         const pending = await hasPinResetPending(session.phone, session.role)
         if (pending) return redirect(new URL('/auth/setup', req.url))

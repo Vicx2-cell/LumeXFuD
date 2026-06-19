@@ -5,6 +5,14 @@ import { createSupabaseAdmin } from './supabase/server'
 // emergency/operational levers the super-admin pulls during incidents.
 
 export type PayoutsMode = 'auto' | 'manual' | 'frozen'
+export type AIProvider = 'anthropic' | 'gemini'
+
+// The active AI provider for the WHOLE app. Seeded from the AI_PROVIDER_DEFAULT
+// env var so a fresh install matches its config, then the super-admin's live
+// toggle (settings row) becomes the single source of truth — flip Gemini ↔
+// Anthropic with no redeploy. Gated, as always, by the master `ai` feature flag.
+const ENV_AI_PROVIDER: AIProvider =
+  (process.env.AI_PROVIDER_DEFAULT ?? 'anthropic').trim().toLowerCase() === 'gemini' ? 'gemini' : 'anthropic'
 
 export interface PlatformControls {
   withdrawals_frozen: boolean      // stop ALL withdrawals (withdraw route enforces)
@@ -17,6 +25,8 @@ export interface PlatformControls {
   hours_close: string              // "22:00"
   enforce_hours: boolean           // block orders outside open/close when true
   auto_cancel_minutes: number      // vendor accept window before auto-cancel (0 = off)
+  ai_provider: AIProvider          // which LLM provider every AI feature uses
+  lockdown_enabled: boolean        // PANIC: lock out every role except super_admin
 }
 
 // The NORMAL operating state. Used to seed the result and to fill in any control
@@ -33,6 +43,8 @@ export const CONTROL_DEFAULTS: PlatformControls = {
   hours_close: '22:00',
   enforce_hours: false,
   auto_cancel_minutes: 5,
+  ai_provider: ENV_AI_PROVIDER,
+  lockdown_enabled: false,
 }
 
 // FAIL-SAFE state. Returned ONLY when the store is unreachable (read threw) so
@@ -58,6 +70,8 @@ const IDS = {
   support: 'support_phone',
   hours: 'platform_hours',
   autocancel: 'auto_cancel_minutes',
+  aiProvider: 'ai_provider',
+  lockdown: 'lockdown_enabled',
 } as const
 
 type Row = { id: string; value: unknown }
@@ -80,6 +94,9 @@ export async function getControls(force = false): Promise<PlatformControls> {
 
     out.withdrawals_frozen = asBool(map.get(IDS.withdrawals))
     out.notifications_paused = asBool(map.get(IDS.notifications))
+    // PANIC lockdown — only ever true when explicitly set. Note it is NOT part of
+    // SAFE_DEFAULTS, so a store outage can never auto-lock the platform.
+    out.lockdown_enabled = asBool(map.get(IDS.lockdown))
 
     const payouts = map.get(IDS.payouts)
     const payoutsRaw = typeof payouts === 'string'
@@ -114,6 +131,12 @@ export async function getControls(force = false): Promise<PlatformControls> {
       out.enforce_hours = hours.enforce === true
     }
 
+    // Active AI provider. Stored as { provider } or a bare string; an unset row
+    // keeps the env-seeded default so a fresh platform matches its config.
+    const ai = map.get(IDS.aiProvider) as { provider?: unknown } | string | undefined
+    const aiRaw = typeof ai === 'string' ? ai : (ai && typeof ai === 'object' ? ai.provider : undefined)
+    if (aiRaw === 'gemini' || aiRaw === 'anthropic') out.ai_provider = aiRaw
+
     _cache = { at: Date.now(), v: out } // cache only successful reads
     return out
   } catch {
@@ -131,6 +154,12 @@ export async function isNotificationsPaused(): Promise<boolean> {
 
 export async function getPayoutsMode(): Promise<PayoutsMode> {
   return (await getControls()).payouts_mode
+}
+
+// PANIC lockdown — true means every role EXCEPT super_admin is locked out
+// (enforced in login, getCurrentUser and the proxy). Reads the cached controls.
+export async function isLockedDown(): Promise<boolean> {
+  return (await getControls()).lockdown_enabled
 }
 
 // Are we within open hours right now (Africa/Lagos)? Only meaningful when

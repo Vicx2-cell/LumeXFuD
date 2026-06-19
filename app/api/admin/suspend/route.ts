@@ -5,6 +5,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone, safeNormalizePhone } from '@/lib/phone'
 import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { isPhoneBlocked } from '@/lib/blocklist'
 
 // Suspend / unsuspend ANY single account (customer, vendor or rider).
 // Suspension is orthogonal to the vendor/rider `is_active` approval flag — it
@@ -56,8 +57,9 @@ export async function GET(req: NextRequest) {
 
   const db = createSupabaseAdmin()
   const found = await lookup(db, phone)
-  if (!found) return NextResponse.json({ found: false })
-  return NextResponse.json({ found: true, role: found.role, name: found.name, suspended: isSuspended(found), reason: found.suspend_reason })
+  const blocked = await isPhoneBlocked(phone)
+  if (!found) return NextResponse.json({ found: false, blocked })
+  return NextResponse.json({ found: true, role: found.role, name: found.name, suspended: isSuspended(found), reason: found.suspend_reason, blocked })
 }
 
 const postInput = z.object({

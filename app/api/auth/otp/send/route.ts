@@ -7,6 +7,7 @@ import { findAuthUserByPhone } from '@/lib/pin-auth'
 import { getFeature } from '@/lib/features'
 import { rateLimitOtpSend } from '@/lib/rate-limit'
 import { getCurrentUser } from '@/lib/session'
+import { isPhoneBlocked } from '@/lib/blocklist'
 
 // Sendchamp's verification/create can take several seconds from Vercel's region;
 // give the function headroom beyond the fetch timeout.
@@ -73,6 +74,12 @@ export async function POST(req: NextRequest) {
   let phone: string
   try { phone = normalizePhone(parsed.data.phone) } catch {
     return NextResponse.json({ error: 'Enter a valid phone number' }, { status: 400 })
+  }
+
+  // Banned numbers get no OTP — covers signup re-registration AND an admin trying
+  // to re-provision a banned number (admin_create). (super-admin blocklist, mig 063)
+  if (await isPhoneBlocked(phone)) {
+    return NextResponse.json({ error: 'This number is not permitted.', blocked: true }, { status: 403 })
   }
 
   // Existence gate, keyed on purpose. admin_create skips it: the new account

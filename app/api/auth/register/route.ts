@@ -8,6 +8,7 @@ import { rateLimitGeneric } from '@/lib/rate-limit'
 import { compareSecret, findAuthUserByPhone, generateRecoveryCode, hashSecret, normalizeSecurityAnswer, validatePin } from '@/lib/pin-auth'
 import { getFeature } from '@/lib/features'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
+import { isPhoneBlocked } from '@/lib/blocklist'
 
 export async function POST(req: NextRequest) {
   try {
@@ -50,6 +51,11 @@ export async function POST(req: NextRequest) {
     }
     if (privilegedPhones.has(normalizedPhone)) {
       return NextResponse.json({ error: 'This number cannot be registered here.' }, { status: 403 })
+    }
+
+    // Banned numbers can never re-register (super-admin blocklist, migration 063).
+    if (await isPhoneBlocked(normalizedPhone)) {
+      return NextResponse.json({ error: 'This number cannot be registered.', blocked: true }, { status: 403 })
     }
 
     // Phone ownership must be proven first: /register/send-code → verify-code

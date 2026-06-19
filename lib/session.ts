@@ -248,6 +248,18 @@ export async function getCurrentUser(): Promise<SessionPayload | null> {
     .single()
 
   if (!data) return null
+
+  // PANIC lockdown: when on, every role except super_admin is treated as
+  // unauthenticated — so every API route and server component that gates on
+  // getCurrentUser() instantly denies them. Dynamic import avoids a static cycle;
+  // fail-open (a controls read error must never lock anyone out by accident).
+  if (payload.role !== 'super_admin') {
+    try {
+      const { isLockedDown } = await import('./controls')
+      if (await isLockedDown()) return null
+    } catch { /* controls unreadable — do not lock out */ }
+  }
+
   return payload
 }
 

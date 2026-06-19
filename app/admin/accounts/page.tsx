@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-interface Found { found: boolean; role?: string; name?: string; suspended?: boolean; reason?: string | null }
+interface Found { found: boolean; role?: string; name?: string; suspended?: boolean; reason?: string | null; blocked?: boolean }
 
 export default function AdminAccounts() {
   const router = useRouter()
@@ -93,6 +93,23 @@ export default function AdminAccounts() {
     } catch { setError('Network error') } finally { setBusy(false) }
   }
 
+  const [banBusy, setBanBusy] = useState(false)
+  async function banAct(action: 'block' | 'unblock') {
+    if (action === 'block' && !window.confirm('Ban this number? They will be logged out, blocked from ordering, and can NEVER register again until you unblock. Reversible.')) return
+    setBanBusy(true); setError('')
+    try {
+      const res = await fetch('/api/admin/block', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone.trim(), action, reason: reason.trim() || undefined }),
+      })
+      const d = await res.json() as { error?: string; blocked?: boolean }
+      if (!res.ok) { setError(d.error ?? 'Action failed'); return }
+      showToast(action === 'block' ? 'Number banned & blocked' : 'Number unblocked')
+      // Ban blocks + suspends; unban unblocks + lifts the suspension (server mirrors this).
+      setResult((r) => r ? { ...r, blocked: action === 'block', suspended: action === 'block' } : r)
+    } catch { setError('Network error') } finally { setBanBusy(false) }
+  }
+
   return (
     <div className="min-h-dvh px-4 py-8" style={{ background: '#0A0A0B' }}>
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg" style={{ background: '#F5A623', color: '#000' }}>{toast}</div>}
@@ -121,8 +138,8 @@ export default function AdminAccounts() {
                   <p className="font-semibold text-white">{result.name}</p>
                   <p className="text-xs text-white/45 uppercase tracking-wide">{result.role}</p>
                 </div>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: result.suspended ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)', color: result.suspended ? '#EF4444' : '#22C55E' }}>
-                  {result.suspended ? 'Suspended' : 'Active'}
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: (result.blocked || result.suspended) ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)', color: (result.blocked || result.suspended) ? '#EF4444' : '#22C55E' }}>
+                  {result.blocked ? 'Banned' : result.suspended ? 'Suspended' : 'Active'}
                 </span>
               </div>
 
@@ -166,6 +183,21 @@ export default function AdminAccounts() {
                 </button>
               )}
               <p className="text-[11px] text-white/30 mt-2 text-center">Suspending blocks login{result.role === 'customer' ? ' and ordering' : ''}.</p>
+
+              {/* Ban & block number (super admin) — permanent restriction */}
+              <div className="mt-5 pt-4 border-t border-white/8">
+                <p className="text-xs uppercase tracking-wide text-white/40 mb-2 font-semibold">Ban &amp; block number</p>
+                {result.blocked ? (
+                  <button onClick={() => banAct('unblock')} disabled={banBusy} className="w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-50" style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
+                    {banBusy ? 'Working…' : 'Unblock this number'}
+                  </button>
+                ) : (
+                  <button onClick={() => banAct('block')} disabled={banBusy} className="w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-50" style={{ background: 'rgba(239,68,68,0.2)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.4)' }}>
+                    {banBusy ? 'Working…' : 'Ban & block this number'}
+                  </button>
+                )}
+                <p className="text-[11px] text-white/30 mt-2 text-center">Super admin only · blocks login + ordering AND stops the number from ever registering again · reversible · audited.</p>
+              </div>
 
               {/* Wallet adjustment (super admin) */}
               <div className="mt-5 pt-4 border-t border-white/8">

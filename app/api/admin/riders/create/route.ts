@@ -6,6 +6,7 @@ import { generateTempPin, hashSecret } from '@/lib/pin-auth'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { getFeature } from '@/lib/features'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
+import { isPhoneBlocked } from '@/lib/blocklist'
 import { z } from 'zod'
 
 const createRiderInput = z.object({
@@ -42,6 +43,12 @@ export async function POST(req: NextRequest) {
     // rider's number and enters it back (the new owner reads it during onboarding).
     // The signed `phone_verified` cookie is bound to THIS number + the admin_create
     // purpose. Governed by the same `phone_verification` flag as customer sign-up.
+    // A banned number can never be re-added — enforced directly here so it holds
+    // even when phone_verification is OFF and the OTP gate below is skipped (mig 063).
+    if (await isPhoneBlocked(normalized)) {
+      return NextResponse.json({ error: 'This number is banned and cannot be added.' }, { status: 403 })
+    }
+
     const verificationEnforced = await getFeature('phone_verification')
     if (verificationEnforced) {
       const ok = await verifyPhoneVerified(req.cookies.get(PHONE_VERIFIED_COOKIE)?.value, normalized, 'admin_create')

@@ -3,10 +3,12 @@ import { createSession, setCookieOptions } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone, safeNormalizePhone } from '@/lib/phone'
 import { loginPinInput } from '@/lib/validators'
-import { compareSecret, findAuthUserByPhone, getRoleRedirect, hashSecret, AUTH_USER_COLUMNS, type AuthUserRow } from '@/lib/pin-auth'
+import { compareSecret, findAuthUserByPhone, hashSecret, AUTH_USER_COLUMNS, type AuthUserRow } from '@/lib/pin-auth'
+import { resolvePostLoginRedirect } from '@/lib/redirect'
 import { rateLimitPinLogin } from '@/lib/rate-limit'
 import { signMfaPending, MFA_COOKIE, shortCookie } from '@/lib/webauthn'
 import { getFeature } from '@/lib/features'
+import { isLockedDown } from '@/lib/controls'
 
 const LOCKOUT_MINUTES = 30
 
@@ -43,6 +45,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { phone, pin } = loginPinInput.parse(body)
+    // Optional deep-link target. Validated against the resolved role below so a
+    // privileged user is never dropped into another role's section.
+    const nextParam = body && typeof body.next === 'string' ? body.next : null
 
     // Canonicalize to E.164 BEFORE the rate-limit key. Keying on the raw input
     // would let an attacker dodge the cap by varying format (+234.../0.../spaces)
@@ -132,6 +137,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // PANIC lockdown: while on, only super_admin may obtain a session. Correct PIN,
+    // but no token is issued for any other role until lockdown is lifted.
+    if (user.role !== 'super_admin' && (await isLockedDown())) {
+      return NextResponse.json(
+        { error: 'The platform is temporarily locked. Please try again later.' },
+        { status: 503 },
+      )
+    }
+
     // ── Second factor (Face ID / Touch ID) ──────────────────────────────────
     // If this account has enrolled a passkey, the correct PIN is only step 1.
     // Issue a short-lived, signed "PIN passed" token instead of a session, and
@@ -166,7 +180,7 @@ export async function POST(req: NextRequest) {
 
     const res = NextResponse.json({
       role: user.role,
-      redirect_path: getRoleRedirect(user.role),
+      redirect_path: resolvePostLoginRedirect(user.role, nextParam),
       pin_reset_pending: user.user.pin_reset_pending ?? false,
     })
     res.cookies.set('session', token, setCookieOptions(user.role))
