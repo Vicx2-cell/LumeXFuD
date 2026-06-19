@@ -71,5 +71,16 @@ key) via `validateEnv()` — unrelated to these changes.
       empty-state icon → utilities), wallet page (flat bg → lx-page + lx-topbar), reviews
       avg → lx-amber. Semantic green status actions + online toggle left. tsc clean.
       (Shared components/wallet/WalletView left for now — used by customer + rider.)
-- [ ] 5. Admin
-- [ ] 6. Super-admin
+- [x] 5. Admin — dashboard, orders, disputes, accounts (done in-session) + vendors, riders,
+      wallets, audit, reviews, kyc, lodges, verify-receipt, new vendor/rider, live-client
+      (fan-out agents): lx-page/glass-thin/lx-field/lx-btn-amber/Badge/Pill/lx-amber/lx-skeleton.
+      admin/live Leaflet+realtime untouched. tsc clean.
+- [x] 6. Super-admin — page, controls, financials, settings, features, pricing, announce,
+      team/new, cron, security, usage, audit, sentinel(+client), launch-counter (fan-out
+      agents): same utilities; encapsulated Toggle/StatCard left intact. tsc clean.
+
+## Verification
+- `tsc --noEmit` → exit 0 across the whole tree after every surface.
+- Semantic red/green/blue (destructive/success/info/toggles), SVG fills, Leaflet colors,
+  dynamic color lookups, and the Lumi (chow-ai) gradient component intentionally preserved.
+- One shared token source (globals.css :root + utilities); no new npm deps; PWA SW untouched.
