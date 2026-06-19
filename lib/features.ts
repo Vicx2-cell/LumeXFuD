@@ -14,10 +14,10 @@ export interface FeatureDef {
 }
 
 export const FEATURES: FeatureDef[] = [
-  { key: 'ai',           label: 'AI features (master)', description: 'MASTER kill switch for everything that spends Anthropic credit — Chow AI, leaderboard captions, dispute concierge, Sentinel, vendor/rider AI, study ingestion, and more. OFF = zero Anthropic API calls anywhere (no credit used). Turn ON only when the account has credit.', default: false, enforced: true },
+  { key: 'ai',           label: 'AI features (master)', description: 'MASTER kill switch for everything that spends AI credit (Gemini OR Anthropic — whichever is active in Controls) — Lumi, leaderboard captions, dispute concierge, Sentinel, vendor/rider AI, menu reader, study ingestion, and more. OFF = zero AI API calls anywhere (no credit used). Turn ON only when the active provider has credit.', default: false, enforced: true },
   { key: 'ordering',     label: 'Ordering',        description: 'Allow customers to place new orders. Off = checkout is paused platform-wide.', default: true,  enforced: true },
   { key: 'signups',      label: 'New sign-ups',    description: 'Allow new customer accounts to be created.',                                       default: true,  enforced: true },
-  { key: 'phone_verification', label: 'Phone verification (OTP)', description: 'Require new customers to verify their phone by OTP before sign-up. Turn OFF only while OTP delivery (Termii) is unavailable — accounts created while off have an unverified phone.', default: true, enforced: true },
+  { key: 'phone_verification', label: 'Phone verification (OTP)', description: 'Require new customers to verify their phone by OTP before sign-up. Turn OFF only while OTP delivery (Sendchamp) is unavailable — accounts created while off have an unverified phone.', default: true, enforced: true },
   { key: 'google_login', label: 'Continue with Google', description: 'Show the "Continue with Google" button on login + sign-up. New Google users still add and verify a phone, so we capture the same info as a phone sign-up. Needs GOOGLE_OAUTH_CLIENT_ID/SECRET set — keep OFF until configured.', default: false, enforced: true },
   { key: 'wallet',       label: 'LumeX Wallet',    description: 'Show wallet top-up and wallet payment at checkout.',                               default: true,  enforced: false },
   { key: 'leaderboard',  label: 'Leaderboard',     description: 'Show the campus leaderboard and its bottom-nav tab.',                              default: true,  enforced: true },
@@ -27,6 +27,8 @@ export const FEATURES: FeatureDef[] = [
   { key: 'reviews',      label: 'Vendor reviews',  description: 'Let customers rate vendors (1–5 stars) and leave a public written review after a completed order. Off = the rating prompt and public reviews are hidden.', default: true, enforced: true },
   { key: 'face_id',      label: 'Face ID login',   description: 'Allow users to enrol Face ID / Touch ID as a second factor, and require it at login for enrolled accounts. Off = Face ID disabled platform-wide (PIN alone logs in).', default: false, enforced: true },
   { key: 'study',        label: 'Study (beta)',    description: 'Show the course-catalog study tool (faculty → programme → level → semester selector, then ask/practice). In development — off hides the /study section entirely.', default: true, enforced: true },
+  { key: 'group_orders', label: 'Group ordering',   description: 'Let customers start a shared "order with friends" basket (host pays, one delivery). Off = the cart button and the group pages are hidden and no new group can be started.', default: true, enforced: true },
+  { key: 'sponsor_topup', label: 'Parent / sponsor top-up', description: 'Public page where a parent/sponsor funds a student’s wallet, plus the "ask family to top up" share button on the wallet. Off = both are hidden and the page is disabled.', default: true, enforced: true },
 ]
 
 const settingId = (key: string) => `feature.${key}`

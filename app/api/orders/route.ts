@@ -5,8 +5,9 @@ import { createOrderInput } from '@/lib/validators'
 import { generateOrderNumber } from '@/lib/order-number'
 import { initializePaystackTransaction } from '@/lib/paystack/init'
 import { spendCustomerWallet } from '@/lib/customer-wallet'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
-import { renderTemplate } from '@/lib/termii/templates'
+import { notifyGroupOrderPlaced } from '@/lib/group-order'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
+import { renderTemplate } from '@/lib/notify-templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { getFeature } from '@/lib/features'
 import { getControls, withinHours } from '@/lib/controls'
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid order data', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { vendor_id, items, delivery_type, delivery_address, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude } = parsed.data
+  const { vendor_id, items, delivery_type, delivery_address, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id } = parsed.data
   const isScheduled = !!scheduled_for
   const hasCoords = typeof delivery_latitude === 'number' && typeof delivery_longitude === 'number'
   const db = createSupabaseAdmin()
@@ -81,11 +82,12 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Scheduling validation (prepaid pre-order) ───────────────────────────────
-  // scheduled_for is the desired DELIVERY time. We hand the order to the vendor at
-  // scheduled_release_at = delivery − prep − buffer, so it's prepared to arrive on
-  // time. Bounds: enough lead, within delivery hours, not too far ahead.
-  const DELIVERY_BUFFER_MIN = 15
-  const SCHEDULE_MARGIN_MIN = 20
+  // scheduled_for is the time the customer picks, and with "send time" semantics
+  // it is exactly when we hand the order to the vendor (scheduled_release_at ==
+  // scheduled_for). The vendor then prepares + delivers from that point. Bounds:
+  // a small minimum lead so it isn't effectively immediate, within opening hours,
+  // and not too far ahead.
+  const SCHEDULE_MIN_LEAD_MIN = 20
   const SCHEDULE_MAX_DAYS = 7
   let scheduledForIso: string | null = null
   let scheduledReleaseIso: string | null = null
@@ -94,18 +96,16 @@ export async function POST(req: NextRequest) {
     if (Number.isNaN(when.getTime())) {
       return NextResponse.json({ error: 'Invalid schedule time' }, { status: 400 })
     }
-    const prep = Number(vendor.prep_time_minutes) || 25
-    const requiredLeadMs = (prep + DELIVERY_BUFFER_MIN + SCHEDULE_MARGIN_MIN) * 60_000
-    if (when.getTime() < Date.now() + requiredLeadMs) {
+    if (when.getTime() < Date.now() + SCHEDULE_MIN_LEAD_MIN * 60_000) {
       return NextResponse.json(
-        { error: `Please schedule at least ${Math.ceil(requiredLeadMs / 60_000)} minutes from now.` },
+        { error: `Please schedule at least ${SCHEDULE_MIN_LEAD_MIN} minutes from now.` },
         { status: 400 },
       )
     }
     if (when.getTime() > Date.now() + SCHEDULE_MAX_DAYS * 86_400_000) {
       return NextResponse.json({ error: `You can schedule up to ${SCHEDULE_MAX_DAYS} days ahead.` }, { status: 400 })
     }
-    // Delivery time must fall within platform opening hours (Africa/Lagos).
+    // Send time must fall within platform opening hours (Africa/Lagos).
     const hm = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', hour12: false,
     }).format(when)
@@ -116,7 +116,8 @@ export async function POST(req: NextRequest) {
       )
     }
     scheduledForIso = when.toISOString()
-    scheduledReleaseIso = new Date(when.getTime() - (prep + DELIVERY_BUFFER_MIN) * 60_000).toISOString()
+    // Send time semantics: release to the vendor exactly at the chosen time.
+    scheduledReleaseIso = when.toISOString()
   }
 
   // Validate all menu items belong to vendor and are available
@@ -278,32 +279,49 @@ export async function POST(req: NextRequest) {
   }
   const paystackAmount = totalAmount - walletApply
 
+  // If this checkout finalizes a group order, link it — but ONLY if the caller is
+  // that group's host and it's still open for this vendor. Validated here so a
+  // client can't attach someone else's group.
+  let linkedGroupId: string | null = null
+  if (group_order_id && customerId) {
+    const { data: gq } = await db.from('group_orders').select('id, host_customer_id, vendor_id, status').eq('id', group_order_id).maybeSingle()
+    const g = gq as { id: string; host_customer_id: string; vendor_id: string; status: string } | null
+    if (g && g.host_customer_id === customerId && g.vendor_id === vendor_id && g.status === 'OPEN') {
+      linkedGroupId = g.id
+    }
+  }
+
+  const orderInsert: Record<string, unknown> = {
+    order_number: orderNumber,
+    customer_id: customerId,
+    vendor_id,
+    status: 'PENDING_PAYMENT',
+    delivery_type,
+    delivery_address,
+    delivery_instructions: delivery_instructions ?? null,
+    subtotal,
+    platform_markup: platformMarkup,
+    delivery_fee: deliveryFee,
+    platform_delivery_cut: platformDeliveryCut,
+    rider_delivery_cut: riderCut,
+    tip_amount: tipKobo,
+    total_amount: totalAmount,
+    payment_method: resolvedMethod,
+    wallet_amount_kobo: walletApply,
+    paystack_reference: orderNumber,
+    idempotency_key: idempotencyKey,
+    payment_status: 'PENDING',
+    rider_payment_status: 'PENDING',
+    scheduled_for: scheduledForIso,
+    scheduled_release_at: scheduledReleaseIso,
+  }
+  // Only include the column when actually linking, so a normal order never
+  // references group_order_id and can't break if migration 065 hasn't run yet.
+  if (linkedGroupId) orderInsert.group_order_id = linkedGroupId
+
   const { data: order, error: orderError } = await db
     .from('orders')
-    .insert({
-      order_number: orderNumber,
-      customer_id: customerId,
-      vendor_id,
-      status: 'PENDING_PAYMENT',
-      delivery_type,
-      delivery_address,
-      delivery_instructions: delivery_instructions ?? null,
-      subtotal,
-      platform_markup: platformMarkup,
-      delivery_fee: deliveryFee,
-      platform_delivery_cut: platformDeliveryCut,
-      rider_delivery_cut: riderCut,
-      tip_amount: tipKobo,
-      total_amount: totalAmount,
-      payment_method: resolvedMethod,
-      wallet_amount_kobo: walletApply,
-      paystack_reference: orderNumber,
-      idempotency_key: idempotencyKey,
-      payment_status: 'PENDING',
-      rider_payment_status: 'PENDING',
-      scheduled_for: scheduledForIso,
-      scheduled_release_at: scheduledReleaseIso,
-    })
+    .insert(orderInsert)
     .select('id')
     .single()
 
@@ -422,6 +440,10 @@ export async function POST(req: NextRequest) {
 
     if (!isScheduled) {
       await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, totalAmount, appUrl)
+      // Wallet orders are paid right here (no webhook), so tell the group now.
+      if (linkedGroupId) {
+        await notifyGroupOrderPlaced(db, { groupOrderId: linkedGroupId, orderNumber, deliveryAddress: delivery_address, appUrl })
+      }
     }
 
     return NextResponse.json({ order_number: orderNumber, payment_method: 'WALLET', paid: true, scheduled: isScheduled })

@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useFeatures } from '@/lib/use-features'
 
 const PRESETS = [1000, 2000, 5000, 10000]
 
 export default function SponsorPage() {
+  const features = useFeatures()
   const [phone, setPhone] = useState('+234')
   const [amount, setAmount] = useState('')
   const [name, setName] = useState('')
@@ -15,7 +17,18 @@ export default function SponsorPage() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search)
     if (q.get('status') === 'success') setDone(true)
+    // A student shares /sponsor?phone=+234… so the parent lands prefilled.
+    const p = q.get('phone')
+    if (p && /^\+?\d{7,}$/.test(p)) setPhone(p.startsWith('+') ? p : '+' + p)
   }, [])
+
+  if (features.sponsor_topup === false) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center px-5" style={{ background: '#0A0A0B' }}>
+        <p className="text-white/60 text-sm text-center max-w-xs">Topping up a student’s wallet isn’t available right now. Please check back later.</p>
+      </div>
+    )
+  }
 
   const submit = async () => {
     setError('')

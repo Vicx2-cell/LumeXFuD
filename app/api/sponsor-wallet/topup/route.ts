@@ -25,8 +25,9 @@ const schema = z.object({
 }).strict()
 
 export async function POST(req: NextRequest) {
-  // Sponsoring is a form of sign-up-adjacent funding; respect the signups switch
-  // is overkill, but DO respect ordering being open isn't required. No flag gate.
+  if (!(await getFeature('sponsor_topup'))) {
+    return NextResponse.json({ error: 'This feature is currently unavailable.' }, { status: 503 })
+  }
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
   const rl = await rateLimitGeneric(`sponsor-topup:${ip}`, 10, 600, true)

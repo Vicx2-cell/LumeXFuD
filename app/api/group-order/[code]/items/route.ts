@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { getFeature } from '@/lib/features'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
@@ -54,6 +56,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
   const item = mi as { id: string; is_available: boolean } | null
   if (!item || !item.is_available) return NextResponse.json({ error: 'That item is not available.' }, { status: 400 })
 
+  if (!(await getFeature('group_orders'))) {
+    return NextResponse.json({ error: 'Group ordering is currently unavailable.' }, { status: 503 })
+  }
+
   const customer = await me(db, session.phone)
   if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
 
@@ -66,6 +72,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
     notes: parsed.data.notes ?? null,
   })
   if (error) return NextResponse.json({ error: 'Could not add item' }, { status: 500 })
+
+  // Let the host know someone joined/added (best-effort; not for the host's own adds).
+  if (customer.id !== group.host_customer_id) {
+    try {
+      const [{ data: hostRow }, { data: mi2 }] = await Promise.all([
+        db.from('customers').select('phone').eq('id', group.host_customer_id).maybeSingle(),
+        db.from('menu_items').select('name').eq('id', parsed.data.menu_item_id).maybeSingle(),
+      ])
+      const hostPhone = (hostRow as { phone: string } | null)?.phone
+      const itemName = (mi2 as { name: string } | null)?.name ?? 'an item'
+      if (hostPhone) {
+        void sendWhatsAppWithFallback({
+          to: hostPhone,
+          message: `🛒 ${customer.name ?? 'A friend'} added ${parsed.data.quantity}× ${itemName} to your LumeX group order.`,
+        }).catch(() => {})
+      }
+    } catch { /* best-effort */ }
+  }
 
   return NextResponse.json({ success: true })
 }

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { generateGroupCode } from '@/lib/group-order'
+import { getFeature } from '@/lib/features'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
@@ -23,6 +24,10 @@ export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'customer') return NextResponse.json({ error: 'Only customers can start a group order.' }, { status: 403 })
+
+  if (!(await getFeature('group_orders'))) {
+    return NextResponse.json({ error: 'Group ordering is currently unavailable.' }, { status: 503 })
+  }
 
   const rl = await rateLimitGeneric(`group-create:${session.userId ?? session.phone}`, 15, 600)
   if (!rl.success) return NextResponse.json({ error: 'Too many group orders. Slow down.' }, { status: 429 })

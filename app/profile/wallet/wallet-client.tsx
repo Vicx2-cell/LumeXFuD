@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { downloadReceiptPng } from '@/lib/receipt-download'
+import { useFeatures } from '@/lib/use-features'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,6 +16,7 @@ interface WalletData {
   lifetime_spent_kobo: number
   is_frozen:           boolean
   frozen_reason:       string | null
+  phone?:              string
 }
 
 interface TxRow {
@@ -51,6 +53,15 @@ function formatBalance(kobo: number): string {
 export default function CustomerWalletClient() {
   const router       = useRouter()
   const searchParams = useSearchParams()
+  const features     = useFeatures()
+
+  function askFamily() {
+    if (!wallet?.phone) return
+    const url = `${window.location.origin}/sponsor?phone=${encodeURIComponent(wallet.phone)}`
+    const text = `Hi! Please help load my LumeX food wallet — it’s quick (Paystack), no account needed: ${url}`
+    if (navigator.share) { navigator.share({ text, url }).catch(() => {}); return }
+    navigator.clipboard.writeText(url).then(() => showToast('Top-up link copied — send it to your family!')).catch(() => {})
+  }
 
   const [wallet,   setWallet]   = useState<WalletData | null>(null)
   const [txs,      setTxs]      = useState<TxRow[]>([])
@@ -238,6 +249,18 @@ export default function CustomerWalletClient() {
                 Refresh
               </button>
             </div>
+
+            {/* Ask family/sponsor to fund this wallet — share a prefilled link.
+                Hidden when the super-admin turns the sponsor_topup feature off. */}
+            {features.sponsor_topup !== false && wallet?.phone && (
+              <button
+                onClick={askFamily}
+                className="w-full mt-3 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+                style={{ background: 'rgba(37,211,102,0.12)', color: '#25D366', border: '1px solid rgba(37,211,102,0.3)' }}
+              >
+                <span aria-hidden="true">💝</span> Ask family to top up
+              </button>
+            )}
           </div>
         )}
 

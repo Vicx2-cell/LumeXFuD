@@ -57,6 +57,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
 
   return NextResponse.json({
     code: group.code,
+    group_order_id: group.id,
     status: group.status,
     is_host: group.host_customer_id === myId,
     vendor: { id: group.vendor_id, name: v?.name ?? 'Vendor' },

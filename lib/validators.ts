@@ -39,6 +39,9 @@ export const createOrderInput = z.object({
   // non-fatally after the order is created; used for rider nav + location data.
   delivery_latitude:  z.number().min(-90).max(90).nullable().optional(),
   delivery_longitude: z.number().min(-180).max(180).nullable().optional(),
+  // Optional: the group order this checkout finalizes. Server verifies the caller
+  // is that group's host before linking; participants are notified once paid.
+  group_order_id: z.string().uuid().nullable().optional(),
 })
 
 export const orderStatusInput = z.object({
@@ -75,6 +78,14 @@ export const vendorStatusInput = z.object({
 
 export const vendorPauseInput = z.object({
   minutes: z.enum(['15', '30', '60']),
+})
+
+// Opening / closing time for a vendor or rider. "HH:MM" 24-hour (Africa/Lagos),
+// or null to clear. Shared by /api/vendors/[id]/hours and /api/riders/[id]/hours.
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM 24-hour time')
+export const businessHoursInput = z.object({
+  opening_time: hhmm.nullable(),
+  closing_time: hhmm.nullable(),
 })
 
 // ─── Wallet ───────────────────────────────────────────────────────────────────

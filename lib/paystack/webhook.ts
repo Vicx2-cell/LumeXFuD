@@ -1,6 +1,6 @@
 import { createSupabaseAdmin } from '../supabase/server'
-import { sendWhatsAppWithFallback } from '../termii/whatsapp'
-import { renderTemplate } from '../termii/templates'
+import { sendWhatsAppWithFallback } from '../notify'
+import { renderTemplate } from '../notify-templates'
 import { recordPlatformEarning } from '../platform-earnings'
 import { processCustomerTopup, spendCustomerWallet } from '../customer-wallet'
 import { refundTransaction } from './transfer'
@@ -206,6 +206,25 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
             dashboard_url: `${appUrl}/vendor-dashboard`,
           }),
         }).catch(() => {})
+      }
+
+      // Group order? Tell every participant the food is on the way + where to.
+      // Best-effort + separate query so a missing group_order_id column (migration
+      // 065 not yet run) can NEVER break marking the order paid above.
+      try {
+        const { data: gRow } = await db.from('orders').select('group_order_id, delivery_address').eq('id', order.id).maybeSingle()
+        const g = gRow as { group_order_id: string | null; delivery_address: string | null } | null
+        if (g?.group_order_id) {
+          const { notifyGroupOrderPlaced } = await import('../group-order')
+          await notifyGroupOrderPlaced(db, {
+            groupOrderId: g.group_order_id,
+            orderNumber: order.order_number as string,
+            deliveryAddress: g.delivery_address ?? 'your location',
+            appUrl,
+          })
+        }
+      } catch (err) {
+        console.error('[webhook] group-order notify skipped:', err)
       }
       break
     }

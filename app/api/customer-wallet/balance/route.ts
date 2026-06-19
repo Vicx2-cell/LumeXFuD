@@ -41,5 +41,8 @@ export async function GET() {
     lifetime_spent_kobo:   wallet.lifetime_spent_kobo,
     is_frozen:             wallet.is_frozen,
     frozen_reason:         wallet.frozen_reason,
+    // Own phone, so the wallet page can build a "ask family to top up" link
+    // (/sponsor?phone=…). It's the caller's own number — no exposure.
+    phone:                 session.phone,
   })
 }

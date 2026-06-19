@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useCart, cartLineKey, type CartItem } from '@/components/cart-context'
+import { useFeatures } from '@/lib/use-features'
 
 interface GItem { id: string; contributor_id: string; contributor_name: string; quantity: number; notes: string | null; menu_item_id: string; name: string; price_kobo: number; mine: boolean }
 interface MenuItem { id: string; name: string; price_kobo: number; category: string }
-interface GroupData { code: string; status: string; is_host: boolean; vendor: { id: string; name: string }; items: GItem[]; menu: MenuItem[] }
+interface GroupData { code: string; group_order_id: string; status: string; is_host: boolean; vendor: { id: string; name: string }; items: GItem[]; menu: MenuItem[] }
 
 const naira = (k: number) => '₦' + (k / 100).toLocaleString()
 
@@ -15,6 +16,7 @@ export default function GroupOrderPage() {
   const code = String(params.code ?? '').toUpperCase()
   const router = useRouter()
   const { replaceCart } = useCart()
+  const features = useFeatures()
 
   const [data, setData] = useState<GroupData | null>(null)
   const [error, setError] = useState('')
@@ -75,10 +77,14 @@ export default function GroupOrderPage() {
       else lines.set(key, { id: key, menu_item_id: it.menu_item_id, name: it.name, price_kobo: it.price_kobo, quantity: Math.min(it.quantity, 20), addons: [] })
     }
     if (lines.size === 0) { setError('Add some items first.'); return }
+    // Tell the cart this checkout finalizes a group order, so /api/orders links it
+    // and notifies everyone once paid.
+    try { sessionStorage.setItem('lx_group_id', data.group_order_id) } catch { /* ignore */ }
     replaceCart({ vendor_id: data.vendor.id, vendor_name: data.vendor.name, items: Array.from(lines.values()) })
     router.push('/cart')
   }
 
+  if (features.group_orders === false) return <Shell><p className="text-white/50 text-sm">Group ordering isn’t available right now.</p></Shell>
   if (loading) return <Shell><p className="text-white/40 text-sm">Loading group order…</p></Shell>
   if (error && !data) return <Shell><p className="text-red-400 text-sm">{error}</p></Shell>
   if (!data) return null

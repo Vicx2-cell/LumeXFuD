@@ -202,6 +202,8 @@ export default function CartPage() {
           scheduled_for:         scheduleOn && scheduleAt ? new Date(scheduleAt).toISOString() : undefined,
           delivery_latitude:     coords?.lat,
           delivery_longitude:    coords?.lng,
+          // Set when this cart was handed over from a group order (host checkout).
+          group_order_id:        (() => { try { return sessionStorage.getItem('lx_group_id') || undefined } catch { return undefined } })(),
         }),
       })
 
@@ -219,6 +221,7 @@ export default function CartPage() {
       }
 
       clearCart()
+      try { sessionStorage.removeItem('lx_group_id') } catch { /* ignore */ }
 
       // Trust the server's resolved split, not the client's guess: it recomputes
       // wallet coverage from the live balance and may downgrade WALLET→SPLIT if
@@ -268,16 +271,19 @@ export default function CartPage() {
           </p>
         </div>
 
-        {/* Order with friends — start a shared group order seeded with this cart */}
-        <button
-          onClick={startGroupOrder}
-          disabled={groupBusy}
-          className="w-full rounded-2xl py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-          style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.3)', color: '#F5A623' }}
-        >
-          <span aria-hidden="true">👥</span>
-          {groupBusy ? 'Starting…' : 'Order with friends (split one delivery)'}
-        </button>
+        {/* Order with friends — start a shared group order seeded with this cart.
+            Hidden when the super-admin turns the group_orders feature off. */}
+        {features.group_orders !== false && (
+          <button
+            onClick={startGroupOrder}
+            disabled={groupBusy}
+            className="w-full rounded-2xl py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+            style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.3)', color: '#F5A623' }}
+          >
+            <span aria-hidden="true">👥</span>
+            {groupBusy ? 'Starting…' : 'Order with friends (split one delivery)'}
+          </button>
+        )}
 
         {/* Items */}
         <div className="glass-thin overflow-hidden">
