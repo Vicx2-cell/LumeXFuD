@@ -18,6 +18,7 @@ export default function CartPage() {
   const router = useRouter()
   const { cart, setQuantity, clearCart, subtotal, totalItems } = useCart()
   const features = useFeatures()
+  const [groupBusy, setGroupBusy] = useState(false)
 
   const [deliveryType,  setDeliveryType]  = useState<'BIKE' | 'DOOR'>('BIKE')
   const [address,       setAddress]       = useState('')
@@ -121,13 +122,14 @@ export default function CartPage() {
       ? (walletCoversAll ? 'WALLET' : walletAmount > 0 ? 'SPLIT' : 'PAYSTACK')
       : 'PAYSTACK'
 
-  // Scheduling bounds for the datetime-local picker (local-time strings). ~1h
-  // minimum lead so there's room for prep + delivery; up to 7 days ahead.
+  // Scheduling bounds for the datetime-local picker (local-time strings). The
+  // chosen time is the SEND time (when the order reaches the vendor); ~25 min
+  // minimum lead so it isn't effectively immediate; up to 7 days ahead.
   const toLocalInput = (d: Date) => {
     const p = (n: number) => String(n).padStart(2, '0')
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
   }
-  const scheduleMin = toLocalInput(new Date(Date.now() + 60 * 60_000))
+  const scheduleMin = toLocalInput(new Date(Date.now() + 25 * 60_000))
   const scheduleMax = toLocalInput(new Date(Date.now() + 7 * 86_400_000))
 
   if (totalItems === 0) {
@@ -153,6 +155,24 @@ export default function CartPage() {
         <BottomNav />
       </main>
     )
+  }
+
+  async function startGroupOrder() {
+    if (!cart.vendor_id || cart.items.length === 0) return
+    setGroupBusy(true); setError('')
+    try {
+      const res = await fetch('/api/group-order/create', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendor_id: cart.vendor_id,
+          // v1 group orders carry base items only (no add-ons yet).
+          items: cart.items.map((i) => ({ menu_item_id: i.menu_item_id, quantity: i.quantity, notes: i.special_instructions })),
+        }),
+      })
+      const d = await res.json()
+      if (!res.ok) { setError(d.error ?? 'Could not start group order.'); return }
+      router.push(`/group/${d.code}`)
+    } catch { setError('Connection error.') } finally { setGroupBusy(false) }
   }
 
   async function handleCheckout() {
@@ -248,6 +268,17 @@ export default function CartPage() {
           </p>
         </div>
 
+        {/* Order with friends — start a shared group order seeded with this cart */}
+        <button
+          onClick={startGroupOrder}
+          disabled={groupBusy}
+          className="w-full rounded-2xl py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+          style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.3)', color: '#F5A623' }}
+        >
+          <span aria-hidden="true">👥</span>
+          {groupBusy ? 'Starting…' : 'Order with friends (split one delivery)'}
+        </button>
+
         {/* Items */}
         <div className="glass-thin overflow-hidden">
           {cart.items.map((item, idx) => {
@@ -311,7 +342,7 @@ export default function CartPage() {
               <p className="text-sm font-medium text-white/80 flex items-center gap-1.5">
                 <span aria-hidden="true">🗓️</span> Schedule for later
               </p>
-              <p className="text-xs text-white/45 mt-0.5">Pre-order now, pay now, and we’ll time it to arrive when you want.</p>
+              <p className="text-xs text-white/45 mt-0.5">Pre-order now, pay now, and we’ll send it to the kitchen at the time you pick.</p>
             </div>
             <button
               type="button"
@@ -326,7 +357,7 @@ export default function CartPage() {
           </div>
           {scheduleOn && (
             <div className="mt-3 lx-enter">
-              <label className="text-xs text-white/50 block mb-1">Deliver at</label>
+              <label className="text-xs text-white/50 block mb-1">Send to kitchen at</label>
               <input
                 type="datetime-local"
                 value={scheduleAt}
@@ -336,7 +367,7 @@ export default function CartPage() {
                 className="w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-amber-400"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', colorScheme: 'dark' }}
               />
-              <p className="text-xs text-white/35 mt-1.5">Within opening hours ({hoursLabel}). You can cancel for a full refund any time before the kitchen starts.</p>
+              <p className="text-xs text-white/35 mt-1.5">This is when we send it to the kitchen — food arrives a bit after. Within opening hours ({hoursLabel}). Cancel for a full refund any time before it’s sent.</p>
             </div>
           )}
         </div>
