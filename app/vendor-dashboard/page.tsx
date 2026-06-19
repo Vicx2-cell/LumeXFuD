@@ -253,7 +253,9 @@ export default function VendorDashboard() {
             <p className="text-xs text-white/40 uppercase tracking-widest">Store appearance</p>
             <ProfileImageUpload
               slot="cover" shape="cover" current={vendor.shop_photo_url}
+              deletable
               onUploaded={(u) => setVendor((v) => v ? { ...v, shop_photo_url: u } : v)}
+              onRemoved={() => setVendor((v) => v ? { ...v, shop_photo_url: null } : v)}
               label="Cover photo — customers see this on your store"
             />
             <div className="flex items-center gap-3 pt-1">
@@ -261,7 +263,10 @@ export default function VendorDashboard() {
                 slot="avatar" shape="circle" current={vendor.logo_url}
                 onUploaded={(u) => setVendor((v) => v ? { ...v, logo_url: u } : v)}
               />
-              <p className="text-xs text-white/45">Your store logo</p>
+              <div>
+                <p className="text-sm font-medium text-white/80">Store logo</p>
+                <p className="text-xs text-white/40">Required</p>
+              </div>
             </div>
           </div>
         )}

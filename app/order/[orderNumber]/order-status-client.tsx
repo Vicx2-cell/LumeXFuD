@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
 import { VerifiedBadge } from '@/components/verified-badge'
@@ -284,9 +285,15 @@ export function OrderStatusClient({
         {/* Rider card */}
         {order.riders && ['RIDER_ASSIGNED', 'PICKED_UP', 'DELIVERED'].includes(order.status) && (
           <div className="glass-thin p-4 flex items-center gap-4 lx-scale-in">
-            <div className="lx-icon-badge w-12 h-12 rounded-full">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5h-5l-2.5-6"/><path d="M12 6h3l2 5"/><path d="M6 11h7"/></svg>
-            </div>
+            {order.riders.avatar_url ? (
+              <div className="relative w-12 h-12 rounded-full overflow-hidden shrink-0" style={{ border: '2px solid rgba(245,166,35,0.4)' }}>
+                <Image src={order.riders.avatar_url} alt="" fill className="object-cover" sizes="48px" />
+              </div>
+            ) : (
+              <div className="lx-icon-badge w-12 h-12 rounded-full">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5h-5l-2.5-6"/><path d="M12 6h3l2 5"/><path d="M6 11h7"/></svg>
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="text-[10px] uppercase tracking-wide text-white/40">Your rider</p>
               <div className="flex items-center gap-1.5">

@@ -15,7 +15,9 @@ export function ProfileImageUpload({
   shape = 'circle',
   size = 84,
   label,
+  deletable = false,
   onUploaded,
+  onRemoved,
   className = '',
 }: {
   slot: 'avatar' | 'cover'
@@ -23,13 +25,30 @@ export function ProfileImageUpload({
   shape?: 'circle' | 'cover'
   size?: number
   label?: string
+  deletable?: boolean
   onUploaded?: (url: string) => void
+  onRemoved?: () => void
   className?: string
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [url, setUrl] = useState<string | null>(current)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+
+  async function remove() {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch(`/api/profile/image?slot=${slot}`, { method: 'DELETE' })
+      const d = await res.json().catch(() => ({})) as { error?: string }
+      if (!res.ok) { setErr(d.error ?? 'Could not remove'); return }
+      setUrl(null)
+      onRemoved?.()
+    } catch {
+      setErr('Network error')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function pick(file: File) {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setErr('JPG, PNG or WebP only'); return }
@@ -77,6 +96,9 @@ export function ProfileImageUpload({
         )}
       </button>
       {label && <p className="text-xs text-white/45 mt-1.5">{label}</p>}
+      {deletable && url && !busy && (
+        <button type="button" onClick={remove} className="text-[11px] font-medium text-red-400/80 hover:text-red-400 mt-1.5">Remove photo</button>
+      )}
       {err && <p className="text-xs text-red-400 mt-1">{err}</p>}
       <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) pick(f); e.target.value = '' }} />

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import Image from 'next/image'
 import { formatPrice } from '@/lib/money'
 import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
@@ -32,7 +33,7 @@ interface CurrentOrder {
   rider_delivery_cut: number
   picked_up_at: string | null
   vendors: { shop_name: string; phone: string } | null
-  customers: { phone: string; name: string | null } | null
+  customers: { phone: string; name: string | null; avatar_url: string | null } | null
 }
 
 interface WalletBalance {
@@ -379,7 +380,13 @@ export default function RiderDashboard() {
               </div>
               {current.customers && (
                 <div className="flex items-center gap-2 text-sm text-white/65">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/40" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  {current.customers.avatar_url ? (
+                    <div className="relative w-7 h-7 rounded-full overflow-hidden shrink-0" style={{ border: '1px solid rgba(255,255,255,0.15)' }}>
+                      <Image src={current.customers.avatar_url} alt="" fill className="object-cover" sizes="28px" />
+                    </div>
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/40" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  )}
                   <a href={`tel:${current.customers.phone}`} className="text-amber-400">{current.customers.name ?? current.customers.phone}</a>
                 </div>
               )}

@@ -90,3 +90,38 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ url })
 }
+
+// DELETE /api/profile/image?slot=avatar|cover — clears the picture.
+// Compulsory pictures can't be removed: a rider's avatar and a vendor's logo are
+// required (replace-only). Customers may remove their avatar; vendors may remove
+// the (optional) cover photo.
+export async function DELETE(req: NextRequest) {
+  const session = await getCurrentUser()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const role = session.role
+  const slot = new URL(req.url).searchParams.get('slot') ?? 'avatar'
+  if (slot !== 'avatar' && slot !== 'cover') return NextResponse.json({ error: 'Invalid slot' }, { status: 400 })
+
+  if (role === 'rider') {
+    return NextResponse.json({ error: 'Your profile photo is required and can only be changed.' }, { status: 403 })
+  }
+  if (role === 'vendor' && slot === 'avatar') {
+    return NextResponse.json({ error: 'Your store logo is required and can only be changed.' }, { status: 403 })
+  }
+  if (role === 'customer' && slot === 'cover') {
+    return NextResponse.json({ error: 'No cover photo' }, { status: 400 })
+  }
+  if (role !== 'customer' && role !== 'vendor') {
+    return NextResponse.json({ error: 'Not allowed' }, { status: 403 })
+  }
+
+  const db = createSupabaseAdmin()
+  const table = role === 'customer' ? 'customers' : 'vendors'
+  const column = role === 'vendor' ? 'shop_photo_url' : 'avatar_url'
+  const { error } = await db.from(table).update({ [column]: null }).eq('phone', session.phone)
+  if (error) {
+    console.error('[profile/image] delete error:', error.message)
+    return NextResponse.json({ error: 'Could not remove image' }, { status: 500 })
+  }
+  return NextResponse.json({ ok: true })
+}

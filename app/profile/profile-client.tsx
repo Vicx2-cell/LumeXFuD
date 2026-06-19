@@ -238,7 +238,7 @@ export function ProfileClient({
       <div className="max-w-lg mx-auto px-4 py-5 space-y-5 lx-enter">
         {/* Profile picture */}
         <div className="flex flex-col items-center pt-1">
-          <ProfileImageUpload slot="avatar" shape="circle" current={profile?.avatar_url ?? null} />
+          <ProfileImageUpload slot="avatar" shape="circle" current={profile?.avatar_url ?? null} deletable />
           {profile?.name && <p className="text-base font-semibold mt-3">{profile.name}</p>}
           <p className="text-xs text-white/40 tabular-nums mt-0.5">{phone}</p>
         </div>

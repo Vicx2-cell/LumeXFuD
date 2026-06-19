@@ -36,7 +36,7 @@ export async function GET() {
             id, order_number, status, delivery_type, delivery_address,
             rider_delivery_cut, picked_up_at, created_at,
             vendors ( shop_name, phone ),
-            customers ( phone, name )
+            customers ( phone, name, avatar_url )
           `)
           .eq('id', rider.active_order_id)
           .single()
