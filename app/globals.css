@@ -227,13 +227,13 @@ a:active,
 .lx-card-amber-soft   { background: rgba(245,166,35,0.06); border: 1px solid rgba(245,166,35,0.20); }
 .lx-card-amber-strong { background: rgba(245,166,35,0.14); border: 1px solid rgba(245,166,35,0.30); }
 
-/* Square amber icon chip (was repeated 6× in admin/vendor headers). */
+/* Amber icon chip (was repeated 6× in admin/vendor headers). Radius is left to
+   the caller's Tailwind class (e.g. rounded-xl) so it composes everywhere. */
 .lx-icon-badge {
   display: inline-flex; align-items: center; justify-content: center;
   background: rgba(245,166,35,0.12);
   border: 1px solid rgba(245,166,35,0.25);
   color: var(--color-amber);
-  border-radius: 12px;
 }
 
 /* Translucent field surface for inputs/selects/textareas (the 30× pattern). */

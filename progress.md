@@ -59,9 +59,10 @@ Verify: `next build` → `✓ Compiled successfully` + TypeScript clean. Build's
 page-data step fails ONLY on pre-existing missing env `SENDCHAMP_API_KEY` (no `.env.local`
 key) via `validateEnv()` — unrelated to these changes.
 
-## PHASE 2 — Surfaces (planned)
-- [ ] 1. Public home
-- [ ] 2. Vendor dashboard (priority)
+## PHASE 2 — Surfaces
+- [x] 1. Public home — display font on wordmarks/stats, amber utilities, live pulse badge. (commit c750e14)
+- [x] 2. Vendor dashboard (priority) — responsive desktop grid (orders main / controls sidebar),
+      header pills + status badge via primitives, lx-btn-amber actions, token colors. tsc clean.
 - [ ] 3. Customer
 - [ ] 4. Rider
 - [ ] 5. Admin

@@ -9,6 +9,7 @@ import { DemandBanner } from '@/components/demand-banner'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
 import { BusinessHours } from '@/components/business-hours'
+import { Badge } from '@/components/ui/badge'
 
 interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
 interface VendorOrder {
@@ -212,44 +213,39 @@ export default function VendorDashboard() {
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <button
               onClick={() => router.push('/vendor-dashboard/menu')}
-              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors flex items-center gap-1.5"
-              style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.25)' }}
+              className="lx-card-amber lx-amber text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
               Menu
             </button>
             <button
               onClick={() => router.push('/vendor-dashboard/earnings')}
-              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors flex items-center gap-1.5"
-              style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.25)' }}
+              className="lx-card-amber lx-amber text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
               Earnings
             </button>
             <button
               onClick={() => router.push('/vendor-dashboard/reviews')}
-              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors flex items-center gap-1.5"
-              style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.25)' }}
+              className="lx-card-amber lx-amber text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
               Reviews
             </button>
-            <span
-              className="text-xs font-semibold px-3 py-1.5 rounded-full"
-              style={{
-                background: vendor?.status === 'OPEN' ? 'rgba(74,222,128,0.15)' : vendor?.status === 'BUSY' ? 'rgba(245,166,35,0.15)' : 'rgba(255,255,255,0.08)',
-                color: vendor?.status === 'OPEN' ? '#4ade80' : vendor?.status === 'BUSY' ? '#F5A623' : 'rgba(255,255,255,0.4)',
-                border: '1px solid currentColor',
-              }}
+            <Badge
+              className="px-3 py-1.5"
+              color={vendor?.status === 'OPEN' ? 'var(--lx-green)' : vendor?.status === 'BUSY' ? 'var(--color-amber)' : 'rgba(255,255,255,0.45)'}
             >
               {vendor?.status}
-            </span>
+            </Badge>
             <LogoutButton />
           </div>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-5 lx-enter">
+      <div className="max-w-lg lg:max-w-5xl mx-auto px-4 py-4 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:items-start lx-enter">
+        {/* Controls — sidebar on desktop (right column), top stack on mobile */}
+        <div className="space-y-5 lg:col-start-2">
         {/* Launch counter — self-hides unless the super-admin flag is on */}
         <LaunchCounter />
 
@@ -263,7 +259,7 @@ export default function VendorDashboard() {
         <button onClick={() => router.push('/vendor-dashboard/share')}
           className="w-full glass-thin px-4 py-3 flex items-center justify-between text-left">
           <span className="text-sm font-medium text-white/80">📲 Share your store link</span>
-          <span style={{ color: '#F5A623' }}>→</span>
+          <span className="lx-amber">→</span>
         </button>
 
         {/* Status Controls */}
@@ -328,7 +324,10 @@ export default function VendorDashboard() {
             initialClose={vendor.closing_time}
           />
         )}
+        </div>
 
+        {/* Orders — main column on desktop (left, wide) */}
+        <div className="space-y-5 mt-5 lg:mt-0 lg:col-start-1 lg:row-start-1">
         {/* Active Orders */}
         <section>
           <div className="flex items-center gap-2 mb-3">
@@ -342,7 +341,7 @@ export default function VendorDashboard() {
 
           {active.length === 0 ? (
             <div className="glass-thin py-12 text-center">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)' }}>
+              <div className="lx-icon-badge w-14 h-14 rounded-2xl mb-3">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
               </div>
               <p className="text-sm font-medium text-white/75">All caught up</p>
@@ -385,6 +384,7 @@ export default function VendorDashboard() {
         <div className="pt-2 flex justify-center">
           <LogoutButton />
         </div>
+        </div>
       </div>
     </div>
   )
@@ -415,12 +415,9 @@ function OrderCard({
           <p className="font-semibold text-white">{order.order_number}</p>
           <p className="text-xs text-white/40 mt-0.5">{order.delivery_type} · {order.delivery_address.slice(0, 45)}</p>
         </div>
-        <span
-          className="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full"
-          style={{ background: `${STATUS_COLOR[order.status]}20`, color: STATUS_COLOR[order.status] }}
-        >
+        <Badge className="shrink-0" color={STATUS_COLOR[order.status]}>
           {STATUS_LABEL[order.status]}
-        </span>
+        </Badge>
       </div>
 
       <div className="space-y-1 border-t border-white/6 pt-3">
@@ -446,15 +443,15 @@ function OrderCard({
                 onClick={() => act(() => onCancel(order.id))}
                 disabled={busy}
                 className="px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
-                style={{ background: 'rgba(248,113,113,0.12)', color: '#f87171', minHeight: 40 }}
+                style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--lx-red)', minHeight: 40 }}
               >
                 Decline
               </button>
               <button
                 onClick={() => act(() => onUpdate(order.id, 'VENDOR_ACCEPTED'))}
                 disabled={busy}
-                className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-40"
-                style={{ background: '#F5A623', color: '#000', minHeight: 40 }}
+                className="lx-btn-amber px-4 py-2 text-sm disabled:opacity-40"
+                style={{ minHeight: 40 }}
               >
                 Accept
               </button>
@@ -464,8 +461,8 @@ function OrderCard({
             <button
               onClick={() => act(() => onUpdate(order.id, 'PREPARING'))}
               disabled={busy}
-              className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: '#F5A623', color: '#000', minHeight: 40 }}
+              className="lx-btn-amber px-4 py-2 text-sm disabled:opacity-40"
+              style={{ minHeight: 40 }}
             >
               Start Preparing
             </button>
@@ -475,7 +472,7 @@ function OrderCard({
               onClick={() => act(() => onUpdate(order.id, 'READY'))}
               disabled={busy}
               className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: '#4ade80', color: '#000', minHeight: 40 }}
+              style={{ background: 'var(--lx-green)', color: '#000', minHeight: 40 }}
             >
               Mark Ready
             </button>
