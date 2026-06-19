@@ -163,9 +163,9 @@ export default function WalletView({ userType }: Props) {
 
   if (loading) {
     return (
-      <div className="p-4 space-y-3 animate-pulse">
+      <div className="p-4 space-y-3">
         {[1,2,3].map((i) => (
-          <div key={i} className="h-24 bg-white/5 rounded-2xl" />
+          <div key={i} className="lx-skeleton h-24 rounded-2xl" />
         ))}
       </div>
     )
@@ -192,7 +192,7 @@ export default function WalletView({ userType }: Props) {
         <h1 className="font-semibold text-base">Wallet</h1>
       </div>
       {/* ── Balance Card ─────────────────────────────────────── */}
-      <div className="bg-white/5 backdrop-blur rounded-2xl p-5 border border-white/10">
+      <div className="glass-thin rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <span className="text-white font-semibold">LumeX Wallet</span>
           <button onClick={() => setTiersOpen(true)} className={`text-sm font-medium ${tierColor} flex items-center gap-1`}>
@@ -212,7 +212,7 @@ export default function WalletView({ userType }: Props) {
           </div>
           <div className="bg-white/5 rounded-xl p-3">
             <p className="text-white/50 text-xs mb-1">Held</p>
-            <p className="text-amber-400 font-semibold">{wallet?.held_balance ?? '₦0'}</p>
+            <p className="lx-amber font-semibold">{wallet?.held_balance ?? '₦0'}</p>
             <p className="text-white/30 text-xs mt-1">
               {hasHeld
                 ? nextUnlockMs
@@ -232,7 +232,7 @@ export default function WalletView({ userType }: Props) {
 
         <div className="flex gap-3">
           <button
-            className="flex-1 bg-amber-500 hover:bg-amber-400 text-black font-semibold py-3 rounded-xl transition-colors disabled:opacity-40"
+            className="lx-btn-amber flex-1 py-3 disabled:opacity-40"
             disabled={!wallet || (wallet.available_kobo ?? 0) === 0 || wallet.is_frozen}
             onClick={() => setWithdrawOpen(true)}
           >
@@ -249,13 +249,13 @@ export default function WalletView({ userType }: Props) {
 
       {/* ── Trust Tier Progress ────────────────────────────── */}
       {wallet?.tier_progress.next_tier && (
-        <div className="bg-white/5 backdrop-blur rounded-2xl p-5 border border-white/10">
+        <div className="glass-thin rounded-2xl p-5">
           <h4 className="text-white font-medium mb-1">Your Tier: {wallet.tier_emoji} {tier}</h4>
           <p className="text-white/50 text-xs mb-3">Benefit: {wallet.tier_label}</p>
           <div className="h-2 bg-white/10 rounded-full mb-2">
             <div
-              className="h-2 bg-amber-500 rounded-full transition-all"
-              style={{ width: `${tierPct}%` }}
+              className="h-2 rounded-full transition-all"
+              style={{ width: `${tierPct}%`, background: 'var(--color-amber)' }}
             />
           </div>
           <div className="flex justify-between text-xs text-white/40">
@@ -263,7 +263,7 @@ export default function WalletView({ userType }: Props) {
             <span>{wallet.tier_progress.orders_to_next} more to {wallet.tier_progress.next_tier}</span>
             <span>{wallet.tier_progress.next_tier}</span>
           </div>
-          <button onClick={() => setTiersOpen(true)} className="mt-3 text-xs font-medium" style={{ color: '#F5A623' }}>
+          <button onClick={() => setTiersOpen(true)} className="lx-amber mt-3 text-xs font-medium">
             What do tiers mean? View all →
           </button>
         </div>
@@ -305,7 +305,7 @@ export default function WalletView({ userType }: Props) {
       )}
 
       {/* ── Bank Account ───────────────────────────────────── */}
-      <div className="bg-white/5 backdrop-blur rounded-2xl p-5 border border-white/10">
+      <div className="glass-thin rounded-2xl p-5">
         <h4 className="text-white/70 text-xs font-medium uppercase tracking-wide mb-3">
           Withdrawal Account
         </h4>
@@ -316,7 +316,7 @@ export default function WalletView({ userType }: Props) {
               ****{wallet.bank_last_4} — {wallet.bank_account_name}
             </p>
             {!wallet.bank_ready && wallet.bank_ready_at && (
-              <p className="text-amber-400 text-xs mt-2">
+              <p className="lx-amber text-xs mt-2">
                 🕐 Withdrawals available from{' '}
                 {new Date(wallet.bank_ready_at).toLocaleDateString('en-NG', {
                   day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
@@ -324,7 +324,7 @@ export default function WalletView({ userType }: Props) {
               </p>
             )}
             <button
-              className="mt-3 text-amber-400 text-sm"
+              className="mt-3 lx-amber text-sm"
               onClick={() => setAddBankOpen(true)}
             >
               Change Bank
@@ -345,11 +345,11 @@ export default function WalletView({ userType }: Props) {
 
       {/* ── Wallet PIN ─────────────────────────────────────── */}
       {!wallet?.wallet_pin_set && (
-        <div className="bg-white/5 backdrop-blur rounded-2xl p-5 border border-amber-500/20">
-          <p className="text-amber-400 text-sm font-medium mb-2">🔑 Set a Wallet PIN</p>
+        <div className="lx-card-amber-soft rounded-2xl p-5">
+          <p className="lx-amber text-sm font-medium mb-2">🔑 Set a Wallet PIN</p>
           <p className="text-white/50 text-xs mb-3">Required to withdraw earnings</p>
           <button
-            className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold py-3 rounded-xl transition-colors"
+            className="lx-btn-amber w-full py-3"
             onClick={() => { setSetPinOpen(true); setPinStep(1) }}
           >
             Set PIN
@@ -358,7 +358,7 @@ export default function WalletView({ userType }: Props) {
       )}
 
       {/* ── Lifetime Stats ─────────────────────────────────── */}
-      <div className="bg-white/5 backdrop-blur rounded-2xl p-5 border border-white/10">
+      <div className="glass-thin rounded-2xl p-5">
         <h4 className="text-white/70 text-xs font-medium uppercase tracking-wide mb-3">
           Lifetime Stats
         </h4>
@@ -375,7 +375,7 @@ export default function WalletView({ userType }: Props) {
       </div>
 
       {/* ── Recent Transactions ────────────────────────────── */}
-      <div className="bg-white/5 backdrop-blur rounded-2xl border border-white/10 overflow-hidden">
+      <div className="glass-thin rounded-2xl overflow-hidden">
         <div className="p-4 border-b border-white/10">
           <h4 className="text-white font-medium">Transactions</h4>
         </div>
@@ -422,7 +422,7 @@ export default function WalletView({ userType }: Props) {
                       {tx.reference && (
                         <div className="pt-1">
                           <div className="flex items-center justify-between"><span className="text-white/50">Reference</span>
-                            <button onClick={() => copyText(tx.reference!)} className="text-[11px]" style={{ color: '#F5A623' }}>Copy</button>
+                            <button onClick={() => copyText(tx.reference!)} className="lx-amber text-[11px]">Copy</button>
                           </div>
                           <p className="text-white/80 font-mono text-[11px] break-all mt-0.5">{tx.reference}</p>
                         </div>
@@ -431,8 +431,8 @@ export default function WalletView({ userType }: Props) {
                     <div className="mt-2 pt-2 border-t border-white/8 flex items-center gap-2">
                       <span className="text-green-400">🔒</span>
                       <span className="text-[11px] text-white/50">Verified</span>
-                      <span className="ml-auto font-mono text-[11px] tracking-wider" style={{ color: '#F5A623' }}>{tx.receipt_code}</span>
-                      <button onClick={() => copyText(tx.receipt_code)} className="text-[11px]" style={{ color: '#F5A623' }}>Copy</button>
+                      <span className="lx-amber ml-auto font-mono text-[11px] tracking-wider">{tx.receipt_code}</span>
+                      <button onClick={() => copyText(tx.receipt_code)} className="lx-amber text-[11px]">Copy</button>
                     </div>
                     <button
                       type="button"
@@ -451,8 +451,7 @@ export default function WalletView({ userType }: Props) {
                         code: tx.receipt_code,
                         refName: tx.reference ?? tx.id.slice(0, 8),
                       })}
-                      className="mt-3 w-full py-2.5 rounded-xl text-sm font-medium"
-                      style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.25)' }}
+                      className="lx-card-amber lx-amber mt-3 w-full py-2.5 rounded-xl text-sm font-medium"
                     >
                       ⬇ Download receipt
                     </button>
@@ -527,7 +526,7 @@ export default function WalletView({ userType }: Props) {
                   ))}
                 </div>
                 <button
-                  className="w-full bg-amber-500 text-black font-semibold py-4 rounded-xl disabled:opacity-40"
+                  className="lx-btn-amber w-full py-4 disabled:opacity-40"
                   disabled={newPin.length < 4}
                   onClick={() => { setPinStep(2); setConfirmPin('') }}
                 >
@@ -560,7 +559,7 @@ export default function WalletView({ userType }: Props) {
                 </div>
                 {pinError && <p className="text-red-400 text-sm text-center mb-3">{pinError}</p>}
                 <button
-                  className="w-full bg-amber-500 text-black font-semibold py-4 rounded-xl disabled:opacity-40"
+                  className="lx-btn-amber w-full py-4 disabled:opacity-40"
                   disabled={confirmPin.length < 4 || pinSaving}
                   onClick={savePin}
                 >

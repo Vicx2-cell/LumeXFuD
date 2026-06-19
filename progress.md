@@ -84,3 +84,11 @@ key) via `validateEnv()` — unrelated to these changes.
 - Semantic red/green/blue (destructive/success/info/toggles), SVG fills, Leaflet colors,
   dynamic color lookups, and the Lumi (chow-ai) gradient component intentionally preserved.
 - One shared token source (globals.css :root + utilities); no new npm deps; PWA SW untouched.
+
+## Follow-up
+- [x] Shared `components/wallet/WalletView.tsx` (customer + rider wallet) — 5 Tailwind glass
+      cards → glass-thin, 4 amber filled buttons → lx-btn-amber, amber texts → lx-amber,
+      PIN-prompt card → lx-card-amber-soft, download-receipt → lx-card-amber, skeleton →
+      lx-skeleton, progress bar → var(--color-amber). Left: ghost buttons, modal solid bg
+      (contrast), PIN-dot indicators, "YOU"/tier conditional chips, semantic green/red.
+      Role-agnostic (no VENDOR/RIDER-specific change). tsc + next build green.
