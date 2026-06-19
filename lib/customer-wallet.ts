@@ -6,7 +6,7 @@
 
 import { createSupabaseAdmin } from './supabase/server'
 import { formatPrice } from './money'
-import { sendWhatsAppWithFallback } from './termii/whatsapp'
+import { sendWhatsAppWithFallback } from './notify'
 import { recordPlatformEarning } from './platform-earnings'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -92,6 +92,7 @@ export async function processCustomerTopup(params: {
   reference: string
   customerPhone?: string
   customerName?: string
+  sponsorName?: string   // set when a parent/sponsor funded this wallet
 }): Promise<string> {
   const db = createSupabaseAdmin()
 
@@ -99,12 +100,19 @@ export async function processCustomerTopup(params: {
   const bonusKobo = Math.floor((params.amountKobo * bonusPct) / 100)
   const totalCredited = params.amountKobo + bonusKobo
 
+  // The sender's name is kept on the transaction so it shows clearly in the
+  // student's wallet history AND on the sponsor's receipt.
+  const sponsor = params.sponsorName?.trim()
+  const description = sponsor
+    ? `Top-up from ${sponsor}${bonusPct > 0 ? ` + ${bonusPct}% bonus` : ''}`
+    : `Wallet top-up${bonusPct > 0 ? ` + ${bonusPct}% bonus` : ''}`
+
   const { data, error } = await db.rpc('topup_customer_wallet', {
     p_customer_id: params.customerId,
     p_amount_kobo: params.amountKobo,
     p_bonus_kobo:  bonusKobo,
     p_reference:   params.reference,
-    p_description: `Wallet top-up${bonusPct > 0 ? ` + ${bonusPct}% bonus` : ''}`,
+    p_description: description,
   })
 
   if (error) throw new Error(`topup_customer_wallet RPC failed: ${error.message}`)
@@ -121,11 +129,15 @@ export async function processCustomerTopup(params: {
   // WhatsApp notification (non-blocking)
   if (params.customerPhone) {
     const name = params.customerName ? ` ${params.customerName.split(' ')[0]},` : ','
+    const bonusBit = bonusKobo > 0 ? ` + ${formatPrice(bonusKobo)} bonus (${bonusPct}% 🎁)` : ''
     sendWhatsAppWithFallback({
       to: params.customerPhone,
-      message: bonusKobo > 0
-        ? `Hey${name} ${formatPrice(params.amountKobo)} loaded + ${formatPrice(bonusKobo)} bonus (${bonusPct}% 🎁) added to your LumeX Wallet!\nNew balance: ${formatPrice(totalCredited)}.\nCheckout faster on your next order.`
-        : `${formatPrice(params.amountKobo)} loaded to your LumeX Wallet!\nBalance: ${formatPrice(params.amountKobo)}.`,
+      message: sponsor
+        // Family/sponsor top-up — name the sender clearly.
+        ? `💝 Hey${name} ${sponsor} just sent you ${formatPrice(params.amountKobo)}${bonusBit} on LumeX!\nNew balance: ${formatPrice(totalCredited)}.`
+        : bonusKobo > 0
+          ? `Hey${name} ${formatPrice(params.amountKobo)} loaded${bonusBit} added to your LumeX Wallet!\nNew balance: ${formatPrice(totalCredited)}.\nCheckout faster on your next order.`
+          : `${formatPrice(params.amountKobo)} loaded to your LumeX Wallet!\nBalance: ${formatPrice(params.amountKobo)}.`,
     }).catch(() => {})
   }
 

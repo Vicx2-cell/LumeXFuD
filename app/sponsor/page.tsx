@@ -6,7 +6,7 @@ import { downloadReceiptPng } from '@/lib/receipt-download'
 
 const PRESETS = [1000, 2000, 5000, 10000]
 
-interface Receipt { reference: string; amount_formatted: string; student_first_name: string; created_at: string; receipt_code: string }
+interface Receipt { reference: string; amount_formatted: string; student_first_name: string; from?: string | null; created_at: string; receipt_code: string }
 
 export default function SponsorPage() {
   const features = useFeatures()
@@ -53,6 +53,7 @@ export default function SponsorPage() {
       amountLine: `+${receipt.amount_formatted}`,
       amountPositive: true,
       rows: [
+        ...(receipt.from ? [['From', receipt.from] as [string, string]] : []),
         ['To', receipt.student_first_name],
         ['Date', new Date(receipt.created_at).toLocaleString()],
         ['Method', 'Paystack'],
@@ -109,6 +110,7 @@ export default function SponsorPage() {
           {receipt && (
             <div className="mt-5 rounded-2xl p-4 text-sm" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.1)' }}>
               <div className="flex justify-between py-1"><span className="text-white/45">Amount</span><span className="text-white font-semibold">{receipt.amount_formatted}</span></div>
+              {receipt.from && <div className="flex justify-between py-1"><span className="text-white/45">From</span><span className="text-white">{receipt.from}</span></div>}
               <div className="flex justify-between py-1"><span className="text-white/45">To</span><span className="text-white">{receipt.student_first_name}</span></div>
               <div className="flex justify-between py-1"><span className="text-white/45">Date</span><span className="text-white">{new Date(receipt.created_at).toLocaleString()}</span></div>
               <div className="py-1"><span className="text-white/45">Reference</span><p className="text-white/80 text-xs font-mono break-all">{receipt.reference}</p></div>
@@ -165,8 +167,8 @@ export default function SponsorPage() {
           </div>
 
           <label className="block">
-            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Your name (optional)</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="From… (e.g. Mum)" className={inputCls} />
+            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Your name (so they know it’s from you)</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Mum, Dad, Uncle Chidi" className={inputCls} />
           </label>
 
           {error && <p className="text-sm text-red-400">{error}</p>}

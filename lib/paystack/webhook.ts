@@ -483,5 +483,8 @@ async function handleWalletTopup(
     reference,
     customerPhone: metadata.customer_phone as string | undefined,
     customerName:  metadata.customer_name as string | undefined,
+    // When a parent/sponsor funded it, name them so the student sees who sent it
+    // (falls back to "A family member" if the sender left their name blank).
+    sponsorName:   metadata.is_sponsor ? ((metadata.sponsor_name as string | undefined)?.trim() || 'A family member') : undefined,
   })
 }

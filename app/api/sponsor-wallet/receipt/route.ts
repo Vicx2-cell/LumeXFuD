@@ -25,15 +25,19 @@ export async function GET(req: NextRequest) {
   const db = createSupabaseAdmin()
   const { data: txRow } = await db
     .from('customer_wallet_transactions')
-    .select('id, customer_id, reference, amount_kobo, type, created_at')
+    .select('id, customer_id, reference, amount_kobo, type, created_at, description')
     .eq('reference', ref)
     .eq('type', 'TOPUP')
     .maybeSingle()
-  const tx = txRow as { id: string; customer_id: string; reference: string; amount_kobo: number; type: string; created_at: string } | null
+  const tx = txRow as { id: string; customer_id: string; reference: string; amount_kobo: number; type: string; created_at: string; description: string | null } | null
   if (!tx) return NextResponse.json({ pending: true }) // webhook hasn't credited yet
 
   const { data: cRow } = await db.from('customers').select('name').eq('id', tx.customer_id).maybeSingle()
   const first = ((cRow as { name: string | null } | null)?.name ?? '').trim().split(/\s+/)[0] || 'Student'
+
+  // The sender's name is stored on the transaction as "Top-up from <name> [+ bonus]".
+  const m = (tx.description ?? '').match(/^Top-up from (.+?)(?: \+ .*)?$/)
+  const from = m ? m[1] : null
 
   return NextResponse.json({
     pending: false,
@@ -41,6 +45,7 @@ export async function GET(req: NextRequest) {
     amount_kobo: tx.amount_kobo,
     amount_formatted: formatPrice(tx.amount_kobo),
     student_first_name: first,
+    from,
     created_at: tx.created_at,
     receipt_code: receiptCode({ id: tx.id, reference: tx.reference, amount: tx.amount_kobo, type: tx.type, created_at: tx.created_at }),
   })
