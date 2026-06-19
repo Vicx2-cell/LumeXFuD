@@ -8,8 +8,8 @@ export default async function RiderWalletPage() {
   if (!session || session.role !== 'rider') redirect('/auth')
 
   return (
-    <main className="min-h-screen bg-[#0A0A0B]">
-      <div className="sticky top-0 z-10 bg-[#0A0A0B]/90 backdrop-blur border-b border-white/10 px-4 py-4 flex items-center gap-3">
+    <main className="lx-page">
+      <div className="lx-topbar sticky top-0 z-10 px-4 py-4 flex items-center gap-3">
         <a
           href="/rider"
           className="w-8 h-8 flex items-center justify-center rounded-full text-white/50 hover:text-white transition-colors"

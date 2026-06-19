@@ -67,7 +67,7 @@ export default function RiderReviews() {
         <div className="glass-thin p-5 text-center">
           {total > 0 ? (
             <>
-              <p className="text-4xl font-bold" style={{ color: '#F5A623' }}>{avg.toFixed(1)}</p>
+              <p className="lx-amber text-4xl font-bold">{avg.toFixed(1)}</p>
               <div className="flex justify-center mt-2"><Stars value={Math.round(avg)} size={18} /></div>
               <p className="text-xs text-white/45 mt-2">{total} rating{total === 1 ? '' : 's'} · {written.length} written</p>
             </>

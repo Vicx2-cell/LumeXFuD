@@ -286,7 +286,7 @@ export default function RiderDashboard() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="#F5A623" stroke="#F5A623" strokeWidth="1" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                 {rider.avg_rating?.toFixed(1) ?? '—'}
               </p>
-              <a href="/rider/reviews" className="text-xs font-medium mt-1.5 inline-block" style={{ color: '#F5A623' }}>
+              <a href="/rider/reviews" className="lx-amber text-xs font-medium mt-1.5 inline-block">
                 See your reviews →
               </a>
             </div>
@@ -346,8 +346,7 @@ export default function RiderDashboard() {
           )}
           <a
             href="/rider/wallet"
-            className="mt-3 inline-block text-xs font-medium px-3 py-1.5 rounded-lg"
-            style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }}
+            className="lx-card-amber lx-amber mt-3 inline-block text-xs font-medium px-3 py-1.5 rounded-lg"
           >
             View Wallet →
           </a>
@@ -358,14 +357,13 @@ export default function RiderDashboard() {
       {current && (
         <div className="mx-4 mb-5">
           <p className="text-xs text-white/40 uppercase tracking-wide mb-2">Active order</p>
-          <div className="glass p-4 lx-scale-in" style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.25)' }}>
+          <div className="glass lx-card-amber-soft p-4 lx-scale-in">
             <div className="flex items-start justify-between mb-3">
               <div>
                 <p className="font-semibold text-white">{current.order_number}</p>
                 <p className="text-xs text-white/50 mt-0.5">{current.vendors?.shop_name}</p>
               </div>
-              <span className="text-xs px-2 py-1 rounded-lg font-medium"
-                style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }}>
+              <span className="lx-card-amber lx-amber text-xs px-2 py-1 rounded-lg font-medium">
                 {STATUS_LABELS[current.status] ?? current.status}
               </span>
             </div>
@@ -397,8 +395,7 @@ export default function RiderDashboard() {
               <button
                 onClick={() => updateOrderStatus(current.id, 'PICKED_UP')}
                 disabled={updatingStatus}
-                className="w-full py-3 rounded-xl font-semibold text-sm disabled:opacity-50"
-                style={{ background: '#F5A623', color: '#000' }}
+                className="lx-btn-amber w-full py-3 text-sm"
               >
                 {updatingStatus ? 'Updating…' : 'Mark as Picked Up'}
               </button>
@@ -461,7 +458,7 @@ export default function RiderDashboard() {
 
         {isOnline && available.length === 0 && !current && (
           <div className="glass-thin p-6 text-center">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)' }}>
+            <div className="lx-icon-badge w-14 h-14 rounded-2xl mb-3">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5h-5l-2.5-6"/><path d="M12 6h3l2 5"/><path d="M6 11h7"/></svg>
             </div>
             <p className="font-semibold text-white/75">Engine&apos;s warm, no orders yet</p>

@@ -67,6 +67,9 @@ key) via `validateEnv()` — unrelated to these changes.
       orders, leaderboard-client, profile-client (5 hand-rolled glass cards → glass-thin).
       Badge/Pill/lx-field/lx-card-amber/lx-icon-badge/lx-amber adopted. chow-ai left intact
       (already on-brand). New utility: .lx-topbar, .lx-amber. tsc clean.
-- [ ] 4. Rider
+- [x] 4. Rider — dashboard (active-order card, wallet/reviews links, picked-up action,
+      empty-state icon → utilities), wallet page (flat bg → lx-page + lx-topbar), reviews
+      avg → lx-amber. Semantic green status actions + online toggle left. tsc clean.
+      (Shared components/wallet/WalletView left for now — used by customer + rider.)
 - [ ] 5. Admin
 - [ ] 6. Super-admin
