@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
+import { Pill } from '@/components/ui/pill'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -94,7 +95,7 @@ function Skeleton() {
   return (
     <div className="grid grid-cols-2 gap-3">
       {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-        <div key={i} className="h-24 rounded-2xl animate-pulse" style={{ background: '#111113' }} />
+        <div key={i} className="lx-skeleton h-24 rounded-2xl" />
       ))}
     </div>
   )
@@ -512,16 +513,13 @@ function MyEarningsTab() {
       {/* Range filter */}
       <div className="flex gap-2 mb-4 flex-wrap">
         {RANGE_BTNS.map(({ key, label }) => (
-          <button
+          <Pill
             key={key}
+            active={range === key}
             onClick={() => { setRange(key); setPage(1) }}
-            className="px-4 py-1.5 rounded-full text-xs font-semibold transition-colors"
-            style={{
-              background: range === key ? '#F5A623' : 'rgba(255,255,255,0.06)',
-              color:      range === key ? '#000'     : 'rgba(255,255,255,0.5)',
-            }}>
+            className="px-4 py-1.5 text-xs font-semibold">
             {label}
-          </button>
+          </Pill>
         ))}
         {records.length > 0 && (
           <button
@@ -558,7 +556,7 @@ function MyEarningsTab() {
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-14 rounded-xl animate-pulse" style={{ background: '#111113' }} />
+            <div key={i} className="lx-skeleton h-14 rounded-xl" />
           ))}
         </div>
       ) : records.length === 0 ? (
@@ -737,7 +735,7 @@ export default function SuperAdminFinancials() {
   }, [router])
 
   return (
-    <div className="min-h-dvh px-4 py-8" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page px-4 py-8">
       <div className="mx-auto max-w-2xl">
 
         {/* Header */}

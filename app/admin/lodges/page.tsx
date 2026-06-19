@@ -112,14 +112,14 @@ export default function AdminLodgesPage() {
         <div className="glass-thin p-4 mb-6 space-y-3">
           <p className="text-xs uppercase tracking-wide text-white/40 font-semibold">Add a lodge</p>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Lodge name (e.g. Chinaza Lodge)"
-            className="w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+            className="lx-field w-full px-3 py-2.5 text-sm" />
           <input value={area} onChange={(e) => setArea(e.target.value)} placeholder="Area / landmark (optional, e.g. Behind Main Gate)"
-            className="w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+            className="lx-field w-full px-3 py-2.5 text-sm" />
           <div className="flex gap-2">
             <input value={lat} onChange={(e) => setLat(e.target.value)} placeholder="Latitude (optional)" inputMode="decimal"
-              className="flex-1 rounded-xl px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+              className="lx-field flex-1 px-3 py-2.5 text-sm" />
             <input value={lng} onChange={(e) => setLng(e.target.value)} placeholder="Longitude (optional)" inputMode="decimal"
-              className="flex-1 rounded-xl px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+              className="lx-field flex-1 px-3 py-2.5 text-sm" />
           </div>
 
           {/* GPS capture — easiest when physically at the lodge. */}

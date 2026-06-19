@@ -35,11 +35,11 @@ export default function FeatureUsagePage() {
   const max = features.reduce((m, f) => Math.max(m, f.total), 0) || 1
 
   return (
-    <div className="min-h-dvh px-5 py-10" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page px-5 py-10">
       <div className="mx-auto max-w-2xl">
         <div className="mb-6 flex items-center justify-between">
           <BackButton fallback="/super-admin" />
-          <button onClick={load} disabled={loading} className="rounded-xl px-4 py-2 text-sm font-semibold text-black disabled:opacity-50" style={{ background: '#F5A623' }}>
+          <button onClick={load} disabled={loading} className="lx-btn-amber px-4 py-2 text-sm disabled:opacity-50">
             {loading ? 'Loading…' : 'Refresh'}
           </button>
         </div>
@@ -55,13 +55,13 @@ export default function FeatureUsagePage() {
 
         <div className="space-y-3">
           {features.map((f, i) => (
-            <div key={f.key} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div key={f.key} className="glass-thin rounded-2xl p-4">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
                   {i === 0 && <span title="Most used">🔥</span>}
                   <p className="font-semibold text-white truncate">{f.label}</p>
                 </div>
-                <span className="text-sm font-bold shrink-0" style={{ color: '#F5A623' }}>{f.total.toLocaleString()}</span>
+                <span className="lx-amber text-sm font-bold shrink-0">{f.total.toLocaleString()}</span>
               </div>
 
               {/* Total bar */}

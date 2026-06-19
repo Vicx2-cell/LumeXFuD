@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { Pill } from '@/components/ui/pill'
 
 interface ReviewRow {
   id: string
@@ -89,7 +90,7 @@ export default function AdminReviews() {
   }
 
   return (
-    <div className="min-h-dvh px-4 py-8" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page px-4 py-8">
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg"
           style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
@@ -105,23 +106,20 @@ export default function AdminReviews() {
               <p className="text-sm text-white/40">{reviews.length} {lowOnly ? 'low (1–2★)' : 'recent'} — newest first</p>
             )}
           </div>
-          <button
+          <Pill
+            active={lowOnly}
+            variant="danger"
             onClick={() => setLowOnly((v) => !v)}
-            className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
-            style={{
-              background: lowOnly ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)',
-              color: lowOnly ? '#EF4444' : 'rgba(255,255,255,0.6)',
-              border: `1px solid ${lowOnly ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)'}`,
-            }}
+            className="px-3 py-1.5 text-xs font-medium"
           >
             {lowOnly ? 'Showing low ratings' : 'Low ratings only'}
-          </button>
+          </Pill>
         </div>
 
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-28 rounded-2xl animate-pulse" style={{ background: '#111113' }} />
+              <div key={i} className="h-28 rounded-2xl lx-skeleton" />
             ))}
           </div>
         ) : reviews.length === 0 ? (

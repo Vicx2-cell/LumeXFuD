@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/back-button'
+import { Pill } from '@/components/ui/pill'
 
 type Audience = 'ALL' | 'CUSTOMER' | 'VENDOR' | 'RIDER'
 type Level = 'info' | 'warning' | 'success'
@@ -172,15 +173,13 @@ export default function AnnouncePage() {
           <div>
             <label className="text-xs text-white/50 mb-1.5 block">Title (optional)</label>
             <input value={title} onChange={(e) => setTitle(e.target.value.slice(0, 80))} placeholder="e.g. We’re open late tonight"
-              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-amber-400 transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+              className="lx-field w-full px-3 py-2.5 text-sm" />
           </div>
 
           <div>
             <label className="text-xs text-white/50 mb-1.5 block">Message</label>
             <textarea value={message} onChange={(e) => setMessage(e.target.value.slice(0, 500))} placeholder="What do you want them to see?" rows={3}
-              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none focus:border-amber-400 transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+              className="lx-field w-full px-3 py-2.5 text-sm resize-none" />
             <p className="text-[11px] text-white/30 mt-1 text-right">{message.length}/500</p>
           </div>
 
@@ -188,11 +187,10 @@ export default function AnnouncePage() {
             <label className="text-xs text-white/50 mb-1.5 block">Who sees it?</label>
             <div className="grid grid-cols-4 gap-2">
               {AUDIENCES.map((a) => (
-                <button key={a.key} onClick={() => setAudience(a.key)}
-                  className="py-2.5 rounded-xl text-xs font-medium transition-colors"
-                  style={{ background: audience === a.key ? '#F5A623' : 'rgba(255,255,255,0.06)', color: audience === a.key ? '#000' : 'rgba(255,255,255,0.7)', border: `1px solid ${audience === a.key ? '#F5A623' : 'rgba(255,255,255,0.1)'}` }}>
+                <Pill key={a.key} active={audience === a.key} onClick={() => setAudience(a.key)}
+                  className="py-2.5 rounded-xl text-xs font-medium">
                   {a.label}
-                </button>
+                </Pill>
               ))}
             </div>
           </div>
@@ -215,25 +213,22 @@ export default function AnnouncePage() {
             <label className="text-xs text-white/50 mb-1.5 block">When</label>
             <div className="grid grid-cols-2 gap-2">
               {([['now', 'Show now'], ['later', 'Schedule']] as const).map(([key, label]) => (
-                <button key={key} onClick={() => setWhen(key)}
-                  className="py-2.5 rounded-xl text-xs font-medium transition-colors"
-                  style={{ background: when === key ? '#F5A623' : 'rgba(255,255,255,0.06)', color: when === key ? '#000' : 'rgba(255,255,255,0.7)', border: `1px solid ${when === key ? '#F5A623' : 'rgba(255,255,255,0.1)'}` }}>
+                <Pill key={key} active={when === key} onClick={() => setWhen(key)}
+                  className="py-2.5 rounded-xl text-xs font-medium">
                   {label}
-                </button>
+                </Pill>
               ))}
             </div>
             {when === 'later' && (
               <div className="mt-2">
                 <input type="datetime-local" value={showAt} onChange={(e) => setShowAt(e.target.value)}
-                  className="w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-amber-400 transition-colors"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', colorScheme: 'dark' }} />
+                  className="lx-field w-full px-3 py-2.5 text-sm" style={{ colorScheme: 'dark' }} />
               </div>
             )}
             <div className="mt-2">
               <label className="text-[11px] text-white/40 mb-1 block">Auto-hide (optional)</label>
               <input type="datetime-local" value={autoHide} onChange={(e) => setAutoHide(e.target.value)}
-                className="w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-amber-400 transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', colorScheme: 'dark' }} />
+                className="lx-field w-full px-3 py-2.5 text-sm" style={{ colorScheme: 'dark' }} />
             </div>
           </div>
 

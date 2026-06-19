@@ -7,7 +7,7 @@ export default async function SentinelPage() {
   if (!session || session.role !== 'super_admin') redirect('/auth')
 
   return (
-    <main className="min-h-dvh px-4 py-6" style={{ background: '#0A0A0B' }}>
+    <main className="lx-page px-4 py-6">
       <div className="mx-auto max-w-2xl">
         <SentinelClient />
       </div>

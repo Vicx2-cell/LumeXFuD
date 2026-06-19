@@ -86,12 +86,12 @@ export default function SecurityHealthPage() {
   const categories = Array.from(new Set(checks.map((c) => c.category)))
 
   return (
-    <div className="min-h-dvh px-5 py-10" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page px-5 py-10">
       <div className="mx-auto max-w-2xl">
         <div className="mb-6 flex items-center justify-between">
           <BackButton fallback="/super-admin" />
           <button onClick={run} disabled={loading}
-            className="rounded-xl px-4 py-2 text-sm font-semibold text-black disabled:opacity-50" style={{ background: '#F5A623' }}>
+            className="lx-btn-amber px-4 py-2 text-sm disabled:opacity-50">
             {loading ? 'Running…' : 'Re-run checks'}
           </button>
         </div>

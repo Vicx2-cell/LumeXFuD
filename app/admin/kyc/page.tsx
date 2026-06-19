@@ -83,7 +83,7 @@ export default function AdminKycQueue() {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {u.docs.map((d) => (
-                          <div key={d.key} className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                          <div key={d.key} className="glass-thin rounded-xl p-3">
                             <p className="text-xs text-white/60 mb-2">{d.label}</p>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={d.url} alt={d.label} className="w-full h-40 object-cover rounded-lg mb-3" style={{ border: '1px solid rgba(255,255,255,0.08)' }} />

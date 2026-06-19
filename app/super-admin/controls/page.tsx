@@ -102,8 +102,7 @@ export default function ControlsPage() {
             <p className="text-sm text-white/55 mb-4">{confirmDlg.body}</p>
             <label className="text-xs text-white/50 block mb-1">Type <span className="font-mono text-amber-400">CONFIRM</span> to proceed</label>
             <input autoFocus value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="CONFIRM"
-              className="w-full rounded-xl px-3 py-2 text-sm outline-none mb-4"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+              className="lx-field w-full px-3 py-2 text-sm mb-4" />
             <div className="flex gap-2">
               <button onClick={() => setConfirmDlg(null)} className="flex-1 rounded-xl py-2.5 text-sm font-medium"
                 style={{ background: 'rgba(255,255,255,0.06)', color: '#fff' }}>Cancel</button>
@@ -133,8 +132,7 @@ export default function ControlsPage() {
             </div>
             <textarea value={c.maintenance_message} onChange={(e) => setC({ ...c, maintenance_message: e.target.value.slice(0, 300) })}
               onBlur={() => patch({ maintenance_message: c.maintenance_message }, 'Message saved')} rows={2}
-              className="w-full mt-3 rounded-xl px-3 py-2 text-sm outline-none resize-none focus:border-amber-400"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+              className="lx-field w-full mt-3 px-3 py-2 text-sm resize-none" />
           </div>
         </div>
 
@@ -223,12 +221,12 @@ export default function ControlsPage() {
             <div className="flex-1">
               <label className="text-xs text-white/50 block mb-1">Opens</label>
               <input type="time" value={c.hours_open} onChange={(e) => setC({ ...c, hours_open: e.target.value })} onBlur={() => patch({ hours_open: c.hours_open }, 'Hours saved')}
-                className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', colorScheme: 'dark' }} />
+                className="lx-field w-full px-3 py-2 text-sm" style={{ colorScheme: 'dark' }} />
             </div>
             <div className="flex-1">
               <label className="text-xs text-white/50 block mb-1">Closes</label>
               <input type="time" value={c.hours_close} onChange={(e) => setC({ ...c, hours_close: e.target.value })} onBlur={() => patch({ hours_close: c.hours_close }, 'Hours saved')}
-                className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', colorScheme: 'dark' }} />
+                className="lx-field w-full px-3 py-2 text-sm" style={{ colorScheme: 'dark' }} />
             </div>
           </div>
 
@@ -237,13 +235,13 @@ export default function ControlsPage() {
             <input type="number" min={0} max={120} value={c.auto_cancel_minutes}
               onChange={(e) => setC({ ...c, auto_cancel_minutes: Math.max(0, Math.min(120, Number(e.target.value) || 0)) })}
               onBlur={() => patch({ auto_cancel_minutes: c.auto_cancel_minutes }, 'Auto-cancel saved')}
-              className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+              className="lx-field w-full px-3 py-2 text-sm" />
           </div>
 
           <div className="p-4">
             <label className="text-xs text-white/50 block mb-1">Support contact (shown to users)</label>
             <input value={c.support_phone} onChange={(e) => setC({ ...c, support_phone: e.target.value })} onBlur={() => patch({ support_phone: c.support_phone }, 'Support contact saved')} placeholder="+234…"
-              className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+              className="lx-field w-full px-3 py-2 text-sm" />
           </div>
         </div>
 

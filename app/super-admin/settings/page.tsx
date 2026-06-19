@@ -82,7 +82,7 @@ export default function SuperAdminSettings() {
   }
 
   return (
-    <div className="min-h-dvh px-4 py-8" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page px-4 py-8">
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium"
           style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
@@ -109,7 +109,7 @@ export default function SuperAdminSettings() {
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: '#111113' }} />
+              <div key={i} className="lx-skeleton h-16 rounded-xl" />
             ))}
           </div>
         ) : settings.length === 0 ? (
@@ -117,7 +117,7 @@ export default function SuperAdminSettings() {
         ) : (
           <div className="space-y-2">
             {settings.map((s) => (
-              <div key={s.id} className="rounded-xl p-4" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div key={s.id} className="glass-thin rounded-xl p-4">
                 {editing === s.id ? (
                   <div>
                     <p className="text-xs text-white/40 font-mono mb-2">{s.id}</p>
@@ -152,8 +152,7 @@ export default function SuperAdminSettings() {
                       </p>
                     </div>
                     <button onClick={() => startEdit(s)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
-                      style={{ background: 'rgba(245,166,35,0.1)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.2)' }}>
+                      className="lx-card-amber-soft lx-amber px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0">
                       Edit
                     </button>
                   </div>

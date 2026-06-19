@@ -54,12 +54,12 @@ export default function VerifyReceiptPage() {
           <div>
             <label className="text-xs text-white/50 block mb-1">Reference</label>
             <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. RIDER-abc123… / WD-… / CWUSE-…"
-              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none font-mono" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+              className="lx-field w-full px-3 py-2.5 text-sm font-mono" />
           </div>
           <div>
             <label className="text-xs text-white/50 block mb-1">Verification code</label>
             <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="A1B2-C3D4-E5F6-7890"
-              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none font-mono uppercase" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+              className="lx-field w-full px-3 py-2.5 text-sm font-mono uppercase" />
           </div>
           <button onClick={() => verify()} disabled={busy || !reference.trim() || !code.trim()} className="lx-btn-amber w-full py-3 text-sm disabled:opacity-50">
             {busy ? 'Verifying…' : 'Verify'}

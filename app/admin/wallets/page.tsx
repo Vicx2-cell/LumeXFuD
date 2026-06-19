@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { Badge } from '@/components/ui/badge'
+import { Pill } from '@/components/ui/pill'
 
 interface FloatStats {
   total_wallet:        string
@@ -117,7 +119,7 @@ export default function AdminWalletsPage() {
   }
 
   return (
-    <div className="min-h-dvh px-4 py-8" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page px-4 py-8">
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg"
           style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
@@ -138,7 +140,7 @@ export default function AdminWalletsPage() {
 
         {/* Platform Float Summary */}
         {float && (
-          <div className="rounded-2xl p-5 mb-6" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="glass-thin rounded-2xl p-5 mb-6">
             <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Platform Float</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
               <div>
@@ -164,7 +166,7 @@ export default function AdminWalletsPage() {
               </div>
               <div>
                 <p className="text-xs text-white/40 mb-1">Total Platform Float</p>
-                <p className="text-lg font-semibold" style={{ color: '#F5A623' }}>{float.platform_total}</p>
+                <p className="lx-amber text-lg font-semibold">{float.platform_total}</p>
               </div>
               {float.frozen_count > 0 && (
                 <div>
@@ -200,41 +202,35 @@ export default function AdminWalletsPage() {
         {/* Filters */}
         <div className="flex flex-wrap gap-2 mb-4">
           <input
-            className="flex-1 min-w-[200px] px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/30 outline-none focus:ring-1 focus:ring-amber-500"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+            className="lx-field flex-1 min-w-[200px] px-4 py-2.5 text-sm placeholder-white/30"
             placeholder="Search name or phone…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           <div className="flex gap-1">
             {TYPE_FILTER_LABELS.map(({ key, label }) => (
-              <button key={key}
+              <Pill key={key}
+                active={typeFilter === key}
                 onClick={() => setTypeFilter(key)}
-                className="px-3 py-2 rounded-xl text-sm font-medium transition-colors"
-                style={{
-                  background: typeFilter === key ? '#F5A623' : 'rgba(255,255,255,0.06)',
-                  color: typeFilter === key ? '#000' : 'rgba(255,255,255,0.6)',
-                }}>
+                className="px-3 py-2 text-sm">
                 {label}
-              </button>
+              </Pill>
             ))}
           </div>
-          <button
+          <Pill
+            variant="danger"
+            active={frozenFilter}
             onClick={() => setFrozenFilter((v) => !v)}
-            className="px-3 py-2 rounded-xl text-sm font-medium transition-colors"
-            style={{
-              background: frozenFilter ? '#ef4444' : 'rgba(255,255,255,0.06)',
-              color: frozenFilter ? '#fff' : 'rgba(255,255,255,0.6)',
-            }}>
+            className="px-3 py-2 text-sm">
             🔒 Frozen
-          </button>
+          </Pill>
         </div>
 
         {/* Wallet Table */}
         {loading ? (
           <div className="space-y-2">
             {[1,2,3,4,5].map((i) => (
-              <div key={i} className="h-16 rounded-2xl animate-pulse" style={{ background: '#111113' }} />
+              <div key={i} className="h-16 rounded-2xl lx-skeleton" />
             ))}
           </div>
         ) : wallets.length === 0 ? (
@@ -257,10 +253,7 @@ export default function AdminWalletsPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-xs px-1.5 py-0.5 rounded font-bold"
-                          style={{ background: badge.bg, color: badge.fg }}>
-                          {w.user_type[0]}
-                        </span>
+                        <Badge color={badge.fg}>{w.user_type[0]}</Badge>
                         <p className="text-white font-medium text-sm truncate">{w.name}</p>
                         {w.is_frozen && <span className="text-xs text-red-400">🔒</span>}
                       </div>
@@ -300,13 +293,9 @@ export default function AdminWalletsPage() {
 
             <div className="flex items-start justify-between mb-4">
               <div>
-                <span className="text-xs px-2 py-0.5 rounded font-bold mb-1 inline-block"
-                  style={(() => {
-                    const b = badgeColor(selected.user_type)
-                    return { background: b.bg, color: b.fg }
-                  })()}>
+                <Badge color={badgeColor(selected.user_type).fg} className="mb-1 inline-block">
                   {selected.user_type}
-                </span>
+                </Badge>
                 <h2 className="text-white font-semibold text-lg">{selected.name}</h2>
                 {selected.owner && <p className="text-white/40 text-sm">{selected.owner}</p>}
                 <p className="text-white/40 text-sm">{selected.phone}</p>

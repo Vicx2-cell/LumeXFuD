@@ -122,14 +122,13 @@ export default function AdminRiders() {
             <p className="text-sm text-white/40">{riders.length} total</p>
           </div>
           <button onClick={() => router.push('/admin/riders/new')}
-            className="ml-auto px-4 py-2 rounded-xl text-sm font-semibold"
-            style={{ background: '#F5A623', color: '#000' }}>+ Add</button>
+            className="lx-btn-amber ml-auto px-4 py-2 text-sm">+ Add</button>
         </div>
 
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 rounded-2xl animate-pulse" style={{ background: '#111113' }} />
+              <div key={i} className="h-24 rounded-2xl lx-skeleton" />
             ))}
           </div>
         ) : riders.length === 0 ? (
@@ -137,7 +136,7 @@ export default function AdminRiders() {
         ) : (
           <div className="space-y-3">
             {riders.map((r) => (
-              <div key={r.id} className="rounded-2xl p-4" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div key={r.id} className="glass-thin rounded-2xl p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">

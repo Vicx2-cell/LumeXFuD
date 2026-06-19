@@ -35,7 +35,7 @@ export default function SuperAdminAudit() {
   useEffect(() => { fetchLogs(1) }, [])
 
   return (
-    <div className="min-h-dvh px-4 py-8" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page px-4 py-8">
       <div className="mx-auto max-w-2xl">
         <div className="flex items-center gap-3 mb-6">
           <button onClick={() => router.back()} className="w-9 h-9 rounded-full flex items-center justify-center text-white/50"
@@ -50,7 +50,7 @@ export default function SuperAdminAudit() {
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-14 rounded-xl animate-pulse" style={{ background: '#111113' }} />
+              <div key={i} className="lx-skeleton h-14 rounded-xl" />
             ))}
           </div>
         ) : logs.length === 0 ? (
@@ -59,8 +59,7 @@ export default function SuperAdminAudit() {
           <>
             <div className="space-y-1.5">
               {logs.map((log) => (
-                <div key={log.id} className="rounded-xl px-4 py-3 flex items-start gap-3"
-                  style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div key={log.id} className="glass-thin rounded-xl px-4 py-3 flex items-start gap-3">
                   <span className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: '#F5A623' }} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white">

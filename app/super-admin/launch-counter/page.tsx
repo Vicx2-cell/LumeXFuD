@@ -129,14 +129,12 @@ export default function SuperAdminLaunchCounter() {
                   inputMode="numeric"
                   value={goalInput}
                   onChange={(e) => setGoalInput(e.target.value)}
-                  className="flex-1 rounded-xl px-4 py-3 text-sm outline-none"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                  className="lx-field flex-1 px-4 py-3 text-sm"
                 />
                 <button
                   onClick={saveGoal}
                   disabled={busy}
-                  className="shrink-0 px-5 py-3 rounded-xl text-sm font-semibold disabled:opacity-60"
-                  style={{ background: '#F5A623', color: '#000' }}
+                  className="lx-btn-amber shrink-0 px-5 py-3 text-sm disabled:opacity-60"
                 >
                   Save goal
                 </button>
