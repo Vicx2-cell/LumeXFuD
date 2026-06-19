@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     .is('deleted_at', null)
   if (vErr) {
     console.error('[cron/recalculate-vendor-scores] vendor query error:', vErr.message)
-    return NextResponse.json({ error: 'DB query failed' }, { status: 500 })
+    return NextResponse.json({ error: 'DB query failed', detail: vErr.message }, { status: 500 })
   }
   const vendorIds = (vendorsRaw ?? []).map((v) => (v as { id: string }).id)
   if (vendorIds.length === 0) return NextResponse.json({ updated: 0 })
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       .range(from, from + PAGE - 1)
     if (oErr) {
       console.error('[cron/recalculate-vendor-scores] order query error:', oErr.message)
-      return NextResponse.json({ error: 'DB query failed' }, { status: 500 })
+      return NextResponse.json({ error: 'DB query failed', detail: oErr.message }, { status: 500 })
     }
     const batch = (data ?? []) as unknown as OrderRow[]
     orderRows.push(...batch)
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
     .upsert(rows, { onConflict: 'vendor_id' })
   if (upErr) {
     console.error('[cron/recalculate-vendor-scores] upsert error:', upErr.message)
-    return NextResponse.json({ error: 'Upsert failed' }, { status: 500 })
+    return NextResponse.json({ error: 'Upsert failed', detail: upErr.message }, { status: 500 })
   }
 
   return NextResponse.json({ updated: rows.length })
