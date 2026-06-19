@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'customer') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  // The 6-char code is the access key — cap lookups so it can't be brute-forced.
+  const rl = await rateLimitGeneric(`group-view:${session.userId ?? session.phone}`, 60, 60)
+  if (!rl.success) return NextResponse.json({ error: 'Too many requests.' }, { status: 429 })
 
   const { code } = await params
   const db = createSupabaseAdmin()
@@ -59,7 +64,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
     code: group.code,
     group_order_id: group.id,
     status: group.status,
+    expires_at: group.expires_at,
     is_host: group.host_customer_id === myId,
+    host_id: group.host_customer_id,
     vendor: { id: group.vendor_id, name: v?.name ?? 'Vendor' },
     items: itemRows,
     menu: (menu ?? []).map((m) => {

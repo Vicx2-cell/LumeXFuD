@@ -73,6 +73,7 @@ const ENTRIES: Entry[] = [
   { path: 'app/api/super-admin/cron-health/route', method: 'GET', allow: SUPER },
   { path: 'app/api/super-admin/cron-run/route', method: 'POST', allow: SUPER },
   { path: 'app/api/super-admin/security-health/route', method: 'GET', allow: SUPER },
+  { path: 'app/api/super-admin/feature-usage/route', method: 'GET', allow: SUPER },
   { path: 'app/api/super-admin/lockdown/route', method: 'GET', allow: SUPER },
   { path: 'app/api/super-admin/lockdown/route', method: 'POST', allow: SUPER },
   { path: 'app/api/super-admin/revoke-sessions/route', method: 'POST', allow: SUPER },

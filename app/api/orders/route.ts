@@ -6,6 +6,7 @@ import { generateOrderNumber } from '@/lib/order-number'
 import { initializePaystackTransaction } from '@/lib/paystack/init'
 import { spendCustomerWallet } from '@/lib/customer-wallet'
 import { notifyGroupOrderPlaced } from '@/lib/group-order'
+import { trackFeature } from '@/lib/usage'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { renderTemplate } from '@/lib/notify-templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
@@ -395,6 +396,8 @@ export async function POST(req: NextRequest) {
       .eq('id', order.id)
       .then(() => {}, () => {})
   }
+
+  trackFeature('ordering', 'customer') // analytics, fire-and-forget
 
   // ── WALLET (full): debit now, mark paid, hand the order to the vendor ───────
   // No Paystack charge and therefore no webhook will ever fire for this order,

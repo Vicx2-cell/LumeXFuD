@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useFeatures } from '@/lib/use-features'
+import { downloadReceiptPng } from '@/lib/receipt-download'
 
 const PRESETS = [1000, 2000, 5000, 10000]
+
+interface Receipt { reference: string; amount_formatted: string; student_first_name: string; created_at: string; receipt_code: string }
 
 export default function SponsorPage() {
   const features = useFeatures()
@@ -13,6 +16,8 @@ export default function SponsorPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  const [receipt, setReceipt] = useState<Receipt | null>(null)
+  const [receiptPending, setReceiptPending] = useState(false)
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search)
@@ -20,7 +25,43 @@ export default function SponsorPage() {
     // A student shares /sponsor?phone=+234… so the parent lands prefilled.
     const p = q.get('phone')
     if (p && /^\+?\d{7,}$/.test(p)) setPhone(p.startsWith('+') ? p : '+' + p)
+
+    // Poll for the receipt once the payment confirms (webhook credits async).
+    const ref = q.get('ref')
+    if (q.get('status') === 'success' && ref) {
+      setReceiptPending(true)
+      let tries = 0
+      const tick = async () => {
+        tries++
+        try {
+          const res = await fetch(`/api/sponsor-wallet/receipt?ref=${encodeURIComponent(ref)}`, { cache: 'no-store' })
+          const d = await res.json()
+          if (res.ok && d.pending === false) { setReceipt(d); setReceiptPending(false); return }
+        } catch { /* retry */ }
+        if (tries < 8) setTimeout(tick, 2000)
+        else setReceiptPending(false)
+      }
+      tick()
+    }
   }, [])
+
+  const saveReceipt = () => {
+    if (!receipt) return
+    downloadReceiptPng({
+      title: 'Wallet Top-up Receipt',
+      party: 'LumeX Wallet',
+      amountLine: `+${receipt.amount_formatted}`,
+      amountPositive: true,
+      rows: [
+        ['To', receipt.student_first_name],
+        ['Date', new Date(receipt.created_at).toLocaleString()],
+        ['Method', 'Paystack'],
+      ],
+      reference: receipt.reference,
+      code: receipt.receipt_code,
+      refName: receipt.reference,
+    })
+  }
 
   if (features.sponsor_topup === false) {
     return (
@@ -50,14 +91,36 @@ export default function SponsorPage() {
   if (done) {
     return (
       <div className="min-h-dvh flex items-center justify-center px-5" style={{ background: '#0A0A0B' }}>
-        <div className="w-full max-w-md text-center rounded-3xl border border-green-500/30 bg-green-500/10 p-8">
-          <div className="text-4xl mb-3">✅</div>
-          <h1 className="text-xl font-bold text-white">Thank you!</h1>
-          <p className="text-sm text-white/60 mt-2">
-            The wallet will be credited as soon as the payment confirms (usually seconds). The student gets a notification.
-          </p>
-          <button onClick={() => { setDone(false); setAmount(''); window.history.replaceState({}, '', '/sponsor') }}
-            className="mt-6 w-full rounded-2xl py-3 text-sm font-semibold text-black" style={{ background: '#F5A623' }}>
+        <div className="w-full max-w-md rounded-3xl border border-green-500/30 bg-green-500/10 p-8">
+          <div className="text-center">
+            <div className="text-4xl mb-3">✅</div>
+            <h1 className="text-xl font-bold text-white">Thank you!</h1>
+            <p className="text-sm text-white/60 mt-2">
+              {receipt
+                ? `${receipt.amount_formatted} sent to ${receipt.student_first_name}'s wallet. They've been notified.`
+                : 'The wallet will be credited as soon as the payment confirms (usually seconds). The student gets a notification.'}
+            </p>
+          </div>
+
+          {receiptPending && !receipt && (
+            <p className="mt-5 text-center text-xs text-white/40">Preparing your receipt…</p>
+          )}
+
+          {receipt && (
+            <div className="mt-5 rounded-2xl p-4 text-sm" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div className="flex justify-between py-1"><span className="text-white/45">Amount</span><span className="text-white font-semibold">{receipt.amount_formatted}</span></div>
+              <div className="flex justify-between py-1"><span className="text-white/45">To</span><span className="text-white">{receipt.student_first_name}</span></div>
+              <div className="flex justify-between py-1"><span className="text-white/45">Date</span><span className="text-white">{new Date(receipt.created_at).toLocaleString()}</span></div>
+              <div className="py-1"><span className="text-white/45">Reference</span><p className="text-white/80 text-xs font-mono break-all">{receipt.reference}</p></div>
+              <div className="py-1"><span className="text-white/45">Verification code</span><p className="text-white/80 text-xs font-mono">{receipt.receipt_code}</p></div>
+              <button onClick={saveReceipt} className="mt-3 w-full rounded-xl py-2.5 text-sm font-semibold text-black" style={{ background: '#F5A623' }}>
+                Download receipt
+              </button>
+            </div>
+          )}
+
+          <button onClick={() => { setDone(false); setReceipt(null); setAmount(''); window.history.replaceState({}, '', '/sponsor') }}
+            className="mt-4 w-full rounded-2xl py-3 text-sm font-semibold text-white/70 border border-white/10">
             Send another
           </button>
         </div>

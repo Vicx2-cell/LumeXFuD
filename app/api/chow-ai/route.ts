@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { trackFeature } from '@/lib/usage'
 import { toKobo } from '@/lib/money'
 import { getLumiMemory, applyRemember, formatMemoryForPrompt, type RememberInput } from '@/lib/lumi-memory'
-import { getAnthropic } from '@/lib/ai/client'
+import { isAIAvailable, resolveProvider, type LLMMessage, type LLMTool, type LLMToolResult } from '@/lib/ai/providers'
 
-// Claude needs the Node runtime.
+// The model needs the Node runtime.
 export const runtime = 'nodejs'
 
 // Lumi — the food companion. Internal path stays /api/chow-ai; "Lumi" is the
-// brand the student sees. Cheapest + fastest model — this runs on every chat
-// turn, so cost discipline matters. Haiku 4.5 grounded in real DB data.
-const MODEL = 'claude-haiku-4-5'
+// brand the student sees. Runs on the active AI provider's fast model (chosen by
+// the super-admin toggle) — this runs on every chat turn, so cost discipline
+// matters. Grounded in real DB data.
 
 // Base persona. The student's remembered profile (lib/lumi-memory) is appended
 // per-request so Lumi greets them by name and leads with their taste.
@@ -56,12 +56,12 @@ HOW TO ORDER (drive it like a friend who's got you):
 PHOTO: if they send a food photo, name the dish, then find_food for similar real items and recommend the closest match.`
 
 // ─── Tools ────────────────────────────────────────────────────────────────────
-const tools: Anthropic.Tool[] = [
+const tools: LLMTool[] = [
   {
     name: 'find_food',
     description:
       'Search what is available to order RIGHT NOW: open vendors and their in-stock menu items. Use the filters to narrow by budget, category, or a craving keyword. Returns real menu items only.',
-    input_schema: {
+    parameters: {
       type: 'object',
       properties: {
         max_price_naira: { type: 'number', description: "Most the student wants to spend on one item, in Naira (e.g. 1500)." },
@@ -75,7 +75,7 @@ const tools: Anthropic.Tool[] = [
     name: 'present_picks',
     description:
       'Give the student your recommendation while they decide. Pass the menu_item_ids you are suggesting (1–3, taken from find_food results) and a short friendly chat message.',
-    input_schema: {
+    parameters: {
       type: 'object',
       properties: {
         menu_item_ids: { type: 'array', items: { type: 'string' }, description: 'IDs of the recommended menu items, from find_food results.' },
@@ -88,7 +88,7 @@ const tools: Anthropic.Tool[] = [
     name: 'build_order',
     description:
       'Assemble a ready-to-pay order and show the student a Confirm & Pay card. This does NOT charge anyone — the student taps to pay themselves. Only call this once you know the item(s), the delivery type, AND the delivery address. All items must be from ONE vendor and come from the latest find_food results in this same turn.',
-    input_schema: {
+    parameters: {
       type: 'object',
       properties: {
         items: {
@@ -114,7 +114,7 @@ const tools: Anthropic.Tool[] = [
     name: 'remember',
     description:
       "Save something durable about this student so you know them next time: their name, taste, favourite dishes/vendors, dietary needs, usual budget, or light personal context they share (e.g. their course, that exams are near). Call this whenever you learn something worth keeping. NEVER save sensitive info (health, mental-health, money problems) or anything they ask you to forget. Arrays are added to what's already saved; name/spice/budget overwrite.",
-    input_schema: {
+    parameters: {
       type: 'object',
       properties: {
         preferred_name: { type: 'string', description: 'What to call them.' },
@@ -132,7 +132,7 @@ const tools: Anthropic.Tool[] = [
     name: 'learn_from_orders',
     description:
       "Look at this student's recent past orders to discover the foods they order most, so you can learn their favourites. ONLY call this AFTER they agree to let you get to know their taste. Read-only — it never changes anything. Afterwards, use the remember tool to save the favourites you found.",
-    input_schema: { type: 'object', properties: {}, required: [] },
+    parameters: { type: 'object', properties: {}, required: [] },
   },
 ]
 
@@ -336,11 +336,11 @@ export async function POST(req: NextRequest) {
 
   const rl = await rateLimitGeneric(`chow-ai:${session.userId ?? session.phone}`, 20, 300)
   if (!rl.success) return NextResponse.json({ error: 'Slow down a bit 😅 try again in a moment.' }, { status: 429 })
+  trackFeature('chow_ai', 'customer')
 
-  // Goes through the gated factory → respects the super-admin AI master switch
-  // (off = no spend). Returns null when AI is off or no key.
-  const anthropic = await getAnthropic()
-  if (!anthropic) {
+  // Respects the super-admin AI master switch (off = no spend) AND the active
+  // provider's key. 503 when AI is off / the active provider isn't configured.
+  if (!(await isAIAvailable('lumi'))) {
     return NextResponse.json({ error: 'Lumi is not configured yet.' }, { status: 503 })
   }
 
@@ -381,36 +381,26 @@ export async function POST(req: NextRequest) {
 
   // Validate picks/orders against what we actually surfaced — Lumi can't invent IDs.
   const seenItems = new Map<string, FoundItem>()
-  const messages: Anthropic.MessageParam[] = history.map((m) => ({ role: m.role, content: m.content }))
+  const messages: LLMMessage[] = history.map((m) => ({ role: m.role, text: m.content }))
   if (image) {
     const lastText = history[history.length - 1].content
     messages[messages.length - 1] = {
       role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: image.media_type, data: image.data } },
-        { type: 'text', text: lastText || 'Find me something like this.' },
-      ],
+      text: lastText || 'Find me something like this.',
+      images: [{ base64: image.data, mimeType: image.media_type }],
     }
   }
 
+  const provider = await resolveProvider('lumi')
+
   try {
     for (let turn = 0; turn < 5; turn++) {
-      const res = await anthropic.messages.create({
-        model: MODEL,
-        max_tokens: 700,
-        system,
-        tools,
-        messages,
-      })
-
-      const toolBlocks = res.content.filter(
-        (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
-      )
+      const res = await provider.chat({ system, tools, messages, maxTokens: 700 })
+      const toolBlocks = res.toolCalls
 
       // No tools → a plain chat/clarifying turn. Return it as-is.
       if (toolBlocks.length === 0) {
-        const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('').trim()
-        return NextResponse.json({ reply: text || "I'm here — what are you in the mood for?", suggestions: [] })
+        return NextResponse.json({ reply: res.text.trim() || "I'm here — what are you in the mood for?", suggestions: [] })
       }
 
       // Apply every remember block up front so saving happens regardless of which
@@ -420,7 +410,7 @@ export async function POST(req: NextRequest) {
         if (b.name !== 'remember') continue
         let saved = false
         if (customerId) {
-          try { saved = !!(await applyRemember(db, customerId, b.input as RememberInput)) }
+          try { saved = !!(await applyRemember(db, customerId, b.args as RememberInput)) }
           catch (e) { console.error('[lumi] remember failed:', e) }
         }
         ackById.set(b.id, saved
@@ -432,7 +422,7 @@ export async function POST(req: NextRequest) {
       const orderBlock = toolBlocks.find((b) => b.name === 'build_order')
       let orderError: string | null = null
       if (orderBlock) {
-        const input = orderBlock.input as {
+        const input = orderBlock.args as {
           items?: Array<{ menu_item_id?: string; quantity?: number }>
           delivery_type?: 'BIKE' | 'DOOR'
           delivery_address?: string
@@ -453,7 +443,7 @@ export async function POST(req: NextRequest) {
       if (!orderBlock) {
         const presentBlock = toolBlocks.find((b) => b.name === 'present_picks')
         if (presentBlock) {
-          const input = presentBlock.input as { menu_item_ids?: string[]; message?: string }
+          const input = presentBlock.args as { menu_item_ids?: string[]; message?: string }
           const picks = (input.menu_item_ids ?? [])
             .map((id) => seenItems.get(id))
             .filter((x): x is FoundItem => !!x)
@@ -463,35 +453,35 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Otherwise: produce a tool_result for EVERY tool_use block (the Anthropic
-      // protocol requires one per id) and loop again.
-      messages.push({ role: 'assistant', content: res.content })
-      const results: Anthropic.ToolResultBlockParam[] = []
+      // Otherwise: produce a tool result for EVERY tool call (the providers
+      // require one result per call) and loop again.
+      messages.push({ role: 'assistant', text: res.text, toolCalls: res.toolCalls })
+      const results: LLMToolResult[] = []
       for (const b of toolBlocks) {
         if (b.name === 'find_food') {
-          const found = await findFood(db, b.input as { max_price_naira?: number; category?: string; query?: string })
+          const found = await findFood(db, b.args as { max_price_naira?: number; category?: string; query?: string })
           for (const it of found.items) seenItems.set(it.menu_item_id, it)
           results.push({
-            type: 'tool_result',
-            tool_use_id: b.id,
+            id: b.id,
+            name: b.name,
             content: JSON.stringify({
               vendors_open: found.vendors_open,
               items: found.items.map((f) => ({ id: f.menu_item_id, vendor: f.vendor, name: f.name, price_naira: Math.round(f.price_kobo / 100), within_budget: f.within_budget, category: f.category })),
             }),
           })
         } else if (b.name === 'remember') {
-          results.push({ type: 'tool_result', tool_use_id: b.id, content: ackById.get(b.id) ?? 'Okay.' })
+          results.push({ id: b.id, name: b.name, content: ackById.get(b.id) ?? 'Okay.' })
         } else if (b.name === 'learn_from_orders') {
           const learned = await learnFromOrders(db, customerId)
-          results.push({ type: 'tool_result', tool_use_id: b.id, content: JSON.stringify(learned) })
+          results.push({ id: b.id, name: b.name, content: JSON.stringify(learned) })
         } else if (b.name === 'build_order') {
-          results.push({ type: 'tool_result', tool_use_id: b.id, is_error: true, content: orderError ?? 'Could not build the order.' })
+          results.push({ id: b.id, name: b.name, content: JSON.stringify({ error: orderError ?? 'Could not build the order.' }) })
         } else {
           // present_picks co-occurring with a build_order retry (rare) — ack so the protocol stays valid.
-          results.push({ type: 'tool_result', tool_use_id: b.id, content: 'Acknowledged.' })
+          results.push({ id: b.id, name: b.name, content: 'Acknowledged.' })
         }
       }
-      messages.push({ role: 'user', content: results })
+      messages.push({ role: 'user', toolResults: results })
     }
     return NextResponse.json({ reply: 'Hmm, I got a bit stuck 😅 please ask me again.', suggestions: [] })
   } catch (err) {

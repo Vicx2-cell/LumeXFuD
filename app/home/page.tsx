@@ -6,6 +6,7 @@ import { BrandLogo } from '@/components/brand-logo'
 import { Lumi } from '@/components/chow-ai'
 import { StreakNudge } from '@/components/streak-nudge'
 import { LaunchCounter } from '@/components/launch-counter'
+import ActiveGroupBanner from '@/components/active-group-banner'
 import { getFeature } from '@/lib/features'
 import { VendorCardSkeleton } from '@/components/ui/skeleton'
 import { HomepageClient } from '../homepage-client'
@@ -100,6 +101,9 @@ export default async function CustomerHomePage() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-5">
+        {/* Active group orders — always shows the way back into a group you're in */}
+        <ActiveGroupBanner />
+
         {/* Streak nudge — loss-aversion hook for returning customers */}
         <StreakNudge />
 

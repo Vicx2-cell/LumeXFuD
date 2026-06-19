@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { rateLimitGeneric } from '@/lib/rate-limit'
-import { getAnthropic, MODELS } from '@/lib/ai/client'
+import { trackFeature } from '@/lib/usage'
+import { isAIAvailable, resolveProvider, type LLMMessage, type LLMTool, type LLMToolResult } from '@/lib/ai/providers'
 import { getTierAndCount, getHoldPolicy, tierHoldLabel, type TrustTier } from '@/lib/wallet'
 import { toNaira } from '@/lib/money'
 
@@ -27,9 +27,9 @@ RULES:
 - You only handle earnings/payout questions. For delivery, app, or order problems, tell them to contact support. Never give tax or financial advice.
 - Encourage them — they did the work.`
 
-const tools: Anthropic.Tool[] = [
-  { name: 'get_earnings', description: "The rider's current balances, trust tier and bank/frozen status.", input_schema: { type: 'object', properties: {}, required: [] } },
-  { name: 'get_upcoming_releases', description: 'Money still on hold for this rider and when each portion is released.', input_schema: { type: 'object', properties: {}, required: [] } },
+const tools: LLMTool[] = [
+  { name: 'get_earnings', description: "The rider's current balances, trust tier and bank/frozen status.", parameters: { type: 'object', properties: {}, required: [] } },
+  { name: 'get_upcoming_releases', description: 'Money still on hold for this rider and when each portion is released.', parameters: { type: 'object', properties: {}, required: [] } },
 ]
 
 type DB = ReturnType<typeof createSupabaseAdmin>
@@ -94,12 +94,13 @@ export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'rider') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  trackFeature('rider_ai', 'rider')
 
   const riderId = session.userId!
   const rl = await rateLimitGeneric(`rider-ai:${riderId}`, 20, 300)
   if (!rl.success) return NextResponse.json({ error: 'Slow down a bit — try again in a moment.' }, { status: 429 })
 
-  if (!(await getAnthropic())) return NextResponse.json({ error: 'The assistant is not configured yet.' }, { status: 503 })
+  if (!(await isAIAvailable('rider'))) return NextResponse.json({ error: 'The assistant is not configured yet.' }, { status: 503 })
 
   let body: { messages?: ChatMessage[] }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid request' }, { status: 400 }) }
@@ -109,28 +110,26 @@ export async function POST(req: NextRequest) {
   }
 
   const db = createSupabaseAdmin()
-  const anthropic = (await getAnthropic())!
-  const messages: Anthropic.MessageParam[] = history.map((m) => ({ role: m.role, content: m.content }))
+  const provider = await resolveProvider('rider')
+  const messages: LLMMessage[] = history.map((m) => ({ role: m.role, text: m.content }))
 
   try {
     for (let turn = 0; turn < 4; turn++) {
-      const res = await anthropic.messages.create({ model: MODELS.fast, max_tokens: 400, system: SYSTEM, tools, messages })
-      const toolBlocks = res.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+      const res = await provider.chat({ system: SYSTEM, tools, messages, maxTokens: 400 })
 
-      if (toolBlocks.length === 0) {
-        const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('').trim()
-        return NextResponse.json({ reply: text || 'Ask me about your balance, payouts, or money on hold.' })
+      if (res.toolCalls.length === 0) {
+        return NextResponse.json({ reply: res.text.trim() || 'Ask me about your balance, payouts, or money on hold.' })
       }
 
-      messages.push({ role: 'assistant', content: res.content })
-      const results: Anthropic.ToolResultBlockParam[] = []
-      for (const b of toolBlocks) {
+      messages.push({ role: 'assistant', text: res.text, toolCalls: res.toolCalls })
+      const results: LLMToolResult[] = []
+      for (const b of res.toolCalls) {
         const data = b.name === 'get_earnings' ? await getEarnings(db, riderId)
           : b.name === 'get_upcoming_releases' ? await getUpcomingReleases(db, riderId)
           : { error: 'unknown tool' }
-        results.push({ type: 'tool_result', tool_use_id: b.id, content: JSON.stringify(data) })
+        results.push({ id: b.id, name: b.name, content: JSON.stringify(data) })
       }
-      messages.push({ role: 'user', content: results })
+      messages.push({ role: 'user', toolResults: results })
     }
     return NextResponse.json({ reply: 'Sorry, I got a bit stuck — please ask again.' })
   } catch (err) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { getTopupLimits, getTopupBonusPct, formatPrice } from '@/lib/customer-wallet'
+import { trackFeature } from '@/lib/usage'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 import crypto from 'crypto'
@@ -112,6 +113,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Paystack declined initialization' }, { status: 502 })
   }
 
+  trackFeature('wallet_topup', 'customer')
   return NextResponse.json({
     authorization_url: psData.data.authorization_url,
     reference,

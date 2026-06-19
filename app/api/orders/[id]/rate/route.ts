@@ -5,6 +5,7 @@ import { ratingInput } from '@/lib/validators'
 import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { getFeature } from '@/lib/features'
+import { trackFeature } from '@/lib/usage'
 
 // POST /api/orders/[id]/rate
 // Customer rates the vendor after their order, with an optional public review.
@@ -27,6 +28,7 @@ export async function POST(
 
   const rl = await rateLimitGeneric(`order-rate:${session.userId ?? session.phone}`, 30, 60)
   if (!rl.success) return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429 })
+  trackFeature('reviews', 'customer')
 
   let body: unknown
   try {

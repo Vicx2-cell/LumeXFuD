@@ -7,7 +7,29 @@ import { useFeatures } from '@/lib/use-features'
 
 interface GItem { id: string; contributor_id: string; contributor_name: string; quantity: number; notes: string | null; menu_item_id: string; name: string; price_kobo: number; mine: boolean }
 interface MenuItem { id: string; name: string; price_kobo: number; category: string }
-interface GroupData { code: string; group_order_id: string; status: string; is_host: boolean; vendor: { id: string; name: string }; items: GItem[]; menu: MenuItem[] }
+interface GroupData { code: string; group_order_id: string; status: string; expires_at: string; is_host: boolean; host_id: string; vendor: { id: string; name: string }; items: GItem[]; menu: MenuItem[] }
+
+interface Person { id: string; name: string; total: number; count: number; mine: boolean }
+function groupByPerson(items: GItem[]): Person[] {
+  const m = new Map<string, Person>()
+  for (const it of items) {
+    const e = m.get(it.contributor_id) ?? { id: it.contributor_id, name: it.contributor_name, total: 0, count: 0, mine: false }
+    e.total += it.price_kobo * it.quantity
+    e.count += it.quantity
+    e.mine = e.mine || it.mine
+    m.set(it.contributor_id, e)
+  }
+  return Array.from(m.values())
+}
+
+function remainingLabel(expiresAt: string, now: number): string | null {
+  const ms = Date.parse(expiresAt) - now
+  if (!Number.isFinite(ms)) return null
+  if (ms <= 0) return 'closed'
+  const mins = Math.floor(ms / 60000)
+  if (mins < 60) return `${mins}m`
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`
+}
 
 const naira = (k: number) => '₦' + (k / 100).toLocaleString()
 
@@ -23,37 +45,66 @@ export default function GroupOrderPage() {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState('')
   const [copied, setCopied] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
+
+  // silent=true is used by the auto-refresh poll so the page never flickers.
+  const load = useCallback(async (silent = false) => {
     try {
       const res = await fetch(`/api/group-order/${code}`, { cache: 'no-store' })
       if (res.status === 401) { router.push(`/auth?next=/group/${code}`); return }
       const d = await res.json()
-      if (!res.ok) { setError(d.error ?? 'Could not load group order.'); return }
-      setData(d)
-    } catch { setError('Connection error.') } finally { setLoading(false) }
+      if (!res.ok) { if (!silent) setError(d.error ?? 'Could not load group order.'); return }
+      setData(d); setError('')
+    } catch { if (!silent) setError('Connection error.') } finally { if (!silent) setLoading(false) }
   }, [code, router])
 
-  useEffect(() => { load() }, [load])
+  // Initial load + a fast auto-refresh so everyone sees new items live.
+  useEffect(() => {
+    load()
+    const t = setInterval(() => load(true), 5000)
+    return () => clearInterval(t)
+  }, [load])
 
   const addItem = async (menu_item_id: string) => {
-    setBusyId(menu_item_id)
+    setBusyId(menu_item_id); setError('')
+    // Optimistic: show it instantly, then reconcile with the server silently.
+    const m = data?.menu.find((x) => x.id === menu_item_id)
+    if (data && m) {
+      setData({ ...data, items: [...data.items, { id: `tmp-${menu_item_id}-${now}`, contributor_id: 'me', contributor_name: 'You', quantity: 1, notes: null, menu_item_id, name: m.name, price_kobo: m.price_kobo, mine: true }] })
+    }
     try {
       const res = await fetch(`/api/group-order/${code}/items`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ menu_item_id, quantity: 1 }),
       })
-      const d = await res.json()
-      if (!res.ok) { setError(d.error ?? 'Could not add.'); return }
-      await load()
-    } catch { setError('Connection error.') } finally { setBusyId('') }
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) setError(d.error ?? 'Could not add.')
+      await load(true)
+    } catch { setError('Connection error.'); await load(true) } finally { setBusyId('') }
   }
 
   const removeItem = async (id: string) => {
     setBusyId(id)
+    // Optimistic remove, then reconcile.
+    if (data) setData({ ...data, items: data.items.filter((it) => it.id !== id) })
     try {
-      const res = await fetch(`/api/group-order/${code}/items?itemId=${id}`, { method: 'DELETE' })
-      if (res.ok) await load()
+      await fetch(`/api/group-order/${code}/items?itemId=${id}`, { method: 'DELETE' })
+      await load(true)
+    } finally { setBusyId('') }
+  }
+
+  const removePerson = async (contributorId: string, name: string) => {
+    if (!window.confirm(`Remove ${name} and all their items from the group?`)) return
+    setBusyId(contributorId)
+    if (data) setData({ ...data, items: data.items.filter((it) => it.contributor_id !== contributorId) })
+    try {
+      await fetch(`/api/group-order/${code}/items?contributorId=${contributorId}`, { method: 'DELETE' })
+      await load(true)
     } finally { setBusyId('') }
   }
 
@@ -90,6 +141,9 @@ export default function GroupOrderPage() {
   if (!data) return null
 
   const total = data.items.reduce((s, i) => s + i.price_kobo * i.quantity, 0)
+  const closesIn = remainingLabel(data.expires_at, now)
+  const expired = closesIn === 'closed'
+  const people = groupByPerson(data.items)
 
   return (
     <Shell>
@@ -97,7 +151,15 @@ export default function GroupOrderPage() {
         <h1 className="text-2xl font-bold text-white">Group order</h1>
         <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }}>{data.vendor.name}</span>
       </div>
-      <p className="text-sm text-white/45 mb-4">Everyone adds their food here. {data.is_host ? 'You’re the host — you’ll pay for the whole order.' : 'The host pays for everyone; sort out your share with them.'}</p>
+      <p className="text-sm text-white/45 mb-3">Everyone adds their food here. {data.is_host ? 'You’re the host — you’ll pay for the whole order.' : 'The host pays for everyone; sort out your share with them.'}</p>
+
+      <div className="rounded-xl px-3 py-2 mb-4 text-sm flex items-center gap-2"
+        style={expired ? { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' } : { background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.2)' }}>
+        <span aria-hidden="true">⏳</span>
+        <span className={expired ? 'text-red-400' : 'text-white/70'}>
+          {expired ? 'This group order has closed — start a new one.' : `Closes in ${closesIn} — add your items before then.`}
+        </span>
+      </div>
 
       <button onClick={share} className="w-full mb-5 rounded-2xl py-3 text-sm font-semibold" style={{ background: '#25D366', color: '#fff' }}>
         {copied ? 'Link copied!' : 'Share group link with friends'}
@@ -105,9 +167,40 @@ export default function GroupOrderPage() {
 
       {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
 
+      {/* People in the group + the bill split */}
+      {people.length > 0 && (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 mb-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-white/40 mb-2">People ({people.length}/3)</p>
+          <div className="space-y-2">
+            {people.map((p) => (
+              <div key={p.id} className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm text-white truncate">
+                    {p.name}{p.id === data.host_id ? ' · host' : ''}{p.mine ? ' (you)' : ''}
+                  </p>
+                  <p className="text-[11px] text-white/40">{p.count} item{p.count === 1 ? '' : 's'} · {naira(p.total)} food</p>
+                </div>
+                {data.is_host && p.id !== data.host_id && p.id !== 'me' && (
+                  <button onClick={() => removePerson(p.id, p.name)} disabled={busyId === p.id}
+                    className="text-xs text-red-400/80 hover:text-red-400 shrink-0 disabled:opacity-50">remove</button>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-white/35 mt-3 pt-2 border-t border-white/10">
+            Split: everyone pays their own food + an equal share of delivery &amp; platform fee. Each person gets their exact share by WhatsApp once you check out.
+          </p>
+        </div>
+      )}
+
       {/* Running list */}
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 mb-5">
-        <p className="text-xs uppercase tracking-[0.18em] text-white/40 mb-2">In the basket ({data.items.length})</p>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs uppercase tracking-[0.18em] text-white/40">In the basket ({data.items.length})</p>
+          <button onClick={() => load(true)} className="text-xs text-white/40 hover:text-white/70 flex items-center gap-1" aria-label="Refresh">
+            ↻ refresh
+          </button>
+        </div>
         {data.items.length === 0 ? (
           <p className="text-sm text-white/40">Nothing yet — add from the menu below.</p>
         ) : (
@@ -141,7 +234,7 @@ export default function GroupOrderPage() {
               <p className="text-sm text-white truncate">{m.name}</p>
               <p className="text-[11px] text-white/40">{naira(m.price_kobo)}</p>
             </div>
-            <button onClick={() => addItem(m.id)} disabled={busyId === m.id}
+            <button onClick={() => addItem(m.id)} disabled={busyId === m.id || expired}
               className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-50" style={{ background: '#F5A623' }}>
               {busyId === m.id ? '…' : '+ Add'}
             </button>
@@ -150,7 +243,7 @@ export default function GroupOrderPage() {
       </div>
 
       {/* Host checkout bar */}
-      {data.is_host && data.items.length > 0 && (
+      {data.is_host && data.items.length > 0 && !expired && (
         <div className="fixed bottom-0 left-0 right-0 p-4" style={{ background: 'linear-gradient(to top, #0A0A0B, rgba(10,10,11,0.9))' }}>
           <div className="mx-auto max-w-md">
             <button onClick={checkout} className="w-full rounded-2xl py-4 text-sm font-bold text-black" style={{ background: '#F5A623', minHeight: 52 }}>

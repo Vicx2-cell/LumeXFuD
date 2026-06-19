@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { generateGroupCode } from '@/lib/group-order'
 import { getFeature } from '@/lib/features'
+import { trackFeature } from '@/lib/usage'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
@@ -65,7 +66,9 @@ export async function POST(req: NextRequest) {
   for (let attempt = 0; attempt < 3; attempt++) {
     code = generateGroupCode()
     const { data, error } = await db.from('group_orders')
-      .insert({ code, vendor_id: v.id, host_customer_id: customer.id })
+      // Short, explicit window — a meal group is decided fast; the link auto-closes
+      // in 3h (the page shows a countdown; adds/checkout are refused after).
+      .insert({ code, vendor_id: v.id, host_customer_id: customer.id, expires_at: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString() })
       .select('id').single()
     if (!error && data) { groupId = (data as { id: string }).id; break }
     if (error && error.code !== '23505') {
@@ -85,5 +88,6 @@ export async function POST(req: NextRequest) {
     })))
   }
 
+  trackFeature('group_orders', 'customer')
   return NextResponse.json({ code })
 }

@@ -3,6 +3,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
 import { getTopupLimits, getTopupBonusPct, formatPrice } from '@/lib/customer-wallet'
 import { getFeature } from '@/lib/features'
+import { trackFeature } from '@/lib/usage'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 import crypto from 'crypto'
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
       email:     `${phone.replace('+', '')}@lumexfud.com.ng`,
       amount:    amountKobo,
       reference,
-      callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/sponsor?status=success`,
+      callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/sponsor?status=success&ref=${reference}`,
       metadata: {
         // Same type the existing webhook handles — it credits this customer_id.
         type:           'WALLET_TOPUP',
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest) {
 
   // Only reveal the first name, so the form confirms the right person without
   // leaking the full identity behind a phone number.
+  trackFeature('sponsor_topup', 'guest')
   const firstName = (customer.name ?? '').trim().split(/\s+/)[0] || 'this student'
   return NextResponse.json({
     authorization_url: psData.data.authorization_url,

@@ -63,6 +63,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
   const customer = await me(db, session.phone)
   if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
 
+  // A group is capped at 3 distinct people (the host + 2 friends). Existing
+  // members can keep adding; a new person is refused once 3 are in.
+  const { data: contribRows } = await db.from('group_order_items').select('contributor_id').eq('group_order_id', group.id)
+  const distinct = new Set((contribRows ?? []).map((r) => (r as { contributor_id: string }).contributor_id))
+  if (!distinct.has(customer.id) && distinct.size >= 3) {
+    return NextResponse.json({ error: 'This group is full (max 3 people).', full: true }, { status: 409 })
+  }
+
   const { error } = await db.from('group_order_items').insert({
     group_order_id: group.id,
     contributor_id: customer.id,
@@ -94,7 +102,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
   return NextResponse.json({ success: true })
 }
 
-// DELETE /api/group-order/[code]/items?itemId=… — remove your own item (or the host removes any).
+// DELETE /api/group-order/[code]/items?itemId=…  → remove one item (own, or host removes any)
+//        /api/group-order/[code]/items?contributorId=…  → host removes a whole person
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -102,7 +111,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ c
 
   const { code } = await params
   const itemId = req.nextUrl.searchParams.get('itemId') ?? ''
-  if (!itemId) return NextResponse.json({ error: 'Missing item' }, { status: 400 })
+  const contributorId = req.nextUrl.searchParams.get('contributorId') ?? ''
+  if (!itemId && !contributorId) return NextResponse.json({ error: 'Nothing to remove' }, { status: 400 })
 
   const db = createSupabaseAdmin()
   const group = await loadOpenGroup(db, code)
@@ -110,6 +120,18 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ c
 
   const customer = await me(db, session.phone)
   if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
+
+  // Host removes an entire person (all their items) — host is in control.
+  if (contributorId) {
+    if (group.host_customer_id !== customer.id) {
+      return NextResponse.json({ error: 'Only the host can remove a person.' }, { status: 403 })
+    }
+    if (contributorId === group.host_customer_id) {
+      return NextResponse.json({ error: 'The host can’t be removed.' }, { status: 400 })
+    }
+    await db.from('group_order_items').delete().eq('group_order_id', group.id).eq('contributor_id', contributorId)
+    return NextResponse.json({ success: true })
+  }
 
   const { data: row } = await db.from('group_order_items').select('id, contributor_id').eq('id', itemId).eq('group_order_id', group.id).maybeSingle()
   const it = row as { id: string; contributor_id: string } | null
