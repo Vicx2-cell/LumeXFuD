@@ -5,7 +5,7 @@ import { createOrderInput } from '@/lib/validators'
 import { generateOrderNumber } from '@/lib/order-number'
 import { initializePaystackTransaction } from '@/lib/paystack/init'
 import { spendCustomerWallet } from '@/lib/customer-wallet'
-import { notifyGroupOrderPlaced } from '@/lib/group-order'
+import { notifyGroupOrderPlaced, notifyGroupSplitPaid } from '@/lib/group-order'
 import { trackFeature } from '@/lib/usage'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { renderTemplate } from '@/lib/notify-templates'
@@ -284,11 +284,13 @@ export async function POST(req: NextRequest) {
   // that group's host and it's still open for this vendor. Validated here so a
   // client can't attach someone else's group.
   let linkedGroupId: string | null = null
+  let groupSplitEnabled = false
   if (group_order_id && customerId) {
-    const { data: gq } = await db.from('group_orders').select('id, host_customer_id, vendor_id, status').eq('id', group_order_id).maybeSingle()
-    const g = gq as { id: string; host_customer_id: string; vendor_id: string; status: string } | null
+    const { data: gq } = await db.from('group_orders').select('id, host_customer_id, vendor_id, status, split_enabled').eq('id', group_order_id).maybeSingle()
+    const g = gq as { id: string; host_customer_id: string; vendor_id: string; status: string; split_enabled?: boolean } | null
     if (g && g.host_customer_id === customerId && g.vendor_id === vendor_id && g.status === 'OPEN') {
       linkedGroupId = g.id
+      groupSplitEnabled = g.split_enabled !== false
     }
   }
 
@@ -398,6 +400,82 @@ export async function POST(req: NextRequest) {
   }
 
   trackFeature('ordering', 'customer') // analytics, fire-and-forget
+
+  // ── GROUP SPLIT: each participant pays their OWN share from their wallet ─────
+  // The host never fronts for anyone. Every wallet is debited its share in ONE
+  // atomic call (group_order_collect): if anyone is short the whole thing rolls
+  // back and the order is dropped — so checkout is impossible until everyone has
+  // funded. Overrides whatever payment method the host picked at /cart.
+  if (linkedGroupId && groupSplitEnabled) {
+    // Per-member food (server-side prices), then split fees+tip: each pays their
+    // food + an equal share of (delivery+platform); the host absorbs the rounding
+    // remainder + the tip.
+    const { data: goItemsRaw } = await db.from('group_order_items').select('contributor_id, menu_item_id, quantity').eq('group_order_id', linkedGroupId)
+    const goItems = (goItemsRaw ?? []) as Array<{ contributor_id: string; menu_item_id: string; quantity: number }>
+    const giIds = Array.from(new Set(goItems.map((r) => r.menu_item_id)))
+    const { data: giMenu } = await db.from('menu_items').select('id, price_kobo').in('id', giIds)
+    const priceMap = new Map((giMenu ?? []).map((m) => [(m as { id: string }).id, Number((m as { price_kobo: number }).price_kobo)]))
+    const foodBy = new Map<string, number>()
+    for (const r of goItems) foodBy.set(r.contributor_id, (foodBy.get(r.contributor_id) ?? 0) + (priceMap.get(r.menu_item_id) ?? 0) * r.quantity)
+    // The host always participates (pays fees + tip even if they added no food).
+    if (customerId && !foodBy.has(customerId)) foodBy.set(customerId, 0)
+
+    const contribIds = Array.from(foodBy.keys())
+    const n = contribIds.length || 1
+    const fees = platformMarkup + deliveryFee
+    const feeEach = Math.floor(fees / n)
+    const hostFeePortion = fees - feeEach * (n - 1) // host covers the rounding remainder
+    const shareByCid: Record<string, number> = {}
+    const shares = contribIds.map((cid) => {
+      const food = foodBy.get(cid) ?? 0
+      const amount = cid === customerId ? food + hostFeePortion + tipKobo : food + feeEach
+      shareByCid[cid] = amount
+      return { customer_id: cid, amount_kobo: amount }
+    })
+    // Guarantee the order is EXACTLY covered (sum of shares == total) even if the
+    // host tweaked quantities at /cart — any difference falls on the host.
+    const sumShares = shares.reduce((s, x) => s + x.amount_kobo, 0)
+    const diff = totalAmount - sumShares
+    if (diff !== 0 && customerId) {
+      const hostShare = shares.find((s) => s.customer_id === customerId)
+      if (hostShare) { hostShare.amount_kobo += diff }
+      else shares.push({ customer_id: customerId, amount_kobo: diff })
+      shareByCid[customerId] = (shareByCid[customerId] ?? 0) + diff
+    }
+
+    let collectErr: string | null = null
+    try {
+      const { error } = await db.rpc('group_order_collect', { p_order_id: order.id, p_order_number: orderNumber, p_shares: shares })
+      if (error) collectErr = error.message
+    } catch (e) { collectErr = e instanceof Error ? e.message : String(e) }
+
+    if (collectErr) {
+      // Nobody charged (atomic rollback) — drop the reserved order so it can be retried once everyone funds.
+      await db.from('order_items').delete().eq('order_id', order.id)
+      await db.from('orders').delete().eq('id', order.id)
+      const shortId = collectErr.match(/INSUFFICIENT:([0-9a-fA-F-]+)/)?.[1] ?? null
+      return NextResponse.json(
+        { error: 'Everyone must put their share in their LumeX wallet before checkout.', split_unfunded: true, member_id: shortId },
+        { status: 409 },
+      )
+    }
+
+    const now = new Date().toISOString()
+    await db.from('orders').update({
+      payment_method: 'WALLET',
+      wallet_amount_kobo: totalAmount,
+      payment_status: 'PAID',
+      status: isScheduled ? 'SCHEDULED' : 'PENDING',
+      ...(isScheduled ? {} : { pending_since: now }),
+      updated_at: now,
+    }).eq('id', order.id).eq('payment_status', 'PENDING')
+
+    if (!isScheduled) {
+      await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, totalAmount, appUrl)
+      await notifyGroupSplitPaid(db, { groupOrderId: linkedGroupId, orderNumber, deliveryAddress: delivery_address, appUrl, hostId: customerId!, shareByCid })
+    }
+    return NextResponse.json({ order_number: orderNumber, payment_method: 'GROUP_SPLIT', paid: true, scheduled: isScheduled })
+  }
 
   // ── WALLET (full): debit now, mark paid, hand the order to the vendor ───────
   // No Paystack charge and therefore no webhook will ever fire for this order,

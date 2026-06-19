@@ -318,15 +318,27 @@ export default function GroupOrderPage() {
       </div>
 
       {/* Host checkout bar */}
-      {data.is_host && data.items.length > 0 && !expired && (
-        <div className="fixed bottom-0 left-0 right-0 p-4" style={{ background: 'linear-gradient(to top, #0A0A0B, rgba(10,10,11,0.9))' }}>
-          <div className="mx-auto max-w-md">
-            <button onClick={checkout} className="w-full rounded-2xl py-4 text-sm font-bold text-black" style={{ background: '#F5A623', minHeight: 52 }}>
-              Checkout &amp; pay for all · {naira(total)}
-            </button>
+      {data.is_host && data.items.length > 0 && !expired && (() => {
+        // When splitting, the host can't check out until every friend has put
+        // their share in their wallet (each pays their own — host never covers).
+        const memberIds = people.filter((p) => p.id !== data.host_id).map((p) => p.id)
+        const waiting = data.split_enabled && memberIds.some((id) => data.funded[id] === false)
+        return (
+          <div className="fixed bottom-0 left-0 right-0 p-4" style={{ background: 'linear-gradient(to top, #0A0A0B, rgba(10,10,11,0.9))' }}>
+            <div className="mx-auto max-w-md">
+              <button onClick={checkout} disabled={waiting}
+                className="w-full rounded-2xl py-4 text-sm font-bold text-black disabled:opacity-50" style={{ background: '#F5A623', minHeight: 52 }}>
+                {waiting
+                  ? 'Waiting for everyone to fund their share…'
+                  : data.split_enabled
+                    ? `Checkout · everyone pays their share · ${naira(total)}`
+                    : `Checkout & pay for all · ${naira(total)}`}
+              </button>
+              {waiting && <p className="text-[11px] text-white/40 text-center mt-2">Each friend must add their share to their LumeX wallet first.</p>}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </Shell>
   )
 }

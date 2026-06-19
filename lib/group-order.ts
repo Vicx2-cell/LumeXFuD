@@ -128,6 +128,50 @@ export async function notifyGroupOrderPlaced(
   }
 }
 
+/**
+ * Notify everyone that a SPLIT group order was placed and their own share was
+ * debited from their wallet. Flips the group OPEN→CHECKED_OUT (once). Best-effort.
+ */
+export async function notifyGroupSplitPaid(
+  db: ReturnType<typeof createSupabaseAdmin>,
+  opts: { groupOrderId: string; orderNumber: string; deliveryAddress: string; appUrl: string; hostId: string; shareByCid: Record<string, number> },
+): Promise<void> {
+  try {
+    const { data: flipped } = await db
+      .from('group_orders').update({ status: 'CHECKED_OUT' })
+      .eq('id', opts.groupOrderId).eq('status', 'OPEN').select('id, vendor_id')
+    if (!flipped || flipped.length === 0) return
+    const vendorId = (flipped[0] as { vendor_id: string }).vendor_id
+
+    const [{ data: vendor }, { data: custs }, { data: items }] = await Promise.all([
+      db.from('vendors').select('name').eq('id', vendorId).maybeSingle(),
+      db.from('customers').select('id, phone').in('id', Object.keys(opts.shareByCid)),
+      db.from('group_order_items').select('contributor_id, quantity, menu_items(name)').eq('group_order_id', opts.groupOrderId),
+    ])
+    const vendorName = (vendor as { name: string | null } | null)?.name ?? 'the vendor'
+    const itemsBy = new Map<string, string[]>()
+    for (const r of items ?? []) {
+      const row = r as unknown as { contributor_id: string; quantity: number; menu_items: { name: string } | null }
+      const a = itemsBy.get(row.contributor_id) ?? []
+      a.push(`${row.quantity}× ${row.menu_items?.name ?? 'item'}`)
+      itemsBy.set(row.contributor_id, a)
+    }
+    const naira = (k: number) => `₦${Math.round(k / 100).toLocaleString()}`
+    const track = `${opts.appUrl}/order/${opts.orderNumber}`
+    for (const c of (custs ?? []) as Array<{ id: string; phone: string }>) {
+      if (!c.phone) continue
+      const share = opts.shareByCid[c.id] ?? 0
+      const summary = (itemsBy.get(c.id) ?? []).join(', ')
+      void sendWhatsAppWithFallback({
+        to: c.phone,
+        message: `✅ Group order from ${vendorName} is placed!\nDelivering to: ${opts.deliveryAddress}\nYour items: ${summary}\nYour share ${naira(share)} was paid from your LumeX wallet${c.id === opts.hostId ? ' (you’re the host)' : ''}.\nTrack: ${track}`,
+      }).catch(() => {})
+    }
+  } catch (err) {
+    console.error('[group-order] notifyGroupSplitPaid failed:', err)
+  }
+}
+
 /** Tell the (non-host) participants the host cancelled the group. Best-effort. */
 export async function notifyGroupCancelled(
   db: ReturnType<typeof createSupabaseAdmin>,
