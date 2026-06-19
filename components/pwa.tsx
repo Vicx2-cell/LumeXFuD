@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 // ─── Service worker registration ─────────────────────────────────────────────
 // Registered only in production — a SW caching navigations/_next assets in dev
 // fights Next's HMR. The SW itself (public/sw.js) never caches /api, Supabase,
-// Paystack, or Termii.
+// Paystack, or Sendchamp.
 function ServiceWorkerRegister() {
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') return

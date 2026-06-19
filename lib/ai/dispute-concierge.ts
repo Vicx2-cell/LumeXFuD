@@ -1,5 +1,5 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { getAnthropic, MODELS } from '@/lib/ai/client'
+import { isAIAvailable, resolveProvider } from '@/lib/ai/providers'
 import { parseModelJson, DisputeConcierge } from '@/lib/ai/schemas'
 import { DISPUTE_CONCIERGE_PROMPT, wrapUntrusted } from '@/lib/ai/prompts'
 import { redactObject } from '@/lib/ai/guard'
@@ -73,8 +73,8 @@ async function gatherFacts(db: DB, orderId: string): Promise<{ facts: unknown; c
 }
 
 export async function runConcierge(db: DB, orderId: string): Promise<ConciergeResult | null> {
-  const anthropic = await getAnthropic()
-  if (!anthropic) return null
+  if (!(await isAIAvailable('dispute'))) return null
+  const provider = await resolveProvider('dispute')
 
   const gathered = await gatherFacts(db, orderId)
   if (!gathered) return null
@@ -82,16 +82,15 @@ export async function runConcierge(db: DB, orderId: string): Promise<ConciergeRe
   const base = `Dispute facts (JSON):\n${JSON.stringify(gathered.facts)}\n\nStudent's complaint:\n${wrapUntrusted(gathered.complaint || '(no description provided)')}`
   let lastErr = ''
   for (let attempt = 0; attempt < 2; attempt++) {
-    const content = attempt === 0 ? base : `${base}\n\nYour previous reply was invalid (${lastErr}). Return ONLY valid JSON for the schema.`
+    const userText = attempt === 0 ? base : `${base}\n\nYour previous reply was invalid (${lastErr}). Return ONLY valid JSON for the schema.`
     try {
-      const res = await anthropic.messages.create({
-        model: MODELS.fast,
-        max_tokens: 700,
+      const out = await provider.generate({
+        maxTokens: 700,
         system: DISPUTE_CONCIERGE_PROMPT,
-        messages: [{ role: 'user', content }],
+        userText,
+        jsonMode: true,
       })
-      const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('')
-      const parsed = parseModelJson(DisputeConcierge, text)
+      const parsed = parseModelJson(DisputeConcierge, out.text)
       if (parsed.ok) {
         const { customer_reply, ...brief } = parsed.data
         return { customerReply: customer_reply, brief }

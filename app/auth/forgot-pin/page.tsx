@@ -3,11 +3,16 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import RecoveryCodeDisplay from '@/components/auth/RecoveryCodeDisplay'
+import { useFeatures } from '@/lib/use-features'
 
-type Mode = 'phone' | 'choose' | 'questions' | 'recovery' | 'contact' | 'new-code'
+type Mode = 'phone' | 'choose' | 'questions' | 'recovery' | 'contact' | 'new-code' | 'otp'
 
 export default function ForgotPinPage() {
   const router = useRouter()
+  const features = useFeatures()
+  // The OTP reset path rides the same super-admin `phone_verification` flag as
+  // sign-up OTP — hidden when a super admin turns OTP delivery off.
+  const otpEnabled = features.phone_verification !== false
   const [mode, setMode]           = useState<Mode>('phone')
   const [phone, setPhone]         = useState('+234')
   const [question1, setQuestion1] = useState('')
@@ -18,6 +23,9 @@ export default function ForgotPinPage() {
   const [newPin, setNewPin]       = useState('')
   const [confirmPin, setConfirmPin] = useState('')
   const [newCode, setNewCode]     = useState('')
+  const [otpStep, setOtpStep]     = useState<'code' | 'pin'>('code')
+  const [otpCode, setOtpCode]     = useState('')
+  const [otpNote, setOtpNote]     = useState('')
   const [error, setError]         = useState('')
   const [loading, setLoading]     = useState(false)
 
@@ -114,6 +122,79 @@ export default function ForgotPinPage() {
     }
   }
 
+  // Method D — send a WhatsApp OTP scoped to "reset"
+  const handleSendResetOtp = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/otp/send', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ phone, purpose: 'reset' }),
+      })
+      const data = await res.json().catch(() => ({})) as { error?: string }
+      if (!res.ok) {
+        setError(data.error ?? 'Could not send the code.')
+        // Surface OTP being off, but keep the user on the choose screen.
+        if (mode !== 'otp') setMode('choose')
+        return
+      }
+      setOtpCode('')
+      setOtpStep('code')
+      setOtpNote('We sent a 6-digit code to your WhatsApp.')
+      setMode('otp')
+    } catch {
+      setError('Unable to connect. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Method D — confirm the code (sets the reset-scoped phone_verified cookie)
+  const handleVerifyResetOtp = async () => {
+    if (otpCode.length !== 6) { setError('Enter the 6-digit code.'); return }
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/otp/verify', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ phone, code: otpCode }),
+      })
+      const data = await res.json().catch(() => ({})) as { error?: string; verified?: boolean }
+      if (!res.ok) { setError(data.error ?? 'Incorrect or expired code.'); return }
+      setOtpStep('pin')
+      setOtpNote('Phone verified ✓ Set your new PIN.')
+    } catch {
+      setError('Unable to connect. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Method D — set the new PIN against the reset-scoped cookie
+  const handleOtpPinReset = async () => {
+    if (newPin !== confirmPin) { setError('PIN confirmation does not match.'); return }
+    if (!/^\d{6}$/.test(newPin)) { setError('PIN must be exactly 6 digits.'); return }
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/pin/reset', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ phone, new_pin: newPin }),
+      })
+      const data = await res.json().catch(() => ({})) as { redirect_path?: string; error?: string }
+      if (!res.ok) { setError(data.error ?? 'Could not reset your PIN. Please try again.'); return }
+      // Full navigation so the fresh session cookie is sent (see /auth login).
+      window.location.assign(data.redirect_path ?? '/')
+    } catch {
+      setError('Unable to reset your PIN right now. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div
       className="min-h-dvh flex items-center justify-center px-5 py-12"
@@ -128,6 +209,7 @@ export default function ForgotPinPage() {
             {mode === 'choose'    && 'Choose how you want to recover access to your account.'}
             {mode === 'questions' && 'Answer your two security questions to verify your identity.'}
             {mode === 'recovery'  && 'Enter your 12-character recovery code.'}
+            {mode === 'otp'       && (otpStep === 'code' ? 'Enter the 6-digit code we sent to your WhatsApp.' : 'Choose your new 6-digit PIN.')}
             {mode === 'contact'   && 'Contact the platform admin for a manual PIN reset.'}
             {mode === 'new-code'  && 'Your PIN has been reset. Save your new recovery code now.'}
           </p>
@@ -172,12 +254,23 @@ export default function ForgotPinPage() {
         {mode === 'choose' && (
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-3">
             <p className="text-xs text-white/40 mb-1">Account: {phone}</p>
+            {otpEnabled && (
+              <button
+                type="button"
+                onClick={handleSendResetOtp}
+                disabled={loading}
+                className="w-full rounded-2xl py-4 text-sm font-semibold text-black disabled:opacity-50"
+                style={{ background: '#F5A623' }}
+              >
+                {loading ? 'Sending…' : 'Send code on WhatsApp'}
+              </button>
+            )}
             <button
               type="button"
               onClick={handleGetQuestions}
               disabled={loading}
-              className="w-full rounded-2xl py-4 text-sm font-semibold text-black disabled:opacity-50"
-              style={{ background: '#F5A623' }}
+              className={`w-full rounded-2xl py-4 text-sm disabled:opacity-50 ${otpEnabled ? 'border border-white/10 bg-[#111113] text-white' : 'font-semibold text-black'}`}
+              style={otpEnabled ? undefined : { background: '#F5A623' }}
             >
               {loading ? 'Loading…' : 'I remember my security questions'}
             </button>
@@ -351,6 +444,104 @@ export default function ForgotPinPage() {
             <button
               type="button"
               onClick={() => { setError(''); setMode('choose') }}
+              className="w-full rounded-2xl border border-white/10 py-3 text-sm text-white"
+            >
+              Back
+            </button>
+          </div>
+        )}
+
+        {/* ── Method D: WhatsApp OTP ── */}
+        {mode === 'otp' && (
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-5">
+            {otpNote && <p className="text-sm text-emerald-400/90">{otpNote}</p>}
+
+            {otpStep === 'code' && (
+              <>
+                <label className="block text-sm text-white/70">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">
+                    6-digit code
+                  </span>
+                  <input
+                    value={otpCode}
+                    onChange={(e) => { setOtpCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6)); setError('') }}
+                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-center font-mono text-lg tracking-[0.4em] text-white outline-none"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="••••••"
+                    autoFocus
+                  />
+                </label>
+
+                {error && <p className="text-sm text-red-400">{error}</p>}
+
+                <button
+                  type="button"
+                  onClick={handleVerifyResetOtp}
+                  disabled={loading || otpCode.length !== 6}
+                  className="w-full rounded-2xl py-4 text-sm font-semibold text-black disabled:opacity-50"
+                  style={{ background: '#F5A623' }}
+                >
+                  {loading ? 'Verifying…' : 'Verify code'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendResetOtp}
+                  disabled={loading}
+                  className="w-full rounded-2xl border border-white/10 py-3 text-sm text-white/70 disabled:opacity-50"
+                >
+                  Resend code
+                </button>
+              </>
+            )}
+
+            {otpStep === 'pin' && (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block text-sm text-white/70">
+                    <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">New PIN</span>
+                    <input
+                      type="password"
+                      value={newPin}
+                      onChange={(e) => { setNewPin(e.target.value.replace(/[^0-9]/g, '')); setError('') }}
+                      className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="••••••"
+                      autoFocus
+                    />
+                  </label>
+                  <label className="block text-sm text-white/70">
+                    <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Confirm PIN</span>
+                    <input
+                      type="password"
+                      value={confirmPin}
+                      onChange={(e) => { setConfirmPin(e.target.value.replace(/[^0-9]/g, '')); setError('') }}
+                      className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="••••••"
+                    />
+                  </label>
+                </div>
+
+                {error && <p className="text-sm text-red-400">{error}</p>}
+
+                <button
+                  type="button"
+                  onClick={handleOtpPinReset}
+                  disabled={loading}
+                  className="w-full rounded-2xl py-4 text-sm font-semibold text-black disabled:opacity-50"
+                  style={{ background: '#F5A623' }}
+                >
+                  {loading ? 'Resetting…' : 'Reset PIN'}
+                </button>
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={() => { setError(''); setOtpNote(''); setOtpCode(''); setMode('choose') }}
               className="w-full rounded-2xl border border-white/10 py-3 text-sm text-white"
             >
               Back

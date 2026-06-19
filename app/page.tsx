@@ -57,8 +57,8 @@ export default async function LandingPage() {
       {/* ── Nav ── */}
       <nav className="sticky top-0 z-50 glass-thin" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
         <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
-          <span className="font-bold text-lg tracking-tight">
-            <span style={{ color: '#F5A623' }}>LumeX</span> Fud
+          <span className="lx-display font-bold text-lg tracking-tight">
+            <span className="lx-amber">LumeX</span> Fud
           </span>
           <div className="flex items-center gap-3">
             <Link
@@ -80,16 +80,14 @@ export default async function LandingPage() {
       {/* ── Hero ── */}
       <section className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-5 py-20">
         <div className="max-w-2xl mx-auto space-y-6 lx-stagger">
-          <div
-            className="inline-block px-3 py-1 rounded-full text-xs font-semibold"
-            style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.3)' }}
-          >
+          <div className="lx-card-amber-strong lx-amber inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" aria-hidden="true" />
             Now live on ABSU campus
           </div>
 
           <h1 className="text-4xl sm:text-5xl font-bold leading-tight tracking-tight">
             Hot food, right to<br />
-            <span style={{ color: '#F5A623' }}>your hostel door.</span>
+            <span className="lx-amber">your hostel door.</span>
           </h1>
 
           <p className="text-base sm:text-lg text-white/65 max-w-lg mx-auto leading-relaxed">
@@ -129,7 +127,7 @@ export default async function LandingPage() {
             { value: '7 days',   label: 'Every week' },
           ].map(({ value, label }, i) => (
             <Reveal key={label} delay={i * 90}>
-              <p className="text-2xl sm:text-3xl font-bold tabular-nums" style={{ color: '#F5A623' }}>{value}</p>
+              <p className="lx-display lx-amber text-2xl sm:text-3xl font-bold tabular-nums">{value}</p>
               <p className="text-xs sm:text-sm text-white/55 mt-1">{label}</p>
             </Reveal>
           ))}
@@ -152,7 +150,7 @@ export default async function LandingPage() {
             ].map(({ step, title, desc }, i) => (
               <Reveal key={step} delay={i * 110}>
                 <div className="glass-thin p-6 space-y-3 transition-transform hover:-translate-y-1 h-full">
-                  <span className="text-xs font-bold tracking-widest" style={{ color: '#F5A623' }}>{step}</span>
+                  <span className="lx-display text-xs font-bold tracking-widest lx-amber">{step}</span>
                   <h3 className="text-lg font-semibold">{title}</h3>
                   <p className="text-sm text-white/60 leading-relaxed">{desc}</p>
                 </div>
@@ -179,10 +177,7 @@ export default async function LandingPage() {
             ].map(({ Icon, title, desc }, i) => (
               <Reveal key={title} delay={i * 90}>
                 <div className="glass p-6 flex gap-4 items-start transition-transform hover:-translate-y-1 h-full">
-                  <span
-                    className="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl"
-                    style={{ background: 'rgba(245,166,35,0.12)', border: '1px solid rgba(245,166,35,0.25)' }}
-                  >
+                  <span className="lx-icon-badge flex-shrink-0 w-11 h-11 rounded-xl">
                     <Icon />
                   </span>
                   <div>
@@ -219,7 +214,7 @@ export default async function LandingPage() {
       <footer className="relative z-10 border-t border-white/8 py-8 px-5">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/35">
           <span>
-            <span className="font-semibold" style={{ color: '#F5A623' }}>LumeX Fud</span>
+            <span className="lx-display font-semibold lx-amber">LumeX Fud</span>
             {' '}— Campus life, simplified.
           </span>
           <div className="flex items-center gap-5">

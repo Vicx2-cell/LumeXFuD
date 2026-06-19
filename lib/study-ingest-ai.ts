@@ -1,10 +1,9 @@
-import type Anthropic from '@anthropic-ai/sdk'
-import { getAnthropic, MODELS } from './ai/client'
+import { resolveProvider } from './ai/providers'
 import { getFeature } from './features'
 import type { IngestProgramme } from './study-ingest'
 
 // Server-only: the grounded model call + the AI kill switch. Never imported by
-// client code; the API key stays server-side (getAnthropic reads process.env).
+// client code; the provider keys stay server-side (read from process.env).
 
 /**
  * AI kill switch (§7.5). Off disables ALL study AI with no code change:
@@ -15,10 +14,6 @@ export async function studyAiEnabled(): Promise<boolean> {
   if (process.env.STUDY_AI_ENABLED === 'false') return false
   return getFeature('ai') // master AI kill switch (super-admin)
 }
-
-// Ingestion is a low-volume, accuracy-critical one-time job, so it uses the
-// stronger (Sonnet) model — NOT the cheap per-student tier. Override via env.
-const INGEST_MODEL = process.env.AI_MODEL_INGEST || MODELS.vision
 
 const SYSTEM = `You extract Nigerian university curriculum data, grounded in the official NUC CCMAS (Core Curriculum and Minimum Academic Standards, in force since Sept 2023). Use web search to find the CCMAS document for the requested programme/discipline.
 
@@ -36,28 +31,21 @@ RULES:
 - Always include a sourceUrl you actually consulted for each row.
 - Output ONLY JSON, no prose: {"courses":[ ... ]}`
 
-/** Calls the grounded model and returns its raw JSON text. Returns '' if no key. */
+/** Calls the grounded model and returns its raw JSON text. Returns '' if AI off. */
 export async function runExtraction(programme: IngestProgramme): Promise<string> {
-  const anthropic = await getAnthropic()
-  if (!anthropic) return ''
+  if (!(await studyAiEnabled())) return ''
 
-  const tools = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 8 }] as unknown as Anthropic.Messages.ToolUnion[]
-  const messages: Anthropic.Messages.MessageParam[] = [
-    {
-      role: 'user',
-      content: `Programme: ${programme.name} (College of ${programme.facultyName}), Abia State University (ABSU), Nigeria. Extract its CCMAS curriculum across all levels and both semesters.`,
-    },
-  ]
-
-  let res = await anthropic.messages.create({ model: INGEST_MODEL, max_tokens: 12000, system: SYSTEM, tools, messages })
-  // Server-side web-search loop can pause_turn; re-send to resume (bounded).
-  let guard = 0
-  while (res.stop_reason === 'pause_turn' && guard++ < 10) {
-    messages.push({ role: 'assistant', content: res.content })
-    res = await anthropic.messages.create({ model: INGEST_MODEL, max_tokens: 12000, system: SYSTEM, tools, messages })
+  // Web-grounded, single call. The provider handles grounding per engine:
+  // Anthropic web_search (with its pause_turn resume loop) or Gemini Google
+  // Search grounding — both run on the stronger vision-tier model.
+  const userText = `Programme: ${programme.name} (College of ${programme.facultyName}), Abia State University (ABSU), Nigeria. Extract its CCMAS curriculum across all levels and both semesters.`
+  try {
+    const provider = await resolveProvider('study')
+    const out = await provider.generate({ system: SYSTEM, userText, webSearch: true, maxTokens: 12000 })
+    console.log(`[study-ingest] ${programme.id}: provider=${out.provider} model=${out.model} textChars=${out.text.length}`)
+    return out.text
+  } catch (err) {
+    console.error(`[study-ingest] ${programme.id}: extraction failed:`, err)
+    return ''
   }
-
-  const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('')
-  console.log(`[study-ingest] ${programme.id}: stop_reason=${res.stop_reason} continuations=${guard} textChars=${text.length}`)
-  return text
 }

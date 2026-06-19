@@ -42,6 +42,7 @@ const patchInput = z.object({
   hours_close:           z.string().regex(/^\d{2}:\d{2}$/).optional(),
   enforce_hours:         z.boolean().optional(),
   auto_cancel_minutes:   z.number().int().min(0).max(120).optional(),
+  ai_provider:           z.enum(['anthropic', 'gemini']).optional(),
 })
 
 export async function PATCH(req: NextRequest) {
@@ -70,6 +71,7 @@ export async function PATCH(req: NextRequest) {
     { id: CONTROL_IDS.support,       value: { phone: next.support_phone },                                        updated_by: session.phone, updated_at: now },
     { id: CONTROL_IDS.hours,         value: { open: next.hours_open, close: next.hours_close, enforce: next.enforce_hours }, updated_by: session.phone, updated_at: now },
     { id: CONTROL_IDS.autocancel,    value: { minutes: next.auto_cancel_minutes },                                updated_by: session.phone, updated_at: now },
+    { id: CONTROL_IDS.aiProvider,    value: { provider: next.ai_provider },                                       updated_by: session.phone, updated_at: now },
   ]
   const { error } = await db.from('settings').upsert(rows, { onConflict: 'id' })
   if (error) return NextResponse.json({ error: 'Failed to save' }, { status: 500 })

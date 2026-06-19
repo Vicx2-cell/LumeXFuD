@@ -1,7 +1,7 @@
 import { createSupabaseAdmin } from './supabase/server'
 import { refundOrderPayments } from './order-refund'
 import { getControls } from './controls'
-import { sendWhatsAppWithFallback } from './termii/whatsapp'
+import { sendWhatsAppWithFallback } from './notify'
 
 // Bank-grade self-healing: a customer's money must never get stuck just because a
 // background cron didn't fire. When anyone opens an order page, we settle that ONE

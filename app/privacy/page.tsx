@@ -54,7 +54,7 @@ export default function PrivacyPage() {
           <p>We share data only with:</p>
           <ul className="list-disc pl-5 space-y-1 mt-1">
             <li><strong className="text-white">Paystack</strong> — payment processing</li>
-            <li><strong className="text-white">Termii</strong> — SMS/WhatsApp notifications</li>
+            <li><strong className="text-white">Sendchamp</strong> — SMS / OTP notifications</li>
             <li><strong className="text-white">Supabase</strong> — database hosting</li>
             <li><strong className="text-white">Vercel</strong> — application hosting</li>
           </ul>

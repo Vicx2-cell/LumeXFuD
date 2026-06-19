@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { completeOrderPayout } from '@/lib/order-payout'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
-import { renderTemplate } from '@/lib/termii/templates'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
+import { renderTemplate } from '@/lib/notify-templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 
 export async function POST(

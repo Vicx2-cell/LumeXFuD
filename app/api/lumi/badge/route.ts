@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
-import { getAnthropic, MODELS } from '@/lib/ai/client'
+import { isAIAvailable, resolveProvider } from '@/lib/ai/providers'
 import { BADGE_MEANINGS } from '@/lib/badges'
 
 // Lumi explains a badge in her own warm voice. Grounded in the static catalog
@@ -25,8 +25,7 @@ export async function GET(req: NextRequest) {
   if (!meaning) return NextResponse.json({ text: null }, { status: 404 })
 
   const fallback = meaning.description
-  const anthropic = await getAnthropic()
-  if (!anthropic) return NextResponse.json({ text: fallback })
+  if (!(await isAIAvailable('lumi'))) return NextResponse.json({ text: fallback })
 
   const key = `lumi:badge:${id}`
   const r = redis()
@@ -35,16 +34,13 @@ export async function GET(req: NextRequest) {
       const cached = await r.get<string>(key)
       if (cached) return NextResponse.json({ text: cached })
     }
-    const res = await anthropic.messages.create({
-      model: MODELS.fast,
-      max_tokens: 90,
+    const provider = await resolveProvider('lumi')
+    const res = await provider.generate({
+      maxTokens: 90,
       system: SYSTEM,
-      messages: [{
-        role: 'user',
-        content: `Badge: ${meaning.name} ${meaning.emoji}\nWhat it celebrates: ${meaning.description}\nHow it's earned: ${meaning.howto}`,
-      }],
+      userText: `Badge: ${meaning.name} ${meaning.emoji}\nWhat it celebrates: ${meaning.description}\nHow it's earned: ${meaning.howto}`,
     })
-    const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('').trim().replace(/^["']|["']$/g, '')
+    const text = res.text.trim().replace(/^["']|["']$/g, '')
     const out = text ? text.slice(0, 220) : fallback
     if (r && text) await r.set(key, out, { ex: 7 * 24 * 3600 })
     return NextResponse.json({ text: out })

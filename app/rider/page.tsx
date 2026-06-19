@@ -7,6 +7,7 @@ import { LogoutButton } from '@/components/logout-button'
 import { RiderHotspots } from '@/components/rider-hotspots'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
+import { BusinessHours } from '@/components/business-hours'
 
 type RiderStatus = 'ONLINE' | 'OFFLINE' | 'BUSY'
 
@@ -81,6 +82,8 @@ export default function RiderDashboard() {
     status: RiderStatus
     avg_rating: number
     total_deliveries: number
+    opening_time: string | null
+    closing_time: string | null
   } | null>(null)
   const [available, setAvailable] = useState<AvailableOrder[]>([])
   const [current, setCurrent] = useState<CurrentOrder | null>(null)
@@ -313,6 +316,16 @@ export default function RiderDashboard() {
 
       {/* KYC verification — upload & track documents, verified badge */}
       <div className="mx-4 mb-5"><KycPanel role="rider" /></div>
+
+      {/* Working hours */}
+      <div className="mx-4 mb-5">
+        <BusinessHours
+          role="rider"
+          id={rider.id}
+          initialOpen={rider.opening_time}
+          initialClose={rider.closing_time}
+        />
+      </div>
 
       {/* Wallet card */}
       {wallet && (

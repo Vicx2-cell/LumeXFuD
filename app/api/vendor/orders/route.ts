@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data: vendor, error: ve } = await db
     .from('vendors')
-    .select('id, shop_name, status, paused_until, prep_time_minutes')
+    .select('id, shop_name, status, paused_until, prep_time_minutes, opening_time, closing_time')
     .eq('id', session.userId!)
     .single()
 

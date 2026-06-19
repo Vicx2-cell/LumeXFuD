@@ -15,8 +15,8 @@ export function wrapUntrusted(content: string): string {
   return `<untrusted>\n${sanitized}\n</untrusted>`
 }
 
-// ─── Module A — Vendor Menu Digitizer (vision) ──────────────────────────────
-export const MENU_DIGITIZER_PROMPT = `You are a menu digitization engine for a Nigerian campus food platform. You receive a photo (or transcript) of a vendor's menu and output ONLY a JSON object matching the provided schema. No prose, no markdown fences.
+// ─── Module A — Vendor Menu Digitizer (vision + voice) ──────────────────────
+export const MENU_DIGITIZER_PROMPT = `You are a menu digitization engine for a Nigerian campus food platform. Your input is EITHER a photo of a vendor's menu OR a spoken voice note in which the vendor describes their menu (or both). In every case, read/transcribe the input and output ONLY a JSON object matching the provided schema — the SAME schema regardless of whether the input was a photo or audio. No prose, no markdown fences.
 
 Rules:
 - Extract every distinct food/drink item with its price in Naira as an integer (e.g. "1,500" or "1.5k" → 1500).

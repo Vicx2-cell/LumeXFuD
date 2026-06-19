@@ -195,7 +195,7 @@ export async function findAuthUserById(role: SessionRole, id: string) {
 export async function logPinResetAudit(params: {
   user_id: string
   user_role: SessionRole
-  reset_method: 'SECURITY_QUESTIONS' | 'RECOVERY_CODE' | 'ADMIN_OVERRIDE' | 'CHANGE_PIN'
+  reset_method: 'SECURITY_QUESTIONS' | 'RECOVERY_CODE' | 'ADMIN_OVERRIDE' | 'CHANGE_PIN' | 'OTP'
   ip_address?: string
   user_agent?: string
   succeeded?: boolean

@@ -79,15 +79,15 @@ export default function RegisterPage() {
     if (form.phone.length < 13) { setVError('Enter your phone number first.'); return }
     setVBusy(true)
     try {
-      const res = await fetch('/api/auth/register/send-code', {
+      const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: form.phone }),
+        body: JSON.stringify({ phone: form.phone, purpose: 'signup' }),
       })
       const data = await res.json()
       if (!res.ok) { setVError(data.error ?? 'Could not send the code.'); return }
       setCodeSent(true)
-      setVNote('Code sent — check WhatsApp or SMS.')
+      setVNote('Code sent — check your WhatsApp.')
     } catch {
       setVError('Network error. Please try again.')
     } finally {
@@ -101,7 +101,7 @@ export default function RegisterPage() {
     if (code.length !== 6) { setVError('Enter the 6-digit code.'); return }
     setVBusy(true)
     try {
-      const res = await fetch('/api/auth/register/verify-code', {
+      const res = await fetch('/api/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: form.phone, code }),

@@ -3,7 +3,7 @@ import { Redis } from '@upstash/redis'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { getFeature } from '@/lib/features'
-import { getAnthropic, MODELS } from '@/lib/ai/client'
+import { isAIAvailable, resolveProvider } from '@/lib/ai/providers'
 import { forecastVendor, type DemandLevel } from '@/lib/demand'
 
 // Next-hour demand outlook for the logged-in vendor → the "prep ahead" banner.
@@ -62,8 +62,7 @@ export async function GET() {
 
 async function advise(vendorId: string, level: DemandLevel, n: number): Promise<string> {
   const fallback = fallbackAdvice(level, n)
-  const anthropic = await getAnthropic()
-  if (!anthropic) return fallback
+  if (!(await isAIAvailable('forecast'))) return fallback
 
   // One call per vendor per (level, rounded count) per 10-min slot — cheap + snappy.
   const slot = Math.floor(Date.now() / (10 * 60_000))
@@ -74,13 +73,13 @@ async function advise(vendorId: string, level: DemandLevel, n: number): Promise<
       const cached = await r.get<string>(key)
       if (cached) return cached
     }
-    const res = await anthropic.messages.create({
-      model: MODELS.fast,
-      max_tokens: 50,
+    const provider = await resolveProvider('forecast')
+    const res = await provider.generate({
+      maxTokens: 50,
       system: SYSTEM,
-      messages: [{ role: 'user', content: `Demand level: ${level}\nExpected orders next hour: ${n}` }],
+      userText: `Demand level: ${level}\nExpected orders next hour: ${n}`,
     })
-    const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('').trim().replace(/^["']|["']$/g, '')
+    const text = res.text.trim().replace(/^["']|["']$/g, '')
     const out = text ? text.slice(0, 140) : fallback
     if (r && text) await r.set(key, out, { ex: 900 })
     return out

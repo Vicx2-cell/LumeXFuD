@@ -12,6 +12,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./', import.meta.url)),
+      // `server-only` throws on import outside an RSC server bundle; stub it so
+      // server modules that import it can be unit-tested (Next.js's recommended
+      // approach). The real guard still applies in the app build.
+      'server-only': fileURLToPath(new URL('./test/stubs/server-only.ts', import.meta.url)),
     },
   },
 })

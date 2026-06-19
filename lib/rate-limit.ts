@@ -22,7 +22,7 @@ export type RateLimitResult = { success: boolean; remaining: number; reset: numb
 // failClosed: when the limiter itself errors (Redis outage / bad token), should
 // the request be allowed (open) or blocked (closed)? Default OPEN — a Redis blip
 // must never 500 a login or payment. Pass `true` only where an unmetered request
-// has a real external cost (e.g. a Termii SMS), so a blip can't drain credits.
+// has a real external cost (e.g. a Sendchamp SMS), so a blip can't drain credits.
 async function check(limiter: Ratelimit | null, key: string, failClosed = false): Promise<RateLimitResult> {
   if (!limiter) {
     // Limiter unconfigured (no Upstash env). Same open/closed decision applies.
@@ -41,7 +41,7 @@ async function check(limiter: Ratelimit | null, key: string, failClosed = false)
   }
 }
 
-// 3 OTP sends per phone per hour. Fails CLOSED: each send costs a Termii SMS, so
+// 3 OTP sends per phone per hour. Fails CLOSED: each send costs a Sendchamp SMS, so
 // if Redis is unavailable we'd rather block (user retries) than leave the
 // endpoint unmetered and burn credits.
 const _otpSendLimiter = makeRatelimit(3, 3600)

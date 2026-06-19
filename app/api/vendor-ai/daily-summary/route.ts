@@ -3,7 +3,7 @@ import { Redis } from '@upstash/redis'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { rateLimitGeneric } from '@/lib/rate-limit'
-import { getAnthropic, MODELS } from '@/lib/ai/client'
+import { isAIAvailable, resolveProvider } from '@/lib/ai/providers'
 
 export const runtime = 'nodejs'
 
@@ -103,16 +103,15 @@ async function computeStats(db: ReturnType<typeof createSupabaseAdmin>, vendorId
 }
 
 async function narrate(stats: DailyStats): Promise<string> {
-  const anthropic = await getAnthropic()
-  if (!anthropic) return fallbackNarrative(stats)
+  if (!(await isAIAvailable('vendor'))) return fallbackNarrative(stats)
   try {
-    const res = await anthropic.messages.create({
-      model: MODELS.fast,
-      max_tokens: 180,
+    const provider = await resolveProvider('vendor')
+    const out = await provider.generate({
+      maxTokens: 180,
       system: `You write a short, warm end-of-day sales recap for a vendor on a Nigerian campus food app. 2–3 sentences, plain English, encouraging and specific. Use ONLY the numbers in the data — never invent figures. If it was a slow/zero day, be kind and motivating, not negative. You may add ONE short practical tip if the data suggests one (e.g. prep more of the top item before the busy hour). No markdown, no emoji spam (at most one).`,
-      messages: [{ role: 'user', content: `Today's data (JSON): ${JSON.stringify(stats)}` }],
+      userText: `Today's data (JSON): ${JSON.stringify(stats)}`,
     })
-    const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('').trim()
+    const text = out.text.trim()
     return text || fallbackNarrative(stats)
   } catch (err) {
     console.error('[vendor-ai] narrate failed:', err)

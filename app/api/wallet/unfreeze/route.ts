@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { unfreezeWallet } from '@/lib/wallet'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 

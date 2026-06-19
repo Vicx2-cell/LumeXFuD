@@ -4,7 +4,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/nav-bottom'
 import { BackButton } from '@/components/back-button'
 import { getFeature } from '@/lib/features'
-import { getAnthropic, MODELS } from '@/lib/ai/client'
+import { isAIAvailable, resolveProvider } from '@/lib/ai/providers'
 import { LeaderboardTabs, type Board, type LeaderEntry, type Commentary } from './leaderboard-client'
 
 // Always render fresh; Realtime keeps an open board live after first paint.
@@ -158,8 +158,7 @@ function fallbackCommentary(board: Board): Commentary {
 // Cached in Redis keyed by the standings, so the LLM only runs when they change.
 async function getCommentary(board: Board): Promise<Commentary> {
   const fallback = fallbackCommentary(board)
-  const anthropic = await getAnthropic()
-  if (!anthropic) return fallback
+  if (!(await isAIAvailable('leaderboard'))) return fallback
 
   const key = 'leaderboard:ai:' + crypto.createHash('sha1').update(JSON.stringify(board)).digest('hex')
   const r = redis()
@@ -168,13 +167,14 @@ async function getCommentary(board: Board): Promise<Commentary> {
     if (cached) return cached
   }
   try {
-    const res = await anthropic.messages.create({
-      model: MODELS.fast,
-      max_tokens: 220,
+    const provider = await resolveProvider('leaderboard')
+    const res = await provider.generate({
+      maxTokens: 220,
       system: COMMENTARY_PROMPT,
-      messages: [{ role: 'user', content: `Top 3 per section (JSON): ${JSON.stringify(board)}` }],
+      userText: `Top 3 per section (JSON): ${JSON.stringify(board)}`,
+      jsonMode: true,
     })
-    const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('').trim().replace(/^```(?:json)?\s*|\s*```$/g, '')
+    const text = res.text.trim().replace(/^```(?:json)?\s*|\s*```$/g, '')
     const parsed = JSON.parse(text) as Partial<Commentary>
     const out: Commentary = {
       streaks: typeof parsed.streaks === 'string' && parsed.streaks.trim() ? parsed.streaks.trim().slice(0, 120) : fallback.streaks,

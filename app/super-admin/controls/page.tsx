@@ -17,6 +17,7 @@ interface Controls {
   hours_close: string
   enforce_hours: boolean
   auto_cancel_minutes: number
+  ai_provider: 'anthropic' | 'gemini'
 }
 
 interface ChangeRow {
@@ -173,6 +174,30 @@ export default function ControlsPage() {
               c.withdrawals_frozen ? 'Resume withdrawals?' : 'Freeze all withdrawals?',
               c.withdrawals_frozen ? 'Vendors and riders will be able to withdraw again.' : 'No vendor or rider will be able to withdraw to their bank.',
               { withdrawals_frozen: !c.withdrawals_frozen }, c.withdrawals_frozen ? 'Withdrawals resumed' : 'Withdrawals FROZEN')} />
+          </div>
+        </div>
+
+        {/* AI provider */}
+        <p className="text-xs uppercase tracking-wide text-white/40 mb-2 font-semibold">🤖 AI provider</p>
+        <div className="glass-thin mb-6">
+          <div className="p-4">
+            <p className="font-semibold text-white">Active AI provider</p>
+            <p className="text-xs text-white/45 mt-0.5 mb-3">Which engine powers ALL AI — Lumi, menu reader, Sentinel, dispute concierge, vendor/rider helpers, study. One switch, whole app. (The “AI features” master flag still turns AI off entirely.)</p>
+            <div className="grid grid-cols-2 gap-2">
+              {(['gemini', 'anthropic'] as const).map((p) => {
+                const on = c.ai_provider === p
+                const label = p === 'gemini' ? 'Gemini' : 'Anthropic'
+                return (
+                  <button key={p} onClick={() => { if (p !== c.ai_provider) patch({ ai_provider: p }, `AI provider: ${label}`) }}
+                    className="rounded-xl py-2.5 text-sm font-semibold transition-colors"
+                    style={{
+                      background: on ? '#F5A623' : 'rgba(255,255,255,0.05)',
+                      color: on ? '#000' : 'rgba(255,255,255,0.7)',
+                      border: `1px solid ${on ? 'transparent' : 'rgba(255,255,255,0.1)'}`,
+                    }}>{label}</button>
+                )
+              })}
+            </div>
           </div>
         </div>
 

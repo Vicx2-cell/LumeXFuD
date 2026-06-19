@@ -7,7 +7,7 @@ import {
 import { createTransferRecipient, initiateTransfer } from '@/lib/paystack/transfer'
 import { decryptField } from '@/lib/crypto'
 import { audit } from '@/lib/audit'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 import type { WalletBalance } from '@/lib/wallet'

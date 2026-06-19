@@ -60,10 +60,10 @@ export default function CompleteSignupPage() {
   const sendCode = async () => {
     setBusy(true); setError(''); setNote(''); setAlreadyRegistered(false)
     try {
-      const res = await fetch('/api/auth/register/send-code', {
+      const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone, purpose: 'signup' }),
       })
       const data = await res.json().catch(() => ({})) as { error?: string; already_registered?: boolean }
       if (!res.ok) {
@@ -72,7 +72,7 @@ export default function CompleteSignupPage() {
         return
       }
       setCodeSent(true)
-      setNote('We sent a 6-digit code to your phone on WhatsApp (SMS as backup).')
+      setNote('We sent a 6-digit code to your WhatsApp.')
     } catch {
       setError('Connection error. Please try again.')
     } finally {
@@ -83,7 +83,7 @@ export default function CompleteSignupPage() {
   const verifyCode = async () => {
     setBusy(true); setError('')
     try {
-      const res = await fetch('/api/auth/register/verify-code', {
+      const res = await fetch('/api/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, code }),

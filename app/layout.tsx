@@ -1,9 +1,24 @@
 import type { Metadata, Viewport } from 'next'
+import localFont from 'next/font/local'
 import './globals.css'
 import { validateEnv } from '@/lib/env'
+
+// Distinctive display face for headings/wordmark only (body stays on the fast
+// system stack). Self-hosted woff2 (latin subset, variable weight) so there is
+// no runtime request to a font CDN and the build needs no network. Exposed as
+// the --font-display CSS variable; globals.css applies it to headings + .lx-display.
+const display = localFont({
+  src: './fonts/bricolage-grotesque.woff2',
+  weight: '400 800',
+  display: 'swap',
+  variable: '--font-display',
+  fallback: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+  preload: true,
+})
 import { Providers } from '@/components/providers'
 import { FeaturesProvider } from '@/lib/use-features'
 import { getAllFeatures } from '@/lib/features'
+import { StructuredData } from '@/components/structured-data'
 
 if (process.env.NODE_ENV !== 'test') validateEnv()
 
@@ -88,8 +103,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // per request. Reading it here makes pages render per-request (dynamic).
   const features = await getAllFeatures()
   return (
-    <html lang="en">
+    <html lang="en" className={display.variable}>
       <body>
+        <StructuredData />
         <FeaturesProvider initial={features}>
           <Providers>{children}</Providers>
         </FeaturesProvider>

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { gatherSnapshot, type SentinelSnapshot } from '@/lib/sentinel'
-import { getAnthropic, MODELS } from '@/lib/ai/client'
+import { resolveProvider, isAIAvailable } from '@/lib/ai/providers'
 import { parseModelJson, TriageBrief } from '@/lib/ai/schemas'
 import { TRIAGE_PROMPT } from '@/lib/ai/prompts'
 
@@ -10,21 +10,21 @@ export const runtime = 'nodejs'
 
 // The super-admin's "personal Sentry". Read-only platform health snapshot, plus
 // an AI triage brief when something is wrong. Super-admin only — it can see
-// across all the data, so the gate is strict.
+// across all the data, so the gate is strict. The triage call runs through the
+// provider abstraction (Anthropic by default; flip with AI_PROVIDER_SENTINEL).
 
 async function triage(snapshot: SentinelSnapshot): Promise<TriageBrief | null> {
-  const anthropic = await getAnthropic()
-  if (!anthropic) return null
+  if (!(await isAIAvailable('sentinel'))) return null
   const context = `LumeX Fud platform health snapshot:\n${JSON.stringify({ status: snapshot.status, metrics: snapshot.metrics, issues: snapshot.issues })}`
   try {
-    const res = await anthropic.messages.create({
-      model: MODELS.fast,
-      max_tokens: 500,
+    const provider = await resolveProvider('sentinel')
+    const out = await provider.generate({
       system: TRIAGE_PROMPT,
-      messages: [{ role: 'user', content: context }],
+      userText: context,
+      jsonMode: true,
+      maxTokens: 500,
     })
-    const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('')
-    const parsed = parseModelJson(TriageBrief, text)
+    const parsed = parseModelJson(TriageBrief, out.text)
     return parsed.ok ? parsed.data : null
   } catch (err) {
     console.error('[sentinel] triage failed:', err)

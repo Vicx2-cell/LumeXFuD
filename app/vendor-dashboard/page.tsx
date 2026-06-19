@@ -8,6 +8,7 @@ import { LogoutButton } from '@/components/logout-button'
 import { DemandBanner } from '@/components/demand-banner'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
+import { BusinessHours } from '@/components/business-hours'
 
 interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
 interface VendorOrder {
@@ -26,6 +27,8 @@ interface VendorInfo {
   status: 'OPEN' | 'BUSY' | 'CLOSED'
   paused_until: string | null
   prep_time_minutes: number
+  opening_time: string | null
+  closing_time: string | null
 }
 
 const ACTIVE = ['PENDING', 'VENDOR_ACCEPTED', 'PREPARING', 'READY']
@@ -315,6 +318,16 @@ export default function VendorDashboard() {
             </p>
           )}
         </div>
+
+        {/* Opening / closing time */}
+        {vendor && (
+          <BusinessHours
+            role="vendor"
+            id={vendor.id}
+            initialOpen={vendor.opening_time}
+            initialClose={vendor.closing_time}
+          />
+        )}
 
         {/* Active Orders */}
         <section>

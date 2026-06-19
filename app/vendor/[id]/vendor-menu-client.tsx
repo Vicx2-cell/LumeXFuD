@@ -197,6 +197,9 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
                 {isPaused ? 'Paused' : vendor.status}
               </span>
               <span className="text-xs text-white/40">{vendor.prep_time_minutes}–{vendor.prep_time_minutes + 10} min</span>
+              {vendor.opening_time && vendor.closing_time && (
+                <span className="text-xs text-white/40">🕒 {vendor.opening_time}–{vendor.closing_time}</span>
+              )}
               {vendor.total_ratings >= 5 && <span className="text-xs text-[#F5A623]">★ {vendor.avg_rating.toFixed(1)}</span>}
               {vendorTrustBadges(vendor).map((b) => (
                 <span key={b.label} className="text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623' }}>

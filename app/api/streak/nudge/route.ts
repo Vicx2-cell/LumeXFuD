@@ -3,7 +3,7 @@ import { Redis } from '@upstash/redis'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { getFeature } from '@/lib/features'
-import { getAnthropic, MODELS } from '@/lib/ai/client'
+import { isAIAvailable, resolveProvider } from '@/lib/ai/providers'
 import { getLumiMemory } from '@/lib/lumi-memory'
 import { lagosDate, streakStatus, type StreakStatus } from '@/lib/streaks'
 
@@ -73,8 +73,7 @@ export async function GET() {
   const fallback = fallbackNudge(status, current, fave)
   let nudge = fallback
 
-  const anthropic = await getAnthropic()
-  if (anthropic && fallback) {
+  if ((await isAIAvailable('lumi')) && fallback) {
     // Cache by what actually changes the copy: who, the state, the count, the
     // local day. One LLM call per student per day per state — cheap + snappy.
     const key = `streak:nudge:${session.userId}:${status}:${current}:${lagosDate()}`
@@ -90,13 +89,9 @@ export async function GET() {
           `Streak state: ${status}`,
           `Current streak: ${current} day(s)`,
         ].filter(Boolean).join('\n')
-        const res = await anthropic.messages.create({
-          model: MODELS.fast,
-          max_tokens: 60,
-          system: SYSTEM,
-          messages: [{ role: 'user', content: facts }],
-        })
-        const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('').trim().replace(/^["']|["']$/g, '')
+        const provider = await resolveProvider('lumi')
+        const out = await provider.generate({ maxTokens: 60, system: SYSTEM, userText: facts })
+        const text = out.text.trim().replace(/^["']|["']$/g, '')
         nudge = text ? text.slice(0, 140) : fallback
         if (r) await r.set(key, nudge, { ex: 3600 })
       }

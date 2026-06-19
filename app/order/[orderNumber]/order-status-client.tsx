@@ -221,7 +221,7 @@ export function OrderStatusClient({
             <p className="text-2xl font-bold tabular-nums" style={{ color: '#F5A623' }}>
               {new Date(order.scheduled_for).toLocaleString('en-NG', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
             </p>
-            <p className="text-xs text-white/50 mt-2">We’ll send it to the kitchen in time to arrive then. Cancel any time before that for a full refund.</p>
+            <p className="text-xs text-white/50 mt-2">We’ll send your order to the kitchen at this time — it arrives a bit after. Cancel any time before then for a full refund.</p>
           </div>
         )}
 
@@ -296,6 +296,9 @@ export function OrderStatusClient({
                 {riderVerified && <VerifiedBadge kind="rider" />}
               </div>
               <a href={`tel:${order.riders.phone}`} className="text-xs text-amber-400 tabular-nums hover:underline">{order.riders.phone}</a>
+              {order.riders.opening_time && order.riders.closing_time && (
+                <p className="text-[11px] text-white/40 mt-0.5 tabular-nums">🕒 Usually {order.riders.opening_time}–{order.riders.closing_time}</p>
+              )}
             </div>
             <div className="flex gap-2 shrink-0">
               <a href={`tel:${order.riders.phone}`} className="w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-90" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }} aria-label="Call rider">

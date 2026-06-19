@@ -4,7 +4,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { validateWalletPin, hashWalletPin, verifyWalletPin } from '@/lib/wallet'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { z } from 'zod'
 import type { WalletBalance } from '@/lib/wallet'
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { rateLimitGeneric } from '@/lib/rate-limit'
-import { getAnthropic, MODELS } from '@/lib/ai/client'
+import { isAIAvailable, resolveProvider } from '@/lib/ai/providers'
 import { parseModelJson, DisputeBrief } from '@/lib/ai/schemas'
 import { DISPUTE_ANALYST_PROMPT, wrapUntrusted } from '@/lib/ai/prompts'
 import { redactObject } from '@/lib/ai/guard'
@@ -18,22 +18,21 @@ export const runtime = 'nodejs'
 type DB = ReturnType<typeof createSupabaseAdmin>
 
 async function analyze(facts: unknown, complaint: string): Promise<DisputeBrief | null> {
-  const anthropic = await getAnthropic()
-  if (!anthropic) return null
+  if (!(await isAIAvailable('dispute'))) return null
+  const provider = await resolveProvider('dispute')
   const base = `Dispute facts (JSON):\n${JSON.stringify(facts)}\n\nCustomer's complaint:\n${wrapUntrusted(complaint || '(no description provided)')}`
   let lastErr = ''
   // One retry: bad JSON → re-ask with the validation error appended, then give up.
   for (let attempt = 0; attempt < 2; attempt++) {
-    const content = attempt === 0 ? base : `${base}\n\nYour previous reply was invalid (${lastErr}). Return ONLY valid JSON for the schema.`
+    const userText = attempt === 0 ? base : `${base}\n\nYour previous reply was invalid (${lastErr}). Return ONLY valid JSON for the schema.`
     try {
-      const res = await anthropic.messages.create({
-        model: MODELS.fast,
-        max_tokens: 600,
+      const out = await provider.generate({
+        maxTokens: 600,
         system: DISPUTE_ANALYST_PROMPT,
-        messages: [{ role: 'user', content }],
+        userText,
+        jsonMode: true,
       })
-      const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('')
-      const parsed = parseModelJson(DisputeBrief, text)
+      const parsed = parseModelJson(DisputeBrief, out.text)
       if (parsed.ok) return parsed.data
       lastErr = parsed.error
     } catch (err) {
@@ -55,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const rl = await rateLimitGeneric(`dispute-analyze:${session.phone}`, 20, 300)
   if (!rl.success) return NextResponse.json({ error: 'Please wait a moment and try again.' }, { status: 429 })
 
-  if (!(await getAnthropic())) return NextResponse.json({ error: 'AI analysis is not configured.' }, { status: 503 })
+  if (!(await isAIAvailable('dispute'))) return NextResponse.json({ error: 'AI analysis is not configured.' }, { status: 503 })
 
   const db: DB = createSupabaseAdmin()
 
