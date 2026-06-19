@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data: rider, error: re } = await db
     .from('riders')
-    .select('id, full_name, status, active_order_id, avg_rating, total_deliveries, opening_time, closing_time')
+    .select('id, full_name, status, active_order_id, avg_rating, total_deliveries, opening_time, closing_time, avatar_url')
     .eq('id', session.userId!)
     .single()
   if (re || !rider) return NextResponse.json({ error: 'Rider not found' }, { status: 404 })
@@ -52,6 +52,7 @@ export async function GET() {
       total_deliveries: rider.total_deliveries,
       opening_time: rider.opening_time,
       closing_time: rider.closing_time,
+      avatar_url: rider.avatar_url,
     },
     available: availableResult.data ?? [],
     current: currentResult.data ?? null,

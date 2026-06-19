@@ -8,6 +8,7 @@ import { RiderHotspots } from '@/components/rider-hotspots'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
 import { BusinessHours } from '@/components/business-hours'
+import { ProfileImageUpload } from '@/components/profile-image-upload'
 
 type RiderStatus = 'ONLINE' | 'OFFLINE' | 'BUSY'
 
@@ -84,6 +85,7 @@ export default function RiderDashboard() {
     total_deliveries: number
     opening_time: string | null
     closing_time: string | null
+    avatar_url: string | null
   } | null>(null)
   const [available, setAvailable] = useState<AvailableOrder[]>([])
   const [current, setCurrent] = useState<CurrentOrder | null>(null)
@@ -274,8 +276,10 @@ export default function RiderDashboard() {
       {/* Header */}
       <div className="px-4 pt-10 pb-4">
         <div className="flex items-start justify-between">
-          <div className="flex items-start gap-2">
+          <div className="flex items-start gap-3">
             <BackButton />
+            <ProfileImageUpload slot="avatar" shape="circle" size={56} current={rider.avatar_url}
+              onUploaded={(u) => setRider((r) => r ? { ...r, avatar_url: u } : r)} />
             <div>
               <span className="inline-block px-2.5 py-0.5 rounded-lg text-xs font-bold mb-2"
                 style={{ background: '#F5A623', color: '#000' }}>Rider</span>

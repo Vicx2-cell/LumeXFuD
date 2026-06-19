@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/back-button'
 import { FaceIdSetup } from '@/components/face-id-setup'
 import { LumiMemoryCard } from '@/components/lumi-memory-card'
+import { ProfileImageUpload } from '@/components/profile-image-upload'
 import type { CustomerProfile, StreakData, BadgeItem } from './page'
 
 const KEYPAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'] as const
@@ -235,6 +236,13 @@ export function ProfileClient({
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-5 space-y-5 lx-enter">
+        {/* Profile picture */}
+        <div className="flex flex-col items-center pt-1">
+          <ProfileImageUpload slot="avatar" shape="circle" current={profile?.avatar_url ?? null} />
+          {profile?.name && <p className="text-base font-semibold mt-3">{profile.name}</p>}
+          <p className="text-xs text-white/40 tabular-nums mt-0.5">{phone}</p>
+        </div>
+
         {/* LumeX Wallet — primary entry point (customers had no way to reach it) */}
         <Link
           href="/profile/wallet"

@@ -20,7 +20,7 @@ export default async function ProfilePage() {
   if (session.role === 'customer') {
     const { data: customer } = await db
       .from('customers')
-      .select('id, name, phone, hostel, room_number, dispute_count, login_pin_hash')
+      .select('id, name, phone, hostel, room_number, dispute_count, login_pin_hash, avatar_url')
       .eq('phone', session.phone)
       .single()
 
@@ -100,6 +100,7 @@ export interface CustomerProfile {
   hostel: string | null
   room_number: string | null
   dispute_count: number
+  avatar_url: string | null
 }
 
 export interface StreakData {

@@ -9,6 +9,7 @@ import { DemandBanner } from '@/components/demand-banner'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
 import { BusinessHours } from '@/components/business-hours'
+import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { Badge } from '@/components/ui/badge'
 
 interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
@@ -30,6 +31,8 @@ interface VendorInfo {
   prep_time_minutes: number
   opening_time: string | null
   closing_time: string | null
+  logo_url: string | null
+  shop_photo_url: string | null
 }
 
 const ACTIVE = ['PENDING', 'VENDOR_ACCEPTED', 'PREPARING', 'READY']
@@ -243,6 +246,25 @@ export default function VendorDashboard() {
           <span className="text-sm font-medium text-white/80">📲 Share your store link</span>
           <span className="lx-amber">→</span>
         </button>
+
+        {/* Store appearance — cover + logo shown to customers */}
+        {vendor && (
+          <div className="glass-thin p-4 space-y-3">
+            <p className="text-xs text-white/40 uppercase tracking-widest">Store appearance</p>
+            <ProfileImageUpload
+              slot="cover" shape="cover" current={vendor.shop_photo_url}
+              onUploaded={(u) => setVendor((v) => v ? { ...v, shop_photo_url: u } : v)}
+              label="Cover photo — customers see this on your store"
+            />
+            <div className="flex items-center gap-3 pt-1">
+              <ProfileImageUpload
+                slot="avatar" shape="circle" current={vendor.logo_url}
+                onUploaded={(u) => setVendor((v) => v ? { ...v, logo_url: u } : v)}
+              />
+              <p className="text-xs text-white/45">Your store logo</p>
+            </div>
+          </div>
+        )}
 
         {/* Opening / closing time */}
         {vendor && (

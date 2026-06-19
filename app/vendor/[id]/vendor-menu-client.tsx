@@ -182,6 +182,24 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
         </div>
       )}
 
+      {/* Cover hero — the vendor's cover photo (or a branded gradient) with the
+          logo overlaid, so the storefront never opens on a blank header. */}
+      {(vendor.shop_photo_url || vendor.logo_url) && (
+        <div className="relative w-full" style={{ aspectRatio: '16 / 7' }}>
+          {vendor.shop_photo_url ? (
+            <Image src={vendor.shop_photo_url} alt="" fill priority className="object-cover" sizes="100vw" />
+          ) : (
+            <div className="w-full h-full" style={{ background: 'linear-gradient(135deg, rgba(245,166,35,0.30), rgba(99,102,241,0.18))' }} />
+          )}
+          <div aria-hidden="true" className="absolute inset-0" style={{ background: 'linear-gradient(to top, #0A0A0B 2%, rgba(10,10,11,0.25) 55%, transparent)' }} />
+          {vendor.logo_url && (
+            <div className="absolute bottom-3 left-4 w-16 h-16 rounded-2xl overflow-hidden" style={{ border: '2px solid rgba(255,255,255,0.25)', boxShadow: '0 6px 20px rgba(0,0,0,0.45)' }}>
+              <Image src={vendor.logo_url} alt="" fill className="object-cover" sizes="64px" />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Sticky header */}
       <div className="sticky top-0 z-40 glass-thin" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
