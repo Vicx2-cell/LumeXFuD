@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useCart, cartLineKey, type CartItem } from '@/components/cart-context'
 import { useFeatures } from '@/lib/use-features'
@@ -52,8 +52,14 @@ export default function GroupOrderPage() {
     return () => clearInterval(t)
   }, [])
 
-  // silent=true is used by the auto-refresh poll so the page never flickers.
-  const load = useCallback(async (silent = false) => {
+  // Skip the background poll for a few seconds after a local change, so it can't
+  // overwrite an optimistic edit (e.g. the split toggle) before the save lands.
+  const lastMutate = useRef(0)
+
+  // silent=true → background poll (no flicker, respects the mutation guard).
+  // force=true → a mutation's own reconcile or a manual refresh (always applies).
+  const load = useCallback(async (silent = false, force = false) => {
+    if (silent && !force && Date.now() - lastMutate.current < 4000) return
     try {
       const res = await fetch(`/api/group-order/${code}`, { cache: 'no-store' })
       if (res.status === 401) { router.push(`/auth?next=/group/${code}`); return }
@@ -73,7 +79,7 @@ export default function GroupOrderPage() {
   }, [load])
 
   const addItem = async (menu_item_id: string) => {
-    setBusyId(menu_item_id); setError('')
+    setBusyId(menu_item_id); setError(''); lastMutate.current = Date.now()
     // Optimistic: show it instantly, then reconcile with the server silently.
     const m = data?.menu.find((x) => x.id === menu_item_id)
     if (data && m) {
@@ -86,32 +92,33 @@ export default function GroupOrderPage() {
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) setError(d.error ?? 'Could not add.')
-      await load(true)
-    } catch { setError('Connection error.'); await load(true) } finally { setBusyId('') }
+      await load(true, true)
+    } catch { setError('Connection error.'); await load(true, true) } finally { setBusyId('') }
   }
 
   const removeItem = async (id: string) => {
-    setBusyId(id)
+    setBusyId(id); lastMutate.current = Date.now()
     // Optimistic remove, then reconcile.
     if (data) setData({ ...data, items: data.items.filter((it) => it.id !== id) })
     try {
       await fetch(`/api/group-order/${code}/items?itemId=${id}`, { method: 'DELETE' })
-      await load(true)
+      await load(true, true)
     } finally { setBusyId('') }
   }
 
   const removePerson = async (contributorId: string, name: string) => {
     if (!window.confirm(`Remove ${name} and all their items from the group?`)) return
-    setBusyId(contributorId)
+    setBusyId(contributorId); lastMutate.current = Date.now()
     if (data) setData({ ...data, items: data.items.filter((it) => it.contributor_id !== contributorId) })
     try {
       await fetch(`/api/group-order/${code}/items?contributorId=${contributorId}`, { method: 'DELETE' })
-      await load(true)
+      await load(true, true)
     } finally { setBusyId('') }
   }
 
   const toggleSplit = async () => {
     if (!data) return
+    lastMutate.current = Date.now()
     const next = !data.split_enabled
     setData({ ...data, split_enabled: next }) // optimistic
     try {
@@ -119,8 +126,8 @@ export default function GroupOrderPage() {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ split_enabled: next }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? 'Could not update.'); await load(true) }
-    } catch { setError('Connection error.'); await load(true) }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? 'Could not update.'); await load(true, true) }
+    } catch { setError('Connection error.'); await load(true, true) }
   }
 
   const cancelGroup = async () => {
@@ -213,25 +220,30 @@ export default function GroupOrderPage() {
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-white/35 mt-3 pt-2 border-t border-white/10">
-            {data.split_enabled
-              ? 'Split ON — everyone pays their own food + an equal share of delivery & platform fee. Each person gets their exact share by WhatsApp at checkout.'
-              : 'Split OFF — you’re treating everyone 🎁 Nobody is asked to pay you back.'}
-          </p>
+        </div>
+      )}
 
-          {data.is_host && !expired && (
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <button onClick={toggleSplit} className="flex items-center gap-2 text-sm" aria-label="Toggle split the bill">
-                <span className="relative w-10 h-6 rounded-full transition-colors shrink-0" style={{ background: data.split_enabled ? '#22C55E' : 'rgba(255,255,255,0.15)' }}>
-                  <span className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all" style={{ left: data.split_enabled ? 22 : 4 }} />
-                </span>
-                <span className="text-white/70">Split the bill</span>
-              </button>
-              <button onClick={cancelGroup} disabled={busyId === 'cancel'} className="text-xs text-red-400/80 hover:text-red-400 disabled:opacity-50">
-                {busyId === 'cancel' ? 'Cancelling…' : 'Cancel group'}
-              </button>
-            </div>
-          )}
+      {/* Host controls — always visible to the host (even before anyone adds food) */}
+      {data.is_host && !expired && (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 mb-5">
+          <p className="text-xs uppercase tracking-[0.18em] text-white/40 mb-3">Host controls</p>
+          <button onClick={toggleSplit} className="flex items-center gap-2 text-sm mb-2" aria-label="Toggle split the bill">
+            <span className="relative w-10 h-6 rounded-full transition-colors shrink-0" style={{ background: data.split_enabled ? '#22C55E' : 'rgba(255,255,255,0.15)' }}>
+              <span className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all" style={{ left: data.split_enabled ? 22 : 4 }} />
+            </span>
+            <span className="text-white/80 font-medium">Split the bill</span>
+            <span className="text-white/40">{data.split_enabled ? 'on' : 'off'}</span>
+          </button>
+          <p className="text-[11px] text-white/35 mb-3">
+            {data.split_enabled
+              ? 'Everyone pays their own food + an equal share of delivery & platform fee. Each person gets their exact share by WhatsApp at checkout.'
+              : 'You’re treating everyone 🎁 Nobody is asked to pay you back.'}
+          </p>
+          <button onClick={cancelGroup} disabled={busyId === 'cancel'}
+            className="w-full rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+            style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.3)' }}>
+            {busyId === 'cancel' ? 'Cancelling…' : 'Cancel group order'}
+          </button>
         </div>
       )}
 
@@ -239,7 +251,7 @@ export default function GroupOrderPage() {
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 mb-5">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs uppercase tracking-[0.18em] text-white/40">In the basket ({data.items.length})</p>
-          <button onClick={() => load(true)} className="text-xs text-white/40 hover:text-white/70 flex items-center gap-1" aria-label="Refresh">
+          <button onClick={() => load(true, true)} className="text-xs text-white/40 hover:text-white/70 flex items-center gap-1" aria-label="Refresh">
             ↻ refresh
           </button>
         </div>
