@@ -74,6 +74,7 @@ export function ProfileClient({
   const [room, setRoom] = useState(profile?.room_number ?? '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [openBadge, setOpenBadge] = useState<string | null>(null)
   // Lumi's warm, AI-generated explanation of the tapped badge (cached server-side).
   // One result per badge; text === null means "fetched, but no Lumi line" (AI off
@@ -204,15 +205,22 @@ export function ProfileClient({
   }
 
   async function handleSave() {
-    setSaving(true)
+    setSaving(true); setSaveError('')
     try {
-      await fetch('/api/auth/me', {
+      const res = await fetch('/api/auth/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), hostel: hostel.trim(), room_number: room.trim() }),
       })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string }
+        setSaveError(d.error ?? 'Could not save. Please try again.')
+        return
+      }
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
+    } catch {
+      setSaveError('Network error. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -380,6 +388,7 @@ export function ProfileClient({
               className="lx-field w-full px-4 py-3 text-sm outline-none"
             />
           </div>
+          {saveError && <p className="text-sm text-red-400">{saveError}</p>}
           <button
             onClick={handleSave}
             disabled={saving}

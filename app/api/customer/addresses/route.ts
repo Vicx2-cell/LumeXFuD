@@ -15,7 +15,7 @@ export async function GET() {
     const db = createSupabaseAdmin()
     const { data: customer } = await db
       .from('customers')
-      .select('id')
+      .select('id, hostel, room_number')
       .eq('phone', session.phone)
       .maybeSingle()
     if (!customer) return NextResponse.json({ addresses: [] })
@@ -28,7 +28,17 @@ export async function GET() {
       .order('last_used_at', { ascending: false })
       .limit(6)
 
-    return NextResponse.json({ addresses: (data ?? []).map((r) => (r as { address: string }).address) })
+    const addresses = (data ?? []).map((r) => (r as { address: string }).address)
+
+    // Offer the saved profile hostel/room as a delivery option too (so a customer
+    // who set it in their profile sees it at checkout, even before any orders).
+    const c = customer as { hostel: string | null; room_number: string | null }
+    const profileAddr = [c.hostel?.trim(), c.room_number?.trim()].filter(Boolean).join(', ')
+    if (profileAddr && !addresses.some((a) => a.toLowerCase() === profileAddr.toLowerCase())) {
+      addresses.push(profileAddr)
+    }
+
+    return NextResponse.json({ addresses })
   } catch {
     return NextResponse.json({ addresses: [] })
   }
