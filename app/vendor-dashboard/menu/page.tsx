@@ -176,31 +176,31 @@ export default function VendorMenuPage() {
   }
 
   return (
-    <div className="min-h-dvh pb-28" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page pb-28">
       {/* Header */}
-      <div className="sticky top-0 z-40 border-b border-white/8" style={{ background: 'rgba(10,10,11,0.95)', backdropFilter: 'blur(20px)' }}>
+      <div className="lx-topbar sticky top-0 z-40">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={() => router.push('/vendor-dashboard')} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
           <h1 className="font-semibold flex-1">My Menu</h1>
-          <button onClick={openAdd} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: '#F5A623', color: '#000' }}>+ Add food</button>
+          <button onClick={openAdd} className="lx-btn-amber text-xs px-4 py-2">+ Add food</button>
         </div>
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4">
         {loading ? (
-          <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: 'rgba(255,255,255,0.05)' }} />)}</div>
+          <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-20 rounded-2xl lx-skeleton" />)}</div>
         ) : items.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-4xl mb-3">🍽️</p>
             <p className="text-white/40 text-sm mb-4">No foods yet. Add your first item.</p>
-            <button onClick={openAdd} className="px-5 py-3 rounded-xl font-semibold" style={{ background: '#F5A623', color: '#000' }}>+ Add food</button>
+            <button onClick={openAdd} className="lx-btn-amber px-5 py-3">+ Add food</button>
           </div>
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
-              <div key={item.id} className="flex gap-3 rounded-2xl p-3" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)', opacity: item.is_available ? 1 : 0.55 }}>
+              <div key={item.id} className="glass-thin flex gap-3 rounded-2xl p-3" style={{ opacity: item.is_available ? 1 : 0.55 }}>
                 <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-white/5">
                   {item.image_url
                     ? <Image src={item.image_url} alt={item.name} fill className="object-cover" sizes="64px" />
@@ -208,10 +208,10 @@ export default function VendorMenuPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.name}</p>
-                  <p className="text-sm font-semibold mt-0.5" style={{ color: '#F5A623' }}>{formatPrice(item.price_kobo)}</p>
+                  <p className="lx-amber text-sm font-semibold mt-0.5">{formatPrice(item.price_kobo)}</p>
                   <p className="text-xs text-white/30 mt-0.5">{item.category}{item.prep_time_minutes != null ? ` · ${item.prep_time_minutes} min` : ''}{item.addons.length > 0 ? ` · ${item.addons.length} add-on${item.addons.length === 1 ? '' : 's'}` : ''}</p>
                   <div className="flex gap-3 mt-2">
-                    <button onClick={() => openEdit(item)} className="text-xs font-medium" style={{ color: '#F5A623' }}>Edit</button>
+                    <button onClick={() => openEdit(item)} className="lx-amber text-xs font-medium">Edit</button>
                     <button onClick={() => removeItem(item)} className="text-xs font-medium text-red-400">Delete</button>
                   </div>
                 </div>
@@ -268,7 +268,7 @@ export default function VendorMenuPage() {
               <div className="mb-1.5 flex items-center justify-between">
                 <span className="text-xs uppercase tracking-[0.18em] text-white/40">Description (optional)</span>
                 <button type="button" onClick={describeWithAI} disabled={describing || !form.name.trim()}
-                  className="text-xs font-semibold disabled:opacity-40" style={{ color: '#F5A623' }}>
+                  className="lx-amber text-xs font-semibold disabled:opacity-40">
                   {describing ? 'Writing…' : (form.image_url ? '✨ Write from photo' : '✨ Write with AI')}
                 </button>
               </div>
@@ -279,7 +279,7 @@ export default function VendorMenuPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs uppercase tracking-[0.18em] text-white/40">Add-ons (optional)</span>
-                <button onClick={() => setForm({ ...form, addons: [...form.addons, { name: '', price: '' }] })} className="text-xs font-semibold" style={{ color: '#F5A623' }}>+ Add-on</button>
+                <button onClick={() => setForm({ ...form, addons: [...form.addons, { name: '', price: '' }] })} className="lx-amber text-xs font-semibold">+ Add-on</button>
               </div>
               <div className="space-y-2">
                 {form.addons.map((a, i) => (
@@ -299,7 +299,7 @@ export default function VendorMenuPage() {
 
             {error && <p className="text-sm text-red-400">{error}</p>}
 
-            <button onClick={save} disabled={saving || uploading} className="w-full rounded-2xl py-4 font-semibold disabled:opacity-50" style={{ background: '#F5A623', color: '#000' }}>
+            <button onClick={save} disabled={saving || uploading} className="lx-btn-amber w-full py-4 disabled:opacity-50">
               {saving ? 'Saving…' : editingId ? 'Save changes' : 'Add to menu'}
             </button>
           </div>
@@ -309,9 +309,9 @@ export default function VendorMenuPage() {
   )
 }
 
-const inputCls = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none bg-white/5 border border-white/10 text-white placeholder-white/30'
+const inputCls = 'lx-field w-full px-3 py-2.5 text-sm outline-none'
 // Same styling minus w-full, for the flex add-on rows (w-full would fight flex-1/w-20).
-const addonInputCls = 'rounded-xl px-3 py-2.5 text-sm outline-none bg-white/5 border border-white/10 text-white placeholder-white/30'
+const addonInputCls = 'lx-field px-3 py-2.5 text-sm outline-none'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

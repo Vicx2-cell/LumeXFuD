@@ -66,6 +66,7 @@ export default function VendorDashboard() {
   const [loading, setLoading] = useState(true)
   const [statusBusy, setStatusBusy] = useState(false)
   const [pauseMenuOpen, setPauseMenuOpen] = useState(false)
+  const [recentOpen, setRecentOpen] = useState(false)
   const audioCtx = useRef<AudioContext | null>(null)
   const knownIds = useRef<Set<string>>(new Set())
 
@@ -372,26 +373,41 @@ export default function VendorDashboard() {
           )}
         </section>
 
-        {/* Recent */}
+        {/* Recent — collapsed by default, rolls down on tap */}
         {recent.length > 0 && (
           <section>
-            <h2 className="text-sm font-semibold text-white/30 mb-3">Recent</h2>
-            <div className="space-y-2">
-              {recent.map((o) => (
-                <div
-                  key={o.id}
-                  className="flex items-center justify-between px-4 py-3 rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-                >
-                  <div>
-                    <p className="text-sm font-medium text-white">{o.order_number}</p>
-                    <p className="text-xs text-white/30">{formatPrice(o.total_amount)}</p>
-                  </div>
-                  <span className="text-xs font-medium" style={{ color: STATUS_COLOR[o.status] ?? 'rgba(255,255,255,0.4)' }}>
-                    {STATUS_LABEL[o.status] ?? o.status}
-                  </span>
+            <button
+              onClick={() => setRecentOpen((v) => !v)}
+              aria-expanded={recentOpen}
+              className="w-full glass-thin rounded-xl px-4 py-3 flex items-center justify-between"
+            >
+              <span className="text-sm font-medium text-white/70 flex items-center gap-2">
+                Recent orders
+                <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-white/10 text-white/50">{recent.length}</span>
+              </span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-white/30 transition-transform" style={{ transform: recentOpen ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {/* grid-rows 0fr→1fr gives a smooth roll-down without measuring height */}
+            <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: recentOpen ? '1fr' : '0fr' }}>
+              <div className="overflow-hidden">
+                <div className="space-y-1.5 mt-2">
+                  {recent.map((o) => (
+                    <div
+                      key={o.id}
+                      className="flex items-center justify-between px-4 py-2.5 rounded-xl"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{o.order_number}</p>
+                        <p className="text-xs text-white/30 tabular-nums">{formatPrice(o.total_amount)}</p>
+                      </div>
+                      <span className="text-xs font-medium shrink-0" style={{ color: STATUS_COLOR[o.status] ?? 'rgba(255,255,255,0.4)' }}>
+                        {STATUS_LABEL[o.status] ?? o.status}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </section>
         )}
