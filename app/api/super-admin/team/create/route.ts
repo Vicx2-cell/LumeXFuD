@@ -4,6 +4,8 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
 import { generateTempPin, hashSecret } from '@/lib/pin-auth'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { getFeature } from '@/lib/features'
+import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { z } from 'zod'
 
 const createTeamInput = z.object({
@@ -28,6 +30,21 @@ export async function POST(req: NextRequest) {
     let normalized: string
     try { normalized = normalizePhone(phone) } catch { return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 }) }
 
+    // Phone ownership must be proven by OTP first — the super admin sends a code to
+    // the new admin's number and enters it back. The signed `phone_verified` cookie
+    // is bound to THIS number + the admin_create purpose. Governed by the same
+    // `phone_verification` flag as customer sign-up.
+    const verificationEnforced = await getFeature('phone_verification')
+    if (verificationEnforced) {
+      const ok = await verifyPhoneVerified(req.cookies.get(PHONE_VERIFIED_COOKIE)?.value, normalized, 'admin_create')
+      if (!ok) {
+        return NextResponse.json(
+          { error: 'Verify the admin’s phone number first.', phone_unverified: true },
+          { status: 403 },
+        )
+      }
+    }
+
     const db = createSupabaseAdmin()
     const { data: existing } = await db.from('admins').select('id').eq('phone', normalized).maybeSingle()
     if (existing) return NextResponse.json({ error: 'Admin phone already exists' }, { status: 409 })
@@ -49,7 +66,10 @@ export async function POST(req: NextRequest) {
 
     const message = `Hi, your LumeX admin account is ready! Login at ${process.env.NEXT_PUBLIC_APP_URL ?? 'https://lumexfud.com.ng'} with your number ${normalized} and PIN: ${tempPin}. You will be asked to change your PIN on first login.`
 
-    return NextResponse.json({ success: true, temp_pin: tempPin, name, phone: normalized, whatsapp_message: message })
+    const res = NextResponse.json({ success: true, temp_pin: tempPin, name, phone: normalized, whatsapp_message: message })
+    // Burn the phone-verified cookie — single use, so the next admin must verify afresh.
+    res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
+    return res
   } catch (error) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }

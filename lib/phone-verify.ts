@@ -78,21 +78,43 @@ export async function checkCode(phone: string, code: string): Promise<VerifyResu
   return 'ok'
 }
 
-/** Issue a signed token proving THIS phone was verified moments ago. */
-export async function signPhoneVerified(phone: string): Promise<string> {
-  return new SignJWT({ stage: 'phone_verified', phone })
+// What the verified phone is allowed to be used for. "signup" → create a new
+// account via /register; "reset" → set a new login PIN via /api/auth/pin/reset;
+// "admin_create" → an admin/super-admin provisioning a vendor/rider/admin account
+// (the new owner reads the WhatsApp code back during onboarding).
+export type VerifyPurpose = 'signup' | 'reset' | 'admin_create'
+
+/**
+ * Issue a signed token proving THIS phone was verified moments ago, scoped to a
+ * single purpose. `purpose` defaults to 'signup' so existing callers (e.g.
+ * /api/auth/register) keep working unchanged.
+ */
+export async function signPhoneVerified(phone: string, purpose: VerifyPurpose = 'signup'): Promise<string> {
+  return new SignJWT({ stage: 'phone_verified', phone, purpose })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(VERIFIED_TTL)
     .sign(jwtSecret())
 }
 
-/** True only if the token is valid, unexpired, and was issued for `phone`. */
-export async function verifyPhoneVerified(token: string | undefined, phone: string): Promise<boolean> {
+/**
+ * True only if the token is valid, unexpired, was issued for `phone`, AND was
+ * scoped to `expectedPurpose` (defaults to 'signup', so /register's existing
+ * call enforces signup-scoped cookies without any change there).
+ */
+export async function verifyPhoneVerified(
+  token: string | undefined,
+  phone: string,
+  expectedPurpose: VerifyPurpose = 'signup',
+): Promise<boolean> {
   if (!token) return false
   try {
     const { payload } = await jwtVerify(token, jwtSecret(), { algorithms: ['HS256'] })
-    return payload.stage === 'phone_verified' && payload.phone === phone
+    return (
+      payload.stage === 'phone_verified' &&
+      payload.phone === phone &&
+      payload.purpose === expectedPurpose
+    )
   } catch {
     return false
   }

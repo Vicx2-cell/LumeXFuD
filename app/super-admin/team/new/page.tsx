@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useFeatures } from '@/lib/use-features'
+import PhoneVerifyInline from '@/components/auth/PhoneVerifyInline'
 
 interface SuccessData {
   temp_pin: string
@@ -12,20 +14,31 @@ interface SuccessData {
 
 export default function NewAdminPage() {
   const router = useRouter()
+  // OTP gate mirrors customer sign-up; a super admin can disable it (phone_verification)
+  // while OTP delivery is down. Defaults to required until flags load.
+  const features = useFeatures()
+  const verificationRequired = features.phone_verification !== false
   const [form, setForm] = useState({ name: '', phone: '+234' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState<SuccessData | null>(null)
   const [copied, setCopied] = useState(false)
+  const [phoneVerified, setPhoneVerified] = useState(false)
 
   const set = (k: keyof typeof form, v: string) => {
     setForm((f) => ({ ...f, [k]: v }))
     setError('')
+    // The verified cookie is bound to a specific number — changing it invalidates it.
+    if (k === 'phone') setPhoneVerified(false)
   }
 
   const handleSubmit = async () => {
     if (!form.name.trim() || form.phone.length < 13) {
       setError('Please fill in all required fields.')
+      return
+    }
+    if (verificationRequired && !phoneVerified) {
+      setError('Verify the admin’s phone number first.')
       return
     }
     setLoading(true)
@@ -150,15 +163,23 @@ export default function NewAdminPage() {
             />
           </label>
 
+          {verificationRequired && (
+            <PhoneVerifyInline
+              phone={form.phone}
+              verified={phoneVerified}
+              onVerified={() => setPhoneVerified(true)}
+            />
+          )}
+
           {error && <p className="text-sm text-red-400">{error}</p>}
 
           <button
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || (verificationRequired && !phoneVerified)}
             className="w-full rounded-2xl py-4 text-sm font-semibold text-black disabled:opacity-50"
             style={{ background: '#F5A623', minHeight: 52 }}
           >
-            {loading ? 'Creating…' : 'Create Admin Account'}
+            {loading ? 'Creating…' : (verificationRequired && !phoneVerified) ? 'Verify phone to continue' : 'Create Admin Account'}
           </button>
         </div>
       </div>

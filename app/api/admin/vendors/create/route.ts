@@ -4,6 +4,8 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
 import { generateTempPin, hashSecret } from '@/lib/pin-auth'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { getFeature } from '@/lib/features'
+import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { z } from 'zod'
 
 const createVendorInput = z.object({
@@ -39,6 +41,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 })
     }
 
+    // Phone ownership must be proven by OTP first — the admin sends a code to the
+    // vendor's number and enters it back (the new owner reads it during onboarding).
+    // The signed `phone_verified` cookie is bound to THIS number + the admin_create
+    // purpose. Governed by the same `phone_verification` flag as customer sign-up,
+    // so the super admin can disable it while OTP delivery is down.
+    const verificationEnforced = await getFeature('phone_verification')
+    if (verificationEnforced) {
+      const ok = await verifyPhoneVerified(req.cookies.get(PHONE_VERIFIED_COOKIE)?.value, normalized, 'admin_create')
+      if (!ok) {
+        return NextResponse.json(
+          { error: 'Verify the vendor’s phone number first.', phone_unverified: true },
+          { status: 403 },
+        )
+      }
+    }
+
     const db = createSupabaseAdmin()
     const { data: existing } = await db.from('vendors').select('id').eq('phone', normalized).maybeSingle()
     if (existing) return NextResponse.json({ error: 'Vendor phone already exists' }, { status: 409 })
@@ -68,7 +86,10 @@ export async function POST(req: NextRequest) {
 
     const message = `Hi, your LumeX Fud vendor account is ready! Login at ${process.env.NEXT_PUBLIC_APP_URL ?? 'https://lumexfud.com.ng'} with your number ${normalized} and PIN: ${tempPin}. You will be asked to change your PIN on first login.`
 
-    return NextResponse.json({ success: true, temp_pin: tempPin, vendor_name: shop_name, phone: normalized, whatsapp_message: message })
+    const res = NextResponse.json({ success: true, temp_pin: tempPin, vendor_name: shop_name, phone: normalized, whatsapp_message: message })
+    // Burn the phone-verified cookie — single use, so the next vendor must verify afresh.
+    res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
+    return res
   } catch (error) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
