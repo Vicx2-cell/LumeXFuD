@@ -7,7 +7,7 @@ import { useFeatures } from '@/lib/use-features'
 
 interface GItem { id: string; contributor_id: string; contributor_name: string; quantity: number; notes: string | null; menu_item_id: string; name: string; price_kobo: number; mine: boolean }
 interface MenuItem { id: string; name: string; price_kobo: number; category: string }
-interface GroupData { code: string; group_order_id: string; status: string; expires_at: string; is_host: boolean; host_id: string; vendor: { id: string; name: string }; items: GItem[]; menu: MenuItem[] }
+interface GroupData { code: string; group_order_id: string; status: string; expires_at: string; is_host: boolean; host_id: string; split_enabled: boolean; vendor: { id: string; name: string }; items: GItem[]; menu: MenuItem[] }
 
 interface Person { id: string; name: string; total: number; count: number; mine: boolean }
 function groupByPerson(items: GItem[]): Person[] {
@@ -58,6 +58,8 @@ export default function GroupOrderPage() {
       const res = await fetch(`/api/group-order/${code}`, { cache: 'no-store' })
       if (res.status === 401) { router.push(`/auth?next=/group/${code}`); return }
       const d = await res.json()
+      // Closed (cancelled / expired) — flip the page to the closed message even on a silent poll.
+      if (res.status === 410) { setData(null); setError(d.error ?? 'This group order is closed.'); return }
       if (!res.ok) { if (!silent) setError(d.error ?? 'Could not load group order.'); return }
       setData(d); setError('')
     } catch { if (!silent) setError('Connection error.') } finally { if (!silent) setLoading(false) }
@@ -106,6 +108,30 @@ export default function GroupOrderPage() {
       await fetch(`/api/group-order/${code}/items?contributorId=${contributorId}`, { method: 'DELETE' })
       await load(true)
     } finally { setBusyId('') }
+  }
+
+  const toggleSplit = async () => {
+    if (!data) return
+    const next = !data.split_enabled
+    setData({ ...data, split_enabled: next }) // optimistic
+    try {
+      const res = await fetch(`/api/group-order/${code}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ split_enabled: next }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? 'Could not update.'); await load(true) }
+    } catch { setError('Connection error.'); await load(true) }
+  }
+
+  const cancelGroup = async () => {
+    if (!window.confirm('Cancel this group order for everyone? The link stops working and everyone is notified. This can’t be undone.')) return
+    setBusyId('cancel')
+    try {
+      const res = await fetch(`/api/group-order/${code}/cancel`, { method: 'POST' })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(d.error ?? 'Could not cancel.'); return }
+      setData(null); setError('You cancelled this group order.')
+    } catch { setError('Connection error.') } finally { setBusyId('') }
   }
 
   const share = () => {
@@ -188,8 +214,24 @@ export default function GroupOrderPage() {
             ))}
           </div>
           <p className="text-[11px] text-white/35 mt-3 pt-2 border-t border-white/10">
-            Split: everyone pays their own food + an equal share of delivery &amp; platform fee. Each person gets their exact share by WhatsApp once you check out.
+            {data.split_enabled
+              ? 'Split ON — everyone pays their own food + an equal share of delivery & platform fee. Each person gets their exact share by WhatsApp at checkout.'
+              : 'Split OFF — you’re treating everyone 🎁 Nobody is asked to pay you back.'}
           </p>
+
+          {data.is_host && !expired && (
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <button onClick={toggleSplit} className="flex items-center gap-2 text-sm" aria-label="Toggle split the bill">
+                <span className="relative w-10 h-6 rounded-full transition-colors shrink-0" style={{ background: data.split_enabled ? '#22C55E' : 'rgba(255,255,255,0.15)' }}>
+                  <span className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all" style={{ left: data.split_enabled ? 22 : 4 }} />
+                </span>
+                <span className="text-white/70">Split the bill</span>
+              </button>
+              <button onClick={cancelGroup} disabled={busyId === 'cancel'} className="text-xs text-red-400/80 hover:text-red-400 disabled:opacity-50">
+                {busyId === 'cancel' ? 'Cancelling…' : 'Cancel group'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

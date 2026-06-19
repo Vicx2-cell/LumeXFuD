@@ -23,24 +23,19 @@ export default function ActiveGroupBanner() {
 
   if (groups.length === 0) return null
 
+  // Compact single-line bar — opens the most recent group; "+N" if more than one.
+  const g = groups[0]
+  const extra = groups.length - 1
   return (
-    <div className="space-y-2">
-      {groups.map((g) => (
-        <button
-          key={g.code}
-          onClick={() => router.push(`/group/${g.code}`)}
-          className="w-full flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left"
-          style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.3)' }}
-        >
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-white truncate">
-              👥 Group order · {g.vendor_name}
-            </p>
-            <p className="text-xs text-white/50">{g.is_host ? 'You’re hosting — tap to check out' : 'Tap to add your food'}</p>
-          </div>
-          <span className="text-xs font-semibold shrink-0" style={{ color: '#F5A623' }}>Open →</span>
-        </button>
-      ))}
-    </div>
+    <button
+      onClick={() => router.push(`/group/${g.code}`)}
+      className="w-full flex items-center justify-between gap-2 rounded-full px-3.5 py-2 text-left"
+      style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.3)' }}
+    >
+      <span className="text-sm text-white/85 truncate">
+        👥 Group order · {g.vendor_name}{extra > 0 ? ` +${extra}` : ''}
+      </span>
+      <span className="text-xs font-semibold shrink-0" style={{ color: '#F5A623' }}>Open →</span>
+    </button>
   )
 }

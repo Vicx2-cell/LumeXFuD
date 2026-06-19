@@ -28,9 +28,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
     .maybeSingle()
   const group = g as { id: string; code: string; vendor_id: string; host_customer_id: string; status: string; expires_at: string } | null
   if (!group) return NextResponse.json({ error: 'Group order not found' }, { status: 404 })
-  if (new Date(group.expires_at).getTime() < Date.now()) {
+  if (group.status === 'CANCELLED') {
+    return NextResponse.json({ error: 'This group order was cancelled by the host.', cancelled: true }, { status: 410 })
+  }
+  if (group.status === 'EXPIRED' || new Date(group.expires_at).getTime() < Date.now()) {
     return NextResponse.json({ error: 'This group order has expired.', expired: true }, { status: 410 })
   }
+
+  // Did the host turn bill-splitting on? Best-effort (column may not exist pre-067).
+  let splitEnabled = true
+  try {
+    const { data: s } = await db.from('group_orders').select('split_enabled').eq('id', group.id).maybeSingle()
+    const v = (s as { split_enabled?: boolean } | null)?.split_enabled
+    if (typeof v === 'boolean') splitEnabled = v
+  } catch { /* default split on */ }
 
   const { data: me } = await db.from('customers').select('id').eq('phone', session.phone).maybeSingle()
   const myId = (me as { id: string } | null)?.id ?? ''
@@ -67,6 +78,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
     expires_at: group.expires_at,
     is_host: group.host_customer_id === myId,
     host_id: group.host_customer_id,
+    split_enabled: splitEnabled,
     vendor: { id: group.vendor_id, name: v?.name ?? 'Vendor' },
     items: itemRows,
     menu: (menu ?? []).map((m) => {
@@ -74,4 +86,30 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
       return { id: row.id, name: row.name, price_kobo: row.price_kobo, category: row.category }
     }),
   })
+}
+
+// PATCH /api/group-order/[code] — host toggles bill-splitting on/off.
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
+  const session = await getCurrentUser()
+  if (!session || session.role !== 'customer') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { code } = await params
+  const body = await req.json().catch(() => null)
+  const split = (body as { split_enabled?: unknown } | null)?.split_enabled
+  if (typeof split !== 'boolean') return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+
+  const db = createSupabaseAdmin()
+  const { data: gRow } = await db.from('group_orders').select('id, host_customer_id, status').eq('code', code.toUpperCase()).maybeSingle()
+  const g = gRow as { id: string; host_customer_id: string; status: string } | null
+  if (!g) return NextResponse.json({ error: 'Group order not found' }, { status: 404 })
+  if (g.status !== 'OPEN') return NextResponse.json({ error: 'This group order is closed.' }, { status: 409 })
+
+  const { data: meRow } = await db.from('customers').select('id').eq('phone', session.phone).maybeSingle()
+  if ((meRow as { id: string } | null)?.id !== g.host_customer_id) {
+    return NextResponse.json({ error: 'Only the host can change this.' }, { status: 403 })
+  }
+
+  const { error } = await db.from('group_orders').update({ split_enabled: split }).eq('id', g.id)
+  if (error) return NextResponse.json({ error: 'Could not update.' }, { status: 500 })
+  return NextResponse.json({ success: true, split_enabled: split })
 }

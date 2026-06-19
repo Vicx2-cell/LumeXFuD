@@ -70,8 +70,15 @@ export function downloadReceiptPng(d: ReceiptDownload): void {
 
   // Amber header
   ctx.fillStyle = '#F5A623'; ctx.fillRect(0, 0, W, 76)
-  ctx.fillStyle = ink; ctx.font = `700 22px ${sans}`; ctx.fillText('LumeX Fud', 28, 40)
-  ctx.font = `500 12px ${sans}`; ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillText('Campus life, simplified.', 28, 59)
+  // Logo badge — amber "X" mark on a dark rounded square (the LumeX brand mark).
+  ctx.fillStyle = ink; roundRect(ctx, 24, 20, 36, 36, 9); ctx.fill()
+  ctx.fillStyle = '#F5A623'; ctx.font = `800 24px ${sans}`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillText('X', 24 + 18, 20 + 19)
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
+  // Wordmark, shifted right of the badge.
+  ctx.fillStyle = ink; ctx.font = `700 22px ${sans}`; ctx.fillText('LumeX Fud', 72, 40)
+  ctx.font = `500 12px ${sans}`; ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillText('Campus life, simplified.', 72, 59)
 
   // Title + party
   ctx.fillStyle = ink; ctx.font = `700 16px ${sans}`; ctx.fillText(d.title, 28, 116)
