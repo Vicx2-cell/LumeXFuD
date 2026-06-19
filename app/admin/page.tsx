@@ -230,7 +230,7 @@ export default function AdminDashboard() {
               className="glass-thin text-left p-4 transition-transform hover:-translate-y-0.5 group"
             >
               <div className="flex items-center gap-2.5 mb-1">
-                <span className="flex items-center justify-center w-9 h-9 rounded-xl text-[#F5A623] transition-colors" style={{ background: 'rgba(245,166,35,0.12)', border: '1px solid rgba(245,166,35,0.2)' }}>
+                <span className="lx-icon-badge w-9 h-9 rounded-xl">
                   {a.icon}
                 </span>
                 <p className="font-semibold text-white">{a.label}</p>

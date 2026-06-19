@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Badge } from '@/components/ui/badge'
 
 interface Found { found: boolean; role?: string; name?: string; suspended?: boolean; reason?: string | null; blocked?: boolean }
 
@@ -111,7 +112,7 @@ export default function AdminAccounts() {
   }
 
   return (
-    <div className="min-h-dvh px-4 py-8" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page px-4 py-8">
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg" style={{ background: '#F5A623', color: '#000' }}>{toast}</div>}
       <div className="mx-auto max-w-md">
         <div className="flex items-center gap-3 mb-6">
@@ -119,12 +120,12 @@ export default function AdminAccounts() {
           <h1 className="text-xl font-bold text-white">Accounts</h1>
         </div>
 
-        <div className="rounded-2xl p-5" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="glass-thin rounded-2xl p-5">
           <label className="text-xs text-white/50 block mb-1.5">Find an account by phone</label>
           <div className="flex gap-2">
             <input value={phone} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') lookup() }} placeholder="+234… or 0…"
-              className="flex-1 rounded-xl px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
-            <button onClick={lookup} disabled={busy} className="px-4 rounded-xl text-sm font-semibold disabled:opacity-50" style={{ background: '#F5A623', color: '#000' }}>Find</button>
+              className="lx-field flex-1 px-3 py-2.5 text-sm outline-none" />
+            <button onClick={lookup} disabled={busy} className="lx-btn-amber px-4 text-sm disabled:opacity-50">Find</button>
           </div>
 
           {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
@@ -138,9 +139,9 @@ export default function AdminAccounts() {
                   <p className="font-semibold text-white">{result.name}</p>
                   <p className="text-xs text-white/45 uppercase tracking-wide">{result.role}</p>
                 </div>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: (result.blocked || result.suspended) ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)', color: (result.blocked || result.suspended) ? '#EF4444' : '#22C55E' }}>
+                <Badge color={(result.blocked || result.suspended) ? 'var(--lx-red)' : 'var(--lx-green)'}>
                   {result.blocked ? 'Banned' : result.suspended ? 'Suspended' : 'Active'}
-                </span>
+                </Badge>
               </div>
 
               {/* KYC selfie (fraud review) — private, fetched via a short-lived signed URL */}
@@ -162,7 +163,7 @@ export default function AdminAccounts() {
                     </div>
                   </div>
                 ) : (
-                  <button onClick={viewFace} disabled={faceBusy} className="text-xs font-medium disabled:opacity-50" style={{ color: '#F5A623' }}>
+                  <button onClick={viewFace} disabled={faceBusy} className="lx-amber text-xs font-medium disabled:opacity-50">
                     {faceBusy ? 'Loading…' : '🪪 View KYC photo'}
                   </button>
                 )}
@@ -170,7 +171,7 @@ export default function AdminAccounts() {
 
               {!result.suspended && (
                 <input value={reason} onChange={(e) => setReason(e.target.value.slice(0, 300))} placeholder="Reason (optional, shown to them)"
-                  className="w-full rounded-xl px-3 py-2.5 text-sm outline-none mb-3" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+                  className="lx-field w-full px-3 py-2.5 text-sm outline-none mb-3" />
               )}
 
               {result.suspended ? (
@@ -209,12 +210,12 @@ export default function AdminAccounts() {
                 <div className="relative mb-2">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-white/40">₦</span>
                   <input type="number" min="1" value={adjAmount} onChange={(e) => setAdjAmount(e.target.value)} placeholder="Amount in naira"
-                    className="w-full pl-7 pr-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+                    className="lx-field w-full pl-7 pr-3 py-2.5 text-sm outline-none" />
                 </div>
                 <input value={adjReason} onChange={(e) => setAdjReason(e.target.value.slice(0, 300))} placeholder="Reason (required, audited)"
-                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none mb-2" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+                  className="lx-field w-full px-3 py-2.5 text-sm outline-none mb-2" />
                 {adjError && <p className="text-sm text-red-400 mb-2">{adjError}</p>}
-                <button onClick={adjustWallet} disabled={adjBusy} className="w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-50" style={{ background: '#F5A623', color: '#000' }}>
+                <button onClick={adjustWallet} disabled={adjBusy} className="lx-btn-amber w-full py-3 text-sm disabled:opacity-50">
                   {adjBusy ? 'Applying…' : `${adjDir === 'credit' ? 'Credit' : 'Debit'} wallet`}
                 </button>
                 <p className="text-[11px] text-white/30 mt-2 text-center">Super admin only · max ₦500,000 · fully audited.</p>

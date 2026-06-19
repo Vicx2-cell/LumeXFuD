@@ -104,7 +104,7 @@ export default function AdminDisputes() {
   }
 
   return (
-    <div className="min-h-dvh px-4 py-8" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page px-4 py-8">
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg"
           style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
@@ -136,7 +136,7 @@ export default function AdminDisputes() {
         {loading ? (
           <div className="space-y-4">
             {[1, 2].map((i) => (
-              <div key={i} className="h-44 rounded-2xl animate-pulse" style={{ background: '#111113' }} />
+              <div key={i} className="h-44 rounded-2xl lx-skeleton" />
             ))}
           </div>
         ) : disputes.length === 0 ? (
@@ -208,8 +208,7 @@ export default function AdminDisputes() {
                     <button
                       onClick={() => analyze(d.id)}
                       disabled={analyzing !== null}
-                      className="w-full mb-3 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
-                      style={{ background: 'rgba(245,166,35,0.1)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.25)' }}
+                      className="lx-card-amber lx-amber w-full mb-3 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
                     >
                       {analyzing === d.id ? 'Analyzing…' : '🤖 AI analysis'}
                     </button>
@@ -247,9 +246,9 @@ export default function AdminDisputes() {
 function DisputeBriefPanel({ brief }: { brief: DisputeBrief }) {
   const meta = RESOLUTION_META[brief.suggested_resolution]
   return (
-    <div className="mb-3 rounded-xl p-3 space-y-2.5" style={{ background: 'rgba(245,166,35,0.06)', border: '1px solid rgba(245,166,35,0.2)' }}>
+    <div className="lx-card-amber-soft mb-3 rounded-xl p-3 space-y-2.5">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-bold tracking-wide" style={{ color: '#F5A623' }}>🤖 AI ANALYSIS</span>
+        <span className="lx-amber text-xs font-bold tracking-wide">🤖 AI ANALYSIS</span>
         <span className="text-[10px] text-white/30">advisory · you decide</span>
       </div>
 

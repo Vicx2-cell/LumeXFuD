@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
+import { Badge } from '@/components/ui/badge'
+import { Pill } from '@/components/ui/pill'
 
 interface OrderRow {
   id: string
@@ -64,7 +66,7 @@ export default function AdminOrders() {
   }, [statusFilter])
 
   return (
-    <div className="min-h-dvh px-4 py-8" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page px-4 py-8">
       <div className="mx-auto max-w-3xl">
         <div className="flex items-center gap-3 mb-5">
           <button onClick={() => router.back()} className="w-9 h-9 rounded-full flex items-center justify-center text-white/50"
@@ -75,24 +77,21 @@ export default function AdminOrders() {
         {/* Status filter */}
         <div className="flex gap-2 flex-wrap mb-5">
           {ALL_STATUSES.map((s) => (
-            <button
+            <Pill
               key={s || 'all'}
+              active={statusFilter === s}
               onClick={() => setStatusFilter(s)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              style={{
-                background: statusFilter === s ? '#F5A623' : 'rgba(255,255,255,0.06)',
-                color: statusFilter === s ? '#000' : 'rgba(255,255,255,0.5)',
-              }}
+              className="px-3 py-1.5 text-xs"
             >
               {s || 'All'}
-            </button>
+            </Pill>
           ))}
         </div>
 
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: '#111113' }} />
+              <div key={i} className="h-20 rounded-2xl lx-skeleton" />
             ))}
           </div>
         ) : orders.length === 0 ? (
@@ -101,18 +100,13 @@ export default function AdminOrders() {
           <>
             <div className="space-y-2">
               {orders.map((o) => (
-                <div key={o.id} className="rounded-2xl px-4 py-3 flex items-center gap-3"
-                  style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div key={o.id} className="glass-thin rounded-2xl px-4 py-3 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold text-white truncate">{o.order_number}</p>
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0"
-                        style={{
-                          background: `${STATUS_COLORS[o.status] ?? '#666'}22`,
-                          color: STATUS_COLORS[o.status] ?? '#999',
-                        }}>
+                      <Badge className="shrink-0" color={STATUS_COLORS[o.status] ?? '#999'}>
                         {o.status}
-                      </span>
+                      </Badge>
                     </div>
                     <p className="text-xs text-white/40 mt-0.5 truncate">
                       {o.vendors?.shop_name ?? '—'} → {o.customers?.name ?? o.customers?.phone ?? '—'}
