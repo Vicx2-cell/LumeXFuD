@@ -63,7 +63,10 @@ key) via `validateEnv()` — unrelated to these changes.
 - [x] 1. Public home — display font on wordmarks/stats, amber utilities, live pulse badge. (commit c750e14)
 - [x] 2. Vendor dashboard (priority) — responsive desktop grid (orders main / controls sidebar),
       header pills + status badge via primitives, lx-btn-amber actions, token colors. tsc clean.
-- [ ] 3. Customer
+- [x] 3. Customer — home (lx-page ambient + lx-topbar), vendor menu, cart, order-status,
+      orders, leaderboard-client, profile-client (5 hand-rolled glass cards → glass-thin).
+      Badge/Pill/lx-field/lx-card-amber/lx-icon-badge/lx-amber adopted. chow-ai left intact
+      (already on-brand). New utility: .lx-topbar, .lx-amber. tsc clean.
 - [ ] 4. Rider
 - [ ] 5. Admin
 - [ ] 6. Super-admin

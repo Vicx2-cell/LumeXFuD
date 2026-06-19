@@ -109,8 +109,7 @@ export function LeaderboardTabs({
 
       {/* AI caption for the active tab */}
       {commentary && entries.length > 0 && (
-        <div className="flex items-start gap-2 mb-4 px-3.5 py-2.5 rounded-2xl"
-          style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.18)' }}>
+        <div className="lx-card-amber-soft flex items-start gap-2 mb-4 px-3.5 py-2.5 rounded-2xl">
           <span className="text-sm shrink-0">✨</span>
           <p className="text-sm leading-snug" style={{ color: 'rgba(255,255,255,0.85)' }}>{commentary[active]}</p>
         </div>
@@ -120,7 +119,7 @@ export function LeaderboardTabs({
       <div className="space-y-3 lx-stagger" key={active}>
         {entries.length === 0 ? (
           <div className="text-center py-16">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)' }}>
+            <div className="lx-icon-badge w-16 h-16 rounded-2xl mb-4">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
             </div>
             <p className="font-medium text-white/80">The podium&apos;s empty</p>
@@ -132,8 +131,7 @@ export function LeaderboardTabs({
             return (
             <div
               key={entry.rank}
-              className={`flex items-center gap-4 px-4 py-4 transition-transform hover:-translate-y-0.5 ${top ? 'glass' : 'glass-thin'}`}
-              style={top ? { background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.22)' } : undefined}
+              className={`lx-tap flex items-center gap-4 px-4 py-4 ${top ? 'glass lx-card-amber-soft' : 'glass-thin'}`}
             >
               <div className="w-9 flex items-center justify-center shrink-0">
                 {top ? (
@@ -161,7 +159,7 @@ export function LeaderboardTabs({
                 </p>
               </div>
               <div className="text-right shrink-0">
-                <p className="font-bold text-base tabular-nums" style={{ color: '#F5A623' }}>
+                <p className="lx-amber font-bold text-base tabular-nums">
                   {isStreak ? `🔥 ${entry.count}` : entry.count}
                 </p>
               </div>

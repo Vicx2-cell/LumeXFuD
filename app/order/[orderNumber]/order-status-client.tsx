@@ -215,10 +215,9 @@ export function OrderStatusClient({
       <div className="max-w-lg mx-auto px-4 py-5 space-y-5 lx-enter">
         {/* Scheduled (prepaid pre-order) — waiting to be handed to the kitchen */}
         {order.status === 'SCHEDULED' && order.scheduled_for && (
-          <div className="rounded-2xl p-5 text-center lx-scale-in"
-            style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.2)' }}>
+          <div className="lx-card-amber-soft rounded-2xl p-5 text-center lx-scale-in">
             <p className="text-xs uppercase tracking-[0.18em] text-white/50 mb-1.5">🗓️ Scheduled · Paid ✓</p>
-            <p className="text-2xl font-bold tabular-nums" style={{ color: '#F5A623' }}>
+            <p className="lx-amber text-2xl font-bold tabular-nums">
               {new Date(order.scheduled_for).toLocaleString('en-NG', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
             </p>
             <p className="text-xs text-white/50 mt-2">We’ll send your order to the kitchen at this time — it arrives a bit after. Cancel any time before then for a full refund.</p>
@@ -227,10 +226,9 @@ export function OrderStatusClient({
 
         {/* ETA */}
         {eta && isActive && (
-          <div className="rounded-2xl p-5 text-center lx-scale-in"
-            style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.2)', boxShadow: '0 0 40px rgba(245,166,35,0.08) inset' }}>
+          <div className="lx-card-amber-soft rounded-2xl p-5 text-center lx-scale-in" style={{ boxShadow: '0 0 40px rgba(245,166,35,0.08) inset' }}>
             <p className="text-xs uppercase tracking-[0.18em] text-white/50 mb-1.5">Estimated arrival</p>
-            <p className="text-4xl font-bold tabular-nums" style={{ color: '#F5A623' }}>{eta}</p>
+            <p className="lx-amber text-4xl font-bold tabular-nums">{eta}</p>
           </div>
         )}
 
@@ -286,7 +284,7 @@ export function OrderStatusClient({
         {/* Rider card */}
         {order.riders && ['RIDER_ASSIGNED', 'PICKED_UP', 'DELIVERED'].includes(order.status) && (
           <div className="glass-thin p-4 flex items-center gap-4 lx-scale-in">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(245,166,35,0.12)', border: '1px solid rgba(245,166,35,0.2)' }}>
+            <div className="lx-icon-badge w-12 h-12 rounded-full">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5h-5l-2.5-6"/><path d="M12 6h3l2 5"/><path d="M6 11h7"/></svg>
             </div>
             <div className="flex-1 min-w-0">
@@ -344,10 +342,10 @@ export function OrderStatusClient({
         {/* Dispute submitted confirmation — Lumi's empathetic reply when available */}
         {order.status === 'DISPUTED' && (
           conciergeReply ? (
-            <div className="rounded-2xl p-4" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.2)' }}>
+            <div className="lx-card-amber-soft rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-1.5">
                 <span aria-hidden="true">✨</span>
-                <p className="text-xs font-semibold tracking-wide" style={{ color: '#F5A623' }}>Lumi</p>
+                <p className="lx-amber text-xs font-semibold tracking-wide">Lumi</p>
               </div>
               <p className="text-sm text-white/85 leading-relaxed">{conciergeReply}</p>
             </div>
@@ -398,8 +396,7 @@ export function OrderStatusClient({
                 onChange={(e) => setReviewText(e.target.value.slice(0, 500))}
                 placeholder="Add a review (optional) — what did you think of the food?"
                 rows={3}
-                className="w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none focus:border-amber-400 transition-colors mt-4"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                className="lx-field w-full px-3 py-2.5 text-sm outline-none resize-none mt-4"
               />
 
               {/* Rate the rider — only if this order had one. Optional. */}
@@ -433,8 +430,7 @@ export function OrderStatusClient({
                       onChange={(e) => setRiderReviewText(e.target.value.slice(0, 500))}
                       placeholder="How was the delivery? (optional)"
                       rows={2}
-                      className="w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none focus:border-amber-400 transition-colors mt-3"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                      className="lx-field w-full px-3 py-2.5 text-sm outline-none resize-none mt-3"
                     />
                   )}
                 </div>
@@ -471,7 +467,7 @@ export function OrderStatusClient({
           ))}
           <div className="px-4 py-3 border-t border-white/8 flex justify-between font-semibold">
             <span>Total</span>
-            <span style={{ color: '#F5A623' }}>{formatPrice(order.total_amount)}</span>
+            <span className="lx-amber">{formatPrice(order.total_amount)}</span>
           </div>
         </div>
       </div>
@@ -511,8 +507,7 @@ export function OrderStatusClient({
               onChange={(e) => setDisputeDesc(e.target.value.slice(0, 2000))}
               placeholder="Add any details (optional)…"
               rows={3}
-              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none focus:border-amber-400 transition-colors mb-3"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+              className="lx-field w-full px-3 py-2.5 text-sm outline-none resize-none mb-3"
             />
 
             {disputeError && <p className="text-sm text-red-400 mb-3">{disputeError}</p>}

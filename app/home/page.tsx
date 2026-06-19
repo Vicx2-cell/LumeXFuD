@@ -61,12 +61,9 @@ export default async function CustomerHomePage() {
   ])
 
   return (
-    <main className="min-h-dvh pb-24" style={{ background: '#0A0A0B' }}>
+    <main className="lx-page pb-24">
       {/* Header */}
-      <div
-        className="sticky top-0 z-40 px-4 py-3 border-b border-white/8"
-        style={{ background: 'rgba(10,10,11,0.9)', backdropFilter: 'blur(20px)' }}
-      >
+      <div className="lx-topbar sticky top-0 z-40 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BackButton />
@@ -79,12 +76,11 @@ export default async function CustomerHomePage() {
           <div className="flex items-center gap-2">
             <a
               href="/profile/wallet"
-              className="h-9 px-3 rounded-full flex items-center gap-1.5"
-              style={{ background: 'rgba(245,166,35,0.14)', border: '1px solid rgba(245,166,35,0.3)' }}
+              className="lx-card-amber-strong h-9 px-3 rounded-full flex items-center gap-1.5"
               aria-label="Wallet"
             >
               <span className="text-sm">💰</span>
-              <span className="text-xs font-semibold" style={{ color: '#F5A623' }}>Wallet</span>
+              <span className="lx-amber text-xs font-semibold">Wallet</span>
             </a>
             <a
               href="/profile"
@@ -134,13 +130,10 @@ export default async function CustomerHomePage() {
 
         {/* Trending */}
         {trending && trending.orders_last_hour && (
-          <div
-            className="rounded-2xl p-4 flex items-center gap-3"
-            style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)' }}
-          >
+          <div className="lx-card-amber rounded-2xl p-4 flex items-center gap-3">
             <span className="text-2xl">🔥</span>
             <div>
-              <p className="text-sm font-semibold text-[#F5A623]">
+              <p className="lx-amber text-sm font-semibold">
                 {trending.orders_last_hour} orders in the last hour
               </p>
               {trending.top_item_name && (

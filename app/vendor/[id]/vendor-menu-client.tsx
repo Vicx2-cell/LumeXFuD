@@ -7,6 +7,8 @@ import { useCart, cartLineKey, type CartItem, type CartAddon } from '@/component
 import { formatPrice } from '@/lib/money'
 import { vendorTrustBadges } from '@/lib/vendor-trust'
 import { VerifiedBadge } from '@/components/verified-badge'
+import { Badge } from '@/components/ui/badge'
+import { Pill } from '@/components/ui/pill'
 import type { VendorInfo, MenuItem, VendorReview } from './page'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks', 'Other']
@@ -148,7 +150,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-lg">{selecting.name}</h3>
-                <p className="text-sm" style={{ color: '#F5A623' }}>{formatPrice(selecting.price_kobo)}</p>
+                <p className="lx-amber text-sm">{formatPrice(selecting.price_kobo)}</p>
               </div>
               <button onClick={() => setSelecting(null)} className="text-white/40 text-sm">Close</button>
             </div>
@@ -173,7 +175,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
               })}
             </div>
 
-            <button onClick={confirmAddons} className="w-full rounded-2xl py-4 font-semibold" style={{ background: '#F5A623', color: '#000' }}>
+            <button onClick={confirmAddons} className="lx-btn-amber w-full rounded-2xl py-4">
               Add to cart · {formatPrice(selectingTotal)}
             </button>
           </div>
@@ -192,17 +194,16 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
               {vendor.kyc_verified && <VerifiedBadge kind="vendor" />}
             </div>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{ background: vendor.status === 'OPEN' ? 'rgba(34,197,94,0.15)' : vendor.status === 'BUSY' ? 'rgba(245,166,35,0.15)' : 'rgba(239,68,68,0.15)', color: vendor.status === 'OPEN' ? '#22c55e' : vendor.status === 'BUSY' ? '#F5A623' : '#ef4444' }}>
+              <Badge color={vendor.status === 'OPEN' ? 'var(--lx-green)' : vendor.status === 'BUSY' ? 'var(--color-amber)' : 'var(--lx-red)'}>
                 {isPaused ? 'Paused' : vendor.status}
-              </span>
+              </Badge>
               <span className="text-xs text-white/40">{vendor.prep_time_minutes}–{vendor.prep_time_minutes + 10} min</span>
               {vendor.opening_time && vendor.closing_time && (
                 <span className="text-xs text-white/40">🕒 {vendor.opening_time}–{vendor.closing_time}</span>
               )}
-              {vendor.total_ratings >= 5 && <span className="text-xs text-[#F5A623]">★ {vendor.avg_rating.toFixed(1)}</span>}
+              {vendor.total_ratings >= 5 && <span className="lx-amber text-xs">★ {vendor.avg_rating.toFixed(1)}</span>}
               {vendorTrustBadges(vendor).map((b) => (
-                <span key={b.label} className="text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623' }}>
+                <span key={b.label} className="lx-card-amber lx-amber text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                   <span aria-hidden="true">{b.emoji}</span>{b.label}
                 </span>
               ))}
@@ -216,10 +217,10 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
         {/* Logged-out visitors (e.g. arrived via the vendor's share link): one tap
             to create an account, and they come right back to this page. */}
         {loggedOut && (
-          <div className="mx-4 mb-2 rounded-xl px-4 py-3" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.28)' }}>
+          <div className="lx-card-amber mx-4 mb-2 rounded-xl px-4 py-3">
             <p className="text-sm text-white/85 mb-2">Order to your hostel — you’ll come right back to this page.</p>
             <div className="flex gap-2">
-              <a href={`/auth/register?next=${vendorNext}`} className="flex-1 text-center py-2 rounded-lg text-sm font-semibold" style={{ background: '#F5A623', color: '#000' }}>Create account</a>
+              <a href={`/auth/register?next=${vendorNext}`} className="lx-btn-amber flex-1 text-center py-2 rounded-lg text-sm">Create account</a>
               <a href={`/auth?next=${vendorNext}`} className="flex-1 text-center py-2 rounded-lg text-sm font-semibold" style={{ background: 'rgba(255,255,255,0.08)', color: '#fff' }}>Log in</a>
             </div>
           </div>
@@ -227,10 +228,9 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
 
         <div className="flex gap-2 overflow-x-auto px-4 pb-3 scrollbar-none">
           {CATEGORIES.map((cat) => (
-            <button key={cat} onClick={() => setActiveCategory(cat)} className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium"
-              style={{ background: activeCategory === cat ? '#F5A623' : 'rgba(255,255,255,0.07)', color: activeCategory === cat ? '#000' : 'rgba(255,255,255,0.6)' }}>
+            <Pill key={cat} active={activeCategory === cat} onClick={() => setActiveCategory(cat)} className="shrink-0 px-3 py-1.5 text-xs">
               {cat}
-            </button>
+            </Pill>
           ))}
         </div>
       </div>
@@ -238,7 +238,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       {menu.length > 10 && (
         <div className="max-w-lg mx-auto px-4 py-3">
           <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search menu..." aria-label="Search menu"
-            className="w-full rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400 transition-colors" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+            className="lx-field w-full px-4 py-2.5 text-sm outline-none" />
         </div>
       )}
 
@@ -246,7 +246,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       <div className="max-w-lg mx-auto px-4 py-3 space-y-3 lx-stagger">
         {filtered.length === 0 ? (
           <div className="text-center py-16 px-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)' }}>
+            <div className="lx-icon-badge w-16 h-16 rounded-2xl mb-4">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>
             </div>
             <p className="font-medium text-white/80">Nothing on this shelf yet</p>
@@ -266,7 +266,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-sm leading-tight">{item.name}</h3>
                   {item.description && <p className="text-xs text-white/40 mt-0.5 line-clamp-2">{item.description}</p>}
-                  <p className="font-semibold text-sm mt-1" style={{ color: '#F5A623' }}>{formatPrice(item.price_kobo)}</p>
+                  <p className="lx-amber font-semibold text-sm mt-1">{formatPrice(item.price_kobo)}</p>
                   {item.prep_time_minutes != null && <p className="text-xs text-white/40 mt-0.5">⏱ {item.prep_time_minutes} min</p>}
                   {item.addons.length > 0 && <p className="text-xs text-white/30 mt-0.5">{item.addons.length} add-on{item.addons.length === 1 ? '' : 's'} available</p>}
                   {soldOut && <p className="text-xs text-red-400 mt-1">Sold out</p>}
@@ -311,7 +311,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
               <div key={r.id} className="glass-thin p-3.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }} aria-hidden="true">
+                    <div className="lx-icon-badge w-7 h-7 rounded-full shrink-0" aria-hidden="true">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
                     </div>
                     <span className="text-sm font-medium truncate text-white/70">Anonymous</span>

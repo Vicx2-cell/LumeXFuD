@@ -262,11 +262,11 @@ export default function CartPage() {
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-5 lx-enter">
         {/* Estimated time — longest dish + delivery window */}
-        <div className="rounded-2xl p-3 flex items-center gap-2.5" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.22)' }}>
+        <div className="lx-card-amber rounded-2xl p-3 flex items-center gap-2.5">
           <span className="text-lg" aria-hidden="true">⏱️</span>
           <p className="text-sm">
             <span className="text-white/55">Estimated </span>
-            <span className="font-semibold" style={{ color: '#F5A623' }}>{prepRangeLabel(prepMinutes)}</span>
+            <span className="lx-amber font-semibold">{prepRangeLabel(prepMinutes)}</span>
             <span className="text-white/45"> · prep + delivery</span>
           </p>
         </div>
@@ -277,8 +277,7 @@ export default function CartPage() {
           <button
             onClick={startGroupOrder}
             disabled={groupBusy}
-            className="w-full rounded-2xl py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-            style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.3)', color: '#F5A623' }}
+            className="lx-card-amber lx-amber w-full rounded-2xl py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <span aria-hidden="true">👥</span>
             {groupBusy ? 'Starting…' : 'Order with friends (split one delivery)'}
@@ -370,8 +369,8 @@ export default function CartPage() {
                 min={scheduleMin}
                 max={scheduleMax}
                 onChange={(e) => setScheduleAt(e.target.value)}
-                className="w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-amber-400"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', colorScheme: 'dark' }}
+                className="lx-field w-full px-3 py-2.5 text-sm outline-none"
+                style={{ colorScheme: 'dark' }}
               />
               <p className="text-xs text-white/35 mt-1.5">This is when we send it to the kitchen — food arrives a bit after. Within opening hours ({hoursLabel}). Cancel for a full refund any time before it’s sent.</p>
             </div>
@@ -383,8 +382,7 @@ export default function CartPage() {
           <label className="block text-sm font-medium text-white/70 mb-2">Delivery address</label>
           <input type="text" value={address} onChange={(e) => { setAddress(e.target.value); setCoords(null) }}
             placeholder="Hall/hostel, room number..."
-            className="w-full rounded-xl px-4 py-3 text-sm outline-none focus:border-amber-400 transition-colors"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+            className="lx-field w-full px-4 py-3 text-sm outline-none" />
           {/* Saved lodges — learned from past orders + verified ABSU catalog; tap to reuse. */}
           {savedAddresses.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1 mt-2 scrollbar-none">
@@ -404,7 +402,7 @@ export default function CartPage() {
           {/* Pick a lodge on the ABSU map */}
           {mapLodges.length > 0 && (
             <div className="mt-2">
-              <button type="button" onClick={() => setShowMap((v) => !v)} className="text-xs font-medium" style={{ color: '#F5A623' }}>
+              <button type="button" onClick={() => setShowMap((v) => !v)} className="lx-amber text-xs font-medium">
                 🗺️ {showMap ? 'Hide map' : 'Pick your lodge on the map'}
               </button>
               {showMap && (
@@ -432,8 +430,7 @@ export default function CartPage() {
           </label>
           <textarea value={instructions} onChange={(e) => setInstructions(e.target.value.slice(0, 200))}
             placeholder="Any special requests for the vendor..." rows={2}
-            className="w-full rounded-xl px-4 py-3 text-sm outline-none resize-none focus:border-amber-400 transition-colors"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
+            className="lx-field w-full px-4 py-3 text-sm outline-none resize-none" />
           <p className="text-xs text-white/30 mt-1 text-right">{instructions.length}/200</p>
         </div>
 
@@ -485,7 +482,7 @@ export default function CartPage() {
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
                       LumeX Wallet
                     </span>
-                    {walletUsable && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }}>Faster</span>}
+                    {walletUsable && <span className="lx-card-amber lx-amber text-xs px-1.5 py-0.5 rounded font-medium">Faster</span>}
                   </div>
                   <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
                     {walletFrozen ? 'Wallet frozen — contact support'
@@ -507,7 +504,7 @@ export default function CartPage() {
                     <div className="rounded-xl p-3 text-sm" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.15)' }}>
                       <div className="flex justify-between mb-1"><span className="text-white/60">From wallet</span><span className="font-medium text-amber-400">{formatPrice(walletAmount)}</span></div>
                       <div className="flex justify-between mb-2"><span className="text-white/60">Rest via Paystack</span><span className="font-semibold">{formatPrice(paystackAmount)}</span></div>
-                      <button type="button" onClick={() => router.push('/profile/wallet')} className="text-xs font-medium" style={{ color: '#F5A623' }}>
+                      <button type="button" onClick={() => router.push('/profile/wallet')} className="lx-amber text-xs font-medium">
                         Top up {formatPrice(topUpNeeded)} to pay fully from wallet →
                       </button>
                     </div>
@@ -518,7 +515,7 @@ export default function CartPage() {
               {/* Empty wallet: prompt to top up */}
               {!walletUsable && !walletFrozen && (
                 <div className="px-4 pb-4 -mt-2">
-                  <button type="button" onClick={() => router.push('/profile/wallet')} className="text-xs font-medium" style={{ color: '#F5A623' }}>
+                  <button type="button" onClick={() => router.push('/profile/wallet')} className="lx-amber text-xs font-medium">
                     Top up to pay with wallet + get 1% bonus →
                   </button>
                 </div>
@@ -619,12 +616,12 @@ export default function CartPage() {
           )}
           <div className="flex justify-between font-semibold text-base pt-2 border-t border-white/8 mt-2">
             <span>Total</span>
-            <span style={{ color: '#F5A623' }}>{formatPrice(total)}</span>
+            <span className="lx-amber">{formatPrice(total)}</span>
           </div>
         </div>
 
         {reorderNote && (
-          <div className="rounded-xl p-3 text-sm" style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.2)', color: '#F5A623' }}>
+          <div className="lx-card-amber lx-amber rounded-xl p-3 text-sm">
             {reorderNote}
           </div>
         )}

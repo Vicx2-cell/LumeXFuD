@@ -238,12 +238,11 @@ export function ProfileClient({
         {/* LumeX Wallet — primary entry point (customers had no way to reach it) */}
         <Link
           href="/profile/wallet"
-          className="flex items-center gap-3 rounded-2xl p-4 transition-colors"
-          style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.25)' }}
+          className="lx-card-amber lx-tap flex items-center gap-3 rounded-2xl p-4"
         >
           <span className="text-2xl">💰</span>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold" style={{ color: '#F5A623' }}>LumeX Wallet</p>
+            <p className="lx-amber font-semibold">LumeX Wallet</p>
             <p className="text-xs text-white/50">Load money, get 1% bonus, checkout faster</p>
           </div>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -253,12 +252,11 @@ export function ProfileClient({
 
         {/* Streak — keep the flame alive by ordering each day */}
         {hasStreak && (
-          <div className="rounded-2xl p-5 flex items-center justify-between"
-            style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.2)' }}>
+          <div className="lx-card-amber-soft rounded-2xl p-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-3xl" aria-hidden="true">🔥</span>
               <div>
-                <p className="text-2xl font-bold leading-none" style={{ color: '#F5A623' }}>
+                <p className="lx-amber text-2xl font-bold leading-none">
                   {streak!.current_streak_days} day{streak!.current_streak_days === 1 ? '' : 's'}
                 </p>
                 <p className="text-xs text-white/45 mt-1">Order each day to keep your streak alive</p>
@@ -273,7 +271,7 @@ export function ProfileClient({
 
         {/* Badges — tap one to read what it means + when it was earned */}
         {badges.length > 0 && (
-          <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+          <div className="glass-thin rounded-2xl p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-white/70">Your badges</h3>
               <span className="text-xs text-white/35">Tap for meaning</span>
@@ -309,14 +307,11 @@ export function ProfileClient({
               const pending = !settled // still waiting on Lumi for this badge
               const meaning = hasLumi ? lumiResult!.text! : (b.badges?.description ?? 'Achievement badge.')
               return (
-                <div
-                  className="mt-3 rounded-xl p-3 lx-enter"
-                  style={{ background: 'rgba(245,166,35,0.06)', border: '1px solid rgba(245,166,35,0.15)' }}
-                >
+                <div className="lx-card-amber-soft mt-3 rounded-xl p-3 lx-enter">
                   <div className="flex items-start gap-2.5">
                     <span className="text-lg shrink-0" aria-hidden="true">{b.badges?.emoji ?? '🏅'}</span>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold" style={{ color: '#F5A623' }}>{b.badges?.name ?? b.badge_id}</p>
+                      <p className="lx-amber text-sm font-semibold">{b.badges?.name ?? b.badge_id}</p>
                       <p className="text-xs text-white/70 mt-1 leading-relaxed flex items-start gap-1.5">
                         <span aria-hidden="true" className="shrink-0">{hasLumi ? '✨' : ''}</span>
                         <span>
@@ -336,7 +331,7 @@ export function ProfileClient({
         )}
 
         {/* Edit profile */}
-        <div className="rounded-2xl p-4 space-y-4" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+        <div className="glass-thin rounded-2xl p-4 space-y-4">
           <h3 className="text-sm font-semibold text-white/70">Your details</h3>
           <div>
             <label className="block text-xs text-white/50 mb-1.5">Phone</label>
@@ -354,8 +349,7 @@ export function ProfileClient({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl px-4 py-3 text-sm outline-none"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}
+              className="lx-field w-full px-4 py-3 text-sm outline-none"
             />
           </div>
           <div>
@@ -365,8 +359,7 @@ export function ProfileClient({
               value={hostel}
               onChange={(e) => setHostel(e.target.value)}
               placeholder="e.g., Umuahia Hall"
-              className="w-full rounded-xl px-4 py-3 text-sm outline-none"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}
+              className="lx-field w-full px-4 py-3 text-sm outline-none"
             />
           </div>
           <div>
@@ -376,8 +369,7 @@ export function ProfileClient({
               value={room}
               onChange={(e) => setRoom(e.target.value)}
               placeholder="e.g., A204"
-              className="w-full rounded-xl px-4 py-3 text-sm outline-none"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}
+              className="lx-field w-full px-4 py-3 text-sm outline-none"
             />
           </div>
           <button
@@ -394,7 +386,7 @@ export function ProfileClient({
         <LumiMemoryCard />
 
         {/* Security — PIN management */}
-        <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+        <div className="glass-thin rounded-2xl p-4 space-y-3">
           <h3 className="text-sm font-semibold text-white/70">Security</h3>
 
           {pinSuccess && (
@@ -428,10 +420,9 @@ export function ProfileClient({
                    of relying on Google as their only way in. */
                 <Link
                   href="/auth/setup?optional=1&next=/profile"
-                  className="block rounded-xl p-3 transition-colors"
-                  style={{ background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.25)' }}
+                  className="lx-card-amber block rounded-xl p-3"
                 >
-                  <p className="text-sm font-semibold" style={{ color: '#F5A623' }}>Set a login PIN</p>
+                  <p className="lx-amber text-sm font-semibold">Set a login PIN</p>
                   <p className="text-xs text-white/55 mt-0.5">
                     Optional — adds phone + PIN login and a recovery code, so Google isn’t your only way in.
                   </p>
@@ -475,7 +466,7 @@ export function ProfileClient({
 
         {/* Help & support — number is set by the super-admin in Controls */}
         {supportPhone && supportPhone.trim() && (
-          <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+          <div className="glass-thin rounded-2xl p-4 space-y-3">
             <h3 className="text-sm font-semibold text-white/70">Help & support</h3>
             <p className="text-xs text-white/45">Order issue or question? Reach the LumeX team.</p>
             <a
@@ -498,7 +489,7 @@ export function ProfileClient({
         )}
 
         {/* NDPR links */}
-        <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(30px) saturate(180%)', WebkitBackdropFilter: 'blur(30px) saturate(180%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+        <div className="glass-thin rounded-2xl p-4 space-y-3">
           <h3 className="text-sm font-semibold text-white/70">Privacy & data</h3>
           <a href="/api/auth/export" className="block text-sm text-white/65 hover:text-white py-1.5 transition-colors">
             Export my data (NDPR)

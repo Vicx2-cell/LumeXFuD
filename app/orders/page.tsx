@@ -8,6 +8,7 @@ import { formatPrice, formatDate } from '@/lib/money'
 import { resolveOrdersView } from '@/lib/orders-view'
 import { ReorderButton } from '@/components/reorder-button'
 import { VerifiedBadge } from '@/components/verified-badge'
+import { Badge } from '@/components/ui/badge'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,9 +80,8 @@ export default async function OrdersPage({
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE)
 
   return (
-    <main className="min-h-dvh pb-24" style={{ background: '#0A0A0B' }}>
-      <div className="sticky top-0 z-40 border-b border-white/8 px-4 py-3"
-        style={{ background: 'rgba(10,10,11,0.95)', backdropFilter: 'blur(20px)' }}>
+    <main className="lx-page pb-24">
+      <div className="lx-topbar sticky top-0 z-40 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <BackButton />
           <h1 className="font-semibold text-base">Your orders</h1>
@@ -94,11 +94,7 @@ export default async function OrdersPage({
             <p className="text-5xl mb-4">⚠️</p>
             <p className="font-semibold text-lg">Couldn&apos;t load your orders</p>
             <p className="text-sm text-white/40 mt-1">Something went wrong on our end. Your orders are safe — please try again.</p>
-            <Link
-              href="/orders"
-              className="inline-block mt-6 px-6 py-3 rounded-xl font-medium"
-              style={{ background: '#F5A623', color: '#000' }}
-            >
+            <Link href="/orders" className="lx-btn-amber inline-block mt-6 px-6 py-3">
               Try again
             </Link>
           </div>
@@ -107,11 +103,7 @@ export default async function OrdersPage({
             <p className="text-5xl mb-4">📋</p>
             <p className="font-semibold text-lg">No orders yet</p>
             <p className="text-sm text-white/40 mt-1">Your order history will appear here</p>
-            <Link
-              href="/"
-              className="inline-block mt-6 px-6 py-3 rounded-xl font-medium"
-              style={{ background: '#F5A623', color: '#000' }}
-            >
+            <Link href="/" className="lx-btn-amber inline-block mt-6 px-6 py-3">
               Order food
             </Link>
           </div>
@@ -125,8 +117,7 @@ export default async function OrdersPage({
               <Link
                 key={order.id as string}
                 href={`/order/${order.order_number}`}
-                className="block rounded-2xl p-4"
-                style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}
+                className="lx-tap glass-thin block rounded-2xl p-4"
               >
                 <div className="flex justify-between items-start">
                   <div>
@@ -136,12 +127,9 @@ export default async function OrdersPage({
                     </p>
                     <p className="text-xs text-white/40 mt-0.5">#{order.order_number as string}</p>
                   </div>
-                  <span
-                    className="text-xs px-2 py-1 rounded-full font-medium"
-                    style={{ background: `${statusColor}18`, color: statusColor }}
-                  >
+                  <Badge color={statusColor}>
                     {STATUS_LABELS[order.status as string] ?? order.status as string}
-                  </span>
+                  </Badge>
                 </div>
                 <div className="flex items-center justify-between mt-3">
                   <p className="text-sm text-white/60">

@@ -236,6 +236,16 @@ a:active,
   color: var(--color-amber);
 }
 
+/* Sticky top bar — the dark translucent header repeated verbatim across
+   customer/order pages. Blur is desktop-only (the global non-.lx-rich rule
+   strips backdrop-filter on phones); the 0.85 dark fill keeps it legible there. */
+.lx-topbar {
+  background: rgba(10,10,11,0.85);
+  border-bottom: 1px solid var(--color-border);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+}
+
 /* Translucent field surface for inputs/selects/textareas (the 30× pattern). */
 .lx-field {
   background: rgba(255,255,255,0.05);
