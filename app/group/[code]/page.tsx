@@ -7,7 +7,7 @@ import { useFeatures } from '@/lib/use-features'
 
 interface GItem { id: string; contributor_id: string; contributor_name: string; quantity: number; notes: string | null; menu_item_id: string; name: string; price_kobo: number; mine: boolean }
 interface MenuItem { id: string; name: string; price_kobo: number; category: string }
-interface GroupData { code: string; group_order_id: string; status: string; expires_at: string; is_host: boolean; host_id: string; split_enabled: boolean; vendor: { id: string; name: string }; items: GItem[]; menu: MenuItem[] }
+interface GroupData { code: string; group_order_id: string; status: string; expires_at: string; is_host: boolean; host_id: string; split_enabled: boolean; funded: Record<string, boolean>; my_balance_kobo: number; my_food_kobo: number; vendor: { id: string; name: string }; items: GItem[]; menu: MenuItem[] }
 
 interface Person { id: string; name: string; total: number; count: number; mine: boolean }
 function groupByPerson(items: GItem[]): Person[] {
@@ -150,6 +150,13 @@ export default function GroupOrderPage() {
 
   const checkout = () => {
     if (!data) return
+    // Warn the host if splitting and some members can't cover their share — those
+    // are charged to the host now (members pay back / top up later).
+    if (data.split_enabled) {
+      const contribIds = Array.from(new Set(data.items.map((i) => i.contributor_id)))
+      const unfunded = contribIds.filter((id) => id !== data.host_id && data.funded[id] === false)
+      if (unfunded.length && !window.confirm(`${unfunded.length} friend(s) haven't put money in their LumeX wallet yet, so YOU'll pay their share now (they can pay you back). Continue?`)) return
+    }
     // Merge everyone's items by menu item (v1 has no add-ons) and hand the combined
     // basket to the normal cart/checkout — the host pays the whole bill there, so
     // it reuses the existing order + payment flow exactly.
@@ -194,6 +201,13 @@ export default function GroupOrderPage() {
         </span>
       </div>
 
+      {data.split_enabled && !data.is_host && data.my_food_kobo > 0 && data.my_balance_kobo < data.my_food_kobo && (
+        <button onClick={() => router.push('/profile/wallet')} className="w-full rounded-2xl p-3 mb-4 text-left" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+          <p className="text-sm font-semibold" style={{ color: '#FCA5A5' }}>⚠️ Top up to pay your share</p>
+          <p className="text-xs text-white/55 mt-0.5">Your wallet ({naira(data.my_balance_kobo)}) won’t cover your {naira(data.my_food_kobo)}+ share, so the host would pay it. Tap to add money and your share gets paid automatically.</p>
+        </button>
+      )}
+
       <button onClick={share} className="w-full mb-5 rounded-2xl py-3 text-sm font-semibold" style={{ background: '#25D366', color: '#fff' }}>
         {copied ? 'Link copied!' : 'Share group link with friends'}
       </button>
@@ -211,7 +225,14 @@ export default function GroupOrderPage() {
                   <p className="text-sm text-white truncate">
                     {p.name}{p.id === data.host_id ? ' · host' : ''}{p.mine ? ' (you)' : ''}
                   </p>
-                  <p className="text-[11px] text-white/40">{p.count} item{p.count === 1 ? '' : 's'} · {naira(p.total)} food</p>
+                  <p className="text-[11px] text-white/40">
+                    {p.count} item{p.count === 1 ? '' : 's'} · {naira(p.total)} food
+                    {data.split_enabled && p.id !== data.host_id && (
+                      data.funded[p.id]
+                        ? <span style={{ color: '#22C55E' }}> · ✅ can pay</span>
+                        : <span style={{ color: '#F5A623' }}> · ⚠️ no wallet money</span>
+                    )}
+                  </p>
                 </div>
                 {data.is_host && p.id !== data.host_id && p.id !== 'me' && (
                   <button onClick={() => removePerson(p.id, p.name)} disabled={busyId === p.id}

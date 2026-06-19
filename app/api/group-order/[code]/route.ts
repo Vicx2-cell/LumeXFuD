@@ -71,6 +71,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
     }
   })
 
+  // Wallet coverage: can each member's wallet cover their FOOD so far? (Fees are
+  // added at checkout; this is the readiness indicator + top-up prompt driver.)
+  const foodByPerson = new Map<string, number>()
+  for (const r of itemRows) foodByPerson.set(r.contributor_id, (foodByPerson.get(r.contributor_id) ?? 0) + r.price_kobo * r.quantity)
+  const contribIds = Array.from(foodByPerson.keys())
+  const funded: Record<string, boolean> = {}
+  let myBalanceKobo = 0
+  try {
+    const lookupIds = Array.from(new Set([...contribIds, myId])).filter(Boolean)
+    if (lookupIds.length) {
+      const { data: wallets } = await db.from('customer_wallets').select('customer_id, balance_kobo, is_frozen').in('customer_id', lookupIds)
+      const balMap = new Map((wallets ?? []).map((w) => {
+        const row = w as { customer_id: string; balance_kobo: number; is_frozen: boolean }
+        return [row.customer_id, row.is_frozen ? 0 : Number(row.balance_kobo)]
+      }))
+      for (const id of contribIds) funded[id] = (balMap.get(id) ?? 0) >= (foodByPerson.get(id) ?? 0)
+      myBalanceKobo = balMap.get(myId) ?? 0
+    }
+  } catch { /* coverage is best-effort */ }
+
   return NextResponse.json({
     code: group.code,
     group_order_id: group.id,
@@ -79,6 +99,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
     is_host: group.host_customer_id === myId,
     host_id: group.host_customer_id,
     split_enabled: splitEnabled,
+    funded,
+    my_balance_kobo: myBalanceKobo,
+    my_food_kobo: foodByPerson.get(myId) ?? 0,
     vendor: { id: group.vendor_id, name: v?.name ?? 'Vendor' },
     items: itemRows,
     menu: (menu ?? []).map((m) => {
