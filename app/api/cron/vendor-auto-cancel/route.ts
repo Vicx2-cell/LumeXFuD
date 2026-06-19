@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { withCronHealth } from '@/lib/cron-health'
 import { refundOrderPayments } from '@/lib/order-refund'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { audit } from '@/lib/audit'
 import { getControls } from '@/lib/controls'
 
@@ -19,6 +20,11 @@ interface PendingOrder {
   wallet_amount_kobo: number | null
   paystack_reference: string
   payment_status: string
+}
+
+// Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
+export async function GET(req: NextRequest) {
+  return withCronHealth('vendor-auto-cancel', () => POST(req))
 }
 
 export async function POST(req: NextRequest) {

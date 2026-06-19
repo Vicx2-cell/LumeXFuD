@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { withCronHealth } from '@/lib/cron-health'
 
 // Called weekly, Sunday midnight, by Vercel cron (vercel.json: "0 0 * * 0").
 // Recomputes the simplified MVP vendor ranking and upserts vendor_scores.
@@ -19,6 +20,11 @@ interface Agg {
   cancelled: number
   prepTotalMin: number
   prepSamples: number
+}
+
+// Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
+export async function GET(req: NextRequest) {
+  return withCronHealth('recalculate-vendor-scores', () => POST(req))
 }
 
 export async function POST(req: NextRequest) {

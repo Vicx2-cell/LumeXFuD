@@ -68,6 +68,8 @@ const ENTRIES: Entry[] = [
   { path: 'app/api/super-admin/settings/route', method: 'GET', allow: SUPER },
   { path: 'app/api/super-admin/settings/route', method: 'PATCH', allow: SUPER },
   { path: 'app/api/super-admin/sentinel/route', method: 'GET', allow: SUPER },
+  { path: 'app/api/super-admin/cron-health/route', method: 'GET', allow: SUPER },
+  { path: 'app/api/super-admin/cron-run/route', method: 'POST', allow: SUPER },
   { path: 'app/api/super-admin/earnings/route', method: 'GET', allow: SUPER },
   { path: 'app/api/super-admin/earnings/history/route', method: 'GET', allow: SUPER },
   { path: 'app/api/super-admin/controls/route', method: 'GET', allow: SUPER },

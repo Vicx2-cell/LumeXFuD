@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
-import { renderTemplate } from '@/lib/termii/templates'
+import { withCronHealth } from '@/lib/cron-health'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
+import { renderTemplate } from '@/lib/notify-templates'
 
 // Called Monday midnight by Vercel cron (vercel.json: "0 0 * * 1").
 // The MVP leaderboard ranks customers by COMPLETED orders (no XP — that
@@ -9,6 +10,11 @@ import { renderTemplate } from '@/lib/termii/templates'
 // rolling 7-day window, so there is no counter to physically "reset" —
 // the window simply rolls forward. This cron's job is to congratulate the
 // top 3 of the week that just ended via WhatsApp.
+// Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
+export async function GET(req: NextRequest) {
+  return withCronHealth('reset-weekly-leaderboard', () => POST(req))
+}
+
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {

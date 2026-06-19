@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
+import { withCronHealth } from '@/lib/cron-health'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { gatherSnapshot, type SentinelSnapshot } from '@/lib/sentinel'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
-import { getAnthropic, MODELS } from '@/lib/ai/client'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
+import { resolveProvider, isAIAvailable } from '@/lib/ai/providers'
 import { parseModelJson, TriageBrief } from '@/lib/ai/schemas'
 import { TRIAGE_PROMPT } from '@/lib/ai/prompts'
 
@@ -23,17 +24,16 @@ function redis(): Redis | null {
 }
 
 async function firstAction(snapshot: SentinelSnapshot): Promise<string | null> {
-  const anthropic = await getAnthropic()
-  if (!anthropic) return null
+  if (!(await isAIAvailable('sentinel'))) return null
   try {
-    const res = await anthropic.messages.create({
-      model: MODELS.fast,
-      max_tokens: 500,
+    const provider = await resolveProvider('sentinel')
+    const out = await provider.generate({
       system: TRIAGE_PROMPT,
-      messages: [{ role: 'user', content: `LumeX Fud platform health snapshot:\n${JSON.stringify({ status: snapshot.status, metrics: snapshot.metrics, issues: snapshot.issues })}` }],
+      userText: `LumeX Fud platform health snapshot:\n${JSON.stringify({ status: snapshot.status, metrics: snapshot.metrics, issues: snapshot.issues })}`,
+      jsonMode: true,
+      maxTokens: 500,
     })
-    const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('')
-    const parsed = parseModelJson(TriageBrief, text)
+    const parsed = parseModelJson(TriageBrief, out.text)
     return parsed.ok ? parsed.data.first_action : null
   } catch {
     return null
@@ -85,5 +85,5 @@ async function handle(req: NextRequest): Promise<NextResponse> {
 }
 
 // Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
-export async function GET(req: NextRequest) { return handle(req) }
+export async function GET(req: NextRequest) { return withCronHealth('sentinel', () => handle(req)) }
 export async function POST(req: NextRequest) { return handle(req) }

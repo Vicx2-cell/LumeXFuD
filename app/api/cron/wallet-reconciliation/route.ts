@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { withCronHealth } from '@/lib/cron-health'
 import { audit } from '@/lib/audit'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { formatPrice } from '@/lib/wallet'
 
 // Called daily at 6am by Vercel cron.
@@ -41,6 +42,11 @@ async function getPaystackBalance(): Promise<number> {
   // Paystack returns balance in kobo
   const ngn = json.data.find((b) => b.currency === 'NGN')
   return ngn?.balance ?? 0
+}
+
+// Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
+export async function GET(req: NextRequest) {
+  return withCronHealth('wallet-reconciliation', () => POST(req))
 }
 
 export async function POST(req: NextRequest) {

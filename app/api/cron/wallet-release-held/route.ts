@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { withCronHealth } from '@/lib/cron-health'
 import { formatPrice } from '@/lib/wallet'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
 
 // Called every 5 minutes by Vercel cron.
 // Calls the Postgres release_held_batch() function which atomically:
@@ -20,6 +21,11 @@ interface ReleasedItem {
 interface RpcResult {
   released_count: number
   released_data: ReleasedItem[]
+}
+
+// Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
+export async function GET(req: NextRequest) {
+  return withCronHealth('wallet-release-held', () => POST(req))
 }
 
 export async function POST(req: NextRequest) {

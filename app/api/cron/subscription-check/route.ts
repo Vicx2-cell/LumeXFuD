@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
-import { renderTemplate } from '@/lib/termii/templates'
+import { withCronHealth } from '@/lib/cron-health'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
+import { renderTemplate } from '@/lib/notify-templates'
 import { audit } from '@/lib/audit'
 
 // Called daily at 9am by Vercel cron (vercel.json: "0 9 * * *").
@@ -22,6 +23,11 @@ const TIER_SETTING: Record<VendorRow['subscription_tier'], string> = {
   FOUNDING: 'subscription_founding',
   EARLY:    'subscription_early',
   STANDARD: 'subscription_standard',
+}
+
+// Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
+export async function GET(req: NextRequest) {
+  return withCronHealth('subscription-check', () => POST(req))
 }
 
 export async function POST(req: NextRequest) {

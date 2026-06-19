@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { withCronHealth } from '@/lib/cron-health'
 import {
   creditWalletHeld,
   getTierAndCount,
@@ -7,7 +8,7 @@ import {
   getHoldPolicy,
   formatPrice,
 } from '@/lib/wallet'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { completeOrderPayout } from '@/lib/order-payout'
 import { getPayoutsMode } from '@/lib/controls'
 
@@ -149,6 +150,11 @@ async function getSettings(db: ReturnType<typeof createSupabaseAdmin>): Promise<
     map.set(row.id, Number(row.value?.amount_kobo ?? 0))
   }
   return map
+}
+
+// Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
+export async function GET(req: NextRequest) {
+  return withCronHealth('release-payments', () => POST(req))
 }
 
 export async function POST(req: NextRequest) {

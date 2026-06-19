@@ -17,6 +17,13 @@ const actions = [
     highlight: true,
   },
   {
+    href: '/super-admin/cron',
+    label: 'Cron Health',
+    desc: 'Are the background jobs alive? Run any now',
+    icon: svg(<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>),
+    highlight: true,
+  },
+  {
     href: '/super-admin/controls',
     label: 'Controls',
     desc: 'Kill switches, maintenance, hours, notifications',

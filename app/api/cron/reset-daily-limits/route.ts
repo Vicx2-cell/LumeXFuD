@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { withCronHealth } from '@/lib/cron-health'
 
 // Called daily at midnight by Vercel cron (vercel.json: "0 0 * * *").
 // Resets menu_items.sold_today back to 0 so per-item daily_limit caps
 // apply fresh each day. Order placement checks (sold_today + qty > daily_limit)
 // live in /api/orders.
+// Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
+export async function GET(req: NextRequest) {
+  return withCronHealth('reset-daily-limits', () => POST(req))
+}
+
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {

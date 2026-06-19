@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { withCronHealth } from '@/lib/cron-health'
 import { refundOrderPayments } from '@/lib/order-refund'
-import { sendWhatsAppWithFallback } from '@/lib/termii/whatsapp'
-import { renderTemplate } from '@/lib/termii/templates'
+import { sendWhatsAppWithFallback } from '@/lib/notify'
+import { renderTemplate } from '@/lib/notify-templates'
 import { audit } from '@/lib/audit'
 
 // Called every minute by Vercel cron.
@@ -20,6 +21,11 @@ interface SchedRow {
   total_amount: number
   wallet_amount_kobo: number | null
   paystack_reference: string | null
+}
+
+// Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
+export async function GET(req: NextRequest) {
+  return withCronHealth('release-scheduled', () => POST(req))
 }
 
 export async function POST(req: NextRequest) {
