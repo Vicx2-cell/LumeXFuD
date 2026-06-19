@@ -48,7 +48,7 @@ export async function notifyGroupOrderPlaced(
       db.from('vendors').select('name').eq('id', group.vendor_id).maybeSingle(),
       db.from('customers').select('name').eq('id', group.host_customer_id).maybeSingle(),
       db.from('group_order_items').select('contributor_id, contributor_name, quantity, menu_items(name, price_kobo)').eq('group_order_id', opts.groupOrderId),
-      db.from('orders').select('delivery_fee, platform_markup').eq('paystack_reference', opts.orderNumber).maybeSingle(),
+      db.from('orders').select('id, delivery_fee, platform_markup').eq('paystack_reference', opts.orderNumber).maybeSingle(),
     ])
     const vendorName = (vendor as { name: string | null } | null)?.name ?? 'the vendor'
     const hostName = ((host as { name: string | null } | null)?.name ?? 'your friend').split(/\s+/)[0]
@@ -65,7 +65,8 @@ export async function notifyGroupOrderPlaced(
     if (ids.length === 0) return
 
     // Split delivery + platform fee EQUALLY among everyone in the group.
-    const order = ord as { delivery_fee: number | null; platform_markup: number | null } | null
+    const order = ord as { id?: string; delivery_fee: number | null; platform_markup: number | null } | null
+    const orderId = order?.id ?? null
     const feesKobo = (Number(order?.delivery_fee) || 0) + (Number(order?.platform_markup) || 0)
     const feeShare = Math.round(feesKobo / ids.length)
     const naira = (k: number) => `₦${Math.round(k / 100).toLocaleString()}`
@@ -74,9 +75,31 @@ export async function notifyGroupOrderPlaced(
     const phoneMap = new Map((custs ?? []).map((c) => [(c as { id: string }).id, (c as { phone: string }).phone]))
     const track = `${opts.appUrl}/order/${opts.orderNumber}`
 
-    // Host's breakdown (only when splitting): each person's food + fee share.
-    const splitLines = Array.from(byContributor.values())
-      .map((p) => `• ${p.name}: ${naira(p.total + feeShare)}`)
+    // WALLET SPLIT: the host already paid the full order; now pull each non-host
+    // member's share FROM their wallet INTO the host's (atomic, zero-sum,
+    // idempotent). 'ok' = collected, anything else = host covered them. Skipped
+    // entirely when split is off or the RPC/migration 068 isn't present yet.
+    const collectedFrom = new Map<string, 'ok' | 'short'>()
+    let collected = 0
+    if (splitEnabled && orderId) {
+      for (const [cid, info] of byContributor) {
+        if (cid === group.host_customer_id) continue
+        const share = info.total + feeShare
+        try {
+          const { data: r } = await db.rpc('group_split_transfer', {
+            p_member_id: cid, p_host_id: group.host_customer_id,
+            p_amount_kobo: share, p_order_id: orderId, p_order_number: opts.orderNumber,
+          })
+          if (String(r) === 'ok' || String(r) === 'done') { collectedFrom.set(cid, 'ok'); collected += share }
+          else collectedFrom.set(cid, 'short')
+        } catch { collectedFrom.set(cid, 'short') } // RPC missing → host covered
+      }
+    }
+
+    // Host breakdown (split mode): who paid from wallet vs who still owes.
+    const splitLines = Array.from(byContributor.entries())
+      .filter(([cid]) => cid !== group.host_customer_id)
+      .map(([cid, p]) => `• ${p.name}: ${naira(p.total + feeShare)} ${collectedFrom.get(cid) === 'ok' ? '✅ paid from wallet' : '⚠️ owes you'}`)
       .join('\n')
 
     for (const [cid, info] of byContributor) {
@@ -90,11 +113,13 @@ export async function notifyGroupOrderPlaced(
         msg = isHost
           ? `✅ Your group order from ${vendorName} is placed — you're treating everyone 🎁\nDelivering to: ${opts.deliveryAddress}\nYour items: ${summary}\nTrack: ${track}`
           : `✅ ${hostName}'s group order from ${vendorName} is placed — ${hostName} is treating everyone 🎁\nDelivering to: ${opts.deliveryAddress}\nYour items: ${summary}\nNo need to pay anyone back!\nTrack: ${track}`
+      } else if (isHost) {
+        msg = `✅ Your group order from ${vendorName} is placed!\nDelivering to: ${opts.deliveryAddress}\nYour items: ${summary}\nTrack: ${track}\n\nSplit (₦${Math.round(collected / 100).toLocaleString()} collected into your wallet):\n${splitLines || '• (no friends added)'}`
       } else {
-        const owe = info.total + feeShare
-        msg = isHost
-          ? `✅ Your group order from ${vendorName} is placed!\nDelivering to: ${opts.deliveryAddress}\nYour items: ${summary}\nTrack: ${track}\n\nWho owes what (food + split fees):\n${splitLines}`
-          : `✅ ${hostName}'s group order from ${vendorName} is placed — ${hostName} paid for everyone!\nDelivering to: ${opts.deliveryAddress}\nYour items: ${summary}\nYour share: ${naira(info.total)} food + ${naira(feeShare)} fees = ${naira(owe)} — settle up with ${hostName}.\nTrack: ${track}`
+        const share = info.total + feeShare
+        msg = collectedFrom.get(cid) === 'ok'
+          ? `✅ ${hostName}'s group order from ${vendorName} is placed!\nDelivering to: ${opts.deliveryAddress}\nYour items: ${summary}\nYour share ${naira(share)} (${naira(info.total)} food + ${naira(feeShare)} fees) was paid from your LumeX wallet. All settled 👍\nTrack: ${track}`
+          : `✅ ${hostName}'s group order from ${vendorName} is placed!\nDelivering to: ${opts.deliveryAddress}\nYour items: ${summary}\nYour share is ${naira(share)} (${naira(info.total)} food + ${naira(feeShare)} fees) — your wallet was short, so ${hostName} covered it. Top up and pay ${hostName} back 🙏\nTrack: ${track}`
       }
       void sendWhatsAppWithFallback({ to: phone, message: msg }).catch(() => {})
     }

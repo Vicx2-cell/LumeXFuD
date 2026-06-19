@@ -24,7 +24,7 @@ export interface CustomerWallet {
 export interface CustomerWalletTx {
   id: string
   customer_id: string
-  type: 'TOPUP' | 'TOPUP_BONUS' | 'PAYMENT' | 'REFUND' | 'FREEZE' | 'ADMIN_ADJUSTMENT'
+  type: 'TOPUP' | 'TOPUP_BONUS' | 'PAYMENT' | 'REFUND' | 'FREEZE' | 'ADMIN_ADJUSTMENT' | 'GROUP_SPLIT'
   amount_kobo: number
   balance_before_kobo: number
   balance_after_kobo: number
@@ -251,6 +251,7 @@ export function customerTxIcon(type: CustomerWalletTx['type']): string {
     case 'REFUND':          return '↩️'
     case 'FREEZE':          return '🔒'
     case 'ADMIN_ADJUSTMENT': return '⚙️'
+    case 'GROUP_SPLIT':     return '👥'
     default:                return '·'
   }
 }

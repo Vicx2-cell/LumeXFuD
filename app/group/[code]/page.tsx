@@ -236,8 +236,8 @@ export default function GroupOrderPage() {
           </button>
           <p className="text-[11px] text-white/35 mb-3">
             {data.split_enabled
-              ? 'Everyone pays their own food + an equal share of delivery & platform fee. Each person gets their exact share by WhatsApp at checkout.'
-              : 'You’re treating everyone 🎁 Nobody is asked to pay you back.'}
+              ? 'When you check out, each member’s share (their food + an equal share of fees) is charged to their LumeX wallet. If someone’s wallet is short, you cover them and they’re asked to pay you back.'
+              : 'You’re treating everyone 🎁 Nobody is charged — you pay the whole bill.'}
           </p>
           <button onClick={cancelGroup} disabled={busyId === 'cancel'}
             className="w-full rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"

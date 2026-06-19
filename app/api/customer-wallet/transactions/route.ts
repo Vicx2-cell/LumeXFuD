@@ -53,7 +53,8 @@ export async function GET(req: NextRequest) {
     id:          tx.id,
     type:        tx.type,
     icon:        customerTxIcon(tx.type),
-    sign:        customerTxSign(tx.type),
+    // GROUP_SPLIT carries both directions under one type — read it from the balance delta.
+    sign:        tx.type === 'GROUP_SPLIT' ? (tx.balance_after_kobo < tx.balance_before_kobo ? '-' : '+') : customerTxSign(tx.type),
     amount:      formatPrice(tx.amount_kobo),
     amount_kobo: tx.amount_kobo,
     description: tx.description,
