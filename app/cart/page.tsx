@@ -8,7 +8,15 @@ import { formatPrice } from '@/lib/money'
 import { useFeatures } from '@/lib/use-features'
 import { estimateOrderPrepMinutes, prepRangeLabel } from '@/lib/prep-time'
 import { formatHoursRange } from '@/lib/hours'
-import { LodgeMap, type MapLodge } from '@/components/lodge-map'
+import dynamic from 'next/dynamic'
+import { type MapLodge } from '@/components/lodge-map'
+
+// Defer the map (and Leaflet's CSS) until the customer actually opens it — keeps
+// the cart's initial JS/CSS lean for fast first paint on slow connections.
+const LodgeMap = dynamic(() => import('@/components/lodge-map').then((m) => ({ default: m.LodgeMap })), {
+  ssr: false,
+  loading: () => <div className="lx-skeleton rounded-2xl" style={{ height: 240 }} />,
+})
 
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
 

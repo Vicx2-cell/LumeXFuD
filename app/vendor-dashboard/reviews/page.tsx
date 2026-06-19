@@ -64,35 +64,44 @@ export default function VendorReviews() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-5 space-y-4 lx-enter">
-        {/* Average summary */}
-        <div className="glass-thin p-5 text-center">
+        {/* Average summary — glassy hero */}
+        <div className="glass rounded-3xl p-7 text-center relative overflow-hidden">
+          <div aria-hidden="true" className="absolute inset-x-0 -top-12 h-32 pointer-events-none" style={{ background: 'radial-gradient(ellipse at center, rgba(245,166,35,0.28), transparent 70%)' }} />
           {total > 0 ? (
-            <>
-              <p className="text-4xl font-bold" style={{ color: '#F5A623' }}>{avg.toFixed(1)}</p>
-              <div className="flex justify-center mt-2"><Stars value={Math.round(avg)} size={18} /></div>
-              <p className="text-xs text-white/45 mt-2">{total} rating{total === 1 ? '' : 's'} · {written.length} written</p>
-            </>
+            <div className="relative">
+              <p className="lx-display lx-foodie-text text-6xl font-bold leading-none tracking-tight">{avg.toFixed(1)}</p>
+              <div className="flex justify-center mt-3"><Stars value={Math.round(avg)} size={22} /></div>
+              <p className="text-xs text-white/50 mt-3">{total} rating{total === 1 ? '' : 's'} · {written.length} written</p>
+            </div>
           ) : (
-            <>
+            <div className="relative">
               <p className="text-sm font-medium text-white/70">No ratings yet</p>
               <p className="text-xs text-white/40 mt-1">Customers can rate you after their order is completed.</p>
-            </>
+            </div>
           )}
         </div>
 
         {loading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <div key={i} className="h-20 rounded-2xl lx-skeleton" />)}
+            {[1, 2, 3].map((i) => <div key={i} className="h-24 rounded-2xl lx-skeleton" />)}
           </div>
         ) : reviews.length > 0 && (
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {reviews.map((r) => (
-              <div key={r.id} className="glass-thin p-3.5">
-                <div className="flex items-center justify-between">
-                  <Stars value={r.stars} />
-                  <span className="text-[11px] text-white/35">{relativeDay(r.created_at)}</span>
+              <div key={r.id} className="glass rounded-2xl p-4">
+                <div className="flex items-center gap-3">
+                  <span className="lx-icon-badge w-9 h-9 rounded-full shrink-0">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-white/80">Anonymous</span>
+                      <span className="text-[11px] text-white/35 shrink-0">{relativeDay(r.created_at)}</span>
+                    </div>
+                    <div className="mt-0.5"><Stars value={r.stars} size={13} /></div>
+                  </div>
                 </div>
-                {r.review && <p className="text-sm text-white/75 mt-2 leading-relaxed">{r.review}</p>}
+                {r.review && <p className="text-sm text-white/80 mt-3 leading-relaxed">{r.review}</p>}
               </div>
             ))}
           </div>

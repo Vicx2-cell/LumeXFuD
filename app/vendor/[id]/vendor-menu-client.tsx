@@ -308,20 +308,20 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
         ) : (
           <div className="space-y-2.5">
             {reviews.map((r) => (
-              <div key={r.id} className="glass-thin p-3.5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="lx-icon-badge w-7 h-7 rounded-full shrink-0" aria-hidden="true">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                    </div>
-                    <span className="text-sm font-medium truncate text-white/70">Anonymous</span>
+              <div key={r.id} className="glass rounded-2xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="lx-icon-badge w-9 h-9 rounded-full shrink-0" aria-hidden="true">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Stars value={r.stars} />
-                    <span className="text-[11px] text-white/35">{relativeDay(r.created_at)}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium truncate text-white/80">Anonymous</span>
+                      <span className="text-[11px] text-white/35 shrink-0">{relativeDay(r.created_at)}</span>
+                    </div>
+                    <div className="mt-0.5"><Stars value={r.stars} /></div>
                   </div>
                 </div>
-                {r.review && <p className="text-sm text-white/75 mt-2 leading-relaxed">{r.review}</p>}
+                {r.review && <p className="text-sm text-white/80 mt-3 leading-relaxed">{r.review}</p>}
               </div>
             ))}
           </div>
