@@ -243,59 +243,6 @@ export default function VendorDashboard() {
           <span className="lx-amber">→</span>
         </button>
 
-        {/* Status Controls */}
-        <div className="glass-thin p-4 space-y-3">
-          <p className="text-xs text-white/40 uppercase tracking-widest">Shop Status</p>
-          <div className="grid grid-cols-3 gap-2">
-            {(['OPEN', 'BUSY', 'CLOSED'] as const).map((s) => {
-              const active_ = vendor?.status === s
-              const colors = { OPEN: '#4ade80', BUSY: '#F5A623', CLOSED: '#f87171' }
-              return (
-                <button
-                  key={s}
-                  onClick={() => setStatus(s)}
-                  disabled={statusBusy || active_}
-                  className="py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
-                  style={{
-                    background: active_ ? colors[s] : 'rgba(255,255,255,0.06)',
-                    color: active_ ? '#000' : 'rgba(255,255,255,0.6)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                  }}
-                >
-                  {s}
-                </button>
-              )
-            })}
-          </div>
-          <div className="relative">
-            <button
-              onClick={() => setPauseMenuOpen((v) => !v)}
-              className="w-full py-2.5 rounded-xl text-sm text-white/50 border border-white/8"
-              style={{ background: 'rgba(255,255,255,0.03)' }}
-            >
-              Pause orders for…
-            </button>
-            {pauseMenuOpen && (
-              <div className="absolute bottom-full mb-1 left-0 right-0 rounded-2xl border border-white/10 overflow-hidden z-10" style={{ background: '#111113' }}>
-                {(['15', '30', '60'] as const).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => pause(m)}
-                    className="w-full px-4 py-3 text-sm text-left text-white/80 hover:bg-white/8"
-                  >
-                    {m} minutes
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {vendor?.paused_until && new Date(vendor.paused_until) > new Date() && (
-            <p className="text-xs text-amber-400 text-center">
-              Paused until {new Date(vendor.paused_until).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}
-            </p>
-          )}
-        </div>
-
         {/* Opening / closing time */}
         {vendor && (
           <BusinessHours
@@ -305,6 +252,10 @@ export default function VendorDashboard() {
             initialClose={vendor.closing_time}
           />
         )}
+
+        <div className="pt-2 flex justify-center">
+          <LogoutButton />
+        </div>
         </div>
 
         {/* Orders — FIRST on mobile, left column on desktop */}
@@ -324,6 +275,59 @@ export default function VendorDashboard() {
                 <span className="text-xs font-semibold text-white/85">{a.label}</span>
               </button>
             ))}
+          </div>
+
+          {/* Shop status */}
+          <div className="glass-thin p-4 space-y-3">
+            <p className="text-xs text-white/40 uppercase tracking-widest">Shop Status</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(['OPEN', 'BUSY', 'CLOSED'] as const).map((s) => {
+                const active_ = vendor?.status === s
+                const colors = { OPEN: '#4ade80', BUSY: '#F5A623', CLOSED: '#f87171' }
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setStatus(s)}
+                    disabled={statusBusy || active_}
+                    className="py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+                    style={{
+                      background: active_ ? colors[s] : 'rgba(255,255,255,0.06)',
+                      color: active_ ? '#000' : 'rgba(255,255,255,0.6)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    {s}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => setPauseMenuOpen((v) => !v)}
+                className="w-full py-2.5 rounded-xl text-sm text-white/50 border border-white/8"
+                style={{ background: 'rgba(255,255,255,0.03)' }}
+              >
+                Pause orders for…
+              </button>
+              {pauseMenuOpen && (
+                <div className="absolute bottom-full mb-1 left-0 right-0 rounded-2xl border border-white/10 overflow-hidden z-10" style={{ background: '#111113' }}>
+                  {(['15', '30', '60'] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => pause(m)}
+                      className="w-full px-4 py-3 text-sm text-left text-white/80 hover:bg-white/8"
+                    >
+                      {m} minutes
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {vendor?.paused_until && new Date(vendor.paused_until) > new Date() && (
+              <p className="text-xs text-amber-400 text-center">
+                Paused until {new Date(vendor.paused_until).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
           </div>
 
           {/* Order pipeline at a glance */}
@@ -360,7 +364,7 @@ export default function VendorDashboard() {
               <p className="text-xs text-white/40 mt-1">New orders will pop up here with a sound.</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {active.map((order) => (
                 <OrderCard key={order.id} order={order} onUpdate={updateOrder} onCancel={cancelOrder} />
               ))}
@@ -392,10 +396,6 @@ export default function VendorDashboard() {
           </section>
         )}
 
-        {/* Always-reachable logout at the end of the page */}
-        <div className="pt-2 flex justify-center">
-          <LogoutButton />
-        </div>
         </div>
       </div>
     </div>
@@ -412,88 +412,71 @@ function OrderCard({
   onCancel: (id: string) => Promise<void>
 }) {
   const [busy, setBusy] = useState(false)
+  const [open, setOpen] = useState(false)
   const act = async (fn: () => Promise<void>) => { setBusy(true); try { await fn() } finally { setBusy(false) } }
+  const itemSummary = (order.order_items ?? []).map((i) => `${i.quantity}× ${i.name}`).join(' · ')
 
   return (
     <div
-      className="glass-thin p-4 pl-5 space-y-3 lx-enter relative overflow-hidden"
+      className="glass-thin relative overflow-hidden rounded-2xl lx-enter"
       style={{
         border: `1px solid ${order.status === 'PENDING' ? 'rgba(245,166,35,0.5)' : 'rgba(255,255,255,0.08)'}`,
-        boxShadow: order.status === 'PENDING' ? '0 0 24px rgba(245,166,35,0.12), inset 0 1px 0 rgba(255,255,255,0.06)' : undefined,
+        boxShadow: order.status === 'PENDING' ? '0 0 20px rgba(245,166,35,0.12), inset 0 1px 0 rgba(255,255,255,0.06)' : undefined,
       }}
     >
       <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: STATUS_COLOR[order.status] ?? 'rgba(255,255,255,0.2)' }} />
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="font-semibold text-white">{order.order_number}</p>
-          <p className="text-xs text-white/40 mt-0.5">{order.delivery_type} · {order.delivery_address.slice(0, 45)}</p>
-        </div>
-        <Badge className="shrink-0" color={STATUS_COLOR[order.status]}>
-          {STATUS_LABEL[order.status]}
-        </Badge>
-      </div>
 
-      <div className="space-y-1 border-t border-white/6 pt-3">
-        {order.order_items?.map((item) => (
-          <div key={item.id} className="text-sm">
-            <div className="flex items-center gap-1.5">
-              <span className="text-white/90">{item.quantity}× {item.name}</span>
-              {item.notes && <span className="text-xs text-amber-400">· {item.notes}</span>}
-            </div>
-            {item.addons && item.addons.length > 0 && (
-              <p className="text-xs text-white/40 pl-4">+ {item.addons.map((a) => a.name).join(', ')}</p>
-            )}
+      {/* Compact header — tap to expand the full item list */}
+      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="w-full text-left flex items-center gap-2.5 pl-4 pr-3 py-2.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-sm text-white">{order.order_number}</span>
+            <span className="text-[11px] font-medium" style={{ color: STATUS_COLOR[order.status] }}>{STATUS_LABEL[order.status]}</span>
           </div>
-        ))}
-      </div>
-
-      <div className="flex items-center justify-between pt-1">
-        <p className="text-sm font-semibold text-white">{formatPrice(order.total_amount)}</p>
-        <div className="flex gap-2">
-          {order.status === 'PENDING' && (
-            <>
-              <button
-                onClick={() => act(() => onCancel(order.id))}
-                disabled={busy}
-                className="px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
-                style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--lx-red)', minHeight: 40 }}
-              >
-                Decline
-              </button>
-              <button
-                onClick={() => act(() => onUpdate(order.id, 'VENDOR_ACCEPTED'))}
-                disabled={busy}
-                className="lx-btn-amber px-4 py-2 text-sm disabled:opacity-40"
-                style={{ minHeight: 40 }}
-              >
-                Accept
-              </button>
-            </>
-          )}
-          {order.status === 'VENDOR_ACCEPTED' && (
-            <button
-              onClick={() => act(() => onUpdate(order.id, 'PREPARING'))}
-              disabled={busy}
-              className="lx-btn-amber px-4 py-2 text-sm disabled:opacity-40"
-              style={{ minHeight: 40 }}
-            >
-              Start Preparing
-            </button>
-          )}
-          {order.status === 'PREPARING' && (
-            <button
-              onClick={() => act(() => onUpdate(order.id, 'READY'))}
-              disabled={busy}
-              className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--lx-green)', color: '#000', minHeight: 40 }}
-            >
-              Mark Ready
-            </button>
-          )}
-          {order.status === 'READY' && (
-            <span className="px-3 py-2 text-sm text-white/30">Waiting for rider…</span>
-          )}
+          <p className="text-xs text-white/45 truncate mt-0.5">{itemSummary}</p>
         </div>
+        <div className="text-right shrink-0">
+          <p className="text-sm font-semibold text-white tabular-nums">{formatPrice(order.total_amount)}</p>
+          <p className="text-[10px] text-white/30 uppercase tracking-wide">{order.delivery_type}</p>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-white/30 transition-transform" style={{ transform: open ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+
+      {/* Expanded detail */}
+      {open && (
+        <div className="pl-5 pr-4 pb-2 space-y-1 border-t border-white/6 pt-2 lx-enter">
+          <p className="text-[11px] text-white/40">{order.delivery_type} · {order.delivery_address}</p>
+          {order.order_items?.map((item) => (
+            <div key={item.id} className="text-sm">
+              <div className="flex items-center gap-1.5">
+                <span className="text-white/90">{item.quantity}× {item.name}</span>
+                {item.notes && <span className="text-xs text-amber-400">· {item.notes}</span>}
+              </div>
+              {item.addons && item.addons.length > 0 && (
+                <p className="text-xs text-white/40 pl-4">+ {item.addons.map((a) => a.name).join(', ')}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="pl-5 pr-3 pb-3 pt-1 flex gap-2 justify-end">
+        {order.status === 'PENDING' && (
+          <>
+            <button onClick={() => act(() => onCancel(order.id))} disabled={busy} className="px-3.5 py-2 rounded-lg text-xs font-medium disabled:opacity-40" style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--lx-red)' }}>Decline</button>
+            <button onClick={() => act(() => onUpdate(order.id, 'VENDOR_ACCEPTED'))} disabled={busy} className="lx-btn-amber px-4 py-2 text-xs disabled:opacity-40">Accept</button>
+          </>
+        )}
+        {order.status === 'VENDOR_ACCEPTED' && (
+          <button onClick={() => act(() => onUpdate(order.id, 'PREPARING'))} disabled={busy} className="lx-btn-amber px-4 py-2 text-xs disabled:opacity-40">Start Preparing</button>
+        )}
+        {order.status === 'PREPARING' && (
+          <button onClick={() => act(() => onUpdate(order.id, 'READY'))} disabled={busy} className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-40" style={{ background: 'var(--lx-green)', color: '#000' }}>Mark Ready</button>
+        )}
+        {order.status === 'READY' && (
+          <span className="px-2 py-2 text-xs text-white/30">Waiting for rider…</span>
+        )}
       </div>
     </div>
   )
