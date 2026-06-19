@@ -6,6 +6,7 @@ import Image from 'next/image'
 import type { VendorData } from './home/page'
 import { vendorTrustBadges } from '@/lib/vendor-trust'
 import { VerifiedBadge } from '@/components/verified-badge'
+import { Pill } from '@/components/ui/pill'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks']
 
@@ -48,8 +49,7 @@ export function HomepageClient({ initialVendors }: { initialVendors: VendorData[
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search vendors..."
-          className="w-full rounded-xl px-4 py-3 pl-10 text-sm outline-none"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}
+          className="lx-field w-full px-4 py-3 pl-10 text-sm outline-none"
         />
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -59,18 +59,15 @@ export function HomepageClient({ initialVendors }: { initialVendors: VendorData[
       {/* Category chips */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
         {CATEGORIES.map((cat) => (
-          <button
+          <Pill
             key={cat}
+            active={category === cat}
             onClick={() => setCategory(cat)}
-            className="shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors"
-            style={{
-              background: category === cat ? '#F5A623' : 'rgba(255,255,255,0.07)',
-              color: category === cat ? '#000' : 'rgba(255,255,255,0.7)',
-              minHeight: 44,
-            }}
+            className="shrink-0 px-4 py-2 text-sm"
+            style={{ minHeight: 44 }}
           >
             {cat}
-          </button>
+          </Pill>
         ))}
       </div>
 
@@ -109,8 +106,8 @@ function VendorCard({ vendor }: { vendor: VendorData }) {
   const trust = vendorTrustBadges(vendor)
 
   return (
-    <Link href={`/vendor/${vendor.id}`} className="lx-tap block rounded-2xl overflow-hidden"
-      style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.08)', opacity: unavailable ? 0.72 : 1 }}>
+    <Link href={`/vendor/${vendor.id}`} className="lx-tap glass-thin block rounded-2xl overflow-hidden"
+      style={{ opacity: unavailable ? 0.72 : 1 }}>
       {/* Photo */}
       <div className="relative h-40 bg-white/5">
         {vendor.shop_photo_url ? (
@@ -146,6 +143,13 @@ function VendorCard({ vendor }: { vendor: VendorData }) {
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} />
           {statusLabel}
         </div>
+
+        {/* Vendor logo badge overlaid on the cover */}
+        {vendor.logo_url && (
+          <div className="absolute bottom-2 left-2 w-10 h-10 rounded-xl overflow-hidden" style={{ border: '2px solid rgba(255,255,255,0.25)', boxShadow: '0 4px 12px rgba(0,0,0,0.45)' }}>
+            <Image src={vendor.logo_url} alt="" fill className="object-cover" sizes="40px" />
+          </div>
+        )}
       </div>
 
       {/* Info */}
@@ -160,13 +164,13 @@ function VendorCard({ vendor }: { vendor: VendorData }) {
           </div>
           <div className="text-right shrink-0">
             {vendor.total_ratings >= 5 ? (
-              <div className="flex items-center gap-1 text-[#F5A623]">
+              <div className="lx-amber flex items-center gap-1">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                 <span className="text-sm font-medium">{vendor.avg_rating.toFixed(1)}</span>
                 <span className="text-white/30 text-xs">({vendor.total_ratings})</span>
               </div>
             ) : (
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }}>NEW</span>
+              <span className="lx-card-amber lx-amber text-xs px-2 py-0.5 rounded-full">NEW</span>
             )}
           </div>
         </div>
@@ -182,8 +186,7 @@ function VendorCard({ vendor }: { vendor: VendorData }) {
               {vendor.prep_time_minutes}–{vendor.prep_time_minutes + 10} min
             </span>
             {trust.map((b) => (
-              <span key={b.label} className="text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1"
-                style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623' }}>
+              <span key={b.label} className="lx-card-amber lx-amber text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                 <span aria-hidden="true">{b.emoji}</span>{b.label}
               </span>
             ))}

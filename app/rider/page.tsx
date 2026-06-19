@@ -316,22 +316,6 @@ export default function RiderDashboard() {
         </div>
       </div>
 
-      {/* Launch counter — self-hides unless the super-admin flag is on */}
-      <div className="mx-4 mb-5"><LaunchCounter /></div>
-
-      {/* KYC verification — upload & track documents, verified badge */}
-      <div className="mx-4 mb-5"><KycPanel role="rider" /></div>
-
-      {/* Working hours */}
-      <div className="mx-4 mb-5">
-        <BusinessHours
-          role="rider"
-          id={rider.id}
-          initialOpen={rider.opening_time}
-          initialClose={rider.closing_time}
-        />
-      </div>
-
       {/* Wallet card */}
       {wallet && (
         <div className="glass-thin mx-4 mb-5 p-4 lx-enter">
@@ -510,10 +494,22 @@ export default function RiderDashboard() {
           </div>
         )}
 
-        {/* Always-reachable logout at the end of the page */}
-        <div className="pt-2 pb-6 flex justify-center">
-          <LogoutButton />
-        </div>
+      </div>
+
+      {/* Setup & account — below the work so orders stay up top */}
+      <div className="mx-4 mt-5"><LaunchCounter /></div>
+      <div className="mx-4 mt-5"><KycPanel role="rider" /></div>
+      <div className="mx-4 mt-5">
+        <BusinessHours
+          role="rider"
+          id={rider.id}
+          initialOpen={rider.opening_time}
+          initialClose={rider.closing_time}
+        />
+      </div>
+
+      <div className="pt-4 pb-6 flex justify-center">
+        <LogoutButton />
       </div>
     </main>
   )
