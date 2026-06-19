@@ -65,7 +65,7 @@ export function SentinelClient() {
       </div>
 
       {loading && !snap ? (
-        <div className="h-28 rounded-2xl animate-pulse" style={{ background: '#111113' }} />
+        <div className="lx-skeleton h-28 rounded-2xl" />
       ) : !snap ? (
         <p className="text-sm text-white/45">Couldn&apos;t load the snapshot. Tap refresh.</p>
       ) : (
@@ -81,8 +81,8 @@ export function SentinelClient() {
 
           {/* AI triage (only when something's wrong) */}
           {data?.triage && (
-            <div className="rounded-2xl p-4 space-y-2" style={{ background: 'rgba(245,166,35,0.06)', border: '1px solid rgba(245,166,35,0.22)' }}>
-              <p className="text-xs font-bold tracking-wide" style={{ color: '#F5A623' }}>🤖 AI TRIAGE</p>
+            <div className="lx-card-amber-soft rounded-2xl p-4 space-y-2">
+              <p className="lx-amber text-xs font-bold tracking-wide">🤖 AI TRIAGE</p>
               <p className="text-sm font-semibold text-white">{data.triage.headline}</p>
               <p className="text-sm text-white/70">{data.triage.what_broke}</p>
               <div className="text-xs text-white/55 space-y-1 pt-1">
@@ -104,7 +104,7 @@ export function SentinelClient() {
               ))}
             </div>
           ) : (
-            <div className="rounded-xl p-3 text-sm text-white/50" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="glass-thin rounded-xl p-3 text-sm text-white/50">
               No issues detected. Everything looks good. ✅
             </div>
           )}
@@ -138,7 +138,7 @@ export function SentinelClient() {
 function Tile({ label, value, sub, highlight, danger }: { label: string; value: string; sub?: string; highlight?: boolean; danger?: boolean }) {
   const color = danger ? '#EF4444' : highlight ? '#F5A623' : '#fff'
   return (
-    <div className="rounded-xl px-3 py-2.5" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="glass-thin rounded-xl px-3 py-2.5">
       <p className="text-[11px] text-white/40">{label}</p>
       <p className="text-sm font-semibold truncate mt-0.5" style={{ color }}>{value}</p>
       {sub && <p className="text-[11px] text-white/30">{sub}</p>}
