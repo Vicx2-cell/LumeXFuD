@@ -32,17 +32,46 @@ export async function resolveProvider(moduleKey?: AIModuleKey): Promise<LLMProvi
   return instance(await getActiveProviderName(moduleKey))
 }
 
+/** Hard-require the paid Anthropic provider; refuse rather than fall back to the
+ *  free tier when no key is set. Used for payloads that must never touch Gemini. */
+function requireAnthropic(kind: string): LLMProvider {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error(`${kind.toUpperCase()}_NEEDS_ANTHROPIC: ${kind} payloads require ANTHROPIC_API_KEY; refusing to route to the free tier`)
+  }
+  return anthropicProvider
+}
+
 /**
- * Capability-aware resolve: a request carrying AUDIO must run on Gemini
- * regardless of the toggle, because Anthropic models cannot accept raw audio.
- * This is the ONLY case where provider choice is overridden by capability.
+ * Capability- and sensitivity-aware resolve. Provider choice is overridden by the
+ * payload (not the toggle) in three cases, checked in priority order:
+ *
+ *  1. sensitivity:'identity' (NIN/BVN/ID docs/face) → HARD-ROUTE to Anthropic.
+ *     NDPR data-handling: identity data must never reach the Gemini free tier.
+ *  2. AUDIO (e.g. a spoken menu) → Gemini, which is the only provider that accepts
+ *     raw audio. A voice menu is not identity data.
+ *  3. IMAGES (Menu Digitizer OCR) → Anthropic. A vendor can upload an ID card as a
+ *     "menu photo" and the route can't detect that to set sensitivity:'identity',
+ *     so EVERY image is treated as potentially sensitive and kept off the free
+ *     tier. Menu OCR is onboarding-time / low-volume, so the paid cost is
+ *     negligible; the free tier stays for high-volume non-sensitive TEXT (Belle,
+ *     badges) — i.e. requests with no image/audio/identity flag.
  */
 export async function resolveProviderForRequest(req: LLMRequest, moduleKey?: AIModuleKey): Promise<LLMProvider> {
+  if (req.sensitivity === 'identity') {
+    if (req.audio?.length) {
+      // Audio can only run on the free tier; identity must never go there. Refuse.
+      throw new Error('IDENTITY_AUDIO_UNSUPPORTED: identity payloads cannot be processed as audio')
+    }
+    return requireAnthropic('identity')
+  }
   if (req.audio?.length) {
     if (!process.env.GEMINI_API_KEY) {
       throw new Error('VOICE_NEEDS_GEMINI: set GEMINI_API_KEY to use voice menus')
     }
     return geminiProvider // force Gemini, ignore the toggle
+  }
+  if (req.images?.length) {
+    return requireAnthropic('image')
   }
   return resolveProvider(moduleKey)
 }

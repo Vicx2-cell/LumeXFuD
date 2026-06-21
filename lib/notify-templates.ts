@@ -19,6 +19,11 @@ export const TEMPLATES = {
 
   CANCELLED: `❌ Your order #{order_number} was cancelled.\nReason: {cancellation_reason}\nNo charge was made to your account.`,
 
+  // ─── Pickup (Order Ahead) ───────────────────────────────────────────────────
+  // NEVER include the collection code here (Invariant I3 — the code is shown only
+  // in the customer's app). This message just tells them it's ready to collect.
+  PICKUP_READY: `🛍️ Your order #{order_number} is ready at {vendor_name}!\nOpen the LumeX app to see your collection code and show it to the vendor.\nPlease collect within {window} minutes.`,
+
   // ─── Wallet ───────────────────────────────────────────────────────────────
   WITHDRAWAL_SUCCESS: `💰 ₦{amount} sent to your {bank_name} account ({last_4}).\nTransaction ref: {reference}\nShould arrive within 5 minutes.`,
 

@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { superAudit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { CONTROL_IDS } from '@/lib/controls'
 
 // settings is id-keyed (TEXT PK) with a JSONB `value`. `value` can be any JSON
 // shape (e.g. {"amount_kobo": N}, {"value": N}, {"open":"07:00"}), so it's
@@ -12,6 +13,27 @@ const patchInput = z.object({
   id:    z.string().min(1).max(100),
   value: z.unknown(),
 })
+
+// Settings owned by typed editors that enforce invariants — pricing (profitability
+// guard + kobo caps, /super-admin/pricing), controls (kill-switch shape,
+// /super-admin/controls) and feature flags (/super-admin/features). This generic
+// editor must NOT blind-write them, or it bypasses those guards (e.g. set a rider
+// cut above the delivery fee, making every order loss-making). They are edited
+// only from their dedicated screens.
+const PRICING_IDS = [
+  'platform_markup', 'delivery_fee_bike', 'rider_delivery_cut_bike',
+  'delivery_fee_door', 'rider_delivery_cut_door', 'min_order_amount',
+]
+const RESERVED_SETTING_IDS = new Set<string>([
+  ...PRICING_IDS,
+  ...Object.values(CONTROL_IDS),
+])
+// Feature flags all live under the `feature.<key>` id prefix (lib/features.ts).
+// Matching the prefix covers every current and future flag without importing the
+// catalog, so they stay editable only from /super-admin/features.
+function isReservedSettingId(id: string): boolean {
+  return RESERVED_SETTING_IDS.has(id) || id.startsWith('feature.')
+}
 
 export async function GET() {
   const session = await getCurrentUser()
@@ -41,6 +63,13 @@ export async function PATCH(req: NextRequest) {
   const parsed = patchInput.safeParse(body)
   if (!parsed.success || parsed.data.value === undefined) {
     return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  }
+
+  if (isReservedSettingId(parsed.data.id)) {
+    return NextResponse.json(
+      { error: 'This setting is managed from its dedicated screen (Pricing / Controls / Features) and cannot be edited here.' },
+      { status: 403 },
+    )
   }
 
   const db = createSupabaseAdmin()

@@ -6,6 +6,7 @@ import { refundOrderPayments } from '@/lib/order-refund'
 import { completeOrderPayout, unlockOrderHolds } from '@/lib/order-payout'
 import { reverseOrderPayout } from '@/lib/wallet'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { requireStepUpForAmount } from '@/lib/step-up'
 import { audit } from '@/lib/audit'
 
 export async function POST(
@@ -39,6 +40,17 @@ export async function POST(
 
   if (!order || order.status !== 'DISPUTED') {
     return NextResponse.json({ error: 'Order not found or not in DISPUTED state' }, { status: 404 })
+  }
+
+  // Rule #28: resolving in the customer's favour moves real money (refund +
+  // payout reversal). Require fresh-PIN re-auth on the refund branch — same
+  // control as paystack/refund and wallet-adjust.
+  if (parsed.data.resolution === 'REFUND') {
+    const reauthPin = (body as Record<string, unknown> | null)?.reauth_pin
+    const stepUp = await requireStepUpForAmount(session, order.total_amount as number, reauthPin)
+    if (!stepUp.ok) {
+      return NextResponse.json({ error: stepUp.error, reauth_required: true }, { status: stepUp.status })
+    }
   }
 
   const newStatus = parsed.data.resolution === 'REFUND' ? 'REFUNDED' : 'COMPLETED'

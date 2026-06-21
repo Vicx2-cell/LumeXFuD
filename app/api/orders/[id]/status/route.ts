@@ -7,6 +7,8 @@ import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { renderTemplate } from '@/lib/notify-templates'
 import { recordOrderCompletedEarnings } from '@/lib/platform-earnings'
 import { completeOrderPayout } from '@/lib/order-payout'
+import { getPickupConfig } from '@/lib/pickup'
+import { getFeature } from '@/lib/features'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import type { OrderStatus } from '@/types'
 
@@ -70,7 +72,7 @@ export async function PATCH(
 
   const { data: order, error } = await db
     .from('orders')
-    .select('id, order_number, status, vendor_id, customer_id, rider_id, guest_phone, total_amount, subtotal, rider_delivery_cut, tip_amount, platform_markup, platform_delivery_cut')
+    .select('id, order_number, status, delivery_type, vendor_id, customer_id, rider_id, guest_phone, total_amount, subtotal, rider_delivery_cut, tip_amount, platform_markup, platform_delivery_cut')
     .eq('id', id)
     .single()
 
@@ -102,6 +104,19 @@ export async function PATCH(
     )
   }
 
+  // Delivery handover (delivery_handover_v1): a rider may NOT mark a delivery
+  // DELIVERED directly — they must enter the customer's code via /deliver, so the
+  // handover is verified (Invariant I2). Staff can still force it. No-op for pickup.
+  if (
+    newStatus === 'DELIVERED' && order.delivery_type !== 'PICKUP' &&
+    session.role === 'rider' && (await getFeature('delivery_handover_v1'))
+  ) {
+    return NextResponse.json(
+      { error: 'Confirm delivery by entering the customer’s code (use the delivery handover).' },
+      { status: 400 },
+    )
+  }
+
   const now = new Date().toISOString()
   const timestampField = TIMESTAMP_FIELDS[newStatus]
   const updateData: Record<string, unknown> = {
@@ -115,6 +130,10 @@ export async function PATCH(
     const autoComplete = new Date(Date.now() + 15 * 60 * 1000).toISOString()
     updateData.rider_auto_release_at = autoComplete
   }
+
+  // NOTE: the PICKUP forfeit clock is NOT started here. It runs from PAYMENT
+  // (orders.pending_since), enforced server-side by settleDuePickups — so marking
+  // READY does not reset or extend the customer's 1h25m window (Invariant I7).
 
   // When COMPLETED: mark rider payment as HELD (will be released by cron after 24h)
   if (newStatus === 'COMPLETED') {
@@ -189,6 +208,27 @@ async function sendNotificationForStatus(
   }
 
   switch (status) {
+    case 'READY': {
+      // Only pickup orders notify the customer at READY. The message NEVER carries
+      // the collection code (Invariant I3) — it tells them to open the app, where
+      // the code is shown to the owner only. (Delivery orders broadcast to riders
+      // elsewhere, not the customer.)
+      if (order.delivery_type !== 'PICKUP') break
+      const phone = await getCustomerPhone()
+      const vendor = await getVendor()
+      if (phone) {
+        const { holdMinutes } = await getPickupConfig(db)
+        await sendWhatsAppWithFallback({
+          to: phone,
+          message: renderTemplate('PICKUP_READY', {
+            order_number: orderNumber,
+            vendor_name: (vendor?.shop_name as string) ?? 'the vendor',
+            window: holdMinutes,
+          }),
+        })
+      }
+      break
+    }
     case 'VENDOR_ACCEPTED': {
       const phone = await getCustomerPhone()
       const vendor = await getVendor()

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
+import { waLink, telLink } from '@/lib/contact'
 import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
 import { DemandBanner } from '@/components/demand-banner'
@@ -17,10 +18,12 @@ interface VendorOrder {
   id: string
   order_number: string
   status: string
-  delivery_type: 'BIKE' | 'DOOR'
+  delivery_type: 'BIKE' | 'DOOR' | 'PICKUP'
   delivery_address: string
   total_amount: number
   created_at: string
+  pickup_eta_at: string | null
+  customers: { phone: string | null; name: string | null } | null
   order_items: OrderItem[]
 }
 interface VendorInfo {
@@ -33,6 +36,8 @@ interface VendorInfo {
   closing_time: string | null
   logo_url: string | null
   shop_photo_url: string | null
+  pickup_enabled: boolean
+  pickup_max_concurrent: number
 }
 
 const ACTIVE = ['PENDING', 'VENDOR_ACCEPTED', 'PREPARING', 'READY']
@@ -40,12 +45,12 @@ const ACTIVE = ['PENDING', 'VENDOR_ACCEPTED', 'PREPARING', 'READY']
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'New Order', VENDOR_ACCEPTED: 'Confirmed',
   PREPARING: 'Preparing', READY: 'Ready for Rider',
-  COMPLETED: 'Completed', CANCELLED: 'Cancelled',
+  COMPLETED: 'Completed', CANCELLED: 'Cancelled', NO_SHOW: 'No-show',
 }
 const STATUS_COLOR: Record<string, string> = {
   PENDING: '#F5A623', VENDOR_ACCEPTED: '#60a5fa',
   PREPARING: '#a78bfa', READY: '#4ade80',
-  COMPLETED: 'rgba(255,255,255,0.3)', CANCELLED: '#f87171',
+  COMPLETED: 'rgba(255,255,255,0.3)', CANCELLED: '#f87171', NO_SHOW: '#f59e0b',
 }
 
 function beep(ctx: AudioContext) {
@@ -189,6 +194,30 @@ export default function VendorDashboard() {
     if (res.ok) setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'CANCELLED' } : o))
   }
 
+  // Pickup handover: enter the customer's 6-character code to release the order.
+  // Returns an error string on failure (wrong code, etc.) so the card can show it.
+  const collectOrder = async (orderId: string, code: string): Promise<string | null> => {
+    const res = await fetch(`/api/orders/${orderId}/collect`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    })
+    if (res.ok) {
+      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'COMPLETED' } : o))
+      return null
+    }
+    const d = await res.json().catch(() => ({})) as { error?: string }
+    return d.error ?? 'Could not collect this order.'
+  }
+
+  const savePickup = async (patch: { pickup_enabled?: boolean; pickup_max_concurrent?: number }) => {
+    if (!vendor) return
+    setVendor((v) => v ? { ...v, ...patch } : v) // optimistic
+    await fetch(`/api/vendors/${vendor.id}/pickup-settings`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).catch(() => {})
+  }
+
   if (loading) {
     return (
       <div className="lx-page flex items-center justify-center">
@@ -280,6 +309,9 @@ export default function VendorDashboard() {
             initialClose={vendor.closing_time}
           />
         )}
+
+        {/* Pickup (Order Ahead) — opt out + pacing cap */}
+        {vendor && <PickupSettings vendor={vendor} onSave={savePickup} />}
 
         <div className="pt-2 flex justify-center">
           <LogoutButton />
@@ -394,7 +426,7 @@ export default function VendorDashboard() {
           ) : (
             <div className="space-y-2.5">
               {active.map((order) => (
-                <OrderCard key={order.id} order={order} onUpdate={updateOrder} onCancel={cancelOrder} />
+                <OrderCard key={order.id} order={order} onUpdate={updateOrder} onCancel={cancelOrder} onCollect={collectOrder} />
               ))}
             </div>
           )}
@@ -449,15 +481,29 @@ function OrderCard({
   order,
   onUpdate,
   onCancel,
+  onCollect,
 }: {
   order: VendorOrder
   onUpdate: (id: string, status: string) => Promise<void>
   onCancel: (id: string) => Promise<void>
+  onCollect: (id: string, code: string) => Promise<string | null>
 }) {
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState(false)
+  const [code, setCode] = useState('')
+  const [collectErr, setCollectErr] = useState('')
   const act = async (fn: () => Promise<void>) => { setBusy(true); try { await fn() } finally { setBusy(false) } }
+  const isPickup = order.delivery_type === 'PICKUP'
   const itemSummary = (order.order_items ?? []).map((i) => `${i.quantity}× ${i.name}`).join(' · ')
+
+  const submitCode = async () => {
+    if (code.length !== 6) { setCollectErr('Enter the customer’s 6-character code.'); return }
+    setBusy(true); setCollectErr('')
+    try {
+      const err = await onCollect(order.id, code)
+      if (err) setCollectErr(err)
+    } finally { setBusy(false) }
+  }
 
   return (
     <div
@@ -503,6 +549,39 @@ function OrderCard({
         </div>
       )}
 
+      {/* Pickup handover: enter the customer's code to release the order */}
+      {isPickup && order.status === 'READY' && (
+        <div className="px-4 pb-3 pt-1 border-t border-white/6 lx-enter">
+          <div className="rounded-lg p-2.5 mb-2 text-xs" style={{ background: 'rgba(255,255,255,0.04)' }}>
+            <p className="text-white/45">Order <span className="text-white/80 font-semibold">#{order.order_number}</span>{order.customers?.name ? <> · for <span className="text-white/80">{order.customers.name.split(' ')[0]}</span></> : null}</p>
+            {itemSummary && <p className="text-white/70 mt-1">{itemSummary}</p>}
+          </div>
+          {order.customers?.phone && (
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs text-white/45">Running late? Reach {order.customers.name?.split(' ')[0] ?? 'them'}:</span>
+              <a href={waLink(order.customers.phone, `Hi${order.customers.name ? ' ' + order.customers.name.split(' ')[0] : ''}, your LumeX order #${order.order_number} is ready to collect.`)}
+                target="_blank" rel="noopener noreferrer"
+                className="text-[11px] px-2 py-1 rounded-lg font-medium" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366' }}>WhatsApp</a>
+              <a href={telLink(order.customers.phone)} className="text-[11px] px-2 py-1 rounded-lg font-medium" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)' }}>Call</a>
+            </div>
+          )}
+          <p className="text-xs text-white/50 mb-2">🛍️ Ask the customer to read you their 6-character pickup code (it’s in their app):</p>
+          <div className="flex gap-2">
+            <input
+              inputMode="text" autoCapitalize="characters" autoCorrect="off" spellCheck={false} maxLength={6} value={code}
+              onChange={(e) => { setCode(e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 6)); setCollectErr('') }}
+              placeholder="ABC234"
+              className="lx-field flex-1 px-3 py-2.5 text-base tracking-[0.4em] text-center font-semibold outline-none uppercase"
+            />
+            <button onClick={submitCode} disabled={busy || code.length !== 6}
+              className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-40 shrink-0" style={{ background: 'var(--lx-green)', color: '#000' }}>
+              {busy ? '…' : 'Collect'}
+            </button>
+          </div>
+          {collectErr && <p className="text-xs text-red-400 mt-1.5">{collectErr}</p>}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="pl-5 pr-3 pb-3 pt-1 flex gap-2 justify-end">
         {order.status === 'PENDING' && (
@@ -517,10 +596,58 @@ function OrderCard({
         {order.status === 'PREPARING' && (
           <button onClick={() => act(() => onUpdate(order.id, 'READY'))} disabled={busy} className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-40" style={{ background: 'var(--lx-green)', color: '#000' }}>Mark Ready</button>
         )}
-        {order.status === 'READY' && (
+        {!isPickup && order.status === 'READY' && (
           <span className="px-2 py-2 text-xs text-white/30">Waiting for rider…</span>
         )}
       </div>
+    </div>
+  )
+}
+
+// Vendor pickup (order ahead) preferences: offer pickup or not, and a pacing cap
+// on simultaneous pickup orders so the kitchen never stacks.
+function PickupSettings({
+  vendor,
+  onSave,
+}: {
+  vendor: VendorInfo
+  onSave: (patch: { pickup_enabled?: boolean; pickup_max_concurrent?: number }) => Promise<void>
+}) {
+  const [cap, setCap] = useState(String(vendor.pickup_max_concurrent ?? 0))
+  const enabled = vendor.pickup_enabled !== false
+
+  return (
+    <div className="glass-thin p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-white/80 flex items-center gap-1.5">🛍️ Pickup (Order Ahead)</p>
+          <p className="text-xs text-white/45 mt-0.5">Let customers order ahead and collect — no rider, ₦0 delivery.</p>
+        </div>
+        <button
+          type="button" role="switch" aria-checked={enabled}
+          onClick={() => onSave({ pickup_enabled: !enabled })}
+          className="relative w-12 h-7 rounded-full transition-colors shrink-0"
+          style={{ background: enabled ? '#F5A623' : 'rgba(255,255,255,0.15)' }}
+        >
+          <span className="absolute top-1 w-5 h-5 rounded-full bg-white transition-all" style={{ left: enabled ? 26 : 4 }} />
+        </button>
+      </div>
+      {enabled && (
+        <div className="lx-enter">
+          <label className="text-xs text-white/50 block mb-1">Max pickup orders at once (pacing)</label>
+          <div className="flex gap-2">
+            <input
+              type="number" min={0} max={100} inputMode="numeric" value={cap}
+              onChange={(e) => setCap(e.target.value.replace(/\D/g, '').slice(0, 3))}
+              className="lx-field flex-1 px-3 py-2.5 text-sm outline-none tabular-nums"
+            />
+            <button
+              onClick={() => onSave({ pickup_max_concurrent: Math.max(0, Math.min(100, Number(cap) || 0)) })}
+              className="lx-btn-amber px-4 py-2 text-xs shrink-0">Save</button>
+          </div>
+          <p className="text-xs text-white/35 mt-1.5">0 = no limit. Above the cap, new orders get a later “ready by” time instead of stacking.</p>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,10 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import WithdrawSheet from './WithdrawSheet'
 import AddBankSheet from './AddBankSheet'
 import { BackButton } from '@/components/back-button'
 import { downloadReceiptPng } from '@/lib/receipt-download'
+import { waLink, telLink } from '@/lib/contact'
+
+interface TxParty { name: string; phone: string | null; avatar: string | null }
 
 interface TierProgress {
   current_count: number
@@ -48,6 +52,9 @@ interface TxRow {
   reference: string | null
   balance_after: string
   receipt_code: string
+  order_id: string | null
+  vendor: TxParty | null
+  rider: TxParty | null
 }
 
 interface Props {
@@ -428,6 +435,16 @@ export default function WalletView({ userType }: Props) {
                         </div>
                       )}
                     </div>
+
+                    {/* People on this order — profile + contact, from the record */}
+                    {(tx.vendor || tx.rider) && (
+                      <div className="mt-2 pt-2 border-t border-white/8 space-y-2">
+                        <p className="text-[11px] uppercase tracking-wide text-white/40">On this order</p>
+                        {tx.vendor && <PartyRow role="Vendor" party={tx.vendor} orderNumber={tx.reference} />}
+                        {tx.rider && <PartyRow role="Rider" party={tx.rider} orderNumber={tx.reference} />}
+                      </div>
+                    )}
+
                     <div className="mt-2 pt-2 border-t border-white/8 flex items-center gap-2">
                       <span className="text-green-400">🔒</span>
                       <span className="text-[11px] text-white/50">Verified</span>
@@ -591,6 +608,35 @@ export default function WalletView({ userType }: Props) {
         onClose={() => setAddBankOpen(false)}
         onSuccess={() => loadWallet()}
       />
+    </div>
+  )
+}
+
+// One person on an order (vendor or rider): avatar + name + one-tap contact. Shown
+// in the transaction receipt so each party can see — and reach — who they worked
+// with. WhatsApp/Call deep links only; no sensitive data beyond the contact number.
+function PartyRow({ role, party, orderNumber }: { role: 'Vendor' | 'Rider'; party: TxParty; orderNumber: string | null }) {
+  const initial = (party.name || role).charAt(0).toUpperCase()
+  const msg = `Hi${party.name ? ' ' + party.name.split(' ')[0] : ''}, regarding LumeX order ${orderNumber ?? ''}`.trim()
+  return (
+    <div className="flex items-center gap-2.5">
+      {party.avatar ? (
+        <div className="relative w-8 h-8 rounded-full overflow-hidden shrink-0" style={{ border: '1px solid rgba(255,255,255,0.15)' }}>
+          <Image src={party.avatar} alt="" fill className="object-cover" sizes="32px" />
+        </div>
+      ) : (
+        <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-xs font-semibold" style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }}>{initial}</div>
+      )}
+      <div className="min-w-0">
+        <p className="text-xs text-white/90 truncate">{party.name}</p>
+        <p className="text-[10px] uppercase tracking-wide text-white/35">{role}</p>
+      </div>
+      {party.phone && (
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          <a href={waLink(party.phone, msg)} target="_blank" rel="noopener noreferrer" className="text-[11px] px-2 py-1 rounded-lg font-medium" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366' }}>WhatsApp</a>
+          <a href={telLink(party.phone)} className="text-[11px] px-2 py-1 rounded-lg font-medium" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)' }}>Call</a>
+        </div>
+      )}
     </div>
   )
 }

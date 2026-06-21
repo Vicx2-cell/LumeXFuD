@@ -85,6 +85,7 @@ const ENTRIES: Entry[] = [
   { path: 'app/api/super-admin/pricing/route', method: 'PATCH', allow: SUPER },
   { path: 'app/api/super-admin/announcement/route', method: 'POST', allow: SUPER },
   { path: 'app/api/super-admin/announcement/route', method: 'DELETE', allow: SUPER },
+  { path: 'app/api/super-admin/consent/route', method: 'GET', allow: SUPER },
 
   // ── admin + super_admin ──
   { path: 'app/api/admin/audit/route', method: 'GET', allow: A_S },
@@ -155,11 +156,16 @@ const ENTRIES: Entry[] = [
   { path: 'app/api/vendor/orders/route', method: 'GET', allow: ['vendor', 'admin', 'super_admin'] },
   { path: 'app/api/vendors/[id]/status/route', method: 'POST', allow: ['vendor', 'admin', 'super_admin'] },
   { path: 'app/api/vendors/[id]/pause/route', method: 'POST', allow: ['vendor', 'admin', 'super_admin'] },
+  // pickup handover: only the fulfilling vendor (or staff) enters the code
+  { path: 'app/api/orders/[id]/collect/route', method: 'POST', allow: ['vendor', 'admin', 'super_admin'] },
 
   // ── rider + admin + super ──
   { path: 'app/api/rider/orders/route', method: 'GET', allow: ['rider', 'admin', 'super_admin'] },
   { path: 'app/api/riders/[id]/status/route', method: 'POST', allow: ['rider', 'admin', 'super_admin'] },
   { path: 'app/api/riders/[id]/accept/route', method: 'POST', allow: ['rider', 'admin', 'super_admin'] },
+  // delivery handover: only the assigned rider (or staff) confirms / uploads proof
+  { path: 'app/api/orders/[id]/deliver/route', method: 'POST', allow: ['rider', 'admin', 'super_admin'] },
+  { path: 'app/api/orders/[id]/delivery-photo/route', method: 'POST', allow: ['rider', 'admin', 'super_admin'] },
 ]
 
 async function invoke(entry: Entry) {
@@ -252,6 +258,30 @@ describe('IDOR / BOLA — other-user resource is blocked (403/404)', () => {
       expect([403, 404]).toContain(res.status)
     })
   }
+
+  it('orders/[id]/collect: vendor B cannot collect vendor A’s pickup order', async () => {
+    h.session = session('vendor', B)
+    h.rows = { orders: { data: { id: 'o1', order_number: 'LXF-1', status: 'READY', delivery_type: 'PICKUP', vendor_id: A, customer_id: A, handover_code_hash: 'x', handover_code_locked: false, payment_status: 'PAID', subtotal: 1000, platform_markup: 250 }, error: null } }
+    const mod: any = await import('@/app/api/orders/[id]/collect/route')
+    const res = await mod.POST(makeReq({ method: 'POST', body: { code: 'ABC234' } }), ctxWithId('o1'))
+    expect(res.status).toBe(403)
+  })
+
+  it('orders/[id]/deliver: rider B cannot confirm rider A’s delivery', async () => {
+    h.session = session('rider', B)
+    h.rows = { orders: { data: { id: 'o1', order_number: 'LXF-1', status: 'PICKED_UP', delivery_type: 'BIKE', rider_id: A, customer_id: A, handover_code_hash: 'x', handover_code_locked: false, payment_status: 'PAID', leave_at_gate: false }, error: null } }
+    const mod: any = await import('@/app/api/orders/[id]/deliver/route')
+    const res = await mod.POST(makeReq({ method: 'POST', body: { code: 'ABC234' } }), ctxWithId('o1'))
+    expect(res.status).toBe(403)
+  })
+
+  it('orders/[id]/handover-code: customer B cannot pull customer A’s code (I5)', async () => {
+    h.session = session('customer', B)
+    h.rows = { orders: { data: { id: 'o1', customer_id: A, delivery_type: 'PICKUP', status: 'READY', payment_status: 'PAID', leave_at_gate: false, pending_since: null }, error: null } }
+    const mod: any = await import('@/app/api/orders/[id]/handover-code/route')
+    const res = await mod.POST(makeReq({ method: 'POST', body: {} }), ctxWithId('o1'))
+    expect(res.status).toBe(403)
+  })
 
   it('riders/[id]/accept: rider B cannot accept using rider A’s id', async () => {
     h.session = session('rider', B)

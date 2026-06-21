@@ -13,6 +13,7 @@ import {
   validatePin,
 } from '@/lib/pin-auth'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { verifyStepUp } from '@/lib/step-up'
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,6 +43,19 @@ export async function POST(req: NextRequest) {
     const user = await findAuthUserByPhone(userSession.phone)
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // First-login setup mints the PIN + security answers + recovery code with no
+    // prior credential. OUTSIDE genuine first-login (pin_reset_pending=true) this
+    // same call would silently overwrite the whole recovery chain — turning a
+    // stolen session into permanent owner lockout. Gate it: require the current
+    // login PIN (constant-time, shared change-pin lockout) when not first-login.
+    if (user.user.pin_reset_pending !== true) {
+      const currentPin = (body as Record<string, unknown> | null)?.current_pin
+      const stepUp = await verifyStepUp(userSession, currentPin)
+      if (!stepUp.ok) {
+        return NextResponse.json({ error: stepUp.error, reauth_required: true }, { status: stepUp.status })
+      }
     }
 
     if (user.user.login_pin_hash) {

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { normalizePhone } from '@/lib/phone'
+import { normalizePhone, maskPhone } from '@/lib/phone'
 import { generateTempPin, hashSecret } from '@/lib/pin-auth'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { getFeature } from '@/lib/features'
+import { superAudit } from '@/lib/audit'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { isPhoneBlocked } from '@/lib/blocklist'
 import { z } from 'zod'
@@ -70,6 +71,16 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await db.from('admins').insert(insert).select('id').single()
     if (error || !data) return NextResponse.json({ error: 'Failed to create admin' }, { status: 500 })
+
+    await superAudit({
+      actor_id: user.phone,
+      actor_role: user.role,
+      action: 'admin_created',
+      target_table: 'admins',
+      target_id: data.id as string,
+      new_value: { name, phone: maskPhone(normalized) },
+      ip_address: req.headers.get('x-forwarded-for') ?? undefined,
+    })
 
     const message = `Hi, your LumeX admin account is ready! Login at ${process.env.NEXT_PUBLIC_APP_URL ?? 'https://lumexfud.com.ng'} with your number ${normalized} and PIN: ${tempPin}. You will be asked to change your PIN on first login.`
 

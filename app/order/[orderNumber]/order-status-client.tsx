@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
 import { VerifiedBadge } from '@/components/verified-badge'
+import { useFeatures } from '@/lib/use-features'
 import type { OrderDetail } from './page'
 
 const DISPUTE_REASONS = [
@@ -29,6 +30,16 @@ const STATUS_STEPS = [
   { key: 'COMPLETED', label: 'Completed' },
 ]
 
+// Pickup (order ahead) has no rider/delivery legs — just paid → ready → collected.
+// Keys reuse STATUS_ORDER so the same index math (done/current/future) works.
+const PICKUP_STEPS = [
+  { key: 'PENDING', label: 'Order placed · paid' },
+  { key: 'VENDOR_ACCEPTED', label: 'Vendor confirmed' },
+  { key: 'PREPARING', label: 'Preparing your food', animated: true },
+  { key: 'READY', label: 'Ready — show your code' },
+  { key: 'COMPLETED', label: 'Collected' },
+]
+
 const STATUS_ORDER = STATUS_STEPS.map((s) => s.key)
 
 function getStatusIndex(status: string): number {
@@ -41,13 +52,16 @@ export function OrderStatusClient({
   canRate = false,
   alreadyRated = false,
   riderVerified = false,
+  pickupHoldMinutes = 85,
 }: {
   order: OrderDetail
   canRate?: boolean
   alreadyRated?: boolean
   riderVerified?: boolean
+  pickupHoldMinutes?: number
 }) {
   const router = useRouter()
+  const features = useFeatures()
   const [order, setOrder] = useState(initialOrder)
   const [actionError, setActionError] = useState('')
   const [confirming, setConfirming] = useState(false)
@@ -73,7 +87,8 @@ export function OrderStatusClient({
   const [conciergeReply, setConciergeReply] = useState('')
 
   const statusIdx = getStatusIndex(order.status)
-  const isActive = !['COMPLETED', 'CANCELLED', 'REFUNDED', 'DISPUTED'].includes(order.status)
+  const isPickup = order.delivery_type === 'PICKUP'
+  const isActive = !['COMPLETED', 'CANCELLED', 'REFUNDED', 'DISPUTED', 'NO_SHOW'].includes(order.status)
 
   // Keep local state in sync with refreshed server data (see polling below).
   useEffect(() => { setOrder(initialOrder) }, [initialOrder])
@@ -225,18 +240,65 @@ export function OrderStatusClient({
           </div>
         )}
 
-        {/* ETA */}
-        {eta && isActive && (
+        {/* ETA — delivery only (pickup shows its code card below instead) */}
+        {eta && isActive && !isPickup && (
           <div className="lx-card-amber-soft rounded-2xl p-5 text-center lx-scale-in" style={{ boxShadow: '0 0 40px rgba(245,166,35,0.08) inset' }}>
             <p className="text-xs uppercase tracking-[0.18em] text-white/50 mb-1.5">Estimated arrival</p>
             <p className="lx-amber text-4xl font-bold tabular-nums">{eta}</p>
           </div>
         )}
 
+        {/* Pickup code — the customer's PRIVATE handover code, pulled from the
+            owner-only endpoint (never shipped in the page payload or any message). */}
+        {isPickup && isActive && order.status !== 'PENDING_PAYMENT' && (
+          <HandoverCodeCard
+            variant="pickup"
+            orderId={order.id}
+            status={order.status}
+            shopName={order.vendors?.shop_name ?? 'the counter'}
+            etaAt={order.pickup_eta_at}
+            readyAt={order.ready_at}
+            holdMinutes={pickupHoldMinutes}
+          />
+        )}
+
+        {/* Delivery handover code — shown to the customer once a rider is on the
+            job, unless they chose leave-at-gate. Flag-gated; absent in the DOM when
+            delivery_handover_v1 is off. */}
+        {!isPickup && features.delivery_handover_v1 === true && !order.leave_at_gate &&
+          ['RIDER_ASSIGNED', 'PICKED_UP'].includes(order.status) && (
+          <HandoverCodeCard
+            variant="delivery"
+            orderId={order.id}
+            status={order.status}
+            shopName={order.vendors?.shop_name ?? ''}
+            etaAt={null}
+            readyAt={null}
+            holdMinutes={pickupHoldMinutes}
+          />
+        )}
+
+        {/* Leave-at-gate notice (customer opted in → no code) */}
+        {!isPickup && order.leave_at_gate && ['RIDER_ASSIGNED', 'PICKED_UP'].includes(order.status) && (
+          <div className="lx-card-amber-soft rounded-2xl p-4 text-center lx-scale-in">
+            <p className="text-sm font-semibold text-amber-300">📷 Leave-at-gate</p>
+            <p className="text-xs text-white/55 mt-1">Your rider will drop your order at your gate — no code needed. You may get a proof photo.</p>
+          </div>
+        )}
+
+        {/* No-show — uncollected past the window: forfeited, vendor kept the food */}
+        {order.status === 'NO_SHOW' && (
+          <div className="rounded-2xl p-5 text-center lx-scale-in" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+            <p className="text-xs uppercase tracking-[0.18em] text-white/50 mb-1.5">⌛ Not collected</p>
+            <p className="text-base font-semibold text-amber-300">This pickup order wasn’t collected in time</p>
+            <p className="text-xs text-white/55 mt-2">It was prepared for you, so it isn’t refundable. You can order again any time.</p>
+          </div>
+        )}
+
         {/* Status timeline */}
         <div className="glass-thin p-5">
           <div className="lx-stagger space-y-0">
-            {STATUS_STEPS.filter((s) => !['PENDING_PAYMENT'].includes(s.key)).map((step, i, arr) => {
+            {(isPickup ? PICKUP_STEPS : STATUS_STEPS.filter((s) => !['PENDING_PAYMENT'].includes(s.key))).map((step, i, arr) => {
               const stepIdx = getStatusIndex(step.key)
               const done = statusIdx > stepIdx
               const current = statusIdx === stepIdx && step.key === order.status
@@ -547,4 +609,112 @@ function getTimestampForStatus(status: string, order: OrderDetail): string | nul
     CANCELLED: order.cancelled_at,
   }
   return map[status] ?? null
+}
+
+// Handover code: the customer's PRIVATE 6-char code for pickup (vendor) or
+// delivery (rider). Materialized only via the owner-only endpoint (never in the
+// page payload, an SMS, or any non-owner response — Invariant I3). The code is
+// issued ONCE and held on the device — it does NOT change as the order moves; only
+// the customer's "Refresh code" rotates it (the old one dies on the server). For
+// pickup, the 1h25m countdown is derived from the server's ready time + the
+// server-configured window; the client only displays it and cannot extend it (I7).
+function HandoverCodeCard({
+  orderId, status, shopName, etaAt, variant, readyAt, holdMinutes,
+}: {
+  orderId: string
+  status: string
+  shopName: string
+  etaAt: string | null
+  variant: 'pickup' | 'delivery'
+  readyAt: string | null
+  holdMinutes: number
+}) {
+  const [code, setCode] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [nowTs, setNowTs] = useState(() => Date.now())
+  const storeKey = `lx_handover_${orderId}`
+
+  // Issue (or rotate) a code — the ONLY thing that changes the code. Persists the
+  // raw code on the device so reopening the page shows the SAME code (the server
+  // keeps only a hash, so we never re-issue just to display it).
+  const issueCode = async () => {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch(`/api/orders/${orderId}/handover-code`, { method: 'POST', cache: 'no-store' })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.code) {
+        setCode(d.code as string)
+        try { localStorage.setItem(storeKey, d.code as string) } catch { /* private mode */ }
+      } else setErr(d.error ?? 'Could not load your code. Tap to retry.')
+    } catch { setErr('Could not load your code. Tap to retry.') }
+    finally { setBusy(false) }
+  }
+
+  // On mount: reuse the stored code if we have one (do NOT rotate); otherwise issue
+  // it once. Status changes never re-issue — the code stays put until Refresh.
+  useEffect(() => {
+    let stored: string | null = null
+    try { stored = localStorage.getItem(storeKey) } catch { /* private mode */ }
+    if (stored) setCode(stored)
+    else void issueCode()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId])
+
+  // Countdown (pickup only): server ready time + the server-configured hold window.
+  const deadlineMs = variant === 'pickup' && status === 'READY' && readyAt
+    ? new Date(readyAt).getTime() + holdMinutes * 60_000
+    : null
+  useEffect(() => {
+    if (!deadlineMs) return
+    const t = setInterval(() => setNowTs(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [deadlineMs])
+
+  const msLeft = deadlineMs ? deadlineMs - nowTs : null
+  const countdown = msLeft != null && msLeft > 0
+    ? `${Math.floor(msLeft / 60000)}:${String(Math.floor((msLeft % 60000) / 1000)).padStart(2, '0')}`
+    : msLeft != null ? '0:00' : null
+
+  return (
+    <div className="lx-card-amber-soft rounded-2xl p-5 text-center lx-scale-in" style={{ boxShadow: '0 0 40px rgba(245,166,35,0.1) inset' }}>
+      <p className="text-xs uppercase tracking-[0.18em] text-white/50 mb-1.5">
+        {variant === 'delivery'
+          ? 'Your delivery code'
+          : (status === 'READY' ? '🛍️ Ready! Show this code' : 'Your pickup code')}
+      </p>
+
+      {code ? (
+        <p className="lx-amber text-5xl font-bold tracking-[0.3em] tabular-nums">{code}</p>
+      ) : (
+        <button onClick={() => void issueCode()} disabled={busy} className="lx-amber text-2xl font-bold tracking-[0.2em] tabular-nums opacity-70">
+          {busy ? '••••••' : (err ? 'Tap to retry' : '••••••')}
+        </button>
+      )}
+
+      <p className="text-xs text-white/55 mt-2.5">
+        {variant === 'delivery'
+          ? <>Give this code to your rider at the door to confirm delivery.</>
+          : status === 'READY'
+            ? <>Show this at {shopName} to collect.</>
+            : <>We’ll buzz you when it’s ready.{etaAt && <> Expected ready ~{new Date(etaAt).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}.</>}</>}
+      </p>
+
+      {countdown && (
+        <p className="text-xs mt-2 text-amber-300/90 tabular-nums">
+          ⏳ Collect within <span className="font-semibold">{countdown}</span> — after that the order is forfeited (no refund).
+        </p>
+      )}
+
+      <p className="text-[11px] text-white/40 mt-3">
+        🔒 LumeX will never call to ask for this code. Show it only to the vendor in person.
+      </p>
+
+      <button onClick={() => void issueCode()} disabled={busy}
+        className="mt-2 text-[11px] underline text-white/55 disabled:opacity-40">
+        {busy ? 'Refreshing…' : 'Refresh code'}
+      </button>
+      {err && <p className="text-[11px] text-red-400 mt-1.5">{err}</p>}
+    </div>
+  )
 }

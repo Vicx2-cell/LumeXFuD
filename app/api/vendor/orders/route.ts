@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { settleDuePickupNoShows } from '@/lib/pickup'
 
 export async function GET() {
   const session = await getCurrentUser()
@@ -11,9 +12,15 @@ export async function GET() {
 
   const db = createSupabaseAdmin()
 
+  // Self-heal pickup no-shows for THIS vendor on every poll (the per-minute cron
+  // has been unreliable). Scoped + cheap; idempotent claim makes it safe.
+  if (session.role === 'vendor' && session.userId) {
+    void settleDuePickupNoShows(session.userId)
+  }
+
   const { data: vendor, error: ve } = await db
     .from('vendors')
-    .select('id, shop_name, status, paused_until, prep_time_minutes, opening_time, closing_time, logo_url, shop_photo_url')
+    .select('id, shop_name, status, paused_until, prep_time_minutes, opening_time, closing_time, logo_url, shop_photo_url, pickup_enabled, pickup_max_concurrent')
     .eq('id', session.userId!)
     .single()
 
@@ -24,10 +31,12 @@ export async function GET() {
     .select(`
       id, order_number, status, delivery_type, delivery_address,
       subtotal, total_amount, created_at, customer_id,
+      pickup_eta_at,
+      customers ( phone, name ),
       order_items ( id, name, quantity, price, notes, addons )
     `)
     .eq('vendor_id', vendor.id)
-    .not('status', 'in', '("COMPLETED","CANCELLED","REFUNDED")')
+    .not('status', 'in', '("COMPLETED","CANCELLED","REFUNDED","NO_SHOW")')
     .order('created_at', { ascending: false })
     .limit(30)
 
@@ -35,7 +44,7 @@ export async function GET() {
     .from('orders')
     .select('id, order_number, status, total_amount, created_at')
     .eq('vendor_id', vendor.id)
-    .in('status', ['COMPLETED', 'CANCELLED'])
+    .in('status', ['COMPLETED', 'CANCELLED', 'NO_SHOW'])
     .order('created_at', { ascending: false })
     .limit(10)
 

@@ -21,6 +21,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNum
       subtotal, platform_markup, delivery_fee, tip_amount, total_amount,
       vendor_accepted_at, preparing_at, ready_at, rider_assigned_at,
       picked_up_at, delivered_at, completed_at, cancelled_at, created_at,
+      pickup_eta_at, collected_at, no_show_at, delivery_photo_url,
       rider_auto_release_at, scheduled_for, pending_since, wallet_amount_kobo, paystack_reference,
       customer_id, guest_phone, vendor_id, rider_id,
       vendors ( shop_name, prep_time_minutes ),
@@ -31,6 +32,16 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNum
     .single()
 
   if (!order) notFound()
+
+  // leave_at_gate is from migration 073 — read it SEPARATELY and non-fatally so the
+  // order page never breaks on a DB where 073 hasn't been applied yet (the whole
+  // page would otherwise fail because one column in the main select is missing).
+  let leaveAtGate = false
+  {
+    const { data: lag } = await db.from('orders').select('leave_at_gate').eq('id', (order as { id: string }).id).maybeSingle()
+    leaveAtGate = !!(lag as { leave_at_gate?: boolean } | null)?.leave_at_gate
+  }
+  ;(order as { leave_at_gate?: boolean }).leave_at_gate = leaveAtGate
 
   // Self-healing: if this is a paid order the vendor never accepted in time,
   // cancel + refund it now (doesn't wait on the auto-cancel cron). Reflect the
@@ -92,6 +103,16 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNum
     } catch { /* not verified */ }
   }
 
+  // Pickup forfeit window (minutes) so the client can render the READY countdown
+  // from the server's value. Read the setting directly (avoids importing the heavy
+  // pickup lib chain); defaults to 85 (1h25m).
+  let pickupHoldMinutes = 85
+  if ((order as { delivery_type?: string }).delivery_type === 'PICKUP') {
+    const { data: s } = await db.from('settings').select('value').eq('id', 'pickup_hold_minutes').maybeSingle()
+    const m = Number((s as { value?: { minutes?: number } } | null)?.value?.minutes)
+    if (Number.isFinite(m) && m > 0) pickupHoldMinutes = m
+  }
+
   return (
     <main className="lx-page pb-24 overflow-hidden">
       <OrderStatusClient
@@ -99,6 +120,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNum
         canRate={canRate}
         alreadyRated={alreadyRated}
         riderVerified={riderVerified}
+        pickupHoldMinutes={pickupHoldMinutes}
       />
       <BottomNav />
     </main>
@@ -125,6 +147,11 @@ export interface OrderDetail {
   delivered_at: string | null
   completed_at: string | null
   cancelled_at: string | null
+  pickup_eta_at: string | null
+  leave_at_gate: boolean | null
+  delivery_photo_url: string | null
+  collected_at: string | null
+  no_show_at: string | null
   created_at: string
   rider_auto_release_at: string | null
   scheduled_for: string | null

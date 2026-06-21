@@ -182,11 +182,14 @@ export async function GET(req: NextRequest) {
   const frozenCount     = allRows.filter((r) => r.is_frozen).length
   const platformTotal   = totalWallet + customerFloat
 
-  // Paystack balance (best effort)
+  // Paystack balance + reconciliation are super-admin-grade (live provider balance
+  // and the platform float difference). Operational admins see wallet rows + last4,
+  // but NOT the live Paystack balance / reconciliation. (best effort)
+  const isSuper = session.role === 'super_admin'
   let paystackBalance: number | null = null
   try {
     const secret = process.env.PAYSTACK_SECRET_KEY
-    if (secret) {
+    if (isSuper && secret) {
       const psRes = await fetch('https://api.paystack.co/balance', {
         headers: { Authorization: `Bearer ${secret}` },
         signal: AbortSignal.timeout(8_000),

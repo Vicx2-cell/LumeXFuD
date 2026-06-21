@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { withCronHealth } from '@/lib/cron-health'
+import { withCronHealth, verifyCronSecret } from '@/lib/cron-health'
 import { refundOrderPayments } from '@/lib/order-refund'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { audit } from '@/lib/audit'
 import { getControls } from '@/lib/controls'
+import { settleDuePickupNoShows } from '@/lib/pickup'
 
 // Called every minute by Vercel cron (vercel.json: "*/1 * * * *").
 // A vendor must accept a PENDING order within 5 minutes. Past that, the
@@ -28,18 +29,22 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(req.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const db = createSupabaseAdmin()
 
+  // Pickup (order ahead): settle READY orders past their no-show window in the
+  // same per-minute pass (vendor keeps payment, customer forfeits). Independent of
+  // the accept-window logic below, so it runs even if auto-cancel is disabled.
+  const noShow = await settleDuePickupNoShows()
+
   // `orders.autoCancelMinutes` (LumeX Control spec) — single enforcement point.
   // 0 = disabled (never auto-cancel). Defaults to 5 min if unset.
   const autoCancelMinutes = (await getControls()).auto_cancel_minutes
   if (autoCancelMinutes <= 0) {
-    return NextResponse.json({ cancelled: 0, skipped: 'auto-cancel disabled' })
+    return NextResponse.json({ cancelled: 0, no_show: noShow, skipped: 'auto-cancel disabled' })
   }
   const cutoff = new Date(Date.now() - autoCancelMinutes * 60 * 1000).toISOString()
 
@@ -61,7 +66,7 @@ export async function POST(req: NextRequest) {
 
   const orders = (ordersRaw ?? []) as unknown as PendingOrder[]
   if (orders.length === 0) {
-    return NextResponse.json({ cancelled: 0 })
+    return NextResponse.json({ cancelled: 0, no_show: noShow })
   }
 
   let cancelled = 0
@@ -140,5 +145,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ cancelled, failed })
+  return NextResponse.json({ cancelled, failed, no_show: noShow })
 }

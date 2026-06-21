@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { withCronHealth } from '@/lib/cron-health'
+import { withCronHealth, verifyCronSecret } from '@/lib/cron-health'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { renderTemplate } from '@/lib/notify-templates'
 import { audit } from '@/lib/audit'
@@ -31,8 +31,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(req.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

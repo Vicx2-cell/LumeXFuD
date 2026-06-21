@@ -12,6 +12,8 @@ import { renderTemplate } from '@/lib/notify-templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { getFeature } from '@/lib/features'
 import { getControls, withinHours } from '@/lib/controls'
+import { computePickupEta, countActivePickups } from '@/lib/pickup'
+import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
 
 // Allowed delivery types from settings
 const DELIVERY_FEES: Record<string, number> = {
@@ -58,15 +60,40 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid order data', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { vendor_id, items, delivery_type, delivery_address, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id } = parsed.data
+  const { vendor_id, items, delivery_type, delivery_address, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate } = parsed.data
   const isScheduled = !!scheduled_for
+  const isPickup = delivery_type === 'PICKUP'
   const hasCoords = typeof delivery_latitude === 'number' && typeof delivery_longitude === 'number'
   const db = createSupabaseAdmin()
+
+  // ── Pickup (order ahead) gates ──────────────────────────────────────────────
+  // Master switch + no scheduling/group/coords for the first version (keeps the
+  // pickup money path simple: pay now, cook now, collect with a code).
+  if (isPickup) {
+    if (!(await getFeature('pickup_v1'))) {
+      return NextResponse.json({ error: 'Pickup is not available right now.' }, { status: 503 })
+    }
+    // Binding consent (Invariant I8): the 1h25m agreement must be explicitly
+    // ticked before the Pay button — enforce it server-side too, never trust the
+    // client to have shown it.
+    if (pickup_agreement !== true) {
+      return NextResponse.json({ error: 'Please accept the pickup terms (once ready, your order is held 1h25m then forfeited) to continue.' }, { status: 400 })
+    }
+    if (isScheduled) {
+      return NextResponse.json({ error: 'Scheduling isn’t available for pickup yet.' }, { status: 400 })
+    }
+    if (group_order_id) {
+      return NextResponse.json({ error: 'Group orders can’t use pickup yet.' }, { status: 400 })
+    }
+  } else if (!delivery_address || delivery_address.trim().length < 5) {
+    // Delivery orders still need a real address (pickup synthesizes its own).
+    return NextResponse.json({ error: 'A delivery address is required.' }, { status: 400 })
+  }
 
   // Validate vendor
   const { data: vendor, error: vendorError } = await db
     .from('vendors')
-    .select('id, shop_name, status, is_active, subscription_paid_until, prep_time_minutes')
+    .select('id, shop_name, status, is_active, subscription_paid_until, prep_time_minutes, pickup_enabled, pickup_max_concurrent')
     .eq('id', vendor_id)
     .is('deleted_at', null)
     .single()
@@ -80,6 +107,10 @@ export async function POST(req: NextRequest) {
   // A currently-CLOSED vendor can still take a SCHEDULED order for later.
   if (vendor.status === 'CLOSED' && !isScheduled) {
     return NextResponse.json({ error: 'Vendor is currently closed' }, { status: 400 })
+  }
+  // Vendor must opt in to pickup (defaults on; they can disable per migration 072).
+  if (isPickup && vendor.pickup_enabled === false) {
+    return NextResponse.json({ error: 'This vendor isn’t offering pickup right now.' }, { status: 400 })
   }
 
   // ── Scheduling validation (prepaid pre-order) ───────────────────────────────
@@ -194,15 +225,21 @@ export async function POST(req: NextRequest) {
     return v !== undefined && Number.isFinite(v) ? v : fallback
   }
 
+  // PICKUP charges the SAME platform fee as delivery (platform_markup); delivery
+  // is ₦0 and there's no rider/tip. Keeping it in platform_markup means the
+  // existing earnings + payout code (platform_markup → platform, subtotal →
+  // vendor) works unchanged.
   const platformMarkup: number = kobo('platform_markup', 25000) // ₦250 in kobo
   const bikeFee: number = kobo('delivery_fee_bike', DELIVERY_FEES.BIKE)
   const doorFee: number = kobo('delivery_fee_door', DELIVERY_FEES.DOOR)
-  const deliveryFee: number = delivery_type === 'BIKE' ? bikeFee : doorFee
-  const riderCut: number = delivery_type === 'BIKE'
-    ? kobo('rider_delivery_cut_bike', 40000)
-    : kobo('rider_delivery_cut_door', 80000)
+  const deliveryFee: number = isPickup ? 0 : delivery_type === 'BIKE' ? bikeFee : doorFee
+  const riderCut: number = isPickup
+    ? 0
+    : delivery_type === 'BIKE'
+      ? kobo('rider_delivery_cut_bike', 40000)
+      : kobo('rider_delivery_cut_door', 80000)
   const platformDeliveryCut: number = deliveryFee - riderCut
-  const tipKobo: number = Math.max(0, Math.min(tip_amount ?? 0, 50000))
+  const tipKobo: number = isPickup ? 0 : Math.max(0, Math.min(tip_amount ?? 0, 50000))
 
   let subtotal = 0
   items.forEach((item, idx) => {
@@ -220,6 +257,23 @@ export async function POST(req: NextRequest) {
   }
 
   const totalAmount = subtotal + platformMarkup + deliveryFee + tipKobo
+
+  // ── Pickup specifics: synthetic address, pacing-aware ETA ───────────────────
+  // The handover code is NOT created here. It is a HASHED, owner-pull secret
+  // (lib/handover-code.ts) materialized to the customer via the owner-only
+  // /api/orders/[id]/handover-code endpoint — never persisted in the clear.
+  const resolvedAddress = isPickup ? `Pickup at ${vendor.shop_name}` : delivery_address!
+  let pickupEtaIso: string | null = null
+  if (isPickup) {
+    const activeCount = await countActivePickups(db, vendor_id)
+    const eta = computePickupEta(
+      new Date(),
+      (vendor.prep_time_minutes as number) ?? 20,
+      activeCount,
+      (vendor.pickup_max_concurrent as number) ?? 0,
+    )
+    pickupEtaIso = eta.toISOString()
+  }
 
   // Generate order number
   const orderNumber = await generateOrderNumber()
@@ -242,6 +296,19 @@ export async function POST(req: NextRequest) {
   }
 
   const customerId: string | null = c?.id ?? null
+
+  // Pickup no-show ban (repeat-abuse guard). Non-fatal read so it degrades
+  // gracefully if migration 073 hasn't run (missing column → treated as not banned).
+  if (isPickup && customerId) {
+    const { data: pb } = await db.from('customers').select('pickup_banned').eq('id', customerId).maybeSingle()
+    if ((pb as { pickup_banned?: boolean } | null)?.pickup_banned) {
+      return NextResponse.json(
+        { error: 'Pickup is paused on your account after repeated missed collections. You can still order delivery.' },
+        { status: 403 },
+      )
+    }
+  }
+
   const customerPhone = session.phone
   // Paystack validates the email's TLD — ".fud" is not a real TLD and is
   // rejected ("Invalid Email Address Passed"), which fails EVERY order. Use the
@@ -300,7 +367,7 @@ export async function POST(req: NextRequest) {
     vendor_id,
     status: 'PENDING_PAYMENT',
     delivery_type,
-    delivery_address,
+    delivery_address: resolvedAddress,
     delivery_instructions: delivery_instructions ?? null,
     subtotal,
     platform_markup: platformMarkup,
@@ -318,9 +385,20 @@ export async function POST(req: NextRequest) {
     scheduled_for: scheduledForIso,
     scheduled_release_at: scheduledReleaseIso,
   }
+  // Pickup fields (omitted entirely for delivery orders so the insert never
+  // references the new columns when migration 072 hasn't run on an old order).
+  // No code here — it is issued, hashed, on owner-pull (see above).
+  if (isPickup) {
+    orderInsert.pickup_eta_at = pickupEtaIso
+  }
   // Only include the column when actually linking, so a normal order never
   // references group_order_id and can't break if migration 065 hasn't run yet.
   if (linkedGroupId) orderInsert.group_order_id = linkedGroupId
+  // Delivery leave-at-gate: code waived at the door, photo proof instead. Only
+  // meaningful when the handover flag is on; ignored otherwise (flag-clean).
+  if (!isPickup && leave_at_gate === true && (await getFeature('delivery_handover_v1'))) {
+    orderInsert.leave_at_gate = true
+  }
 
   const { data: order, error: orderError } = await db
     .from('orders')
@@ -377,11 +455,28 @@ export async function POST(req: NextRequest) {
   })
   await db.from('order_items').insert(orderItems)
 
+  // Record the customer's binding place-order consent (Invariant I8) against the
+  // current terms version. Append-only; fire-and-forget so it never blocks checkout.
+  if (customerId) {
+    const consentMeta = {
+      ipAddress: req.headers.get('x-forwarded-for') ?? undefined,
+      userAgent: req.headers.get('user-agent') ?? undefined,
+    }
+    if (isPickup) {
+      void recordConsent({ actorId: customerId, role: 'customer', action: CONSENT_ACTIONS.PICKUP_PLACE, orderId: order.id, ...consentMeta })
+    } else {
+      void recordConsent({ actorId: customerId, role: 'customer', action: CONSENT_ACTIONS.DELIVERY_PLACE, orderId: order.id, ...consentMeta })
+      if (orderInsert.leave_at_gate === true) {
+        void recordConsent({ actorId: customerId, role: 'customer', action: CONSENT_ACTIONS.LEAVE_AT_GATE, orderId: order.id, ...consentMeta })
+      }
+    }
+  }
+
   // Remember this lodge so the cart can pre-fill it next time (fire-and-forget;
   // no-ops if migration 050 hasn't run). The system "gets used to" where the
   // customer orders by bumping a per-address use count, and pins it if the
   // student shared GPS (migration 052).
-  if (customerId) {
+  if (customerId && !isPickup) {
     db.rpc('remember_customer_address', {
       p_customer_id: customerId,
       p_address: delivery_address,
@@ -472,7 +567,7 @@ export async function POST(req: NextRequest) {
 
     if (!isScheduled) {
       await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, totalAmount, appUrl)
-      await notifyGroupSplitPaid(db, { groupOrderId: linkedGroupId, orderNumber, deliveryAddress: delivery_address, appUrl, hostId: customerId!, shareByCid })
+      await notifyGroupSplitPaid(db, { groupOrderId: linkedGroupId, orderNumber, deliveryAddress: resolvedAddress, appUrl, hostId: customerId!, shareByCid })
     }
     return NextResponse.json({ order_number: orderNumber, payment_method: 'GROUP_SPLIT', paid: true, scheduled: isScheduled })
   }
@@ -523,7 +618,7 @@ export async function POST(req: NextRequest) {
       await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, totalAmount, appUrl)
       // Wallet orders are paid right here (no webhook), so tell the group now.
       if (linkedGroupId) {
-        await notifyGroupOrderPlaced(db, { groupOrderId: linkedGroupId, orderNumber, deliveryAddress: delivery_address, appUrl })
+        await notifyGroupOrderPlaced(db, { groupOrderId: linkedGroupId, orderNumber, deliveryAddress: resolvedAddress, appUrl })
       }
     }
 

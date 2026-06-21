@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
-import { withCronHealth } from '@/lib/cron-health'
+import { withCronHealth, verifyCronSecret } from '@/lib/cron-health'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { gatherSnapshot, type SentinelSnapshot } from '@/lib/sentinel'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
@@ -41,7 +41,7 @@ async function firstAction(snapshot: SentinelSnapshot): Promise<string | null> {
 }
 
 async function handle(req: NextRequest): Promise<NextResponse> {
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(req.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

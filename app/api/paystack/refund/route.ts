@@ -46,45 +46,74 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   }
 
-  if (order.payment_status !== 'PAID') {
-    return NextResponse.json({ error: 'Order was not paid' }, { status: 400 })
+  // Only card-paid orders are refundable here, and only until fully refunded.
+  if (order.payment_status !== 'PAID' && order.payment_status !== 'PARTIALLY_REFUNDED') {
+    return NextResponse.json({ error: 'Order is not in a refundable state' }, { status: 400 })
+  }
+  if (!order.paystack_reference) {
+    return NextResponse.json({ error: 'Order has no card payment to refund' }, { status: 400 })
   }
 
-  const refundAmount = amount ?? (order.total_amount as number)
-  if (refundAmount > (order.total_amount as number)) {
-    return NextResponse.json({ error: 'Refund exceeds order total' }, { status: 400 })
+  // Sum refunds already issued (all but FAILED): cap at the REMAINING balance and
+  // decide step-up on the CUMULATIVE amount so a split ≥₦50k still trips re-auth.
+  const { data: priorRows } = await db
+    .from('refunds').select('amount_kobo').eq('order_id', order.id).neq('status', 'FAILED')
+  const priorRefunded = (priorRows ?? []).reduce((s, r) => s + Number(r.amount_kobo), 0)
+  const remaining = (order.total_amount as number) - priorRefunded
+
+  const refundAmount = amount ?? remaining
+  if (refundAmount <= 0 || refundAmount > remaining) {
+    return NextResponse.json({ error: 'Refund exceeds remaining refundable amount' }, { status: 400 })
   }
 
-  // Rule #28: re-authenticate (fresh login PIN) for any refund ≥ ₦50,000.
+  // Rule #28: re-auth once the CUMULATIVE refund on this order reaches ₦50,000.
   const reauthPin = (body as Record<string, unknown> | null)?.reauth_pin
-  const stepUp = await requireStepUpForAmount(session, refundAmount, reauthPin)
+  const stepUp = await requireStepUpForAmount(session, priorRefunded + refundAmount, reauthPin)
   if (!stepUp.ok) {
     return NextResponse.json({ error: stepUp.error, reauth_required: true }, { status: stepUp.status })
   }
 
-  // Trigger Paystack refund
-  await refundTransaction(order.paystack_reference as string, refundAmount)
-
-  // Record refund (column is amount_kobo — surface a write failure rather than
-  // leaving an issued refund with no ledger row, per rule #30)
-  const { error: refundInsertErr } = await db.from('refunds').insert({
-    order_id: order.id,
-    paystack_transaction_reference: order.paystack_reference,
-    amount_kobo: refundAmount,
-    reason,
-    status: 'PROCESSING',
-    triggered_by: session.phone,
+  // Atomic reserve: locks the order, re-checks the cap under the lock, writes the
+  // refunds ledger row, and flips payment_status — the duplicate-call guard.
+  const { data: reserved, error: reserveErr } = await db.rpc('reserve_order_refund', {
+    p_order_id: order.id, p_amount_kobo: refundAmount, p_reason: reason,
+    p_triggered_by: session.phone, p_reference: order.paystack_reference,
   })
-  if (refundInsertErr) {
-    console.error('[paystack/refund] refunds ledger insert failed:', refundInsertErr.message)
-    return NextResponse.json({ error: 'Refund issued but failed to record — investigate immediately' }, { status: 500 })
+  if (reserveErr) {
+    console.error('[paystack/refund] reserve_order_refund RPC error:', reserveErr.message)
+    return NextResponse.json({ error: 'Could not record refund' }, { status: 500 })
+  }
+  const row = (reserved as Array<{ refund_id: string; success: boolean; error_code: string | null; fully_refunded: boolean }>)[0]
+  if (!row?.success) {
+    const map: Record<string, [number, string]> = {
+      NOT_FOUND: [404, 'Order not found'], NOT_REFUNDABLE: [400, 'Order is not in a refundable state'],
+      INVALID_AMOUNT: [400, 'Invalid refund amount'], EXCEEDS_TOTAL: [400, 'Refund exceeds order total'],
+    }
+    const [st, msg] = map[row?.error_code ?? ''] ?? [409, 'Refund could not be processed']
+    return NextResponse.json({ error: msg }, { status: st })
   }
 
-  // Update order
-  await db
-    .from('orders')
-    .update({ status: 'REFUNDED', updated_at: new Date().toISOString() })
-    .eq('id', order.id)
+  // External money movement AFTER the ledger reservation; compensate on failure.
+  try {
+    await refundTransaction(order.paystack_reference as string, refundAmount)
+  } catch (err) {
+    console.error('[paystack/refund] Paystack refund failed, compensating:', err)
+    const { error: compErr } = await db.rpc('fail_order_refund', {
+      p_refund_id: row.refund_id,
+      p_reason: 'Paystack refund request failed',
+    })
+    if (compErr) {
+      // Compensation failed → order stuck PARTIALLY_REFUNDED with no money out.
+      // Money-path inconsistency: log loudly now, wire to the #8 alert later.
+      console.error('[paystack/refund] fail_order_refund compensation failed:', compErr.message)
+    }
+    return NextResponse.json({ error: 'Refund could not be initiated with the payment provider' }, { status: 502 })
+  }
+
+  // Full refund → flip the order workflow status too (parity with prior behaviour).
+  if (row.fully_refunded) {
+    await db.from('orders').update({ status: 'REFUNDED', updated_at: new Date().toISOString() }).eq('id', order.id)
+  }
 
   // Record as platform cost (fire-and-forget)
   void recordPlatformEarning({

@@ -1,5 +1,17 @@
 import { createSupabaseAdmin } from './supabase/server'
 import type { NextResponse } from 'next/server'
+import { constantTimeEqual } from './security'
+
+/**
+ * Validate a cron request's Authorization header against CRON_SECRET in constant
+ * time (avoids a byte-by-byte timing side-channel on `!==`). Returns false when
+ * the secret is unset or the header is missing/wrong. Used by every /api/cron/*.
+ */
+export function verifyCronSecret(authHeader: string | null): boolean {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return false
+  return constantTimeEqual(authHeader ?? '', `Bearer ${secret}`)
+}
 
 // Cron health tracking. Vercel invokes every cron via GET on a schedule; we wrap
 // that GET entrypoint with `withCronHealth` so each run stamps a heartbeat row in

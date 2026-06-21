@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { normalizePhone } from '@/lib/phone'
+import { normalizePhone, maskPhone } from '@/lib/phone'
 import { generateTempPin, hashSecret } from '@/lib/pin-auth'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { getFeature } from '@/lib/features'
+import { audit } from '@/lib/audit'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { isPhoneBlocked } from '@/lib/blocklist'
 import { z } from 'zod'
@@ -90,6 +91,16 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await db.from('vendors').insert(insert).select('id').single()
     if (error || !data) return NextResponse.json({ error: 'Failed to create vendor' }, { status: 500 })
+
+    await audit({
+      actor_id: user.phone,
+      actor_role: user.role,
+      action: 'vendor_created',
+      target_table: 'vendors',
+      target_id: data.id as string,
+      new_value: { shop_name, owner_name, phone: maskPhone(normalized) },
+      ip_address: req.headers.get('x-forwarded-for') ?? undefined,
+    })
 
     const message = `Hi, your LumeX Fud vendor account is ready! Login at ${process.env.NEXT_PUBLIC_APP_URL ?? 'https://lumexfud.com.ng'} with your number ${normalized} and PIN: ${tempPin}. You will be asked to change your PIN on first login.`
 

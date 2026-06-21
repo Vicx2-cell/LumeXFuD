@@ -23,8 +23,11 @@ export const createOrderInput = z.object({
       addons: z.array(z.string().uuid()).max(20).optional().default([]),
     })
   ).min(1).max(50),
-  delivery_type: z.enum(['BIKE', 'DOOR']),
-  delivery_address: z.string().min(5).max(500),
+  // PICKUP = order ahead / skip the queue (no rider, ₦0 delivery). For PICKUP the
+  // delivery_address is optional (the route synthesizes "Pickup at <shop>"); for
+  // BIKE/DOOR the route still requires a real address.
+  delivery_type: z.enum(['BIKE', 'DOOR', 'PICKUP']),
+  delivery_address: z.string().min(5).max(500).optional(),
   delivery_instructions: z.string().max(300).optional(),
   tip_amount: z.number().int().min(0).max(50000).optional().default(0),
   // How the customer intends to pay. The wallet split is ALWAYS recomputed
@@ -42,6 +45,12 @@ export const createOrderInput = z.object({
   // Optional: the group order this checkout finalizes. Server verifies the caller
   // is that group's host before linking; participants are notified once paid.
   group_order_id: z.string().uuid().nullable().optional(),
+  // Binding consent (Invariant I8). For PICKUP this is the explicit tick of the
+  // 1h25m agreement and is REQUIRED server-side; for delivery it records the
+  // place-order agreement. Recorded append-only against the current terms version.
+  pickup_agreement: z.boolean().optional(),
+  // Customer opts to waive the door code for a DELIVERY order (leave-at-gate).
+  leave_at_gate: z.boolean().optional(),
 })
 
 export const orderStatusInput = z.object({
@@ -70,6 +79,16 @@ export const orderMessageInput = z.object({
   message: z.string().min(1).max(500),
 })
 
+// A fulfiller (vendor at pickup, rider at the door) enters the customer's 6-char
+// handover code. Entering the correct code is the ONLY trigger that releases the
+// held funds (Invariants I2/I3). Crockford-Base32 alphabet, case-insensitive;
+// the engine normalizes + rejects anything outside the safe alphabet.
+export const handoverCodeInput = z.object({
+  code: z.string().trim().min(6).max(12).regex(/^[0-9A-Za-z-]+$/, 'Enter the 6-character code'),
+})
+// Back-compat alias for the existing pickup collect route import.
+export const pickupCollectInput = handoverCodeInput
+
 // ─── Vendors ──────────────────────────────────────────────────────────────────
 
 export const vendorStatusInput = z.object({
@@ -78,6 +97,15 @@ export const vendorStatusInput = z.object({
 
 export const vendorPauseInput = z.object({
   minutes: z.enum(['15', '30', '60']),
+})
+
+// Vendor pickup (order ahead) settings: opt out of pickup, and a pacing cap on
+// simultaneous pickup orders (0 = no cap). Both optional — only sent keys change.
+export const vendorPickupSettingsInput = z.object({
+  pickup_enabled:        z.boolean().optional(),
+  pickup_max_concurrent: z.number().int().min(0).max(100).optional(),
+}).refine((v) => v.pickup_enabled !== undefined || v.pickup_max_concurrent !== undefined, {
+  message: 'Nothing to update',
 })
 
 // Opening / closing time for a vendor or rider. "HH:MM" 24-hour (Africa/Lagos),

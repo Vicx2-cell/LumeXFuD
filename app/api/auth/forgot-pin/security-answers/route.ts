@@ -4,6 +4,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { forgotPinSecurityAnswersInput } from '@/lib/validators'
 import { compareSecret, findAuthUserByPhone, hashSecret, logPinResetAudit, normalizeSecurityAnswer, validatePin } from '@/lib/pin-auth'
 import { rateLimitForgotPinQuestions } from '@/lib/rate-limit'
+import { safeNormalizePhone } from '@/lib/phone'
 
 const LOCKOUT_ATTEMPTS = 3
 const LOCKOUT_DURATION_MS = 24 * 60 * 60 * 1000
@@ -12,7 +13,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { phone, answer_1, answer_2, new_pin } = forgotPinSecurityAnswersInput.parse(body)
-    const normalizedPhone = phone.trim()
+    // Normalize to E.164 BEFORE keying the limiter (match /auth/login): otherwise
+    // format variants (+234.../0.../spaces) land in separate Upstash buckets and
+    // multiply the per-hour allowance against one account.
+    const normalizedPhone = safeNormalizePhone(phone) ?? phone.trim()
 
     const rate = await rateLimitForgotPinQuestions(normalizedPhone)
     if (!rate.success) {

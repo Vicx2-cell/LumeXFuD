@@ -52,6 +52,35 @@ export async function GET(req: NextRequest) {
 
   const txs = (txsRaw ?? []) as unknown as WalletTransaction[]
 
+  // ── Enrich each order-linked transaction with the people on that order ───────
+  // So a vendor sees the RIDER they worked with (and vice-versa) on each payout —
+  // profile + contact — straight from the transaction record.
+  const orderIds = Array.from(new Set(txs.map((t) => t.order_id).filter(Boolean))) as string[]
+  type Party = { name: string; phone: string | null; avatar: string | null }
+  const vendorByOrder = new Map<string, Party>()
+  const riderByOrder = new Map<string, Party>()
+  if (orderIds.length) {
+    const { data: ordersRaw } = await db
+      .from('orders')
+      .select('id, vendor_id, rider_id')
+      .in('id', orderIds)
+    const orders = (ordersRaw ?? []) as Array<{ id: string; vendor_id: string | null; rider_id: string | null }>
+    const vIds = Array.from(new Set(orders.map((o) => o.vendor_id).filter(Boolean))) as string[]
+    const rIds = Array.from(new Set(orders.map((o) => o.rider_id).filter(Boolean))) as string[]
+    const [vRes, rRes] = await Promise.all([
+      vIds.length ? db.from('vendors').select('id, shop_name, phone, logo_url').in('id', vIds) : Promise.resolve({ data: [] }),
+      rIds.length ? db.from('riders').select('id, full_name, phone, avatar_url').in('id', rIds) : Promise.resolve({ data: [] }),
+    ])
+    const vMap = new Map(((vRes.data ?? []) as Array<{ id: string; shop_name: string; phone: string | null; logo_url: string | null }>)
+      .map((v) => [v.id, { name: v.shop_name, phone: v.phone, avatar: v.logo_url } as Party]))
+    const rMap = new Map(((rRes.data ?? []) as Array<{ id: string; full_name: string; phone: string | null; avatar_url: string | null }>)
+      .map((r) => [r.id, { name: r.full_name, phone: r.phone, avatar: r.avatar_url } as Party]))
+    for (const o of orders) {
+      if (o.vendor_id && vMap.has(o.vendor_id)) vendorByOrder.set(o.id, vMap.get(o.vendor_id)!)
+      if (o.rider_id && rMap.has(o.rider_id)) riderByOrder.set(o.id, rMap.get(o.rider_id)!)
+    }
+  }
+
   const rows = txs.map((tx) => ({
     id:          tx.id,
     type:        tx.type,
@@ -65,6 +94,9 @@ export async function GET(req: NextRequest) {
     reference:   tx.reference,
     balance_after: formatPrice(tx.balance_after),
     created_at:  tx.created_at,
+    // The people on this order (whichever exist) — profile + contact.
+    vendor:      tx.order_id ? vendorByOrder.get(tx.order_id) ?? null : null,
+    rider:       tx.order_id ? riderByOrder.get(tx.order_id) ?? null : null,
     // Tamper-evident verification stamp for this receipt.
     receipt_code: receiptCode({ id: tx.id, reference: tx.reference, amount: tx.amount, type: tx.type, created_at: tx.created_at }),
   }))

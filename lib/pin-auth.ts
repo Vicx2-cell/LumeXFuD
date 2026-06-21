@@ -39,13 +39,9 @@ export interface AuthUserRow {
   recovery_locked_until: string | null
 }
 
-export const SECURITY_QUESTIONS = [
-  'What was the name of your first pet?',
-  "What is your mother's maiden name?",
-  'What was the name of your primary school?',
-  'What is your favorite food?',
-  'What city were you born in?',
-] as const
+// Re-exported from a client-safe module so client components can import the
+// constant without dragging in this server-only module (see lib/security-questions.ts).
+export { SECURITY_QUESTIONS } from './security-questions'
 
 export function validatePin(pin: string) {
   if (!/^[0-9]{6}$/.test(pin)) {

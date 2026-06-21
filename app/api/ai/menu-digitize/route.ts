@@ -100,8 +100,13 @@ export async function POST(req: NextRequest) {
   if (audio.length > 0 && !process.env.GEMINI_API_KEY) {
     return NextResponse.json({ error: 'Voice menus need Gemini configured. Add a photo instead, or contact support.' }, { status: 503 })
   }
-  // Photo/text-only path: the active provider must be usable.
-  if (audio.length === 0 && !(await isAIAvailable('menu'))) {
+  // Photo path is pinned to Anthropic (never the free tier — a menu photo could be
+  // an ID card). Without an Anthropic key the photo path can't run safely.
+  if (audio.length === 0 && images.length > 0 && !process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: 'Photo menus need our secure AI provider configured. Contact support.' }, { status: 503 })
+  }
+  // Text-only path: the active provider must be usable.
+  if (audio.length === 0 && images.length === 0 && !(await isAIAvailable('menu'))) {
     return NextResponse.json({ error: 'AI is not configured yet.' }, { status: 503 })
   }
 
@@ -121,7 +126,7 @@ export async function POST(req: NextRequest) {
   try {
     provider = await resolveProviderForRequest(baseReq, 'menu')
   } catch {
-    return NextResponse.json({ error: 'Voice menus need Gemini configured.' }, { status: 503 })
+    return NextResponse.json({ error: 'The menu reader is not available for this request right now.' }, { status: 503 })
   }
 
   // ── Parse → one retry → deterministic fallback (existing Zod pipeline) ────────

@@ -10,6 +10,8 @@ import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
 import { BusinessHours } from '@/components/business-hours'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
+import { useFeatures } from '@/lib/use-features'
+import { waLink } from '@/lib/contact'
 
 type RiderStatus = 'ONLINE' | 'OFFLINE' | 'BUSY'
 
@@ -32,8 +34,11 @@ interface CurrentOrder {
   delivery_address: string
   rider_delivery_cut: number
   picked_up_at: string | null
+  leave_at_gate: boolean | null
+  delivery_photo_url: string | null
   vendors: { shop_name: string; phone: string } | null
   customers: { phone: string; name: string | null; avatar_url: string | null } | null
+  order_items: { name: string; quantity: number }[] | null
 }
 
 interface WalletBalance {
@@ -78,6 +83,7 @@ const TRUST_COLORS: Record<string, string> = {
 }
 
 export default function RiderDashboard() {
+  const features = useFeatures()
   const [rider, setRider] = useState<{
     id: string
     full_name: string
@@ -242,6 +248,31 @@ export default function RiderDashboard() {
     }
   }
 
+  // Delivery handover: confirm with the customer's code, or (if they opted into
+  // leave-at-gate) confirm the drop. Returns an error string on failure.
+  async function confirmDelivery(orderId: string, payload: { code?: string; leave_at_gate?: boolean }): Promise<string | null> {
+    setUpdatingStatus(true)
+    try {
+      const res = await fetch(`/api/orders/${orderId}/deliver`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const d = await res.json().catch(() => ({})) as { error?: string }
+      if (res.ok) { showToast('Delivery confirmed'); await fetchData(); return null }
+      return d.error ?? 'Could not confirm delivery.'
+    } catch { return 'Network error. Please try again.' }
+    finally { setUpdatingStatus(false) }
+  }
+
+  // OPTIONAL leave-at-gate proof photo upload (never required).
+  async function uploadGatePhoto(orderId: string, file: File): Promise<string | null> {
+    const form = new FormData(); form.append('file', file)
+    const res = await fetch(`/api/orders/${orderId}/delivery-photo`, { method: 'POST', body: form })
+    const d = await res.json().catch(() => ({})) as { error?: string }
+    if (res.ok) { showToast('Proof photo added'); await fetchData(); return null }
+    return d.error ?? 'Could not upload photo.'
+  }
+
   if (loading) {
     return (
       <div className="lx-page px-4 py-6 space-y-4">
@@ -364,6 +395,7 @@ export default function RiderDashboard() {
               </div>
               {current.customers && (
                 <div className="flex items-center gap-2 text-sm text-white/65">
+                  <span className="text-[10px] uppercase tracking-wide text-white/35 shrink-0 w-14">Customer</span>
                   {current.customers.avatar_url ? (
                     <div className="relative w-7 h-7 rounded-full overflow-hidden shrink-0" style={{ border: '1px solid rgba(255,255,255,0.15)' }}>
                       <Image src={current.customers.avatar_url} alt="" fill className="object-cover" sizes="28px" />
@@ -372,12 +404,23 @@ export default function RiderDashboard() {
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/40" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                   )}
                   <a href={`tel:${current.customers.phone}`} className="text-amber-400">{current.customers.name ?? current.customers.phone}</a>
+                  <a
+                    href={waLink(current.customers.phone, `Hi${current.customers.name ? ' ' + current.customers.name.split(' ')[0] : ''}, I’m your LumeX rider for order #${current.order_number}. I’m on my way!`)}
+                    target="_blank" rel="noopener noreferrer"
+                    className="ml-auto text-[11px] px-2 py-1 rounded-lg font-medium shrink-0" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366' }}
+                  >WhatsApp</a>
                 </div>
               )}
               {current.vendors?.phone && (
                 <div className="flex items-center gap-2 text-sm text-white/65">
+                  <span className="text-[10px] uppercase tracking-wide text-white/35 shrink-0 w-14">Vendor</span>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/40" aria-hidden="true"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M2 7h20"/><path d="M12 22V12"/></svg>
-                  <a href={`tel:${current.vendors.phone}`} className="text-amber-400">{current.vendors.phone}</a>
+                  <a href={`tel:${current.vendors.phone}`} className="text-amber-400 truncate">{current.vendors.phone}</a>
+                  <a
+                    href={waLink(current.vendors.phone, `Hi, I’m the LumeX rider for order #${current.order_number}. Is it ready for pickup?`)}
+                    target="_blank" rel="noopener noreferrer"
+                    className="ml-auto text-[11px] px-2 py-1 rounded-lg font-medium shrink-0" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366' }}
+                  >WhatsApp</a>
                 </div>
               )}
               <div className="flex items-center gap-2 text-sm">
@@ -396,14 +439,23 @@ export default function RiderDashboard() {
               </button>
             )}
             {current.status === 'PICKED_UP' && (
-              <button
-                onClick={() => updateOrderStatus(current.id, 'DELIVERED')}
-                disabled={updatingStatus}
-                className="w-full py-3 rounded-xl font-semibold text-sm disabled:opacity-50"
-                style={{ background: '#22C55E', color: '#000' }}
-              >
-                {updatingStatus ? 'Updating…' : 'Mark as Delivered'}
-              </button>
+              features.delivery_handover_v1 === true ? (
+                <DeliverPanel
+                  order={current}
+                  busy={updatingStatus}
+                  onConfirm={confirmDelivery}
+                  onUploadPhoto={uploadGatePhoto}
+                />
+              ) : (
+                <button
+                  onClick={() => updateOrderStatus(current.id, 'DELIVERED')}
+                  disabled={updatingStatus}
+                  className="w-full py-3 rounded-xl font-semibold text-sm disabled:opacity-50"
+                  style={{ background: '#22C55E', color: '#000' }}
+                >
+                  {updatingStatus ? 'Updating…' : 'Mark as Delivered'}
+                </button>
+              )
             )}
             {current.status === 'DELIVERED' && (
               <button
@@ -512,5 +564,108 @@ export default function RiderDashboard() {
         <LogoutButton />
       </div>
     </main>
+  )
+}
+
+// Delivery handover panel (delivery_handover_v1). Default: enter the customer's
+// 6-char code. If the customer opted into leave-at-gate: confirm the drop, with an
+// OPTIONAL proof photo (never required). Shows fulfillment-only data — order id +
+// customer first name (no full phone/address/payment here) — per Invariant I5.
+function DeliverPanel({
+  order, busy, onConfirm, onUploadPhoto,
+}: {
+  order: CurrentOrder
+  busy: boolean
+  onConfirm: (orderId: string, payload: { code?: string; leave_at_gate?: boolean }) => Promise<string | null>
+  onUploadPhoto: (orderId: string, file: File) => Promise<string | null>
+}) {
+  const [code, setCode] = useState('')
+  const [err, setErr] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const firstName = order.customers?.name?.split(' ')[0] ?? 'the customer'
+
+  const submitCode = async () => {
+    if (code.length !== 6) { setErr('Enter the customer’s 6-character code.'); return }
+    setErr('')
+    const e = await onConfirm(order.id, { code })
+    if (e) setErr(e)
+  }
+  const confirmGate = async () => {
+    setErr('')
+    const e = await onConfirm(order.id, { leave_at_gate: true })
+    if (e) setErr(e)
+  }
+  const pickPhoto = async (file: File | null) => {
+    if (!file) return
+    setUploading(true); setErr('')
+    const e = await onUploadPhoto(order.id, file)
+    setUploading(false)
+    if (e) setErr(e)
+  }
+
+  // One-tap "I've arrived" message to the customer (no code in the text — I3). This
+  // is the rider's first move at the door, and the fallback when the customer isn't
+  // out yet: ping them on WhatsApp before anything stalls.
+  const arrivedWa = order.customers?.phone
+    ? waLink(order.customers.phone, `Hi${firstName !== 'the customer' ? ' ' + firstName : ''}, I’ve arrived with your LumeX order #${order.order_number}. Please come out to collect — or open the LumeX app and read me your collection code.`)
+    : null
+
+  // Order summary the rider checks against the bag before confirming (fulfillment
+  // data only — items, order id, customer first name).
+  const summary = (
+    <div className="rounded-lg p-2.5 mb-2 text-xs" style={{ background: 'rgba(255,255,255,0.04)' }}>
+      <p className="text-white/45">Order <span className="text-white/80 font-semibold">#{order.order_number}</span> · for <span className="text-white/80">{firstName}</span></p>
+      {order.order_items && order.order_items.length > 0 && (
+        <p className="text-white/70 mt-1">{order.order_items.map((i) => `${i.quantity}× ${i.name}`).join(' · ')}</p>
+      )}
+    </div>
+  )
+
+  if (order.leave_at_gate) {
+    return (
+      <div className="rounded-xl p-3 mt-1" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.2)' }}>
+        {summary}
+        <p className="text-xs text-white/65 mb-2">📷 Leave-at-gate for <span className="font-semibold text-white/90">{firstName}</span> — drop it at the gate. A proof photo is optional.</p>
+        {arrivedWa && (
+          <a href={arrivedWa} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-2.5 mb-2 rounded-lg text-xs font-semibold" style={{ background: 'rgba(37,211,102,0.16)', color: '#25D366' }}>
+            📲 Tell {firstName} you’ve arrived (WhatsApp)
+          </a>
+        )}
+        <div className="flex gap-2">
+          <label className="flex-1 text-center py-2.5 rounded-lg text-xs font-semibold cursor-pointer" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)' }}>
+            {uploading ? 'Uploading…' : order.delivery_photo_url ? '✓ Photo added — retake' : 'Add proof photo'}
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void pickPhoto(e.target.files?.[0] ?? null)} disabled={uploading || busy} />
+          </label>
+          <button onClick={confirmGate} disabled={busy} className="px-4 py-2.5 rounded-lg text-xs font-semibold disabled:opacity-50 shrink-0" style={{ background: '#22C55E', color: '#000' }}>
+            {busy ? '…' : 'Confirm drop'}
+          </button>
+        </div>
+        {err && <p className="text-xs text-red-400 mt-1.5">{err}</p>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl p-3 mt-1" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.2)' }}>
+      {summary}
+      {arrivedWa && (
+        <a href={arrivedWa} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-2.5 mb-2 rounded-lg text-xs font-semibold" style={{ background: 'rgba(37,211,102,0.16)', color: '#25D366' }}>
+          📲 Tell {firstName} you’ve arrived (WhatsApp)
+        </a>
+      )}
+      <p className="text-xs text-white/65 mb-2">🔑 Ask <span className="font-semibold text-white/90">{firstName}</span> for their 6-character delivery code (it’s in their app):</p>
+      <div className="flex gap-2">
+        <input
+          inputMode="text" autoCapitalize="characters" autoCorrect="off" spellCheck={false} maxLength={6} value={code}
+          onChange={(e) => { setCode(e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 6)); setErr('') }}
+          placeholder="ABC234"
+          className="lx-field flex-1 px-3 py-2.5 text-base tracking-[0.4em] text-center font-semibold outline-none uppercase"
+        />
+        <button onClick={submitCode} disabled={busy || code.length !== 6} className="px-4 py-2.5 rounded-lg text-xs font-semibold disabled:opacity-50 shrink-0" style={{ background: '#22C55E', color: '#000' }}>
+          {busy ? '…' : 'Confirm'}
+        </button>
+      </div>
+      {err && <p className="text-xs text-red-400 mt-1.5">{err}</p>}
+    </div>
   )
 }

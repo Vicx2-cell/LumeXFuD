@@ -128,9 +128,10 @@ export type OrderStatus =
   | 'CANCELLED'
   | 'DISPUTED'
   | 'REFUNDED'
+  | 'NO_SHOW'
 
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
-export type DeliveryType = 'BIKE' | 'DOOR'
+export type DeliveryType = 'BIKE' | 'DOOR' | 'PICKUP'
 
 export interface Order {
   id: string
@@ -165,6 +166,12 @@ export interface Order {
   delivered_at: string | null
   completed_at: string | null
   cancelled_at: string | null
+  // Pickup (order ahead) — null on BIKE/DOOR orders
+  pickup_code: string | null
+  pickup_eta_at: string | null
+  pickup_deadline_at: string | null
+  collected_at: string | null
+  no_show_at: string | null
   created_at: string
   updated_at: string
 }

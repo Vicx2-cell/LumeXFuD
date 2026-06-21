@@ -34,14 +34,23 @@ export async function GET() {
       ? db.from('orders')
           .select(`
             id, order_number, status, delivery_type, delivery_address,
-            rider_delivery_cut, picked_up_at, created_at,
+            rider_delivery_cut, picked_up_at, created_at, delivery_photo_url,
             vendors ( shop_name, phone ),
-            customers ( phone, name, avatar_url )
+            customers ( phone, name, avatar_url ),
+            order_items ( name, quantity )
           `)
           .eq('id', rider.active_order_id)
           .single()
       : Promise.resolve({ data: null }),
   ])
+
+  // leave_at_gate is from migration 073 — read it SEPARATELY and non-fatally so the
+  // rider dashboard never breaks on a DB where 073 hasn't been applied yet.
+  const current = currentResult.data as ({ id: string; leave_at_gate?: boolean } | null)
+  if (current?.id) {
+    const { data: lag } = await db.from('orders').select('leave_at_gate').eq('id', current.id).maybeSingle()
+    current.leave_at_gate = !!(lag as { leave_at_gate?: boolean } | null)?.leave_at_gate
+  }
 
   return NextResponse.json({
     rider: {
@@ -55,6 +64,6 @@ export async function GET() {
       avatar_url: rider.avatar_url,
     },
     available: availableResult.data ?? [],
-    current: currentResult.data ?? null,
+    current: current ?? null,
   })
 }

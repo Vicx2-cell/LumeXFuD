@@ -38,6 +38,14 @@ export interface LLMRequest {
    * Search grounding). Used by the study-curriculum ingestion.
    */
   webSearch?: boolean
+  /**
+   * Marks the payload as containing identity data (NIN/BVN/ID docs/face image).
+   * NDPR data-handling guard: such payloads are HARD-ROUTED to Anthropic and are
+   * NEVER sent to the Gemini free tier, regardless of the global provider toggle
+   * (see resolveProviderForRequest). Set this on any KYC/identity AI call so the
+   * guarantee is enforced in code, not by convention.
+   */
+  sensitivity?: 'identity'
 }
 
 export interface LLMResponse {

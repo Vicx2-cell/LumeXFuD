@@ -28,12 +28,16 @@ export default function CartPage() {
   const features = useFeatures()
   const [groupBusy, setGroupBusy] = useState(false)
 
-  const [deliveryType,  setDeliveryType]  = useState<'BIKE' | 'DOOR'>('BIKE')
+  const [deliveryType,  setDeliveryType]  = useState<'BIKE' | 'DOOR' | 'PICKUP'>('BIKE')
   const [address,       setAddress]       = useState('')
   const [instructions,  setInstructions]  = useState('')
   const [tip,           setTip]           = useState(0)
   const [loading,       setLoading]       = useState(false)
   const [error,         setError]         = useState('')
+  // Binding 1h25m pickup agreement (Invariant I8) — gates the Pay button.
+  const [pickupAgree,   setPickupAgree]   = useState(false)
+  // Optional leave-at-gate (delivery handover) — never compulsory.
+  const [leaveAtGate,   setLeaveAtGate]   = useState(false)
   const [feeInfo,       setFeeInfo]       = useState(false)
   const [deliveryInfo,  setDeliveryInfo]  = useState(false)
   const [scheduleOn,    setScheduleOn]    = useState(false)
@@ -107,10 +111,13 @@ export default function CartPage() {
     } catch { /* ignore */ }
   }, [])
 
+  const isPickup        = deliveryType === 'PICKUP'
   const deliveryFees    = fees ? { BIKE: fees.bike, DOOR: fees.door } : { BIKE: 50000, DOOR: 100000 }
+  // Pickup charges the SAME platform fee as delivery — just ₦0 delivery, no tip.
   const platformMarkup  = fees?.markup ?? 25000
-  const deliveryFee     = deliveryFees[deliveryType]
-  const total           = subtotal + platformMarkup + deliveryFee + tip
+  const deliveryFee     = isPickup ? 0 : deliveryFees[deliveryType as 'BIKE' | 'DOOR']
+  const tipApplied      = isPickup ? 0 : tip
+  const total           = subtotal + platformMarkup + deliveryFee + tipApplied
 
   // Longest-dish prep estimate from the per-item times captured at add-time
   // (falls back to a 25-min default for any item saved before that field existed).
@@ -185,8 +192,9 @@ export default function CartPage() {
 
   async function handleCheckout() {
     if (loading) return // guard against double-submit before the disabled state paints
-    if (!address.trim()) { setError('Please enter a delivery address'); return }
-    if (scheduleOn && !scheduleAt) { setError('Pick a date and time for your scheduled order'); return }
+    if (!isPickup && !address.trim()) { setError('Please enter a delivery address'); return }
+    if (!isPickup && scheduleOn && !scheduleAt) { setError('Pick a date and time for your scheduled order'); return }
+    if (isPickup && !pickupAgree) { setError('Please accept the pickup collection terms to continue'); return }
     setError(''); setLoading(true)
 
     try {
@@ -202,16 +210,22 @@ export default function CartPage() {
             addons:                i.addons.map((a) => a.id),
           })),
           delivery_type:         deliveryType,
-          delivery_address:      address,
+          // Pickup has no address/tip/schedule/coords/group — the server synthesizes
+          // "Pickup at <shop>" and rejects those extras.
+          delivery_address:      isPickup ? undefined : address,
           delivery_instructions: instructions || undefined,
-          tip_amount:            tip,
+          tip_amount:            isPickup ? 0 : tip,
           payment_method:        effectivePaymentMethod,
           wallet_amount_kobo:    effectivePaymentMethod !== 'PAYSTACK' ? walletAmount : 0,
-          scheduled_for:         scheduleOn && scheduleAt ? new Date(scheduleAt).toISOString() : undefined,
-          delivery_latitude:     coords?.lat,
-          delivery_longitude:    coords?.lng,
+          scheduled_for:         !isPickup && scheduleOn && scheduleAt ? new Date(scheduleAt).toISOString() : undefined,
+          delivery_latitude:     isPickup ? undefined : coords?.lat,
+          delivery_longitude:    isPickup ? undefined : coords?.lng,
           // Set when this cart was handed over from a group order (host checkout).
-          group_order_id:        (() => { try { return sessionStorage.getItem('lx_group_id') || undefined } catch { return undefined } })(),
+          group_order_id:        isPickup ? undefined : (() => { try { return sessionStorage.getItem('lx_group_id') || undefined } catch { return undefined } })(),
+          // Binding consent for the 1h25m pickup agreement (Invariant I8).
+          pickup_agreement:      isPickup ? pickupAgree : undefined,
+          // Optional leave-at-gate for delivery (only when the handover flag is on).
+          leave_at_gate:         !isPickup && features.delivery_handover_v1 === true ? leaveAtGate : undefined,
         }),
       })
 
@@ -323,7 +337,7 @@ export default function CartPage() {
 
         {/* Delivery type */}
         <div>
-          <h3 className="text-sm font-medium text-white/70 mb-3">Delivery type</h3>
+          <h3 className="text-sm font-medium text-white/70 mb-3">How do you want it?</h3>
           <div className="grid grid-cols-2 gap-3">
             {(['BIKE', 'DOOR'] as const).map((type) => {
               const selected = deliveryType === type
@@ -346,9 +360,64 @@ export default function CartPage() {
               )
             })}
           </div>
+
+          {/* Pickup (Order Ahead) — skip the queue. Self-hides unless the
+              super-admin pickup flag is on. ₦0 delivery, no rider. */}
+          {features.pickup_v1 === true && (
+            <button onClick={() => setDeliveryType('PICKUP')}
+              aria-pressed={isPickup}
+              className="w-full mt-3 rounded-xl p-4 text-left transition-all active:scale-[0.99] flex items-center gap-3"
+              style={{
+                background: isPickup ? 'rgba(245,166,35,0.1)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${isPickup ? '#F5A623' : 'rgba(255,255,255,0.08)'}`,
+              }}>
+              <div style={{ color: isPickup ? '#F5A623' : 'rgba(255,255,255,0.7)' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold flex items-center gap-2">Pickup — skip the queue
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }}>₦0 delivery</span>
+                </p>
+                <p className="text-xs text-white/55 mt-0.5">Order from class, walk up, it’s hot and waiting. Same platform fee, no delivery fee.</p>
+              </div>
+            </button>
+          )}
         </div>
 
-        {/* Schedule for later */}
+        {/* Pickup info — replaces address/schedule when collecting in person */}
+        {isPickup && (
+          <div className="lx-card-amber rounded-2xl p-4 lx-enter">
+            <p className="text-sm font-semibold flex items-center gap-2">🛍️ Collecting from {cart.vendor_name}</p>
+            <p className="text-xs text-white/55 mt-1 leading-relaxed">
+              Pay now, we’ll send it to the kitchen, and you’ll get a private 6-character code in this app when it’s ready. Show the code at the counter to collect — no delivery, no waiting in line. If the vendor can’t fulfil it, you’re fully refunded.
+            </p>
+            {/* Binding 1h25m agreement — REQUIRED before paying (Invariant I8). */}
+            <label className="flex items-start gap-2.5 mt-3 pt-3 border-t border-white/10 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={pickupAgree}
+                onChange={(e) => { setPickupAgree(e.target.checked); if (e.target.checked) setError('') }}
+                className="mt-0.5 w-4 h-4 shrink-0 accent-amber-400"
+              />
+              <span className="text-xs text-white/70 leading-relaxed">
+                I understand that once my order is ready it is held for <span className="font-semibold text-white/90">1 hour 25 minutes</span>. If I don’t collect it in that time, the order is cleared and my payment is not refunded. If I’m running late, I’ll contact the vendor.
+              </span>
+            </label>
+          </div>
+        )}
+
+        {/* Leave-at-gate — OPTIONAL delivery handover (flag-gated, never default) */}
+        {!isPickup && features.delivery_handover_v1 === true && (
+          <label className="lx-card-amber-soft rounded-2xl p-4 flex items-start gap-2.5 cursor-pointer lx-enter">
+            <input type="checkbox" checked={leaveAtGate} onChange={(e) => setLeaveAtGate(e.target.checked)} className="mt-0.5 w-4 h-4 shrink-0 accent-amber-400" />
+            <span className="text-xs text-white/70 leading-relaxed">
+              <span className="font-semibold text-white/90">Leave at my gate</span> (optional) — let the rider drop it without me sharing a code. They may take a proof photo. Otherwise you’ll confirm delivery with a private code at the door.
+            </span>
+          </label>
+        )}
+
+        {/* Schedule for later — delivery only */}
+        {!isPickup && (
         <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -384,8 +453,10 @@ export default function CartPage() {
             </div>
           )}
         </div>
+        )}
 
-        {/* Address */}
+        {/* Address — delivery only */}
+        {!isPickup && (
         <div>
           <label className="block text-sm font-medium text-white/70 mb-2">Delivery address</label>
           <input type="text" value={address} onChange={(e) => { setAddress(e.target.value); setCoords(null) }}
@@ -430,6 +501,7 @@ export default function CartPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Instructions */}
         <div>
@@ -442,7 +514,8 @@ export default function CartPage() {
           <p className="text-xs text-white/30 mt-1 text-right">{instructions.length}/200</p>
         </div>
 
-        {/* Tip */}
+        {/* Tip — delivery only (no rider on pickup) */}
+        {!isPickup && (
         <div>
           <h3 className="text-sm font-medium text-white/70 mb-3">Add a tip (optional)</h3>
           <div className="flex gap-2">
@@ -459,6 +532,7 @@ export default function CartPage() {
             ))}
           </div>
         </div>
+        )}
 
         {/* ── Payment method: Wallet vs Paystack (always a clear choice) ── */}
         {/* The whole selector shows regardless of the wallet flag; only the WALLET
@@ -577,7 +651,9 @@ export default function CartPage() {
             </button>
             {feeInfo && (
               <p className="text-xs text-white/45 mt-1.5 leading-relaxed lx-enter">
-                That’s <span className="text-white/70 font-medium">{platformMarkup.toLocaleString('en-NG')} kobo</span> 😅 — relax, just <span className="text-white/70 font-medium">{formatPrice(platformMarkup)}</span>, flat. Never a percentage. It runs your live tracking, reliable riders and real support. 🧡
+                {isPickup
+                  ? <>A flat <span className="text-white/70 font-medium">{formatPrice(platformMarkup)}</span>, same as delivery — but you skip the queue and there’s <span className="text-white/70 font-medium">no delivery fee</span>. 🛍️</>
+                  : <>That’s <span className="text-white/70 font-medium">{platformMarkup.toLocaleString('en-NG')} kobo</span> 😅 — relax, just <span className="text-white/70 font-medium">{formatPrice(platformMarkup)}</span>, flat. Never a percentage. It runs your live tracking, reliable riders and real support. 🧡</>}
               </p>
             )}
           </div>
@@ -589,20 +665,22 @@ export default function CartPage() {
               className="flex justify-between text-sm w-full text-left transition-opacity active:opacity-60"
             >
               <span className="text-white/60 inline-flex items-center gap-1.5">
-                Delivery ({deliveryType.toLowerCase()})
+                {isPickup ? 'Delivery (pickup)' : `Delivery (${deliveryType.toLowerCase()})`}
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/35" aria-hidden="true">
                   <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
                 </svg>
               </span>
-              <span>{formatPrice(deliveryFee)}</span>
+              <span>{isPickup ? 'Free' : formatPrice(deliveryFee)}</span>
             </button>
             {deliveryInfo && (
               <p className="text-xs text-white/45 mt-1.5 leading-relaxed lx-enter">
-                Almost all of this goes straight to your rider — the person braving sun and traffic to reach your door. Worth every naira. 🛵
+                {isPickup
+                  ? 'You’re collecting in person, so there’s no rider and no delivery fee. 🛍️'
+                  : 'Almost all of this goes straight to your rider — the person braving sun and traffic to reach your door. Worth every naira. 🛵'}
               </p>
             )}
           </div>
-          {tip > 0 && (
+          {!isPickup && tip > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-white/60">Tip</span>
               <span>{formatPrice(tip)}</span>
@@ -646,12 +724,12 @@ export default function CartPage() {
         <div className="max-w-lg mx-auto">
           <button
             onClick={handleCheckout}
-            disabled={loading}
+            disabled={loading || (isPickup && !pickupAgree)}
             className="lx-btn-amber w-full py-4 text-base"
             style={{ minHeight: 56, borderRadius: 16 }}
           >
             {loading ? 'Processing…' : (
-              (scheduleOn ? '🗓️ Schedule · ' : '') + (
+              (!isPickup && scheduleOn ? '🗓️ Schedule · ' : '') + (
                 effectivePaymentMethod === 'WALLET'
                   ? `Pay ${formatPrice(total)} from Wallet`
                   : effectivePaymentMethod === 'SPLIT'
