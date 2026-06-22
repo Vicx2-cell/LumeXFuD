@@ -68,7 +68,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-base font-semibold text-white mb-2">7. Contact us</h2>
-          <p>For privacy-related requests or complaints, contact our Data Protection Officer at: <a href="mailto:privacy@lumexfud.com.ng" className="text-[#F5A623]">privacy@lumexfud.com.ng</a>. For anything else, see our <a href="/contact" className="text-[#F5A623]">Contact</a> page.</p>
+          <p>For privacy-related requests or complaints, contact our Data Protection Officer at: <a href="mailto:hello@lumex.com.ng" className="text-[#F5A623]">hello@lumex.com.ng</a>. For anything else, see our <a href="/contact" className="text-[#F5A623]">Contact</a> page.</p>
         </section>
       </div>
       </div>

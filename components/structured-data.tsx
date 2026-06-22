@@ -9,9 +9,12 @@
 // location would risk a structured-data spam penalty. The Menu node points at
 // the live vendor listing where the real, per-vendor menus are served.
 
+import { getControls } from '@/lib/controls'
+
 const SITE_URL = 'https://lumexfud.com.ng'
 
-const structuredData = {
+function buildStructuredData(opens: string, closes: string) {
+  return {
   '@context': 'https://schema.org',
   '@graph': [
     {
@@ -71,15 +74,15 @@ const structuredData = {
         '@type': 'Place',
         name: 'Abia State University (ABSU), Uturu',
       },
-      // Platform hours: 7am–10pm, every day (see CLAUDE.md pricing block).
+      // Platform hours — live from super-admin controls (no hardcoded close time).
       openingHoursSpecification: {
         '@type': 'OpeningHoursSpecification',
         dayOfWeek: [
           'Monday', 'Tuesday', 'Wednesday', 'Thursday',
           'Friday', 'Saturday', 'Sunday',
         ],
-        opens: '07:00',
-        closes: '22:00',
+        opens,
+        closes,
       },
       availableLanguage: 'en-NG',
       hasMenu: {
@@ -99,9 +102,14 @@ const structuredData = {
       },
     },
   ],
+  }
 }
 
-export function StructuredData() {
+export async function StructuredData() {
+  // Hours come from live super-admin controls so the schema's opening time never
+  // drifts from the real platform hours (fail-safe to the 7am–10pm defaults).
+  const controls = await getControls()
+  const structuredData = buildStructuredData(controls.hours_open, controls.hours_close)
   return (
     <script
       type="application/ld+json"

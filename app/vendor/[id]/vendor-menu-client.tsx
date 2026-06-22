@@ -230,7 +230,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
         </div>
 
         {isPaused && <div className="px-4 pb-2 text-center"><span className="text-xs text-yellow-400">Temporarily paused — back soon</span></div>}
-        {isClosed && vendor.status === 'CLOSED' && <div className="px-4 pb-2 text-center"><span className="text-xs text-red-400">Closed — Opens at 7am</span></div>}
+        {isClosed && vendor.status === 'CLOSED' && <div className="px-4 pb-2 text-center"><span className="text-xs text-red-400">Closed{vendor.opening_time ? ` — Opens at ${vendor.opening_time}` : ''}</span></div>}
 
         {/* Logged-out visitors (e.g. arrived via the vendor's share link): one tap
             to create an account, and they come right back to this page. */}
