@@ -8,7 +8,7 @@ import { BackButton } from '@/components/back-button'
 import { downloadReceiptPng } from '@/lib/receipt-download'
 import { waLink, telLink } from '@/lib/contact'
 
-interface TxParty { name: string; phone: string | null; avatar: string | null }
+interface TxParty { name: string; phone: string | null; call_phone: string | null; avatar: string | null }
 
 interface TierProgress {
   current_count: number
@@ -634,7 +634,7 @@ function PartyRow({ role, party, orderNumber }: { role: 'Vendor' | 'Rider'; part
       {party.phone && (
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           <a href={waLink(party.phone, msg)} target="_blank" rel="noopener noreferrer" className="text-[11px] px-2 py-1 rounded-lg font-medium" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366' }}>WhatsApp</a>
-          <a href={telLink(party.phone)} className="text-[11px] px-2 py-1 rounded-lg font-medium" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)' }}>Call</a>
+          <a href={telLink(party.call_phone ?? party.phone)} className="text-[11px] px-2 py-1 rounded-lg font-medium" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)' }}>Call</a>
         </div>
       )}
     </div>

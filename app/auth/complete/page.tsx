@@ -158,7 +158,7 @@ export default function CompleteSignupPage() {
           </label>
 
           <label className="block text-sm text-white/70">
-            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Phone number</span>
+            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">WhatsApp number</span>
             <div className="flex gap-2">
               <input
                 value={phone}

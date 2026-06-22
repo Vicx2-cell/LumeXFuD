@@ -220,7 +220,7 @@ export default function ForgotPinPage() {
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-4">
             <label className="block text-sm text-white/70">
               <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">
-                Phone number
+                WhatsApp number
               </span>
               <input
                 value={phone}

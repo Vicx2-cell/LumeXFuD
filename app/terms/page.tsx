@@ -1,18 +1,22 @@
 import { getControls } from '@/lib/controls'
 import { formatHoursRange } from '@/lib/hours'
+import { SiteFooter, SUPPORT_EMAIL } from '@/components/site-footer'
+
+export const dynamic = 'force-dynamic'
 
 export default async function TermsPage() {
   const controls = await getControls()
   const hoursLabel = formatHoursRange(controls.hours_open, controls.hours_close)
   return (
-    <main className="min-h-dvh px-5 py-12 max-w-2xl mx-auto" style={{ background: '#0A0A0B' }}>
+    <main style={{ background: '#0A0A0B' }}>
+      <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-2">Terms of Service</h1>
-      <p className="text-sm text-white/40 mb-8">Last updated: January 2026</p>
+      <p className="text-sm text-white/40 mb-8">Last updated: June 2026</p>
 
       <div className="space-y-8 text-sm leading-relaxed text-white/70">
         <section>
           <h2 className="text-base font-semibold text-white mb-2">1. Acceptance of terms</h2>
-          <p>By using LumeX Fud, you agree to these terms. These terms govern your use of our campus food delivery service at Abia State University (ABSU).</p>
+          <p>By using LumeX Fud, you agree to these terms. LumeX Fud is a campus food delivery service operated by Lumex, serving students at Abia State University (ABSU), Nigeria. These terms, together with our <a href="/refunds" className="text-[#F5A623]">Refund &amp; Cancellation Policy</a> and <a href="/privacy" className="text-[#F5A623]">Privacy Policy</a>, govern your use of the service.</p>
         </section>
 
         <section>
@@ -37,13 +41,15 @@ export default async function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white mb-2">4. Disputes</h2>
+          <h2 className="text-base font-semibold text-white mb-2">4. Refunds, cancellations &amp; disputes</h2>
           <ul className="list-disc pl-5 space-y-1">
-            <li>You may raise a dispute within 15 minutes of receiving your order</li>
-            <li>Disputes are reviewed by our admin team within 24 hours</li>
-            <li>Refunds are at admin discretion based on evidence provided</li>
+            <li>You may cancel for a full refund before the vendor accepts (about the first 5 minutes); once the vendor starts cooking, the order can no longer be cancelled</li>
+            <li>For delivery, you may report a problem within <strong className="text-white">24 hours</strong> of receiving your order; our team reviews every report within 24 hours and refunds in full or in part based on the evidence</li>
+            <li>For pickup, once your order is marked ready it is held for <strong className="text-white">1 hour 25 minutes</strong> — you agree to this before paying; if you don’t collect in time the order is cleared and not refunded. If the vendor never makes it ready, you are automatically refunded in full</li>
+            <li>Refunds are returned to your original payment method (via Paystack) or your LumeX Wallet</li>
             <li>Abusing the dispute system may result in account suspension</li>
           </ul>
+          <p className="mt-2">Full details: <a href="/refunds" className="text-[#F5A623]">Refund &amp; Cancellation Policy</a>.</p>
         </section>
 
         <section>
@@ -74,9 +80,11 @@ export default async function TermsPage() {
 
         <section>
           <h2 className="text-base font-semibold text-white mb-2">9. Contact</h2>
-          <p>Questions? Email <span className="text-[#F5A623]">support@lumexfud.com.ng</span></p>
+          <p>Questions? Email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#F5A623]">{SUPPORT_EMAIL}</a> or see our <a href="/contact" className="text-[#F5A623]">Contact</a> page.</p>
         </section>
       </div>
+      </div>
+      <SiteFooter />
     </main>
   )
 }

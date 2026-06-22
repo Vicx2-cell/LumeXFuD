@@ -362,16 +362,16 @@ export function OrderStatusClient({
                 <p className="font-semibold truncate">{order.riders.full_name}</p>
                 {riderVerified && <VerifiedBadge kind="rider" />}
               </div>
-              <a href={`tel:${order.riders.phone}`} className="text-xs text-amber-400 tabular-nums hover:underline">{order.riders.phone}</a>
+              <a href={`tel:${order.riders.call_phone ?? order.riders.phone}`} className="text-xs text-amber-400 tabular-nums hover:underline">{order.riders.call_phone ?? order.riders.phone}</a>
               {order.riders.opening_time && order.riders.closing_time && (
                 <p className="text-[11px] text-white/40 mt-0.5 tabular-nums">🕒 Usually {order.riders.opening_time}–{order.riders.closing_time}</p>
               )}
             </div>
             <div className="flex gap-2 shrink-0">
-              <a href={`tel:${order.riders.phone}`} className="w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-90" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }} aria-label="Call rider">
+              <a href={`tel:${order.riders.call_phone ?? order.riders.phone}`} className="w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-90" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }} aria-label="Call rider">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>
               </a>
-              <a href={`sms:${order.riders.phone}`} className="w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-90" style={{ background: 'rgba(96,165,250,0.15)', color: '#60a5fa' }} aria-label="Text rider (SMS)">
+              <a href={`sms:${order.riders.call_phone ?? order.riders.phone}`} className="w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-90" style={{ background: 'rgba(96,165,250,0.15)', color: '#60a5fa' }} aria-label="Text rider (SMS)">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               </a>
               <a href={`https://wa.me/${order.riders.phone.replace('+', '')}`} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-90" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }} aria-label="WhatsApp rider">

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { settleDuePickupNoShows } from '@/lib/pickup'
+import { callPhoneMap } from '@/lib/call-phone'
 
 export async function GET() {
   const session = await getCurrentUser()
@@ -48,5 +49,12 @@ export async function GET() {
     .order('created_at', { ascending: false })
     .limit(10)
 
-  return NextResponse.json({ vendor, orders: orders ?? [], recent: recent ?? [] })
+  // Customer call numbers (migration 074) — resolved non-fatally so the dashboard
+  // never breaks pre-074. tel: uses the call number; wa.me uses the WhatsApp number.
+  type VOrder = { customer_id?: string | null; customers?: { phone: string; call_phone?: string | null } | null }
+  const list = (orders ?? []) as unknown as VOrder[]
+  const cMap = await callPhoneMap('customers', list.map((o) => o.customer_id), db)
+  for (const o of list) if (o.customers && o.customer_id) o.customers.call_phone = cMap.get(o.customer_id) ?? null
+
+  return NextResponse.json({ vendor, orders: list, recent: recent ?? [] })
 }

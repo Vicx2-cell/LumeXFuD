@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Reveal } from '@/components/reveal'
 import { getControls } from '@/lib/controls'
 import { formatHoursRange } from '@/lib/hours'
+import { SiteFooter } from '@/components/site-footer'
 
 export const metadata = {
   title: { absolute: 'LumeX Fud — Campus food delivery at ABSU, Uturu' },
@@ -211,19 +212,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="relative z-10 border-t border-white/8 py-8 px-5">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/35">
-          <span>
-            <span className="lx-display font-semibold lx-amber">LumeX Fud</span>
-            {' '}— Campus life, simplified.
-          </span>
-          <div className="flex items-center gap-5">
-            <Link href="/terms"   className="hover:text-white/70 transition-colors">Terms</Link>
-            <Link href="/privacy" className="hover:text-white/70 transition-colors">Privacy</Link>
-          </div>
-          <span>Platform hours: {hoursLabel}</span>
-        </div>
-      </footer>
+      <SiteFooter />
 
     </div>
   )

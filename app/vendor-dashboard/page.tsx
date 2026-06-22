@@ -23,7 +23,7 @@ interface VendorOrder {
   total_amount: number
   created_at: string
   pickup_eta_at: string | null
-  customers: { phone: string | null; name: string | null } | null
+  customers: { phone: string | null; name: string | null; call_phone?: string | null } | null
   order_items: OrderItem[]
 }
 interface VendorInfo {
@@ -562,7 +562,7 @@ function OrderCard({
               <a href={waLink(order.customers.phone, `Hi${order.customers.name ? ' ' + order.customers.name.split(' ')[0] : ''}, your LumeX order #${order.order_number} is ready to collect.`)}
                 target="_blank" rel="noopener noreferrer"
                 className="text-[11px] px-2 py-1 rounded-lg font-medium" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366' }}>WhatsApp</a>
-              <a href={telLink(order.customers.phone)} className="text-[11px] px-2 py-1 rounded-lg font-medium" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)' }}>Call</a>
+              <a href={telLink(order.customers.call_phone ?? order.customers.phone)} className="text-[11px] px-2 py-1 rounded-lg font-medium" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)' }}>Call</a>
             </div>
           )}
           <p className="text-xs text-white/50 mb-2">🛍️ Ask the customer to read you their 6-character pickup code (it’s in their app):</p>

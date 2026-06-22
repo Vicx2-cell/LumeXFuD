@@ -9,6 +9,7 @@ import { compareSecret, findAuthUserByPhone, generateRecoveryCode, hashSecret, n
 import { getFeature } from '@/lib/features'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { isPhoneBlocked } from '@/lib/blocklist'
+import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
 
 export async function POST(req: NextRequest) {
   try {
@@ -117,6 +118,18 @@ export async function POST(req: NextRequest) {
 
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
     const userAgent = req.headers.get('user-agent') ?? undefined
+
+    // Record the customer's acceptance of the Terms, Privacy and Refund policies at
+    // sign-up against the current terms version (append-only). The UI gates account
+    // creation on an explicit tick; this is the durable proof. Non-fatal.
+    void recordConsent({ actorId: user.id, role: 'customer', action: CONSENT_ACTIONS.ONBOARD, ipAddress, userAgent })
+
+    // Call number (the account `phone` IS the WhatsApp number). Both are required;
+    // "same as WhatsApp" sends no call_phone, so default it to the WhatsApp number
+    // — call_phone is ALWAYS stored. Separate non-fatal update so sign-up never
+    // breaks on a DB where migration 074 hasn't been applied (missing column = no-op).
+    const callPhone = (data.call_phone ? safeNormalizePhone(data.call_phone) : null) || normalizedPhone
+    db.from('customers').update({ call_phone: callPhone }).eq('id', user.id).then(() => {}, () => {})
     // If the registering phone matches SUPER_ADMIN_PHONE, grant super_admin role.
     // (In practice the privileged-phone guard above already 403s this number, so
     // this is belt-and-braces; normalize the env value to stay format-agnostic.)

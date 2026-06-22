@@ -148,7 +148,7 @@ export default function NewAdminPage() {
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Phone number (+234)</span>
+            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">WhatsApp number (+234)</span>
             <input
               value={form.phone}
               onChange={(e) => {

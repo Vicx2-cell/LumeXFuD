@@ -1,8 +1,13 @@
+import { SiteFooter } from '@/components/site-footer'
+
+export const dynamic = 'force-dynamic'
+
 export default function PrivacyPage() {
   return (
-    <main className="min-h-dvh px-5 py-12 max-w-2xl mx-auto" style={{ background: '#0A0A0B' }}>
+    <main style={{ background: '#0A0A0B' }}>
+      <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-2">Privacy Policy</h1>
-      <p className="text-sm text-white/40 mb-8">Last updated: January 2026 · NDPR Compliant</p>
+      <p className="text-sm text-white/40 mb-8">Last updated: June 2026 · NDPR Compliant</p>
 
       <div className="space-y-8 text-sm leading-relaxed text-white/70">
         <section>
@@ -63,9 +68,11 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-base font-semibold text-white mb-2">7. Contact us</h2>
-          <p>For privacy-related requests or complaints, contact our Data Protection Officer at: <span className="text-[#F5A623]">privacy@lumexfud.com.ng</span></p>
+          <p>For privacy-related requests or complaints, contact our Data Protection Officer at: <a href="mailto:privacy@lumexfud.com.ng" className="text-[#F5A623]">privacy@lumexfud.com.ng</a>. For anything else, see our <a href="/contact" className="text-[#F5A623]">Contact</a> page.</p>
         </section>
       </div>
+      </div>
+      <SiteFooter />
     </main>
   )
 }

@@ -208,7 +208,7 @@ function LoginForm() {
 
               <div>
                 <label htmlFor="lx-phone" className="block text-xs font-medium text-white/60 mb-2">
-                  Phone number
+                  WhatsApp number
                 </label>
                 <input
                   id="lx-phone"

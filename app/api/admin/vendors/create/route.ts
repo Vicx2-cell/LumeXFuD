@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { normalizePhone, maskPhone } from '@/lib/phone'
+import { normalizePhone, maskPhone, safeNormalizePhone } from '@/lib/phone'
 import { generateTempPin, hashSecret } from '@/lib/pin-auth'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { getFeature } from '@/lib/features'
@@ -14,6 +14,7 @@ const createVendorInput = z.object({
   owner_name:        z.string().min(1).max(100),
   shop_name:         z.string().min(1).max(100),
   phone:             z.string().min(7).max(20),
+  call_phone:        z.string().min(7).max(20).optional(),
   category:          z.string().min(1).max(50).optional(),
   subscription_tier: z.string().min(1).max(20).optional(),
 })
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: 'Missing or invalid required fields' }, { status: 400 })
     }
-    const { owner_name, shop_name, phone, category, subscription_tier } = parsed.data
+    const { owner_name, shop_name, phone, call_phone, category, subscription_tier } = parsed.data
 
     let normalized: string
     try {
@@ -91,6 +92,11 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await db.from('vendors').insert(insert).select('id').single()
     if (error || !data) return NextResponse.json({ error: 'Failed to create vendor' }, { status: 500 })
+
+    // Call number (migration 074) — defaults to the WhatsApp number when not given.
+    // Separate non-fatal update so creation never breaks pre-074 (missing col = no-op).
+    const callNormalized = (call_phone ? safeNormalizePhone(call_phone) : null) || normalized
+    db.from('vendors').update({ call_phone: callNormalized }).eq('id', data.id).then(() => {}, () => {})
 
     await audit({
       actor_id: user.phone,

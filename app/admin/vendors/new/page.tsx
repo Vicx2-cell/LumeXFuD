@@ -25,6 +25,7 @@ export default function NewVendorPage() {
     owner_name: '',
     shop_name: '',
     phone: '+234',
+    call_phone: '',
     category: 'Other',
     subscription_tier: 'STANDARD',
   })
@@ -162,7 +163,7 @@ export default function NewVendorPage() {
             />
           </Field>
 
-          <Field label="Phone number (+234)">
+          <Field label="WhatsApp number (+234) — for messages & login">
             <input
               value={form.phone}
               onChange={(e) => {
@@ -183,6 +184,19 @@ export default function NewVendorPage() {
               onVerified={() => setPhoneVerified(true)}
             />
           )}
+
+          <Field label="Phone number for calls (leave blank if same as WhatsApp)">
+            <input
+              value={form.call_phone}
+              onChange={(e) => {
+                const v = e.target.value
+                set('call_phone', v && !v.startsWith('+234') ? '+234' + v.replace(/^\+?234?/, '') : v)
+              }}
+              placeholder="Same as WhatsApp"
+              inputMode="tel"
+              className={inputCls}
+            />
+          </Field>
 
           <Field label="Category">
             <select value={form.category} onChange={(e) => set('category', e.target.value)} className={inputCls}>

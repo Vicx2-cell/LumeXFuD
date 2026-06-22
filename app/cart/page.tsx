@@ -36,6 +36,8 @@ export default function CartPage() {
   const [error,         setError]         = useState('')
   // Binding 1h25m pickup agreement (Invariant I8) — gates the Pay button.
   const [pickupAgree,   setPickupAgree]   = useState(false)
+  // Delivery acceptance of Terms + Refund policy — gates the Pay button.
+  const [orderAgree,    setOrderAgree]    = useState(false)
   // Optional leave-at-gate (delivery handover) — never compulsory.
   const [leaveAtGate,   setLeaveAtGate]   = useState(false)
   const [feeInfo,       setFeeInfo]       = useState(false)
@@ -195,6 +197,7 @@ export default function CartPage() {
     if (!isPickup && !address.trim()) { setError('Please enter a delivery address'); return }
     if (!isPickup && scheduleOn && !scheduleAt) { setError('Pick a date and time for your scheduled order'); return }
     if (isPickup && !pickupAgree) { setError('Please accept the pickup collection terms to continue'); return }
+    if (!isPickup && !orderAgree) { setError('Please accept the Terms and Refund Policy to continue'); return }
     setError(''); setLoading(true)
 
     try {
@@ -400,7 +403,7 @@ export default function CartPage() {
                 className="mt-0.5 w-4 h-4 shrink-0 accent-amber-400"
               />
               <span className="text-xs text-white/70 leading-relaxed">
-                I understand that once my order is ready it is held for <span className="font-semibold text-white/90">1 hour 25 minutes</span>. If I don’t collect it in that time, the order is cleared and my payment is not refunded. If I’m running late, I’ll contact the vendor.
+                I understand that once my order is ready it is held for <span className="font-semibold text-white/90">1 hour 25 minutes</span>. If I don’t collect it in that time, the order is cleared and my payment is not refunded. If I’m running late, I’ll contact the vendor. See our <a href="/refunds" target="_blank" className="text-[#F5A623] underline">Refund Policy</a>.
               </span>
             </label>
           </div>
@@ -706,6 +709,22 @@ export default function CartPage() {
           </div>
         </div>
 
+        {/* Delivery acceptance — explicit agreement to Terms + Refund policy, gates Pay */}
+        {!isPickup && (
+          <label className="flex items-start gap-2.5 cursor-pointer px-1">
+            <input
+              type="checkbox"
+              checked={orderAgree}
+              onChange={(e) => { setOrderAgree(e.target.checked); if (e.target.checked) setError('') }}
+              className="mt-0.5 w-4 h-4 shrink-0 accent-amber-400"
+            />
+            <span className="text-xs text-white/60 leading-relaxed">
+              I agree to the <a href="/terms" target="_blank" className="text-[#F5A623]">Terms</a> and{' '}
+              <a href="/refunds" target="_blank" className="text-[#F5A623]">Refund &amp; Cancellation Policy</a>. I can cancel for a full refund before the vendor accepts, and report a problem within 24 hours of delivery.
+            </span>
+          </label>
+        )}
+
         {reorderNote && (
           <div className="lx-card-amber lx-amber rounded-xl p-3 text-sm">
             {reorderNote}
@@ -724,7 +743,7 @@ export default function CartPage() {
         <div className="max-w-lg mx-auto">
           <button
             onClick={handleCheckout}
-            disabled={loading || (isPickup && !pickupAgree)}
+            disabled={loading || (isPickup && !pickupAgree) || (!isPickup && !orderAgree)}
             className="lx-btn-amber w-full py-4 text-base"
             style={{ minHeight: 56, borderRadius: 16 }}
           >

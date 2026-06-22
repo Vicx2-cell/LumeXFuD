@@ -36,8 +36,8 @@ interface CurrentOrder {
   picked_up_at: string | null
   leave_at_gate: boolean | null
   delivery_photo_url: string | null
-  vendors: { shop_name: string; phone: string } | null
-  customers: { phone: string; name: string | null; avatar_url: string | null } | null
+  vendors: { shop_name: string; phone: string; call_phone?: string | null } | null
+  customers: { phone: string; name: string | null; avatar_url: string | null; call_phone?: string | null } | null
   order_items: { name: string; quantity: number }[] | null
 }
 
@@ -403,7 +403,7 @@ export default function RiderDashboard() {
                   ) : (
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/40" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                   )}
-                  <a href={`tel:${current.customers.phone}`} className="text-amber-400">{current.customers.name ?? current.customers.phone}</a>
+                  <a href={`tel:${current.customers.call_phone ?? current.customers.phone}`} className="text-amber-400">{current.customers.name ?? current.customers.phone}</a>
                   <a
                     href={waLink(current.customers.phone, `Hi${current.customers.name ? ' ' + current.customers.name.split(' ')[0] : ''}, I’m your LumeX rider for order #${current.order_number}. I’m on my way!`)}
                     target="_blank" rel="noopener noreferrer"
@@ -415,7 +415,7 @@ export default function RiderDashboard() {
                 <div className="flex items-center gap-2 text-sm text-white/65">
                   <span className="text-[10px] uppercase tracking-wide text-white/35 shrink-0 w-14">Vendor</span>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/40" aria-hidden="true"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M2 7h20"/><path d="M12 22V12"/></svg>
-                  <a href={`tel:${current.vendors.phone}`} className="text-amber-400 truncate">{current.vendors.phone}</a>
+                  <a href={`tel:${current.vendors.call_phone ?? current.vendors.phone}`} className="text-amber-400 truncate">{current.vendors.call_phone ?? current.vendors.phone}</a>
                   <a
                     href={waLink(current.vendors.phone, `Hi, I’m the LumeX rider for order #${current.order_number}. Is it ready for pickup?`)}
                     target="_blank" rel="noopener noreferrer"

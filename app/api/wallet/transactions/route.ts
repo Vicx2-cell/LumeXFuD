@@ -4,6 +4,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { formatPrice, humanizeTx, txSign, txIcon } from '@/lib/wallet'
 import type { WalletTransaction, WalletBalance } from '@/lib/wallet'
 import { receiptCode } from '@/lib/receipt'
+import { callPhoneMap } from '@/lib/call-phone'
 
 export async function GET(req: NextRequest) {
   const session = await getCurrentUser()
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest) {
   // So a vendor sees the RIDER they worked with (and vice-versa) on each payout —
   // profile + contact — straight from the transaction record.
   const orderIds = Array.from(new Set(txs.map((t) => t.order_id).filter(Boolean))) as string[]
-  type Party = { name: string; phone: string | null; avatar: string | null }
+  type Party = { name: string; phone: string | null; call_phone: string | null; avatar: string | null }
   const vendorByOrder = new Map<string, Party>()
   const riderByOrder = new Map<string, Party>()
   if (orderIds.length) {
@@ -67,14 +68,16 @@ export async function GET(req: NextRequest) {
     const orders = (ordersRaw ?? []) as Array<{ id: string; vendor_id: string | null; rider_id: string | null }>
     const vIds = Array.from(new Set(orders.map((o) => o.vendor_id).filter(Boolean))) as string[]
     const rIds = Array.from(new Set(orders.map((o) => o.rider_id).filter(Boolean))) as string[]
-    const [vRes, rRes] = await Promise.all([
+    const [vRes, rRes, vCall, rCall] = await Promise.all([
       vIds.length ? db.from('vendors').select('id, shop_name, phone, logo_url').in('id', vIds) : Promise.resolve({ data: [] }),
       rIds.length ? db.from('riders').select('id, full_name, phone, avatar_url').in('id', rIds) : Promise.resolve({ data: [] }),
+      callPhoneMap('vendors', vIds, db),  // migration-074-safe (empty map if absent)
+      callPhoneMap('riders', rIds, db),
     ])
     const vMap = new Map(((vRes.data ?? []) as Array<{ id: string; shop_name: string; phone: string | null; logo_url: string | null }>)
-      .map((v) => [v.id, { name: v.shop_name, phone: v.phone, avatar: v.logo_url } as Party]))
+      .map((v) => [v.id, { name: v.shop_name, phone: v.phone, call_phone: vCall.get(v.id) ?? null, avatar: v.logo_url } as Party]))
     const rMap = new Map(((rRes.data ?? []) as Array<{ id: string; full_name: string; phone: string | null; avatar_url: string | null }>)
-      .map((r) => [r.id, { name: r.full_name, phone: r.phone, avatar: r.avatar_url } as Party]))
+      .map((r) => [r.id, { name: r.full_name, phone: r.phone, call_phone: rCall.get(r.id) ?? null, avatar: r.avatar_url } as Party]))
     for (const o of orders) {
       if (o.vendor_id && vMap.has(o.vendor_id)) vendorByOrder.set(o.id, vMap.get(o.vendor_id)!)
       if (o.rider_id && rMap.has(o.rider_id)) riderByOrder.set(o.id, rMap.get(o.rider_id)!)

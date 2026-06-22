@@ -32,6 +32,11 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [recoveryCode, setRecoveryCode] = useState('')
   const [savedCode, setSavedCode] = useState(false)
+  // Explicit acceptance of the Terms, Privacy and Refund policies (gates sign-up).
+  const [agreed, setAgreed] = useState(false)
+  // Optional separate call number. Default: same as the WhatsApp (account) number.
+  const [callSame, setCallSame] = useState(true)
+  const [callPhone, setCallPhone] = useState('+234')
   // Deep-link destination (e.g. a vendor's store link) — land here after signup.
   const [nextPath, setNextPath] = useState('/')
 
@@ -134,12 +139,20 @@ export default function RegisterPage() {
       setError('Please answer both security questions.')
       return
     }
+    if (!callSame && callPhone.replace(/\D/g, '').length < 11) {
+      setError('Enter a phone number for calls, or tick “Same as my WhatsApp number”.')
+      return
+    }
+    if (!agreed) {
+      setError('Please accept the Terms, Privacy Policy and Refund Policy to continue.')
+      return
+    }
     setLoading(true)
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, call_phone: callSame ? undefined : callPhone }),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -234,7 +247,8 @@ export default function RegisterPage() {
           </label>
 
           <label className="block text-sm text-white/70">
-            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Phone number</span>
+            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">WhatsApp number — for messages</span>
+            <span className="mb-2 block text-xs text-white/40">Required. We send your login code here, and vendors/riders message you on WhatsApp. Use a number with WhatsApp.</span>
             <input
               value={form.phone}
               onChange={(event) => {
@@ -309,6 +323,37 @@ export default function RegisterPage() {
             </div>
           ))}
 
+          {/* Phone number — for calls. Required: a separate number, or "same". */}
+          <div className="space-y-2">
+            <span className="block text-xs uppercase tracking-[0.18em] text-white/40">Phone number — for calls</span>
+            <span className="block text-xs text-white/40">Required. The number vendors/riders will call you on. Can be the same as your WhatsApp number.</span>
+            <label className="flex items-center gap-2.5 cursor-pointer text-sm text-white/70">
+              <input
+                type="checkbox"
+                checked={callSame}
+                onChange={(event) => setCallSame(event.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-slate-950 accent-amber-500"
+              />
+              Same as my WhatsApp number
+            </label>
+            {!callSame && (
+              <input
+                value={callPhone}
+                onChange={(event) => {
+                  const raw = event.target.value.replace(/\s/g, '')
+                  let normalized = raw
+                  if (raw.startsWith('0')) normalized = '+234' + raw.slice(1)
+                  else if (raw.startsWith('234') && !raw.startsWith('+')) normalized = '+' + raw
+                  else if (!raw.startsWith('+')) normalized = '+234' + raw
+                  setCallPhone(normalized)
+                }}
+                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                placeholder="+2348012345678"
+                inputMode="tel"
+              />
+            )}
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm text-white/70">
               <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Choose PIN</span>
@@ -369,12 +414,27 @@ export default function RegisterPage() {
             </label>
           </div>
 
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(event) => { setAgreed(event.target.checked); if (event.target.checked) setError('') }}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-slate-950 accent-amber-500"
+            />
+            <span className="text-xs leading-relaxed text-white/60">
+              I agree to LumeX Fud’s{' '}
+              <a href="/terms" target="_blank" className="text-[#F5A623]">Terms</a>,{' '}
+              <a href="/privacy" target="_blank" className="text-[#F5A623]">Privacy Policy</a>{' '}and{' '}
+              <a href="/refunds" target="_blank" className="text-[#F5A623]">Refund &amp; Cancellation Policy</a>.
+            </span>
+          </label>
+
           {error && <p className="text-sm text-red-400">{error}</p>}
 
           <button
             type="button"
             onClick={handleRegister}
-            disabled={loading || (verificationRequired && !phoneVerified)}
+            disabled={loading || !agreed || (verificationRequired && !phoneVerified)}
             className="w-full rounded-2xl bg-amber-500 py-4 text-sm font-semibold text-black disabled:opacity-50"
           >
             {loading ? 'Creating account…' : (verificationRequired && !phoneVerified) ? 'Verify your phone to continue' : 'Create account'}

@@ -5,6 +5,7 @@ import { getFeature } from '@/lib/features'
 import { BottomNav } from '@/components/nav-bottom'
 import { OrderStatusClient } from './order-status-client'
 import { settleOrderIfDue, type SettleableOrder } from '@/lib/order-settle'
+import { callPhoneMap } from '@/lib/call-phone'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,6 +43,14 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNum
     leaveAtGate = !!(lag as { leave_at_gate?: boolean } | null)?.leave_at_gate
   }
   ;(order as { leave_at_gate?: boolean }).leave_at_gate = leaveAtGate
+
+  // Rider call number (migration 074) — resolved non-fatally. The rider card calls
+  // this number (tel:); WhatsApp/SMS use the rider's WhatsApp (account) number.
+  const riderId = (order as { rider_id?: string | null }).rider_id
+  if (riderId && (order as { riders?: { call_phone?: string | null } | null }).riders) {
+    const m = await callPhoneMap('riders', [riderId], db)
+    ;(order as { riders: { call_phone?: string | null } }).riders.call_phone = m.get(riderId) ?? null
+  }
 
   // Self-healing: if this is a paid order the vendor never accepted in time,
   // cancel + refund it now (doesn't wait on the auto-cancel cron). Reflect the
@@ -160,6 +169,6 @@ export interface OrderDetail {
   vendor_id: string
   rider_id: string | null
   vendors: { shop_name: string; prep_time_minutes: number } | null
-  riders: { full_name: string; phone: string; opening_time: string | null; closing_time: string | null; avatar_url: string | null } | null
+  riders: { full_name: string; phone: string; call_phone?: string | null; opening_time: string | null; closing_time: string | null; avatar_url: string | null } | null
   order_items: Array<{ id: string; name: string; price: number; quantity: number; subtotal: number; addons?: { name: string; price_kobo: number }[] }>
 }

@@ -18,7 +18,7 @@ export default function NewRiderPage() {
   // while OTP delivery is down. Defaults to required until flags load.
   const features = useFeatures()
   const verificationRequired = features.phone_verification !== false
-  const [form, setForm] = useState({ full_name: '', phone: '+234' })
+  const [form, setForm] = useState({ full_name: '', phone: '+234', call_phone: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState<SuccessData | null>(null)
@@ -146,7 +146,7 @@ export default function NewRiderPage() {
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Phone number (+234)</span>
+            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">WhatsApp number (+234) — for messages &amp; login</span>
             <input
               value={form.phone}
               onChange={(e) => {
@@ -167,6 +167,20 @@ export default function NewRiderPage() {
               onVerified={() => setPhoneVerified(true)}
             />
           )}
+
+          <label className="block">
+            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Phone number for calls (leave blank if same as WhatsApp)</span>
+            <input
+              value={form.call_phone}
+              onChange={(e) => {
+                const v = e.target.value
+                set('call_phone', v && !v.startsWith('+234') ? '+234' + v.replace(/^\+?234?/, '') : v)
+              }}
+              placeholder="Same as WhatsApp"
+              inputMode="tel"
+              className={inputCls}
+            />
+          </label>
 
           {error && <p className="text-sm text-red-400">{error}</p>}
 

@@ -142,7 +142,7 @@ export default function SponsorPage() {
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-4">
           <label className="block">
-            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Student’s phone number</span>
+            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Student’s WhatsApp number</span>
             <input value={phone} inputMode="tel"
               onChange={(e) => { let v = e.target.value; if (!v.startsWith('+234')) v = '+234' + v.replace(/^\+?234?/, ''); setPhone(v); setError('') }}
               placeholder="+2348012345678" className={inputCls} />
