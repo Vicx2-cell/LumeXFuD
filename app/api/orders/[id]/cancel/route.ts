@@ -9,15 +9,14 @@ import { audit } from '@/lib/audit'
 
 const CANCELLABLE_STATUSES = ['PENDING_PAYMENT', 'SCHEDULED', 'PENDING', 'VENDOR_ACCEPTED']
 
-// Who may cancel WHAT — abuse-resistant by design. A customer must NOT be able to
-// self-cancel a paid, live order on demand (order→cancel→refund farming, or
-// pulling out after a vendor committed). So a customer can only cancel an UNPAID
-// checkout (PENDING_PAYMENT) or a prepaid SCHEDULED pre-order before it is sent to
-// the vendor. A paid PENDING order that the vendor never accepts is refunded
-// AUTOMATICALLY by the auto-cancel sweep — not by a customer button. Vendors may
+// Who may cancel WHAT. A customer may cancel ONLY while the vendor hasn't accepted
+// yet — an unpaid checkout, a scheduled pre-order before it's sent, or a paid
+// PENDING order the vendor hasn't picked up. The moment the vendor ACCEPTS, the
+// customer can no longer cancel (the food is being committed/prepared) — that's
+// the line that stops people pulling out after a vendor has committed. Vendors may
 // reject (PENDING / VENDOR_ACCEPTED before cooking); staff may cancel anything.
 const CANCELLABLE_BY_ROLE: Record<string, string[]> = {
-  customer:    ['PENDING_PAYMENT', 'SCHEDULED'],
+  customer:    ['PENDING_PAYMENT', 'SCHEDULED', 'PENDING'],
   vendor:      ['PENDING', 'VENDOR_ACCEPTED'],
   admin:       CANCELLABLE_STATUSES,
   super_admin: CANCELLABLE_STATUSES,
@@ -68,7 +67,7 @@ export async function POST(
   const allowedForRole = CANCELLABLE_BY_ROLE[session.role] ?? []
   if (!allowedForRole.includes(order.status as string)) {
     const msg = session.role === 'customer'
-      ? 'This order can no longer be cancelled. If the vendor doesn’t accept it in time it’s refunded automatically; otherwise report a problem after delivery.'
+      ? 'This order can’t be cancelled — the vendor has already accepted it. If there’s a problem, report it after delivery.'
       : 'Order cannot be cancelled at this stage'
     return NextResponse.json({ error: msg }, { status: 400 })
   }

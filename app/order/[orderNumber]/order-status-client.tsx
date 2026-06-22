@@ -109,6 +109,28 @@ export function OrderStatusClient({
     }
   }, [isActive, router])
 
+  // Cancel — allowed ONLY before the vendor accepts (PENDING / scheduled). The
+  // server enforces this too; the button just disappears once accepted.
+  const [cancelling, setCancelling] = useState(false)
+  async function cancelOrder() {
+    if (!confirm('Cancel this order? You’ll be refunded in full. This can’t be undone.')) return
+    setActionError('')
+    setCancelling(true)
+    try {
+      const res = await fetch(`/api/orders/${order.id}/cancel`, { method: 'POST' })
+      if (res.ok) {
+        setOrder((prev) => ({ ...prev, status: 'CANCELLED' }))
+      } else {
+        const d = await res.json().catch(() => ({})) as { error?: string }
+        setActionError(d.error ?? 'Could not cancel your order. Please try again.')
+      }
+    } catch {
+      setActionError('Network error. Please try again.')
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   async function confirmDelivery() {
     setActionError('')
     setConfirming(true)
@@ -238,6 +260,18 @@ export function OrderStatusClient({
             </p>
             <p className="text-xs text-white/50 mt-2">We’ll send your order to the kitchen at this time — it arrives a bit after. Cancel any time before then for a full refund.</p>
           </div>
+        )}
+
+        {/* Cancel — only while the vendor hasn't accepted yet (full refund). */}
+        {['PENDING', 'SCHEDULED'].includes(order.status) && (
+          <button
+            onClick={cancelOrder}
+            disabled={cancelling}
+            className="w-full py-3 rounded-xl text-sm font-medium disabled:opacity-50 transition-colors"
+            style={{ background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)' }}
+          >
+            {cancelling ? 'Cancelling…' : 'Cancel order — full refund'}
+          </button>
         )}
 
         {/* ETA — delivery only (pickup shows its code card below instead) */}

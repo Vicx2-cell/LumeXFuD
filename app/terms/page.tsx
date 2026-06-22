@@ -50,7 +50,7 @@ export default async function TermsPage() {
         <section>
           <h2 className="text-base font-semibold text-white mb-2">4. Refunds, cancellations &amp; disputes</h2>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Once you pay, your order is sent to the vendor. If the vendor does not accept it in time (about 5 minutes), it is automatically cancelled and refunded in full — you don’t need to do anything. Once a vendor accepts, the order can’t be cancelled; report a problem instead</li>
+            <li>You can cancel for a full refund any time before the vendor accepts your order. Once the vendor accepts, the order can’t be cancelled (your food is being prepared) — report a problem instead. If the vendor never accepts in time (about 5 minutes), it is cancelled and refunded automatically</li>
             <li>For delivery, you may report a problem within <strong className="text-white">24 hours</strong> of receiving your order; our team reviews every report within 24 hours and refunds in full or in part based on the evidence</li>
             <li>For pickup, once your order is marked ready it is held for <strong className="text-white">1 hour 25 minutes</strong> — you agree to this before paying; if you don’t collect in time the order is cleared and not refunded. If the vendor never makes it ready, you are automatically refunded in full</li>
             <li>Refunds are returned to your original payment method (via Paystack) or your LumeX Wallet</li>

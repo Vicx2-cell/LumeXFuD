@@ -54,8 +54,9 @@ export default async function RefundsPage() {
           <section>
             <h2 className="text-base font-semibold text-white mb-2">Cancelling an order</h2>
             <ul className="list-disc pl-5 space-y-1">
-              <li><strong className="text-white">If the vendor doesn’t accept your order in time</strong> (about 5 minutes), it is <strong className="text-white">automatically cancelled and refunded in full</strong> — you don’t need to do anything.</li>
+              <li><strong className="text-white">Before the vendor accepts your order, you can cancel it for a full refund</strong> — straight from your order screen.</li>
               <li><strong className="text-white">Once a vendor accepts your order, it can’t be cancelled</strong>, because your food is being prepared. If something goes wrong, report a problem (below).</li>
+              <li><strong className="text-white">If the vendor never accepts in time</strong> (about 5 minutes), the order is cancelled and refunded automatically — you don’t need to do anything.</li>
               <li><strong className="text-white">Scheduled (order-ahead) orders</strong> can be cancelled for a full refund any time before they are sent to the vendor.</li>
             </ul>
           </section>
