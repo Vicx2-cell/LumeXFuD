@@ -10,13 +10,18 @@ export const dynamic = 'force-dynamic'
 // and shows the live fees so pricing is transparent without logging in.
 export default async function RefundsPage() {
   const db = createSupabaseAdmin()
+  // Live fees from the settings table — id-keyed JSONB shaped {"amount_kobo": N},
+  // the SAME source the cart + the authoritative checkout calc use. A super-admin
+  // price change here is reflected on this page immediately (no hardcoded prices).
   const { data } = await db.from('settings').select('id, value')
     .in('id', ['platform_markup', 'delivery_fee_bike', 'delivery_fee_door', 'min_order_amount'])
+  const priceMap = new Map<string, number>()
+  for (const row of (data ?? []) as Array<{ id: string; value: { amount_kobo?: number } }>) {
+    priceMap.set(row.id, Number(row.value?.amount_kobo))
+  }
   const kobo = (id: string, fallback: number) => {
-    const row = (data ?? []).find((r) => (r as { id: string }).id === id)
-    const v = (row as { value?: { kobo?: number; amount?: number; value?: number } } | undefined)?.value
-    const n = Number(v?.kobo ?? v?.amount ?? v?.value ?? (typeof v === 'number' ? v : NaN))
-    return Number.isFinite(n) && n > 0 ? n : fallback
+    const n = priceMap.get(id)
+    return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : fallback
   }
   const platform = kobo('platform_markup', 25000)
   const bike = kobo('delivery_fee_bike', 50000)
