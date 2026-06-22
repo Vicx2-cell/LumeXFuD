@@ -7,6 +7,7 @@ import { BackButton } from '@/components/back-button'
 import { formatPrice, formatDate } from '@/lib/money'
 import { resolveOrdersView } from '@/lib/orders-view'
 import { ReorderButton } from '@/components/reorder-button'
+import { CancelOrderButton } from '@/components/cancel-order-button'
 import { VerifiedBadge } from '@/components/verified-badge'
 import { Badge } from '@/components/ui/badge'
 
@@ -142,6 +143,12 @@ export default async function OrdersPage({
                     {/* Client island: rebuilds the cart from this order. preventDefault
                         inside stops the surrounding card <Link> from also navigating. */}
                     <ReorderButton orderId={order.id as string} />
+                  </div>
+                )}
+                {/* Cancel — only before the vendor accepts (PENDING / scheduled). */}
+                {(order.status === 'PENDING' || order.status === 'SCHEDULED') && (
+                  <div className="mt-3 border-t border-white/5 pt-3">
+                    <CancelOrderButton orderId={order.id as string} />
                   </div>
                 )}
               </Link>
