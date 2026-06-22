@@ -720,7 +720,7 @@ export default function CartPage() {
             />
             <span className="text-xs text-white/60 leading-relaxed">
               I agree to the <a href="/terms" target="_blank" className="text-[#F5A623]">Terms</a> and{' '}
-              <a href="/refunds" target="_blank" className="text-[#F5A623]">Refund &amp; Cancellation Policy</a>. I can cancel for a full refund before the vendor accepts, and report a problem within 24 hours of delivery.
+              <a href="/refunds" target="_blank" className="text-[#F5A623]">Refund &amp; Cancellation Policy</a>. If the vendor doesn’t accept my order in time it’s refunded automatically; once accepted it can’t be cancelled. I can report a problem within 24 hours of delivery.
             </span>
           </label>
         )}

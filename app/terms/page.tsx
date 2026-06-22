@@ -1,5 +1,7 @@
 import { getControls } from '@/lib/controls'
 import { formatHoursRange } from '@/lib/hours'
+import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { formatPrice } from '@/lib/money'
 import { SiteFooter, SUPPORT_EMAIL } from '@/components/site-footer'
 
 export const dynamic = 'force-dynamic'
@@ -7,6 +9,11 @@ export const dynamic = 'force-dynamic'
 export default async function TermsPage() {
   const controls = await getControls()
   const hoursLabel = formatHoursRange(controls.hours_open, controls.hours_close)
+  // Minimum order — live from settings ({"amount_kobo": N}); never hardcoded.
+  const db = createSupabaseAdmin()
+  const { data: minRow } = await db.from('settings').select('value').eq('id', 'min_order_amount').maybeSingle()
+  const minKobo = Number((minRow as { value?: { amount_kobo?: number } } | null)?.value?.amount_kobo)
+  const minOrder = Number.isFinite(minKobo) && minKobo > 0 ? minKobo : 50000
   return (
     <main style={{ background: '#0A0A0B' }}>
       <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto">
@@ -23,7 +30,7 @@ export default async function TermsPage() {
           <h2 className="text-base font-semibold text-white mb-2">2. Platform hours & service</h2>
           <ul className="list-disc pl-5 space-y-1">
             <li>LumeX Fud operates {hoursLabel} daily</li>
-            <li>Minimum order is ₦500</li>
+            <li>Minimum order is {formatPrice(minOrder)}</li>
             <li>Delivery is available only within ABSU campus</li>
             <li>We are not responsible for vendor food quality, only for delivery</li>
           </ul>
@@ -43,7 +50,7 @@ export default async function TermsPage() {
         <section>
           <h2 className="text-base font-semibold text-white mb-2">4. Refunds, cancellations &amp; disputes</h2>
           <ul className="list-disc pl-5 space-y-1">
-            <li>You may cancel for a full refund before the vendor accepts (about the first 5 minutes); once the vendor starts cooking, the order can no longer be cancelled</li>
+            <li>Once you pay, your order is sent to the vendor. If the vendor does not accept it in time (about 5 minutes), it is automatically cancelled and refunded in full — you don’t need to do anything. Once a vendor accepts, the order can’t be cancelled; report a problem instead</li>
             <li>For delivery, you may report a problem within <strong className="text-white">24 hours</strong> of receiving your order; our team reviews every report within 24 hours and refunds in full or in part based on the evidence</li>
             <li>For pickup, once your order is marked ready it is held for <strong className="text-white">1 hour 25 minutes</strong> — you agree to this before paying; if you don’t collect in time the order is cleared and not refunded. If the vendor never makes it ready, you are automatically refunded in full</li>
             <li>Refunds are returned to your original payment method (via Paystack) or your LumeX Wallet</li>

@@ -9,6 +9,20 @@ import { audit } from '@/lib/audit'
 
 const CANCELLABLE_STATUSES = ['PENDING_PAYMENT', 'SCHEDULED', 'PENDING', 'VENDOR_ACCEPTED']
 
+// Who may cancel WHAT — abuse-resistant by design. A customer must NOT be able to
+// self-cancel a paid, live order on demand (order→cancel→refund farming, or
+// pulling out after a vendor committed). So a customer can only cancel an UNPAID
+// checkout (PENDING_PAYMENT) or a prepaid SCHEDULED pre-order before it is sent to
+// the vendor. A paid PENDING order that the vendor never accepts is refunded
+// AUTOMATICALLY by the auto-cancel sweep — not by a customer button. Vendors may
+// reject (PENDING / VENDOR_ACCEPTED before cooking); staff may cancel anything.
+const CANCELLABLE_BY_ROLE: Record<string, string[]> = {
+  customer:    ['PENDING_PAYMENT', 'SCHEDULED'],
+  vendor:      ['PENDING', 'VENDOR_ACCEPTED'],
+  admin:       CANCELLABLE_STATUSES,
+  super_admin: CANCELLABLE_STATUSES,
+}
+
 // POST /api/orders/[id]/cancel
 // A customer cancels their own order, a VENDOR rejects an order placed with them
 // (the "Decline" button — previously this route was customer-only, so vendor
@@ -51,8 +65,12 @@ export async function POST(
   }
   if (!authorized) return NextResponse.json({ error: 'Not your order' }, { status: 403 })
 
-  if (!CANCELLABLE_STATUSES.includes(order.status as string)) {
-    return NextResponse.json({ error: 'Order cannot be cancelled at this stage' }, { status: 400 })
+  const allowedForRole = CANCELLABLE_BY_ROLE[session.role] ?? []
+  if (!allowedForRole.includes(order.status as string)) {
+    const msg = session.role === 'customer'
+      ? 'This order can no longer be cancelled. If the vendor doesn’t accept it in time it’s refunded automatically; otherwise report a problem after delivery.'
+      : 'Order cannot be cancelled at this stage'
+    return NextResponse.json({ error: msg }, { status: 400 })
   }
 
   // Once cooking has started, no one can cancel a VENDOR_ACCEPTED order.
