@@ -33,6 +33,8 @@ interface WalletData {
   bank_account_name: string | null
   bank_ready: boolean
   bank_ready_at: string | null
+  bank_verified: boolean
+  next_sweep_at: string | null
   is_frozen: boolean
   frozen_reason: string | null
   lifetime_earned: string
@@ -217,6 +219,16 @@ export default function WalletView({ userType }: Props) {
             <p className="text-green-400 font-semibold">{wallet?.available_balance ?? '₦0'}</p>
             <p className="text-white/30 text-xs mt-1">Withdraw now</p>
           </div>
+          {wallet?.next_sweep_at && (wallet?.available_kobo ?? 0) > 0 && (
+            <div className="col-span-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+              <p className="lx-amber text-xs">
+                🏦 Auto-payout to your bank {new Date(wallet.next_sweep_at).getTime() <= now
+                  ? 'any moment now'
+                  : `in ${formatCountdown(new Date(wallet.next_sweep_at).getTime() - now)}`}
+              </p>
+              <p className="text-white/40 text-xs mt-1">Earnings you don’t withdraw are sent to your registered account after 48 hours.</p>
+            </div>
+          )}
           <div className="bg-white/5 rounded-xl p-3">
             <p className="text-white/50 text-xs mb-1">Held</p>
             <p className="lx-amber font-semibold">{wallet?.held_balance ?? '₦0'}</p>

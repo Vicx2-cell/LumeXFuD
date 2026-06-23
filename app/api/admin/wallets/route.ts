@@ -18,6 +18,8 @@ interface WalletRow {
   frozen_reason: string | null
   bank_name: string | null
   bank_account_last4: string | null
+  bank_verified_at: string | null
+  sweep_fail_count: number | null
   lifetime_earned: number
   total_withdrawals: number
   updated_at: string
@@ -50,7 +52,7 @@ export async function GET(req: NextRequest) {
     .select(
       'user_id, user_type, total_balance, available_balance, held_balance, ' +
       'trust_tier, is_frozen, frozen_reason, bank_name, bank_account_last4, ' +
-      'lifetime_earned, total_withdrawals, updated_at'
+      'bank_verified_at, sweep_fail_count, lifetime_earned, total_withdrawals, updated_at'
     )
     .order('total_balance', { ascending: false })
 
@@ -129,6 +131,8 @@ export async function GET(req: NextRequest) {
       frozen_reason:     w.frozen_reason,
       bank_name:         w.bank_name,
       bank_last_4:       w.bank_account_last4 ?? null,
+      bank_verified:     !!w.bank_verified_at,
+      sweep_fail_count:  w.sweep_fail_count ?? 0,
       lifetime_earned:   formatPrice(w.lifetime_earned ?? 0),
       total_withdrawn:   formatPrice(w.total_withdrawals ?? 0),
       updated_at:        w.updated_at,
@@ -153,6 +157,8 @@ export async function GET(req: NextRequest) {
       frozen_reason:     null,
       bank_name:         null,
       bank_last_4:       null,
+      bank_verified:     false,
+      sweep_fail_count:  0,
       lifetime_earned:   '—',
       total_withdrawn:   '—',
       updated_at:        cw.updated_at,

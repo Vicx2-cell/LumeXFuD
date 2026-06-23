@@ -28,7 +28,7 @@ export async function GET() {
     .select(
       'total_balance, available_balance, held_balance, trust_tier, ' +
       'wallet_pin_hash, bank_account_number, bank_account_last4, bank_code, bank_account_name, bank_name, ' +
-      'last_bank_added_at, is_frozen, frozen_reason, lifetime_earned, total_withdrawals, ' +
+      'last_bank_added_at, bank_verified_at, is_frozen, frozen_reason, lifetime_earned, total_withdrawals, ' +
       'pin_attempts, pin_locked_until'
     )
     .eq('user_id', session.userId!)
@@ -36,6 +36,19 @@ export async function GET() {
     .maybeSingle()
 
   const wallet = raw as unknown as WalletBalance | null
+
+  // 48h auto-sweep: soonest moment unwithdrawn funds will be sent to the bank.
+  const { data: nextLot } = await db
+    .from('wallet_payout_lots')
+    .select('sweep_due_at')
+    .eq('user_id', session.userId!)
+    .eq('user_type', userType)
+    .eq('state', 'WITHDRAWABLE')
+    .gt('remaining', 0)
+    .order('sweep_due_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  const nextSweepAt = (nextLot as { sweep_due_at?: string } | null)?.sweep_due_at ?? null
 
   // Tier + experience count computed LIVE from the same source the hold logic
   // uses (completed orders for vendors, deliveries for riders) — so the tier
@@ -73,6 +86,9 @@ export async function GET() {
     bank_account_name: wallet?.bank_account_name ?? null,
     bank_ready:     bankReady,
     bank_ready_at:  coolingExpires?.toISOString() ?? null,
+    bank_verified:  !!wallet?.bank_verified_at,
+    // When the soonest withdrawable funds will auto-pay-out to the bank if left.
+    next_sweep_at:  nextSweepAt,
     is_frozen:      wallet?.is_frozen ?? false,
     frozen_reason:  wallet?.is_frozen ? (wallet?.frozen_reason ?? null) : null,
     lifetime_earned: formatPrice(wallet?.lifetime_earned ?? 0),

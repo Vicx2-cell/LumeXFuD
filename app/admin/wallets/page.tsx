@@ -35,6 +35,8 @@ interface WalletRow {
   frozen_reason:      string | null
   bank_name:          string | null
   bank_last_4:        string | null
+  bank_verified:      boolean
+  sweep_fail_count:   number
   lifetime_earned:    string
   total_withdrawn:    string
   updated_at:         string
@@ -343,10 +345,22 @@ export default function AdminWalletsPage() {
             )}
 
             {/* Bank */}
-            {selected.bank_name && (
+            {selected.bank_name ? (
               <div className="bg-white/5 rounded-xl p-3 mb-5">
                 <p className="text-white/40 text-xs mb-1">Withdrawal Bank</p>
                 <p className="text-white text-sm">{selected.bank_name} ****{selected.bank_last_4}</p>
+                <p className="text-xs mt-1">
+                  {selected.bank_verified
+                    ? <span className="text-green-400">✓ Verified — eligible for 48h auto-sweep</span>
+                    : <span className="lx-amber">⚠ Not verified — won’t auto-sweep until re-verified</span>}
+                </p>
+                {selected.sweep_fail_count > 0 && (
+                  <p className="text-red-400 text-xs mt-1">⚠ {selected.sweep_fail_count} failed auto-sweep{selected.sweep_fail_count === 1 ? '' : 's'} — check this account</p>
+                )}
+              </div>
+            ) : selected.user_type !== 'CUSTOMER' && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-5">
+                <p className="lx-amber text-xs">⚠ No payout bank on file — this {selected.user_type.toLowerCase()} is gated from operating until they add one.</p>
               </div>
             )}
 

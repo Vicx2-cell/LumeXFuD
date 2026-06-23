@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { vendorStatusInput } from '@/lib/validators'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { isBankVerified, BANK_GATE_MESSAGE } from '@/lib/wallet'
 
 export async function POST(
   req: NextRequest,
@@ -36,6 +37,11 @@ export async function POST(
 
   const parsed = vendorStatusInput.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+
+  // Mandatory verified bank before a vendor can OPEN for orders (admins exempt).
+  if (parsed.data.status === 'OPEN' && session.role === 'vendor' && !(await isBankVerified(id, 'VENDOR'))) {
+    return NextResponse.json({ error: BANK_GATE_MESSAGE, code: 'BANK_REQUIRED' }, { status: 403 })
+  }
 
   // A manual status change always clears any active pause timer — otherwise a
   // vendor who paused by mistake stays "Paused" (paused_until in the future) even

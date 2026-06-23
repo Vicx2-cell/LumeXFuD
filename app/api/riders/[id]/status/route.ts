@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { isBankVerified, BANK_GATE_MESSAGE } from '@/lib/wallet'
 
 const riderStatusInput = z.object({ status: z.enum(['ONLINE', 'OFFLINE']) })
 
@@ -42,6 +43,11 @@ export async function POST(
   // Cannot go offline while on an active order
   if (parsed.data.status === 'OFFLINE' && rider.active_order_id) {
     return NextResponse.json({ error: 'Complete your current delivery before going offline' }, { status: 400 })
+  }
+
+  // Mandatory verified bank before a rider can go ONLINE (admins/super-admins exempt).
+  if (parsed.data.status === 'ONLINE' && session.role === 'rider' && !(await isBankVerified(id, 'RIDER'))) {
+    return NextResponse.json({ error: BANK_GATE_MESSAGE, code: 'BANK_REQUIRED' }, { status: 403 })
   }
 
   await db.from('riders').update({

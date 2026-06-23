@@ -20,6 +20,7 @@ export interface WalletBalance {
   bank_account_name: string | null
   bank_name: string | null
   last_bank_added_at: string | null
+  bank_verified_at: string | null
   is_frozen: boolean
   frozen_reason: string | null
   frozen_at: string | null
@@ -37,6 +38,7 @@ export interface WalletTransaction {
     | 'CREDIT' | 'DEBIT' | 'HOLD' | 'RELEASE'
     | 'FREEZE' | 'UNFREEZE' | 'WITHDRAWAL'
     | 'WITHDRAWAL_REVERSAL' | 'ADMIN_ADJUSTMENT'
+    | 'SWEEP' | 'SWEEP_REVERSAL'
   amount: number
   balance_before: number
   balance_after: number
@@ -211,6 +213,26 @@ export async function getTierAndCount(
   return { tier: calculateTier(count, avg), count }
 }
 
+// ─── Bank verification gate ────────────────────────────────────────────────────
+// A vendor/rider must have a Paystack-verified payout bank on file before they can
+// operate (accept orders / go online / open shop) or reach their dashboard. The
+// bank is the destination for both manual withdrawals and the 48h auto-sweep.
+// Verification = save-bank confirmed the account against Paystack and stamped
+// bank_verified_at (re-stamped on every change). Returns true for a verified bank.
+export async function isBankVerified(userId: string, userType: WalletUserType): Promise<boolean> {
+  const db = createSupabaseAdmin()
+  const { data } = await db
+    .from('wallet_balances')
+    .select('bank_verified_at, bank_account_number, bank_code')
+    .eq('user_id', userId)
+    .eq('user_type', userType)
+    .maybeSingle()
+  const w = data as unknown as { bank_verified_at: string | null; bank_account_number: string | null; bank_code: string | null } | null
+  return !!(w?.bank_verified_at && w?.bank_account_number && w?.bank_code)
+}
+
+export const BANK_GATE_MESSAGE = 'Add and verify your bank account before you can operate. Open your Wallet to add it.'
+
 // ─── Atomic credit: calls the Postgres RPC for SELECT FOR UPDATE safety ───────
 
 export async function creditWalletHeld(params: {
@@ -298,6 +320,68 @@ export async function reverseWithdrawal(txId: string, reason: string): Promise<b
     return false
   }
   return !!data
+}
+
+// ─── 48h auto-sweep ────────────────────────────────────────────────────────────
+// When held earnings finish their hold they become WITHDRAWABLE and start a 48h
+// window (see migration 075). The wallet-sweep cron uses these to force any funds
+// the user never withdrew out to their registered bank.
+
+// Stage a sweep: under the wallet lock, claim all due lots that fit in the live
+// balance, debit the pool, log a PENDING SWEEP. Returns the staged tx + amount, or
+// a zero amount when there is nothing due. The caller then fires the transfer and
+// calls finalizeSweep. Idempotency: the staged lots flip to SWEEPING so a second
+// call can't claim them again.
+export async function sweepDueFunds(params: {
+  userId: string
+  userType: WalletUserType
+  reference: string
+}): Promise<{ txId: string | null; sweptAmount: number; lotCount: number }> {
+  const db = createSupabaseAdmin()
+  const { data, error } = await db.rpc('sweep_due_funds', {
+    p_user_id:   params.userId,
+    p_user_type: params.userType,
+    p_reference: params.reference,
+  })
+  if (error) throw new Error(`sweep_due_funds failed: ${error.message}`)
+  const row = (data as unknown as Array<{ tx_id: string | null; swept_amount: number; lot_count: number }>)[0]
+  return { txId: row?.tx_id ?? null, sweptAmount: row?.swept_amount ?? 0, lotCount: row?.lot_count ?? 0 }
+}
+
+// Commit (success) or roll back (failure) a staged sweep. On failure the pool and
+// lots are restored — money is never lost on a failed transfer.
+export async function finalizeSweep(params: {
+  txId: string
+  success: boolean
+  transferCode?: string | null
+  recipientCode?: string | null
+  reason?: string | null
+}): Promise<boolean> {
+  const db = createSupabaseAdmin()
+  const { data, error } = await db.rpc('finalize_sweep', {
+    p_tx_id:          params.txId,
+    p_success:        params.success,
+    p_transfer_code:  params.transferCode ?? null,
+    p_recipient_code: params.recipientCode ?? null,
+    p_reason:         params.reason ?? null,
+  })
+  if (error) {
+    console.error('[finalizeSweep] RPC error:', error.message)
+    return false
+  }
+  return !!data
+}
+
+// Reclaim sweeps stranded in SWEEPING with a PENDING tx and no transfer code (the
+// cron died between staging and the Paystack call) so the funds sweep again.
+export async function reclaimStuckSweeps(minutes: number): Promise<number> {
+  const db = createSupabaseAdmin()
+  const { data, error } = await db.rpc('reclaim_stuck_sweeps', { p_minutes: minutes })
+  if (error) {
+    console.error('[reclaimStuckSweeps] RPC error:', error.message)
+    return 0
+  }
+  return (data as number) ?? 0
 }
 
 // ─── Freeze / Unfreeze ─────────────────────────────────────────────────────────
@@ -455,6 +539,8 @@ export function humanizeTx(
     case 'RELEASE':            return tx.description ?? 'Earnings released'
     case 'WITHDRAWAL':         return bankLast4 ? `Withdrawal to ****${bankLast4}` : 'Withdrawal'
     case 'WITHDRAWAL_REVERSAL': return 'Withdrawal reversed — balance restored'
+    case 'SWEEP':              return bankLast4 ? `Auto-payout to ****${bankLast4}` : 'Auto-payout to your bank'
+    case 'SWEEP_REVERSAL':     return 'Auto-payout failed — balance restored'
     case 'FREEZE':             return 'Wallet frozen — contact support'
     case 'UNFREEZE':           return 'Wallet unfrozen'
     case 'ADMIN_ADJUSTMENT':   return tx.description ?? 'Admin adjustment'
@@ -463,14 +549,14 @@ export function humanizeTx(
 }
 
 export function txSign(type: WalletTransaction['type']): '+' | '-' | '' {
-  if (['CREDIT','RELEASE','WITHDRAWAL_REVERSAL','UNFREEZE'].includes(type)) return '+'
-  if (['WITHDRAWAL','DEBIT','FREEZE'].includes(type)) return '-'
+  if (['CREDIT','RELEASE','WITHDRAWAL_REVERSAL','SWEEP_REVERSAL','UNFREEZE'].includes(type)) return '+'
+  if (['WITHDRAWAL','SWEEP','DEBIT','FREEZE'].includes(type)) return '-'
   return ''
 }
 
 export function txIcon(type: WalletTransaction['type']): string {
-  if (['CREDIT','RELEASE','WITHDRAWAL_REVERSAL'].includes(type)) return '↑'
-  if (['WITHDRAWAL','DEBIT'].includes(type)) return '↑'
+  if (['CREDIT','RELEASE','WITHDRAWAL_REVERSAL','SWEEP_REVERSAL'].includes(type)) return '↑'
+  if (['WITHDRAWAL','SWEEP','DEBIT'].includes(type)) return '↑'
   if (type === 'HOLD') return '🔒'
   if (['FREEZE','UNFREEZE'].includes(type)) return '🔒'
   return '·'

@@ -1,8 +1,14 @@
 import { FaceGate } from '@/components/face-gate'
+import { BankGate } from '@/components/bank-gate'
 
-// Every vendor page is gated: a vendor must have a KYC photo on file before they
-// can use the dashboard (applies to all vendors, new and existing). Admins/
-// super-admins viewing this section are exempt (handled in the status endpoint).
+// Every vendor page is gated, in order: KYC selfie → verified payout bank. A
+// vendor must clear both before they can use the dashboard or open for orders
+// (applies to all vendors, new and existing). Admins/super-admins are exempt
+// (handled in each gate's status endpoint + the operation endpoints).
 export default function VendorDashboardLayout({ children }: { children: React.ReactNode }) {
-  return <FaceGate>{children}</FaceGate>
+  return (
+    <FaceGate>
+      <BankGate>{children}</BankGate>
+    </FaceGate>
+  )
 }

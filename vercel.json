@@ -4,6 +4,7 @@
     { "path": "/api/cron/vendor-auto-cancel", "schedule": "* * * * *" },
     { "path": "/api/cron/release-scheduled", "schedule": "* * * * *" },
     { "path": "/api/cron/wallet-release-held", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/wallet-sweep", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/reset-daily-limits", "schedule": "0 23 * * *" },
     { "path": "/api/cron/wallet-reconciliation", "schedule": "0 5 * * *" },
     { "path": "/api/cron/subscription-check", "schedule": "0 8 * * *" },

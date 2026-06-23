@@ -111,6 +111,9 @@ export async function POST(req: NextRequest) {
       bank_account_name:   verifiedName,
       bank_name,
       last_bank_added_at:  now,
+      // Verified against Paystack just above — this is the gate's source of truth
+      // (set fresh on every save, so a bank CHANGE re-verifies before it counts).
+      bank_verified_at:    now,
       pin_attempts:        0,
       updated_at:          now,
     })

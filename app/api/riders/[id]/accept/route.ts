@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
+import { isBankVerified, BANK_GATE_MESSAGE } from '@/lib/wallet'
 
 const acceptInput = z.object({ order_id: z.string().uuid() })
 
@@ -34,6 +35,10 @@ export async function POST(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
   if (!rider.is_active) return NextResponse.json({ error: 'Rider account is inactive' }, { status: 403 })
+  // Mandatory verified bank before a rider can earn (admins/super-admins exempt).
+  if (session.role === 'rider' && !(await isBankVerified(id, 'RIDER'))) {
+    return NextResponse.json({ error: BANK_GATE_MESSAGE, code: 'BANK_REQUIRED' }, { status: 403 })
+  }
   if (rider.status !== 'ONLINE') {
     return NextResponse.json({ error: 'Go online before accepting orders' }, { status: 400 })
   }
