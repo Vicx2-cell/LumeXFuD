@@ -81,8 +81,15 @@ export async function POST(req: NextRequest) {
   // genuinely-paid order.
   const db = createSupabaseAdmin()
   try {
+    // NOTE: production's processed_webhooks has drifted from migration 007 and
+    // carries an extra `paystack_reference NOT NULL` column (created out-of-band,
+    // not in any migration). Writing only `reference` therefore failed the NOT
+    // NULL constraint on every webhook, so idempotency was never recorded. Set
+    // both columns to the same dedupe value so the insert succeeds and the
+    // (reference,event) / (paystack_reference,event) uniqueness drives dedup.
     const { error: insErr } = await db.from('processed_webhooks').insert({
       reference: dedupeRef,
+      paystack_reference: dedupeRef,
       event,
       payload,
     })

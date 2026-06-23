@@ -79,26 +79,39 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
 
       // The card only ever pays the NON-wallet portion. For a plain PAYSTACK
       // order wallet_amount_kobo is 0 so this equals total_amount; for a SPLIT
-      // it's the remainder after the wallet. A mismatch means reference reuse, a
-      // partial charge, or config drift — never credit; alert for manual review.
+      // it's the remainder after the wallet.
+      //
+      // We require the customer to have paid AT LEAST the expected amount, not
+      // EXACTLY it. When the Paystack account has "Customer bears transaction
+      // charges" enabled, Paystack grosses the charge up so the platform still
+      // NETS the order total — e.g. expected ₦8,050 is charged as ₦8,274.12
+      // ((805000+10000)/(1-0.015)). The settled amount is still the order total,
+      // so an exact-equality check wrongly rejected every fee-bearing order and
+      // left it stuck in PENDING_PAYMENT ("paid but never appears"). We still
+      // reject UNDERpayment (reference reuse / partial charge) and alert.
       const walletPortion = Number(pending.wallet_amount_kobo) || 0
       const expectedCharge = Number(pending.total_amount) - walletPortion
-      if (!Number.isFinite(paidAmount) || paidAmount !== expectedCharge) {
+      if (!Number.isFinite(paidAmount) || paidAmount < expectedCharge) {
         console.error(
-          `[webhook] amount mismatch on ${reference}: charged ${paidAmount}, expected ${expectedCharge}`
+          `[webhook] underpayment on ${reference}: charged ${paidAmount}, expected >= ${expectedCharge}`
         )
         const adminPhone = process.env.ADMIN_PHONE
         if (adminPhone) {
           void sendWhatsAppWithFallback({
             to: adminPhone,
             message:
-              `⚠️ Payment amount mismatch on order ${pending.order_number}\n` +
+              `⚠️ Payment shortfall on order ${pending.order_number}\n` +
               `Charged: ₦${Math.round((Number.isFinite(paidAmount) ? paidAmount : 0) / 100)}\n` +
-              `Expected: ₦${Math.round(expectedCharge / 100)}\n` +
+              `Expected at least: ₦${Math.round(expectedCharge / 100)}\n` +
               `Order NOT marked paid. Manual review needed.`,
           }).catch(() => {})
         }
         break
+      }
+      if (paidAmount > expectedCharge) {
+        // Overpayment = customer-borne Paystack fees; platform still nets the
+        // order total. Informational only — proceed to mark the order paid.
+        console.info(`[webhook] ${reference}: charged ${paidAmount} vs net ${expectedCharge} (customer bore ₦${Math.round((paidAmount - expectedCharge) / 100)} fees)`)
       }
 
       // SPLIT: the card remainder is confirmed — debit the wallet portion now.
