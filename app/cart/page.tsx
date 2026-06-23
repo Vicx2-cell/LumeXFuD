@@ -106,7 +106,12 @@ export default function CartPage() {
       for (const l of catalog) if (!merged.includes(l)) merged.push(l)
       setSavedAddresses(merged)
       setMapLodges(lodges.filter((l) => l.latitude != null && l.longitude != null))
-      if (personal.length > 0) setAddress((cur) => cur || personal[0])
+      // A "Saved places → Order here" tap pre-fills the chosen place (takes
+      // priority over the learned default); otherwise fall back to most-used.
+      let prefill: string | null = null
+      try { prefill = sessionStorage.getItem('lx_prefill_address'); if (prefill) sessionStorage.removeItem('lx_prefill_address') } catch { /* ignore */ }
+      if (prefill) setAddress((cur) => cur || prefill!)
+      else if (personal.length > 0) setAddress((cur) => cur || personal[0])
     }).catch(() => {})
 
     // Surface any items "Order again" had to drop (no longer on the menu).

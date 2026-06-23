@@ -270,6 +270,21 @@ export function ProfileClient({
         </Link>
         )}
 
+        {/* Saved places — named delivery locations + "your usual" for one-tap reuse. */}
+        <Link
+          href="/profile/places"
+          className="lx-tap flex items-center gap-3 rounded-2xl p-4 glass-thin"
+        >
+          <span className="text-2xl">📍</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-white">Saved places</p>
+            <p className="text-xs text-white/50">Save where you order to & reuse your usual</p>
+          </div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </Link>
+
         {/* Streak — keep the flame alive by ordering each day */}
         {hasStreak && (
           <div className="lx-card-amber-soft rounded-2xl p-5 flex items-center justify-between">

@@ -246,6 +246,33 @@ export const adminResetPinInput = z.object({
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
 export const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp']
 
+// ─── Saved places ─────────────────────────────────────────────────────────────
+// Shape validation only; trimming + cross-field rules (half-pin, ranges) live in
+// lib/saved-places.ts (cleanPlaceFields) so they're unit-testable and shared.
+
+const placeCoordsShape = {
+  latitude:  z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+  // Storage key returned by the photo upload route — never a client-chosen URL.
+  photo_path: z.string().max(300).nullable().optional(),
+}
+
+export const createSavedPlaceInput = z.object({
+  label:    z.string().min(1).max(60),
+  landmark: z.string().max(120).nullable().optional(),
+  is_default: z.boolean().optional(),
+  ...placeCoordsShape,
+}).strict()
+
+// Update is a partial — any subset of fields may change. Coords stay all-or-
+// nothing (enforced in cleanPlaceFields when latitude/longitude are present).
+export const updateSavedPlaceInput = z.object({
+  label:    z.string().min(1).max(60).optional(),
+  landmark: z.string().max(120).nullable().optional(),
+  is_default: z.boolean().optional(),
+  ...placeCoordsShape,
+}).strict()
+
 // ─── Vendor menu ────────────────────────────────────────────────────────────────
 
 export const MENU_CATEGORIES = ['RICE', 'PROTEIN', 'DRINKS', 'SNACKS', 'OTHER'] as const
