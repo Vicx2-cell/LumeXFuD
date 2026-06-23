@@ -105,6 +105,11 @@ export function ProfileClient({
   const [pinWorking, setPinWorking] = useState(false)
   const [pinSuccess, setPinSuccess] = useState('')
 
+  // NDPR account deletion (two-step confirm, so a stray tap can't wipe an account).
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
   function resetPinFlow() {
     setPinFlow('idle')
     setPinCurrent('')
@@ -232,6 +237,26 @@ export function ProfileClient({
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/')
     router.refresh()
+  }
+
+  async function handleDeleteAccount() {
+    setDeleteError('')
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/auth/account', { method: 'DELETE' })
+      if (res.ok) {
+        // Account anonymized + session revoked server-side — drop them home.
+        router.push('/')
+        router.refresh()
+        return
+      }
+      const d = await res.json().catch(() => ({})) as { error?: string }
+      setDeleteError(d.error ?? 'Could not delete your account. Please try again.')
+    } catch {
+      setDeleteError('Network error. Please try again.')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const hasStreak = !!streak && streak.current_streak_days > 0
@@ -538,12 +563,38 @@ export function ProfileClient({
           <a href="/terms" className="block text-sm text-white/65 hover:text-white py-1.5 transition-colors">
             Terms of service
           </a>
-          <button
-            className="block text-sm py-1.5 w-full text-left"
-            style={{ color: '#ef4444' }}
-          >
-            Delete account
-          </button>
+          {!confirmDelete ? (
+            <button
+              onClick={() => { setDeleteError(''); setConfirmDelete(true) }}
+              className="block text-sm py-1.5 w-full text-left"
+              style={{ color: '#ef4444' }}
+            >
+              Delete account
+            </button>
+          ) : (
+            <div className="rounded-xl p-3 space-y-2" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <p className="text-sm text-white/80">Delete your account? This anonymizes your data and signs you out. It can’t be undone.</p>
+              {deleteError && <p className="text-xs" style={{ color: '#ef4444' }}>{deleteError}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleting}
+                  className="flex-1 rounded-lg py-2 text-sm font-medium disabled:opacity-50"
+                  style={{ background: '#ef4444', color: '#fff' }}
+                >
+                  {deleting ? 'Deleting…' : 'Yes, delete'}
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                  className="flex-1 rounded-lg py-2 text-sm font-medium disabled:opacity-50"
+                  style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sign out */}
