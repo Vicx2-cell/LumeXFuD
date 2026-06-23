@@ -64,29 +64,40 @@ export default async function TermsPage() {
           <ul className="list-disc pl-5 space-y-1">
             <li>Placing fraudulent orders</li>
             <li>Harassing vendors, riders, or platform staff</li>
-            <li>Sharing phone numbers or external contact details via platform messages</li>
+            <li>Misusing contact details shared for an order (numbers shown to coordinate a delivery or pickup are for that purpose only — not for spam, marketing, or harassment)</li>
             <li>Attempting to manipulate pricing or payments</li>
             <li>Creating multiple accounts to abuse promotions</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white mb-2">6. Limitation of liability</h2>
+          <h2 className="text-base font-semibold text-white mb-2">6. Vendors &amp; riders — earnings &amp; payouts</h2>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>If you sell or deliver on LumeX, you must add and verify a bank account (confirmed through Paystack) before you can open for orders, go online, or accept deliveries</li>
+            <li>Earnings from a completed order are held for a short period (so any problem can be resolved) and then become available to withdraw to your verified bank account</li>
+            <li>You can withdraw available earnings anytime. <strong className="text-white">Any earnings you don’t withdraw are automatically paid out to your verified bank account 48 hours after they become available</strong> — so your money always reaches you</li>
+            <li>All payouts are digital, to your own verified account only. Changing your bank account requires re-verification and a short security hold before it can receive funds</li>
+            <li>If an order is refunded, the related earnings are reversed; any amount already paid out is recovered from future earnings</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="text-base font-semibold text-white mb-2">7. Limitation of liability</h2>
           <p>LumeX is not liable for delays caused by vendor kitchen issues, extreme weather, or events beyond our control. Our maximum liability is limited to the value of the affected order.</p>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white mb-2">7. Governing law</h2>
+          <h2 className="text-base font-semibold text-white mb-2">8. Governing law</h2>
           <p>These terms are governed by Nigerian law. Any disputes shall be resolved in Abia State courts.</p>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white mb-2">8. Changes</h2>
+          <h2 className="text-base font-semibold text-white mb-2">9. Changes</h2>
           <p>We may update these terms at any time. Continued use of the platform after changes constitutes acceptance.</p>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white mb-2">9. Contact</h2>
+          <h2 className="text-base font-semibold text-white mb-2">10. Contact</h2>
           <p>Questions? Email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#F5A623] break-words">{SUPPORT_EMAIL}</a> or see our <a href="/contact" className="text-[#F5A623]">Contact</a> page.</p>
         </section>
       </div>

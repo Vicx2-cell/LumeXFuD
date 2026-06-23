@@ -18,12 +18,13 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-base font-semibold text-white mb-2">2. Data we collect</h2>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Phone number (used for account identification and OTP authentication)</li>
-            <li>Name and delivery address (hostel, room number)</li>
+            <li>Phone number (used for account identification, login PIN, and OTP verification); an optional separate call number if you add one</li>
+            <li>Name and delivery location (lodge/hostel and room)</li>
             <li>Order history and food preferences</li>
+            <li>Ratings and reviews you submit about vendors and riders</li>
             <li>Payment information (processed securely by Paystack — we never store card details)</li>
             <li>Device information and IP address (for security and fraud prevention)</li>
-            <li>Messages sent through the platform</li>
+            <li><strong className="text-white">If you sell or deliver on LumeX:</strong> your bank account details (stored encrypted, used only for payouts) and a verification selfie (KYC), to confirm identity and pay you</li>
           </ul>
         </section>
 
@@ -32,8 +33,10 @@ export default function PrivacyPage() {
           <ul className="list-disc pl-5 space-y-1">
             <li>To process and deliver your food orders</li>
             <li>To communicate order status via WhatsApp/SMS</li>
+            <li>To pay vendors and riders their earnings to their verified bank account</li>
+            <li>To power in-app AI assistant features (e.g. food suggestions and support help)</li>
             <li>To improve our service quality and vendor performance</li>
-            <li>To prevent fraud and ensure platform security</li>
+            <li>To verify identity (KYC), prevent fraud and ensure platform security</li>
             <li>To comply with legal obligations</li>
           </ul>
         </section>
@@ -51,17 +54,18 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-base font-semibold text-white mb-2">5. Data retention</h2>
-          <p>Order history is retained for 5 years for legal/tax purposes. Account data is deleted within 30 days of account deletion. Messages tied to disputed orders are retained until dispute resolution is complete.</p>
+          <p>Order, payment and payout records are retained for up to 5 years for legal, tax and financial-reconciliation purposes (even after account deletion). Other account data is deleted within 30 days of account deletion. Reviews and records tied to a disputed order are retained until the dispute is resolved.</p>
         </section>
 
         <section>
           <h2 className="text-base font-semibold text-white mb-2">6. Third parties</h2>
           <p>We share data only with:</p>
           <ul className="list-disc pl-5 space-y-1 mt-1">
-            <li><strong className="text-white">Paystack</strong> — payment processing</li>
-            <li><strong className="text-white">Sendchamp</strong> — SMS / OTP notifications</li>
+            <li><strong className="text-white">Paystack</strong> — payment processing and bank payouts</li>
+            <li><strong className="text-white">Sendchamp</strong> — SMS / WhatsApp / OTP notifications</li>
             <li><strong className="text-white">Supabase</strong> — database hosting</li>
             <li><strong className="text-white">Vercel</strong> — application hosting</li>
+            <li><strong className="text-white">Anthropic / Google (Gemini)</strong> — power our in-app AI features; only the context needed for your request is sent, and it is not used to train their models</li>
           </ul>
           <p className="mt-2">All third parties are contractually bound to protect your data and may not use it for their own purposes.</p>
         </section>
