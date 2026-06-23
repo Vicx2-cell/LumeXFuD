@@ -90,11 +90,11 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  // Extends the layout under the notch / home indicator so the env(safe-area-inset-*)
-  // padding already wired into the bottom nav and sticky topbars actually resolves to
-  // non-zero values on iOS. Without viewport-fit=cover those insets compute to 0 and
-  // fixed UI can sit behind the notch / gesture bar.
-  viewportFit: 'cover',
+  // NOTE: viewport-fit=cover was tried here to enable env(safe-area-inset-*), but it
+  // pulled page content under the status bar/notch and clipped the top of the sticky
+  // headers (which don't pad safe-area-inset-top). Reverted to the default contained
+  // viewport. Re-introducing cover requires adding env(safe-area-inset-top) padding to
+  // every sticky header first — tracked as a follow-up.
   themeColor: '#0A0A0B',
   // The on-screen keyboard resizes the layout viewport instead of overlaying it,
   // so bottom-anchored inputs (e.g. the Lumi chat) stay visible while typing.
