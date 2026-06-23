@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
-import { getCustomerWallet, formatPrice } from '@/lib/customer-wallet'
+import { getCustomerWallet, formatPrice, isCustomerWalletEnabled } from '@/lib/customer-wallet'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 
 // GET /api/customer-wallet/balance
@@ -11,6 +11,9 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'customer') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  if (!(await isCustomerWalletEnabled())) {
+    return NextResponse.json({ error: 'The wallet is currently unavailable.', code: 'feature_disabled' }, { status: 403 })
   }
 
   const db = createSupabaseAdmin()

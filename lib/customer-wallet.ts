@@ -8,6 +8,21 @@ import { createSupabaseAdmin } from './supabase/server'
 import { formatPrice } from './money'
 import { sendWhatsAppWithFallback } from './notify'
 import { recordPlatformEarning } from './platform-earnings'
+import { getFeature } from './features'
+
+// ─── Customer wallet kill switch ──────────────────────────────────────────────
+
+/**
+ * Single source of truth for the CUSTOMER wallet kill switch — super-admin flag
+ * `customer_wallet_enabled`. Every customer top-up, balance/history read and
+ * pay-from-balance path reads from HERE (never a raw setting lookup). When false
+ * the customer wallet is fully off: no top-ups, no spending, hidden in the UI.
+ * Vendor & rider wallets/earnings are a DIFFERENT system (`wallet_balances`) and
+ * are deliberately NOT gated by this flag.
+ */
+export async function isCustomerWalletEnabled(): Promise<boolean> {
+  return getFeature('customer_wallet_enabled')
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

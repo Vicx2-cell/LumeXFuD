@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { customerTxIcon, customerTxSign, formatPrice } from '@/lib/customer-wallet'
+import { customerTxIcon, customerTxSign, formatPrice, isCustomerWalletEnabled } from '@/lib/customer-wallet'
 import type { CustomerWalletTx } from '@/lib/customer-wallet'
 import { receiptCode } from '@/lib/receipt'
 
@@ -13,6 +13,9 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'customer') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  if (!(await isCustomerWalletEnabled())) {
+    return NextResponse.json({ error: 'The wallet is currently unavailable.', code: 'feature_disabled' }, { status: 403 })
   }
 
   const { searchParams } = new URL(req.url)

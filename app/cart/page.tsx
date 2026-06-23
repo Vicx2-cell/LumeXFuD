@@ -75,17 +75,23 @@ export default function CartPage() {
 
     // Load customer wallet balance — keep it even when 0 so Wallet is always an
     // explicit choice next to Paystack (with a top-up prompt when short). A frozen
-    // wallet can't pay, so it's flagged and not selectable.
-    fetch('/api/customer-wallet/balance')
-      .then((r) => r.ok ? r.json() : null)
-      .then((d: { balance_kobo: number; is_frozen: boolean } | null) => {
-        if (d) {
-          setWalletFrozen(!!d.is_frozen)
-          if (!d.is_frozen) setWalletBalance(d.balance_kobo ?? 0)
-        }
-      })
-      .catch(() => {})
-      .finally(() => setWalletLoading(false))
+    // wallet can't pay, so it's flagged and not selectable. Skipped entirely when
+    // the customer wallet is disabled (the balance endpoint 403s anyway) — but we
+    // still clear the loading flag so the Paystack-only selector renders.
+    if (features.customer_wallet_enabled === true) {
+      fetch('/api/customer-wallet/balance')
+        .then((r) => r.ok ? r.json() : null)
+        .then((d: { balance_kobo: number; is_frozen: boolean } | null) => {
+          if (d) {
+            setWalletFrozen(!!d.is_frozen)
+            if (!d.is_frozen) setWalletBalance(d.balance_kobo ?? 0)
+          }
+        })
+        .catch(() => {})
+        .finally(() => setWalletLoading(false))
+    } else {
+      setWalletLoading(false)
+    }
 
     // Delivery suggestions = the customer's own learned lodges first, then the
     // admin-verified ABSU lodge catalog. Pre-fill the customer's most-used.
@@ -545,8 +551,8 @@ export default function CartPage() {
           <div>
             <h3 className="text-sm font-medium text-white/70 mb-3">Pay with</h3>
             <div className="glass-thin overflow-hidden">
-              {/* Wallet choice — only when the wallet feature is enabled */}
-              {features.wallet !== false && (
+              {/* Wallet choice — only when the customer wallet feature is enabled */}
+              {features.customer_wallet_enabled === true && (
               <>
               <button
                 onClick={() => { if (walletUsable) setPaymentMethod('WALLET'); else router.push('/profile/wallet') }}

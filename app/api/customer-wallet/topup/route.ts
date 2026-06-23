@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { getTopupLimits, getTopupBonusPct, formatPrice } from '@/lib/customer-wallet'
+import { getTopupLimits, getTopupBonusPct, formatPrice, isCustomerWalletEnabled } from '@/lib/customer-wallet'
 import { trackFeature } from '@/lib/usage'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
@@ -20,6 +20,11 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'customer') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  // Kill switch (server perimeter): if the customer wallet is disabled no top-up
+  // can be initialized, no matter what the client sends.
+  if (!(await isCustomerWalletEnabled())) {
+    return NextResponse.json({ error: 'The wallet is currently unavailable.', code: 'feature_disabled' }, { status: 403 })
   }
 
   // Rate limit: each top-up spins up a Paystack transaction — cap at 10 / 10 min

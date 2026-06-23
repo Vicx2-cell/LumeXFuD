@@ -9,6 +9,8 @@ interface FeatureRow {
   description: string
   enforced: boolean
   enabled: boolean
+  updated_by?: string | null
+  updated_at?: string | null
 }
 
 export default function SuperAdminFeatures() {
@@ -85,6 +87,12 @@ export default function SuperAdminFeatures() {
                     )}
                   </div>
                   <p className="text-xs text-white/50 mt-0.5">{f.description}</p>
+                  <p className="text-[11px] text-white/35 mt-1">
+                    {f.enabled ? 'On' : 'Off'}
+                    {f.updated_by
+                      ? ` · last changed by ${f.updated_by}${f.updated_at ? ` on ${new Date(f.updated_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}`
+                      : ' · never changed (default)'}
+                  </p>
                 </div>
 
                 {/* Toggle switch */}

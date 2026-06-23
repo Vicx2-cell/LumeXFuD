@@ -55,9 +55,10 @@ async function getVendorsAndTrending() {
 }
 
 export default async function CustomerHomePage() {
-  const [{ vendors, trending }, studyOn] = await Promise.all([
+  const [{ vendors, trending }, studyOn, walletOn] = await Promise.all([
     getVendorsAndTrending(),
     getFeature('study'),
+    getFeature('customer_wallet_enabled'),
   ])
 
   return (
@@ -74,6 +75,7 @@ export default async function CustomerHomePage() {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {walletOn && (
             <a
               href="/profile/wallet"
               className="lx-card-amber-strong h-11 px-3 rounded-full flex items-center gap-1.5"
@@ -82,6 +84,7 @@ export default async function CustomerHomePage() {
               <span className="text-sm" aria-hidden="true">💰</span>
               <span className="lx-amber text-xs font-semibold">Wallet</span>
             </a>
+            )}
             <a
               href="/profile"
               className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center"

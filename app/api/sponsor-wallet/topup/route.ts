@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
-import { getTopupLimits, getTopupBonusPct, formatPrice } from '@/lib/customer-wallet'
+import { getTopupLimits, getTopupBonusPct, formatPrice, isCustomerWalletEnabled } from '@/lib/customer-wallet'
 import { getFeature } from '@/lib/features'
 import { trackFeature } from '@/lib/usage'
 import { rateLimitGeneric } from '@/lib/rate-limit'
@@ -26,7 +26,9 @@ const schema = z.object({
 }).strict()
 
 export async function POST(req: NextRequest) {
-  if (!(await getFeature('sponsor_topup'))) {
+  // Sponsor top-up credits a CUSTOMER wallet, so it needs BOTH the sponsor flag
+  // and the customer-wallet kill switch on. Either off → no crediting path.
+  if (!(await getFeature('sponsor_topup')) || !(await isCustomerWalletEnabled())) {
     return NextResponse.json({ error: 'This feature is currently unavailable.' }, { status: 503 })
   }
 

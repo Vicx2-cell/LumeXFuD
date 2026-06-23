@@ -7,6 +7,7 @@ import { BackButton } from '@/components/back-button'
 import { FaceIdSetup } from '@/components/face-id-setup'
 import { LumiMemoryCard } from '@/components/lumi-memory-card'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
+import { useFeatures } from '@/lib/use-features'
 import type { CustomerProfile, StreakData, BadgeItem } from './page'
 
 const KEYPAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'] as const
@@ -69,6 +70,7 @@ export function ProfileClient({
   hasPin: boolean
 }) {
   const router = useRouter()
+  const features = useFeatures()
   const [name, setName] = useState(profile?.name ?? '')
   const [hostel, setHostel] = useState(profile?.hostel ?? '')
   const [room, setRoom] = useState(profile?.room_number ?? '')
@@ -251,7 +253,8 @@ export function ProfileClient({
           <p className="text-xs text-white/40 tabular-nums mt-0.5">{phone}</p>
         </div>
 
-        {/* LumeX Wallet — primary entry point (customers had no way to reach it) */}
+        {/* LumeX Wallet — primary entry point. Hidden when the customer wallet is off. */}
+        {features.customer_wallet_enabled === true && (
         <Link
           href="/profile/wallet"
           className="lx-card-amber lx-tap flex items-center gap-3 rounded-2xl p-4"
@@ -265,6 +268,7 @@ export function ProfileClient({
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </Link>
+        )}
 
         {/* Streak — keep the flame alive by ordering each day */}
         {hasStreak && (

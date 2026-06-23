@@ -2,7 +2,7 @@ import { createSupabaseAdmin } from '../supabase/server'
 import { sendWhatsAppWithFallback } from '../notify'
 import { renderTemplate } from '../notify-templates'
 import { recordPlatformEarning } from '../platform-earnings'
-import { processCustomerTopup, spendCustomerWallet } from '../customer-wallet'
+import { processCustomerTopup, spendCustomerWallet, isCustomerWalletEnabled } from '../customer-wallet'
 import { refundTransaction } from './transfer'
 import { verifyPaystackTransaction } from './init'
 
@@ -441,6 +441,26 @@ async function handleWalletTopup(
 ): Promise<void> {
   const customerId = metadata.customer_id as string | undefined
   if (!customerId) return
+
+  // Customer-wallet kill switch. The webhook itself ALWAYS runs (reconciliation,
+  // order payments, vendor/rider crediting, subscriptions all stay live) — we
+  // only refuse to CREDIT a customer balance while the wallet is disabled. A
+  // top-up cannot normally be initiated while off (init routes are gated), so
+  // this only catches a payment that crossed the toggle: don't credit, and alert
+  // an admin to refund the payer manually.
+  if (!(await isCustomerWalletEnabled())) {
+    console.warn(`[webhook] customer wallet disabled — NOT crediting top-up ${reference}`)
+    const adminPhone = process.env.ADMIN_PHONE
+    if (adminPhone) {
+      void sendWhatsAppWithFallback({
+        to: adminPhone,
+        message:
+          `⚠️ Wallet top-up ${reference} arrived while the customer wallet is DISABLED.\n` +
+          `NOT credited. Refund the payer manually if the charge went through.`,
+      }).catch(() => {})
+    }
+    return
+  }
 
   // A4 — independent re-verification. The webhook payload is HMAC-authenticated
   // but is still only a *signal*: re-fetch the transaction from Paystack and

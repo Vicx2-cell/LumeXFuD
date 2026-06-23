@@ -15,9 +15,22 @@ export async function GET() {
   if (session.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const values = await getAllFeatures()
+
+  // Pull who last changed each flag + when, so the UI can show provenance.
+  const db = createSupabaseAdmin()
+  const { data: rows } = await db
+    .from('settings')
+    .select('id, updated_by, updated_at')
+    .in('id', FEATURES.map((f) => featureSettingId(f.key)))
+  const meta = new Map(
+    (rows ?? []).map((r) => [String(r.id).replace(/^feature\./, ''), r as { updated_by: string | null; updated_at: string | null }]),
+  )
+
   const features = FEATURES.map((f) => ({
     key: f.key, label: f.label, description: f.description, enforced: f.enforced,
     enabled: values[f.key],
+    updated_by: meta.get(f.key)?.updated_by ?? null,
+    updated_at: meta.get(f.key)?.updated_at ?? null,
   }))
   return NextResponse.json({ features })
 }

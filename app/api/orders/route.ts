@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createOrderInput } from '@/lib/validators'
 import { generateOrderNumber } from '@/lib/order-number'
 import { initializePaystackTransaction } from '@/lib/paystack/init'
-import { spendCustomerWallet } from '@/lib/customer-wallet'
+import { spendCustomerWallet, isCustomerWalletEnabled } from '@/lib/customer-wallet'
 import { notifyGroupOrderPlaced, notifyGroupSplitPaid } from '@/lib/group-order'
 import { trackFeature } from '@/lib/usage'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
@@ -330,9 +330,13 @@ export async function POST(req: NextRequest) {
   //   walletApply === total → WALLET (paid here, no Paystack)
   //   0 < walletApply < total → SPLIT (wallet debited in the webhook, card pays rest)
   //   walletApply === 0       → PAYSTACK (card pays everything)
+  // Customer-wallet kill switch: when off, the wallet can NEVER pay an order —
+  // we force the normal per-order Paystack path regardless of what the client
+  // sent. (Group-split, which also pays from wallets, is rejected below.)
+  const customerWalletEnabled = await isCustomerWalletEnabled()
   let walletApply = 0
   let resolvedMethod: 'PAYSTACK' | 'WALLET' | 'SPLIT' = 'PAYSTACK'
-  if ((payment_method === 'WALLET' || payment_method === 'SPLIT') && customerId) {
+  if (customerWalletEnabled && (payment_method === 'WALLET' || payment_method === 'SPLIT') && customerId) {
     const { data: cwRow } = await db
       .from('customer_wallets')
       .select('balance_kobo, is_frozen')
@@ -502,6 +506,18 @@ export async function POST(req: NextRequest) {
   // back and the order is dropped — so checkout is impossible until everyone has
   // funded. Overrides whatever payment method the host picked at /cart.
   if (linkedGroupId && groupSplitEnabled) {
+    // Group split pays each member's share from their CUSTOMER wallet, so it's a
+    // pay-from-balance path — blocked when the customer wallet is disabled. Drop
+    // the reserved order so the host can retry once the wallet is back (or order
+    // solo via Paystack).
+    if (!customerWalletEnabled) {
+      await db.from('order_items').delete().eq('order_id', order.id)
+      await db.from('orders').delete().eq('id', order.id)
+      return NextResponse.json(
+        { error: 'Wallet payment is currently unavailable. Please order individually and pay by card.', code: 'feature_disabled' },
+        { status: 403 },
+      )
+    }
     // Per-member food (server-side prices), then split fees+tip: each pays their
     // food + an equal share of (delivery+platform); the host absorbs the rounding
     // remainder + the tip.
