@@ -22,15 +22,23 @@ export function BottomNav() {
   const items = NAV_ITEMS.filter((i) => !i.feature || features[i.feature] !== false)
 
   return (
+    // Full-width positioner is click-transparent so the empty desktop gutters never
+    // intercept taps; only the bar itself is interactive. The bar is bound to the
+    // app column (max-w-lg) — flush to the screen edge on mobile, a centered
+    // floating pill on desktop (sm+) so it tracks the centered content instead of
+    // stretching across a wide screen with its items bunched in the middle.
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/8"
-      style={{
-        background: 'rgba(10,10,11,0.95)',
-        backdropFilter: 'blur(20px)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}
+      className="fixed bottom-0 inset-x-0 z-50 pointer-events-none"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
+      <div
+        className="pointer-events-auto mx-auto max-w-lg border-t border-white/8 sm:border sm:border-white/10 sm:rounded-2xl sm:mb-3 sm:shadow-[0_10px_40px_rgba(0,0,0,0.55)]"
+        style={{
+          background: 'rgba(10,10,11,0.95)',
+          backdropFilter: 'blur(20px)',
+        }}
+      >
+      <div className="flex items-center justify-around h-16 px-2">
         {items.map(({ href, label, icon: Icon, showBadge }) => {
           const active = pathname === href
           return (
@@ -65,6 +73,7 @@ export function BottomNav() {
             </Link>
           )
         })}
+      </div>
       </div>
     </nav>
   )

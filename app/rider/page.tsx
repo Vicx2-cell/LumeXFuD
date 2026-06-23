@@ -8,7 +8,6 @@ import { LogoutButton } from '@/components/logout-button'
 import { RiderHotspots } from '@/components/rider-hotspots'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
-import { BusinessHours } from '@/components/business-hours'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { useFeatures } from '@/lib/use-features'
 import { waLink } from '@/lib/contact'
@@ -90,8 +89,6 @@ export default function RiderDashboard() {
     status: RiderStatus
     avg_rating: number
     total_deliveries: number
-    opening_time: string | null
-    closing_time: string | null
     avatar_url: string | null
   } | null>(null)
   const [available, setAvailable] = useState<AvailableOrder[]>([])
@@ -295,7 +292,10 @@ export default function RiderDashboard() {
   const isOnline = rider.status === 'ONLINE' || rider.status === 'BUSY'
 
   return (
-    <main className="lx-page pb-10 overflow-hidden">
+    // Centered app column: flush on mobile, a framed column on desktop (matches the
+    // customer app + vendor dashboard) instead of sprawling edge-to-edge on wide
+    // screens. The faint side borders read as an intentional surface on ≥sm.
+    <main className="lx-page pb-10 overflow-hidden mx-auto w-full max-w-lg lg:max-w-2xl sm:border-x sm:border-white/5">
       {/* Toast */}
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg lx-scale-in"
@@ -548,17 +548,11 @@ export default function RiderDashboard() {
 
       </div>
 
-      {/* Setup & account — below the work so orders stay up top */}
+      {/* Setup & account — below the work so orders stay up top. Riders have no
+          working-hours schedule (like Chowdeck): availability is the Online/Offline
+          toggle alone, nothing time-boxed. */}
       <div className="mx-4 mt-5"><LaunchCounter /></div>
       <div className="mx-4 mt-5"><KycPanel role="rider" /></div>
-      <div className="mx-4 mt-5">
-        <BusinessHours
-          role="rider"
-          id={rider.id}
-          initialOpen={rider.opening_time}
-          initialClose={rider.closing_time}
-        />
-      </div>
 
       <div className="pt-4 pb-6 flex justify-center">
         <LogoutButton />
@@ -631,15 +625,13 @@ function DeliverPanel({
             📲 Tell {firstName} you’ve arrived (WhatsApp)
           </a>
         )}
-        <div className="flex gap-2">
-          <label className="flex-1 text-center py-2.5 rounded-lg text-xs font-semibold cursor-pointer" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)' }}>
-            {uploading ? 'Uploading…' : order.delivery_photo_url ? '✓ Photo added — retake' : 'Add proof photo'}
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void pickPhoto(e.target.files?.[0] ?? null)} disabled={uploading || busy} />
-          </label>
-          <button onClick={confirmGate} disabled={busy} className="px-4 py-2.5 rounded-lg text-xs font-semibold disabled:opacity-50 shrink-0" style={{ background: '#22C55E', color: '#000' }}>
-            {busy ? '…' : 'Confirm drop'}
-          </button>
-        </div>
+        <label className="block w-full text-center py-3 mb-2 rounded-lg text-xs font-semibold cursor-pointer" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)' }}>
+          {uploading ? 'Uploading…' : order.delivery_photo_url ? '✓ Photo added — retake' : 'Add proof photo (optional)'}
+          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void pickPhoto(e.target.files?.[0] ?? null)} disabled={uploading || busy} />
+        </label>
+        <button onClick={confirmGate} disabled={busy} className="w-full py-3 rounded-lg text-sm font-semibold disabled:opacity-50" style={{ background: '#22C55E', color: '#000' }}>
+          {busy ? 'Confirming…' : 'Confirm drop'}
+        </button>
         {err && <p className="text-xs text-red-400 mt-1.5">{err}</p>}
       </div>
     )
@@ -654,17 +646,17 @@ function DeliverPanel({
         </a>
       )}
       <p className="text-xs text-white/65 mb-2">🔑 Ask <span className="font-semibold text-white/90">{firstName}</span> for their 6-character delivery code (it’s in their app):</p>
-      <div className="flex gap-2">
-        <input
-          inputMode="text" autoCapitalize="characters" autoCorrect="off" spellCheck={false} maxLength={6} value={code}
-          onChange={(e) => { setCode(e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 6)); setErr('') }}
-          placeholder="ABC234"
-          className="lx-field flex-1 px-3 py-2.5 text-base tracking-[0.4em] text-center font-semibold outline-none uppercase"
-        />
-        <button onClick={submitCode} disabled={busy || code.length !== 6} className="px-4 py-2.5 rounded-lg text-xs font-semibold disabled:opacity-50 shrink-0" style={{ background: '#22C55E', color: '#000' }}>
-          {busy ? '…' : 'Confirm'}
-        </button>
-      </div>
+      {/* Stacked (not side-by-side): the confirm button is full-width BELOW the input
+          so it can never be clipped off the right edge of the card on a narrow phone. */}
+      <input
+        inputMode="text" autoCapitalize="characters" autoCorrect="off" spellCheck={false} maxLength={6} value={code}
+        onChange={(e) => { setCode(e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 6)); setErr('') }}
+        placeholder="ABC234"
+        className="lx-field w-full min-w-0 px-3 py-3 text-lg tracking-[0.4em] text-center font-semibold outline-none uppercase"
+      />
+      <button onClick={submitCode} disabled={busy || code.length !== 6} className="w-full mt-2 py-3 rounded-lg text-sm font-semibold disabled:opacity-50" style={{ background: '#22C55E', color: '#000' }}>
+        {busy ? 'Confirming…' : 'Confirm delivery'}
+      </button>
       {err && <p className="text-xs text-red-400 mt-1.5">{err}</p>}
     </div>
   )

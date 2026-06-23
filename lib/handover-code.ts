@@ -73,16 +73,39 @@ export function verifyHandoverCode(raw: string, storedHash: string | null): bool
  * Issue (or rotate) the handover code for an order: generate a fresh code, store
  * ONLY its hash, reset the attempt counter + lock, and return the RAW code so the
  * caller can show it to the order's owner. Any previous code dies instantly (its
- * hash is overwritten). `method` records whether this is the pickup or delivery
- * handover for the audit trail; it does not change the engine.
+ * hash is overwritten).
  *
- * Returns null if the row could not be updated (e.g. order gone) — callers must
- * treat that as "no code issued" and never fabricate one.
+ * IDEMPOTENT BY DEFAULT (`rotate:false`): if a code already exists for the order,
+ * this does NOT generate a new one — it returns `{ code:null, alreadyActive:true }`
+ * so the caller leaves the live code untouched. This is the page-mount path: a
+ * customer reopening the order (or opening it on a second device) must NOT silently
+ * rotate the code, or the code another device is already showing — and that the
+ * rider/vendor is about to type — would stop matching. The raw code is unrecoverable
+ * once issued (we keep only the hash), so re-display relies on the device's own copy.
+ *
+ * `rotate:true` (the explicit "Refresh code" action) always mints a fresh code and
+ * invalidates the old one — the customer chose to replace it.
+ *
+ * Returns `{ code:null, alreadyActive:false }` if the row could not be updated
+ * (e.g. order gone) — callers must treat that as "no code issued".
  */
 export async function issueHandoverCode(
   db: ReturnType<typeof createSupabaseAdmin>,
   orderId: string,
-): Promise<string | null> {
+  opts: { rotate?: boolean } = {},
+): Promise<{ code: string | null; alreadyActive: boolean }> {
+  // Idempotent path: don't touch an existing code unless an explicit rotate was asked.
+  if (!opts.rotate) {
+    const { data: existing } = await db
+      .from('orders')
+      .select('handover_code_hash')
+      .eq('id', orderId)
+      .single()
+    if (existing && existing.handover_code_hash) {
+      return { code: null, alreadyActive: true }
+    }
+  }
+
   const raw = generateHandoverCode()
   const now = new Date().toISOString()
   const { data, error } = await db
@@ -96,8 +119,8 @@ export async function issueHandoverCode(
     })
     .eq('id', orderId)
     .select('id')
-  if (error || !data || data.length === 0) return null
-  return raw
+  if (error || !data || data.length === 0) return { code: null, alreadyActive: false }
+  return { code: raw, alreadyActive: false }
 }
 
 /**

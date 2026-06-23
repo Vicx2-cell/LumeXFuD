@@ -303,7 +303,6 @@ export default function VendorDashboard() {
         {/* Opening / closing time */}
         {vendor && (
           <BusinessHours
-            role="vendor"
             id={vendor.id}
             initialOpen={vendor.opening_time}
             initialClose={vendor.closing_time}
@@ -566,18 +565,18 @@ function OrderCard({
             </div>
           )}
           <p className="text-xs text-white/50 mb-2">🛍️ Ask the customer to read you their 6-character pickup code (it’s in their app):</p>
-          <div className="flex gap-2">
-            <input
-              inputMode="text" autoCapitalize="characters" autoCorrect="off" spellCheck={false} maxLength={6} value={code}
-              onChange={(e) => { setCode(e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 6)); setCollectErr('') }}
-              placeholder="ABC234"
-              className="lx-field flex-1 px-3 py-2.5 text-base tracking-[0.4em] text-center font-semibold outline-none uppercase"
-            />
-            <button onClick={submitCode} disabled={busy || code.length !== 6}
-              className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-40 shrink-0" style={{ background: 'var(--lx-green)', color: '#000' }}>
-              {busy ? '…' : 'Collect'}
-            </button>
-          </div>
+          {/* Stacked (not side-by-side): the Collect button is full-width BELOW the
+              input so it can never be clipped off the edge of the card on a phone. */}
+          <input
+            inputMode="text" autoCapitalize="characters" autoCorrect="off" spellCheck={false} maxLength={6} value={code}
+            onChange={(e) => { setCode(e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 6)); setCollectErr('') }}
+            placeholder="ABC234"
+            className="lx-field w-full min-w-0 px-3 py-3 text-lg tracking-[0.4em] text-center font-semibold outline-none uppercase"
+          />
+          <button onClick={submitCode} disabled={busy || code.length !== 6}
+            className="w-full mt-2 py-3 rounded-lg text-sm font-semibold disabled:opacity-40" style={{ background: 'var(--lx-green)', color: '#000' }}>
+            {busy ? 'Collecting…' : 'Collect order'}
+          </button>
           {collectErr && <p className="text-xs text-red-400 mt-1.5">{collectErr}</p>}
         </div>
       )}

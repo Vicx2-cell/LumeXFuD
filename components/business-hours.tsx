@@ -2,16 +2,15 @@
 
 import { useState } from 'react'
 
-// Compact "business hours" editor for the vendor and rider dashboards. Collapsed
-// to a single row by default (shows the saved hours); tap to expand two native
-// time pickers + Save. Display only — these times don't open/close the account.
+// Compact "opening hours" editor for the vendor dashboard. Collapsed to a single
+// row by default (shows the saved hours); tap to expand two native time pickers +
+// Save. Display only — these times don't open/close the shop. (Riders have no
+// working-hours schedule — availability is the Online/Offline toggle alone.)
 export function BusinessHours({
-  role,
   id,
   initialOpen,
   initialClose,
 }: {
-  role: 'vendor' | 'rider'
   id: string
   initialOpen: string | null
   initialClose: string | null
@@ -24,8 +23,8 @@ export function BusinessHours({
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
-  const label = role === 'vendor' ? 'Opening hours' : 'Working hours'
-  const endpoint = role === 'vendor' ? `/api/vendors/${id}/hours` : `/api/riders/${id}/hours`
+  const label = 'Opening hours'
+  const endpoint = `/api/vendors/${id}/hours`
   const summary = savedOpen && savedClose ? `${savedOpen} – ${savedClose}` : 'Not set'
 
   async function save() {

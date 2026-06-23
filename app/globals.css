@@ -30,6 +30,29 @@ html, body {
   letter-spacing: -0.01em;
 }
 
+/* ============================================================
+   Desktop framing. The app is mobile-first and content is bound to a
+   centered column (max-w-lg) — on a wide screen the empty gutters would
+   read as dead flat black. This fixed backdrop (cheap, no blend-mode,
+   pointer-events-none) puts a soft amber bloom + cool wash behind the
+   whole viewport so the centered column reads as an intentional, framed
+   app surface. Mobile is untouched (only ≥768px).
+   ============================================================ */
+@media (min-width: 768px) {
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      radial-gradient(ellipse 60% 50% at 50% -5%, rgba(245,166,35,0.10) 0%, transparent 60%),
+      radial-gradient(ellipse 70% 60% at 50% 110%, rgba(99,102,241,0.08) 0%, transparent 65%),
+      radial-gradient(rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: auto, auto, 26px 26px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

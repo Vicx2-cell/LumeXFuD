@@ -9,12 +9,18 @@ import { audit } from '@/lib/audit'
 
 // POST /api/orders/[id]/handover-code
 // Owner-pull issuance of the handover code (Invariants I3 + I5). Only the order's
-// own customer (or staff) may call it. It generates a fresh code, stores ONLY the
-// hash, invalidates any previous code instantly, and returns the RAW code so the
-// customer's app can display it. The raw code is returned ONCE, to the owner, over
-// the authenticated session — never persisted, never sent by SMS/WhatsApp/push,
-// never logged. This same endpoint backs the customer's "Refresh code" action and
-// the app's re-fetch when an order reaches READY (pickup) / out-for-delivery.
+// own customer (or staff) may call it. It stores ONLY the hash and returns the RAW
+// code so the customer's app can display it. The raw code is returned ONCE, to the
+// owner, over the authenticated session — never persisted, never sent by
+// SMS/WhatsApp/push, never logged.
+//
+// Two modes (Invariant I3 — the raw code lives only on the owner's device + server
+// hash, so it cannot be re-shown once issued):
+//   • mount/auto (default): IDEMPOTENT — if a code already exists it is left intact
+//     and we report `alreadyActive` WITHOUT rotating, so a reopen on a second device
+//     can never invalidate the code the customer is already reading to the fulfiller.
+//   • { rotate:true } (the "Refresh code" button): always mints a fresh code and
+//     kills the old one — the customer explicitly chose to replace it.
 //
 // Active states where a code is meaningful: paid and not yet terminal.
 const PICKUP_STATES   = ['PENDING', 'VENDOR_ACCEPTED', 'PREPARING', 'READY']
@@ -27,6 +33,10 @@ export async function POST(
   const { id } = await params
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // The "Refresh code" action sets rotate:true; a bare page-mount pull omits it.
+  let rotate = false
+  try { rotate = (await req.json())?.rotate === true } catch { /* no body → auto pull */ }
 
   // Cheap throttle so the refresh button can't be hammered.
   const rl = await rateLimitGeneric(`handover-issue:${id}:${session.userId ?? session.phone}`, 12, 60)
@@ -65,7 +75,17 @@ export async function POST(
     return NextResponse.json({ error: 'A code isn’t available for this order right now.' }, { status: 400 })
   }
 
-  const code = await issueHandoverCode(db, id)
+  const { code, alreadyActive } = await issueHandoverCode(db, id, { rotate })
+
+  // A code is already live on the customer's other device — don't rotate it out from
+  // under the fulfiller. Tell the client so it can prompt the customer to Refresh
+  // here (which DOES rotate) if they can't see the original.
+  if (!code && alreadyActive) {
+    return NextResponse.json(
+      { code: null, alreadyActive: true, kind: isPickup ? 'pickup' : 'delivery' },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } },
+    )
+  }
   if (!code) return NextResponse.json({ error: 'Could not issue a code. Please try again.' }, { status: 500 })
 
   // Server-authoritative forfeit deadline for pickup (Invariant I7): the 1h25m

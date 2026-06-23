@@ -397,9 +397,6 @@ export function OrderStatusClient({
                 {riderVerified && <VerifiedBadge kind="rider" />}
               </div>
               <a href={`tel:${order.riders.call_phone ?? order.riders.phone}`} className="text-xs text-amber-400 tabular-nums hover:underline">{order.riders.call_phone ?? order.riders.phone}</a>
-              {order.riders.opening_time && order.riders.closing_time && (
-                <p className="text-[11px] text-white/40 mt-0.5 tabular-nums">🕒 Usually {order.riders.opening_time}–{order.riders.closing_time}</p>
-              )}
             </div>
             <div className="flex gap-2 shrink-0">
               <a href={`tel:${order.riders.call_phone ?? order.riders.phone}`} className="w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-90" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }} aria-label="Call rider">
@@ -666,20 +663,33 @@ function HandoverCodeCard({
   const [code, setCode] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // True when the server reports a code is already live (issued on another device)
+  // and so cannot be re-shown here — the customer must Refresh to mint a new one.
+  const [stale, setStale] = useState(false)
   const [nowTs, setNowTs] = useState(() => Date.now())
   const storeKey = `lx_handover_${orderId}`
 
-  // Issue (or rotate) a code — the ONLY thing that changes the code. Persists the
-  // raw code on the device so reopening the page shows the SAME code (the server
-  // keeps only a hash, so we never re-issue just to display it).
-  const issueCode = async () => {
+  // Pull the code. The page-mount pull is IDEMPOTENT (rotate:false): if a code is
+  // already live the server leaves it untouched so it keeps matching whatever the
+  // fulfiller types — reopening on a new device never breaks an in-flight handover.
+  // `rotate:true` is the explicit "Refresh code" action: mint a fresh one, kill the
+  // old. The raw code lives only on the device + as a server hash, so we persist it
+  // locally to redisplay without re-issuing.
+  const issueCode = async (rotate = false) => {
     setBusy(true); setErr('')
     try {
-      const res = await fetch(`/api/orders/${orderId}/handover-code`, { method: 'POST', cache: 'no-store' })
+      const res = await fetch(`/api/orders/${orderId}/handover-code`, {
+        method: 'POST', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rotate }),
+      })
       const d = await res.json().catch(() => ({}))
       if (res.ok && d.code) {
-        setCode(d.code as string)
+        setCode(d.code as string); setStale(false)
         try { localStorage.setItem(storeKey, d.code as string) } catch { /* private mode */ }
+      } else if (res.ok && d.alreadyActive) {
+        // Code is live elsewhere and can't be re-shown here without replacing it.
+        setStale(true)
       } else setErr(d.error ?? 'Could not load your code. Tap to retry.')
     } catch { setErr('Could not load your code. Tap to retry.') }
     finally { setBusy(false) }
@@ -720,10 +730,20 @@ function HandoverCodeCard({
 
       {code ? (
         <p className="lx-amber text-5xl font-bold tracking-[0.3em] tabular-nums">{code}</p>
+      ) : stale ? (
+        <button onClick={() => void issueCode(true)} disabled={busy} className="lx-amber text-base font-semibold tracking-normal opacity-90 px-3 py-2 rounded-lg" style={{ background: 'rgba(245,166,35,0.12)' }}>
+          {busy ? 'Generating…' : 'Show a new code here'}
+        </button>
       ) : (
         <button onClick={() => void issueCode()} disabled={busy} className="lx-amber text-2xl font-bold tracking-[0.2em] tabular-nums opacity-70">
           {busy ? '••••••' : (err ? 'Tap to retry' : '••••••')}
         </button>
+      )}
+
+      {stale && !code && (
+        <p className="text-[11px] text-white/55 mt-2">
+          Your code is open on another device. Tap above to show a fresh code here — it replaces the old one.
+        </p>
       )}
 
       <p className="text-xs text-white/55 mt-2.5">
@@ -744,7 +764,7 @@ function HandoverCodeCard({
         🔒 LumeX will never call to ask for this code. Show it only to the vendor in person.
       </p>
 
-      <button onClick={() => void issueCode()} disabled={busy}
+      <button onClick={() => void issueCode(true)} disabled={busy}
         className="mt-2 text-[11px] underline text-white/55 disabled:opacity-40">
         {busy ? 'Refreshing…' : 'Refresh code'}
       </button>

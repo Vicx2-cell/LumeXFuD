@@ -120,7 +120,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="lx-page px-4 py-10 overflow-hidden">
-      <div className="relative z-10 mx-auto max-w-2xl lx-enter">
+      <div className="relative z-10 mx-auto max-w-2xl lg:max-w-4xl lx-enter">
         {/* Header */}
         <div className="mb-6">
           <div className="mb-3 flex items-center justify-between"><BackButton /><LogoutButton /></div>
@@ -151,13 +151,13 @@ export default function AdminDashboard() {
 
         {/* Metrics grid */}
         {loading ? (
-          <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="lx-skeleton h-24" style={{ borderRadius: 20 }} />
             ))}
           </div>
         ) : metrics ? (
-          <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
             <MetricCard
               label="Orders today"
               value={String(metrics.orders_today)}
