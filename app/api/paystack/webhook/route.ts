@@ -16,10 +16,22 @@ export async function POST(req: NextRequest) {
   // 1. READ raw body BEFORE parsing JSON (HMAC needs raw bytes)
   const rawBody = await req.text()
   const signature = req.headers.get('x-paystack-signature') ?? ''
-  const secret = process.env.PAYSTACK_WEBHOOK_SECRET ?? ''
 
-  // 2. Verify HMAC — reject 400 if invalid
-  if (!secret || !verifyHMAC(rawBody, signature, secret)) {
+  // 2. Verify HMAC — reject 400 if invalid.
+  //
+  // Paystack signs every webhook with HMAC-SHA512 using your account's SECRET
+  // KEY (sk_live_… / sk_test_…) — there is NO separate "webhook secret" in
+  // Paystack's model. We therefore verify against PAYSTACK_SECRET_KEY (which is
+  // already proven correct in prod because transaction initialization uses it).
+  // PAYSTACK_WEBHOOK_SECRET is kept as an optional override/fallback for any
+  // environment that deliberately configured a distinct value; a match on EITHER
+  // is accepted. (Previously this checked ONLY PAYSTACK_WEBHOOK_SECRET, which was
+  // unset/mismatched in prod, so EVERY real webhook failed signature and no paid
+  // Paystack order ever finalized.)
+  const candidateSecrets = [process.env.PAYSTACK_SECRET_KEY, process.env.PAYSTACK_WEBHOOK_SECRET]
+    .filter((s): s is string => !!s)
+  const signatureOk = candidateSecrets.some((s) => verifyHMAC(rawBody, signature, s))
+  if (!signatureOk) {
     console.warn('[webhook] invalid Paystack signature')
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
