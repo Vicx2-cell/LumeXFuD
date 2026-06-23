@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { FOOD_BLUR } from '@/lib/blur'
 import type { VendorData } from './home/page'
 import { vendorTrustBadges } from '@/lib/vendor-trust'
 import { VerifiedBadge } from '@/components/verified-badge'
@@ -117,6 +118,8 @@ function VendorCard({ vendor }: { vendor: VendorData }) {
             fill
             className="object-cover"
             sizes="(max-width: 512px) 100vw, 512px"
+            placeholder="blur"
+            blurDataURL={FOOD_BLUR}
             style={unavailable ? { filter: 'grayscale(1)' } : undefined}
           />
         ) : (

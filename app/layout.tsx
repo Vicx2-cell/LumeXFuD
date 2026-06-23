@@ -19,6 +19,7 @@ import { Providers } from '@/components/providers'
 import { FeaturesProvider } from '@/lib/use-features'
 import { getAllFeatures } from '@/lib/features'
 import { StructuredData } from '@/components/structured-data'
+import { SpeculationRules } from '@/components/speculation-rules'
 
 if (process.env.NODE_ENV !== 'test') validateEnv()
 
@@ -111,6 +112,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" className={display.variable}>
       <body>
         <StructuredData />
+        <SpeculationRules />
         <FeaturesProvider initial={features}>
           <Providers>{children}</Providers>
         </FeaturesProvider>

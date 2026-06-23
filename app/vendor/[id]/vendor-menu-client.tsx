@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import Image from 'next/image'
+import { FOOD_BLUR } from '@/lib/blur'
 import { useRouter } from 'next/navigation'
 import { useCart, cartLineKey, type CartItem, type CartAddon } from '@/components/cart-context'
 import { formatPrice } from '@/lib/money'
@@ -187,7 +188,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       {(vendor.shop_photo_url || vendor.logo_url) && (
         <div className="relative w-full" style={{ aspectRatio: '16 / 7' }}>
           {vendor.shop_photo_url ? (
-            <Image src={vendor.shop_photo_url} alt="" fill priority className="object-cover" sizes="100vw" />
+            <Image src={vendor.shop_photo_url} alt="" fill priority className="object-cover" sizes="100vw" placeholder="blur" blurDataURL={FOOD_BLUR} />
           ) : (
             <div className="w-full h-full" style={{ background: 'linear-gradient(135deg, rgba(245,166,35,0.30), rgba(99,102,241,0.18))' }} />
           )}
@@ -278,7 +279,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
               <div key={item.id} className="glass-thin flex gap-3 p-3 transition-transform hover:-translate-y-0.5" style={{ opacity: soldOut ? 0.5 : 1 }}>
                 <div className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-white/5">
                   {item.image_url
-                    ? <Image src={item.image_url} alt={item.name} fill className="object-cover" sizes="80px" />
+                    ? <Image src={item.image_url} alt={item.name} fill className="object-cover" sizes="80px" placeholder="blur" blurDataURL={FOOD_BLUR} />
                     : <div className="w-full h-full flex items-center justify-center text-white/15"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2" /><path d="M7 2v20" /><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></svg></div>}
                 </div>
                 <div className="flex-1 min-w-0">
