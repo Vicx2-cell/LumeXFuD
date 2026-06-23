@@ -34,7 +34,7 @@ export default function ShareStorePage() {
   return (
     <div className="lx-page px-5 py-10 overflow-hidden">
       <div className="mx-auto max-w-lg lx-enter">
-        <div className="mb-5 flex items-center gap-3"><BackButton fallback="/vendor-dashboard" /><h1 className="text-xl font-bold text-white">Share your store</h1></div>
+        <div className="mb-5 flex items-center gap-3"><BackButton fallback="/vendor-dashboard" /><h1 className="text-xl font-bold text-white truncate">Share your store</h1></div>
         <p className="text-sm text-white/50 mb-5">Your store link, ready to paste anywhere. Customers tap it and order straight from you — new ones sign up and come right back.</p>
 
         {!vendor ? (
@@ -45,7 +45,7 @@ export default function ShareStorePage() {
               <div key={c.id} className="glass-thin p-4">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs uppercase tracking-wide text-white/45 font-semibold">{c.label}</p>
-                  <button onClick={() => copy(c.text, c.id)} className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                  <button onClick={() => copy(c.text, c.id)} aria-label={`Copy ${c.label} text`} className="lx-tap text-xs font-semibold px-4 min-h-[40px] shrink-0 rounded-lg"
                     style={{ background: copied === c.id ? 'rgba(34,197,94,0.15)' : 'rgba(245,166,35,0.15)', color: copied === c.id ? '#22C55E' : '#F5A623', border: `1px solid ${copied === c.id ? 'rgba(34,197,94,0.3)' : 'rgba(245,166,35,0.25)'}` }}>
                     {copied === c.id ? 'Copied ✓' : 'Copy'}
                   </button>
@@ -55,7 +55,7 @@ export default function ShareStorePage() {
             ))}
 
             <a href={`https://wa.me/?text=${encodeURIComponent(captions[1].text)}`} target="_blank" rel="noopener noreferrer"
-              className="block text-center py-3 rounded-xl text-sm font-semibold mt-2" style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E' }}>
+              className="lx-tap flex items-center justify-center text-center min-h-[48px] py-3 rounded-xl text-sm font-semibold mt-2" style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E' }}>
               Open WhatsApp to share now
             </a>
           </div>

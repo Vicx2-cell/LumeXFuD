@@ -70,8 +70,8 @@ export function ReorderButton({ orderId }: { orderId: string }) {
       type="button"
       onClick={reorder}
       disabled={busy}
-      className="text-xs font-medium transition-opacity active:opacity-60 disabled:opacity-50"
-      style={{ color: '#F5A623' }}
+      className="inline-flex items-center text-xs font-medium py-1.5 -my-1.5 transition-opacity active:opacity-60 disabled:opacity-50"
+      style={{ color: '#F5A623', minHeight: 44 }}
     >
       {busy ? 'Adding to cart…' : msg ? msg : '🔁 Order again'}
     </button>

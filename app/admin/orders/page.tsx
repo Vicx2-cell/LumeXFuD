@@ -69,7 +69,7 @@ export default function AdminOrders() {
     <div className="lx-page px-4 py-8">
       <div className="mx-auto max-w-3xl">
         <div className="flex items-center gap-3 mb-5">
-          <button onClick={() => router.back()} className="w-9 h-9 rounded-full flex items-center justify-center text-white/50"
+          <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 rounded-full flex items-center justify-center text-white/50"
             style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
           <h1 className="text-xl font-bold text-white">Orders</h1>
         </div>

@@ -12,7 +12,7 @@ export function BackButton({ fallback = '/' }: { fallback?: string }) {
         if (typeof window !== 'undefined' && window.history.length > 1) router.back()
         else router.push(fallback)
       }}
-      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+      className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
       style={{ background: 'rgba(255,255,255,0.06)' }}
       aria-label="Go back"
     >

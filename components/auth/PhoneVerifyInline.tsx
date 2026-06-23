@@ -92,16 +92,22 @@ export default function PhoneVerifyInline({
             <input
               value={code}
               onChange={(e) => { setCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6)); setError('') }}
-              className="flex-1 rounded-xl border border-white/10 bg-[#111113] px-4 py-3 text-center text-white tracking-[0.4em] outline-none"
+              className="flex-1 min-w-0 rounded-xl border border-white/10 bg-[#111113] px-4 py-3 text-center text-base text-white tracking-[0.4em] outline-none focus:border-amber-400/60"
+              type="text"
               inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="one-time-code"
+              autoCorrect="off"
+              spellCheck={false}
               maxLength={6}
               placeholder="••••••"
+              aria-label="6-digit verification code"
             />
             <button
               type="button"
               onClick={verifyCode}
               disabled={busy || code.length !== 6}
-              className="rounded-xl bg-amber-500 px-5 text-sm font-semibold text-black disabled:opacity-50"
+              className="shrink-0 rounded-xl bg-amber-500 px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
             >
               {busy ? '…' : 'Verify'}
             </button>

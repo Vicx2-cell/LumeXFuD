@@ -93,7 +93,7 @@ export function LeaderboardTabs({
             <button
               key={t.key}
               onClick={() => setActive(t.key)}
-              className="flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all active:scale-[0.97]"
+              className="flex-1 min-w-0 rounded-xl py-2.5 px-1 text-xs sm:text-sm font-semibold whitespace-nowrap transition-all active:scale-[0.97]"
               style={{
                 background: isActive ? '#F5A623' : 'transparent',
                 color: isActive ? '#000' : 'rgba(255,255,255,0.55)',

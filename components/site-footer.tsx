@@ -35,7 +35,7 @@ export async function SiteFooter() {
           <div className="space-y-1.5 sm:text-right">
             <p className="text-white/55 font-medium">Contact &amp; support</p>
             <p>
-              <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-white/80 transition-colors">{SUPPORT_EMAIL}</a>
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-white/80 transition-colors break-words">{SUPPORT_EMAIL}</a>
             </p>
             {phone && (
               <p className="flex sm:justify-end items-center gap-3">
@@ -47,13 +47,13 @@ export async function SiteFooter() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/8 pt-4">
-          <Link href="/" className="hover:text-white/70 transition-colors">Home</Link>
-          <Link href="/contact" className="hover:text-white/70 transition-colors">Contact</Link>
-          <Link href="/refunds" className="hover:text-white/70 transition-colors">Refunds &amp; Cancellations</Link>
-          <Link href="/terms" className="hover:text-white/70 transition-colors">Terms</Link>
-          <Link href="/privacy" className="hover:text-white/70 transition-colors">Privacy</Link>
-          <span className="ml-auto text-white/25">© {new Date().getFullYear()} {OPERATOR}</span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/8 pt-3 -mb-1">
+          <Link href="/" className="inline-flex items-center min-h-[44px] py-1.5 hover:text-white/70 transition-colors">Home</Link>
+          <Link href="/contact" className="inline-flex items-center min-h-[44px] py-1.5 hover:text-white/70 transition-colors">Contact</Link>
+          <Link href="/refunds" className="inline-flex items-center min-h-[44px] py-1.5 hover:text-white/70 transition-colors">Refunds &amp; Cancellations</Link>
+          <Link href="/terms" className="inline-flex items-center min-h-[44px] py-1.5 hover:text-white/70 transition-colors">Terms</Link>
+          <Link href="/privacy" className="inline-flex items-center min-h-[44px] py-1.5 hover:text-white/70 transition-colors">Privacy</Link>
+          <span className="w-full sm:w-auto sm:ml-auto text-white/25">© {new Date().getFullYear()} {OPERATOR}</span>
         </div>
       </div>
     </footer>

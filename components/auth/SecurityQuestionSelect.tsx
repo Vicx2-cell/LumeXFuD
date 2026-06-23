@@ -25,7 +25,7 @@ export default function SecurityQuestionSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-sm text-white outline-none"
+        className="mt-1 w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
       >
         <option value="">Select a question</option>
         {options.map((question) => (

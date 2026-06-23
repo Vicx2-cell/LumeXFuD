@@ -295,12 +295,15 @@ export default function RiderDashboard() {
     // Centered app column: flush on mobile, a framed column on desktop (matches the
     // customer app + vendor dashboard) instead of sprawling edge-to-edge on wide
     // screens. The faint side borders read as an intentional surface on ≥sm.
-    <main className="lx-page pb-10 overflow-hidden mx-auto w-full max-w-lg lg:max-w-2xl sm:border-x sm:border-white/5">
+    <main
+      className="lx-page overflow-hidden mx-auto w-full max-w-lg lg:max-w-2xl sm:border-x sm:border-white/5"
+      style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom))' }}
+    >
       {/* Toast */}
       {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg lx-scale-in"
+        <div className="fixed left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg lx-scale-in max-w-[92vw] text-center"
           role="status" aria-live="polite"
-          style={{ background: '#F5A623', color: '#000' }}>
+          style={{ background: '#F5A623', color: '#000', top: 'calc(1rem + env(safe-area-inset-top))' }}>
           {toast}
         </div>
       )}
@@ -328,18 +331,26 @@ export default function RiderDashboard() {
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-          {/* Online/Offline toggle */}
+          {/* Online/Offline toggle — status conveyed by icon + text (not colour alone). */}
           <button
             onClick={toggleStatus}
             disabled={statusLoading || rider.status === 'BUSY'}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-60 transition-colors"
+            role="switch"
+            aria-checked={isOnline}
+            aria-label={`You are ${rider.status === 'BUSY' ? 'busy' : isOnline ? 'online' : 'offline'}. Tap to go ${isOnline ? 'offline' : 'online'}.`}
+            className="flex items-center gap-2 px-4 rounded-xl text-sm font-semibold disabled:opacity-60 transition-colors active:scale-95"
             style={{
+              minHeight: 48,
               background: isOnline ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)',
               border: `1px solid ${isOnline ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
               color: isOnline ? '#22C55E' : 'rgba(255,255,255,0.5)',
             }}
           >
-            <span className="w-2 h-2 rounded-full" style={{ background: isOnline ? '#22C55E' : '#666', flexShrink: 0 }} />
+            {statusLoading ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="shrink-0 animate-spin" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            ) : (
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: isOnline ? '#22C55E' : '#666', flexShrink: 0 }} />
+            )}
             {rider.status === 'BUSY' ? 'Busy' : isOnline ? 'Online' : 'Offline'}
           </button>
             <LogoutButton />
@@ -407,7 +418,8 @@ export default function RiderDashboard() {
                   <a
                     href={waLink(current.customers.phone, `Hi${current.customers.name ? ' ' + current.customers.name.split(' ')[0] : ''}, I’m your LumeX rider for order #${current.order_number}. I’m on my way!`)}
                     target="_blank" rel="noopener noreferrer"
-                    className="ml-auto text-[11px] px-2 py-1 rounded-lg font-medium shrink-0" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366' }}
+                    aria-label="Message customer on WhatsApp"
+                    className="ml-auto inline-flex items-center text-[11px] px-3 rounded-lg font-medium shrink-0 active:scale-95 transition-transform" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366', minHeight: 36 }}
                   >WhatsApp</a>
                 </div>
               )}
@@ -419,7 +431,8 @@ export default function RiderDashboard() {
                   <a
                     href={waLink(current.vendors.phone, `Hi, I’m the LumeX rider for order #${current.order_number}. Is it ready for pickup?`)}
                     target="_blank" rel="noopener noreferrer"
-                    className="ml-auto text-[11px] px-2 py-1 rounded-lg font-medium shrink-0" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366' }}
+                    aria-label="Message vendor on WhatsApp"
+                    className="ml-auto inline-flex items-center text-[11px] px-3 rounded-lg font-medium shrink-0 active:scale-95 transition-transform" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366', minHeight: 36 }}
                   >WhatsApp</a>
                 </div>
               )}
@@ -433,7 +446,8 @@ export default function RiderDashboard() {
               <button
                 onClick={() => updateOrderStatus(current.id, 'PICKED_UP')}
                 disabled={updatingStatus}
-                className="lx-btn-amber w-full py-3 text-sm"
+                className="lx-btn-amber w-full text-base font-bold active:scale-[0.98]"
+                style={{ minHeight: 52 }}
               >
                 {updatingStatus ? 'Updating…' : 'Mark as Picked Up'}
               </button>
@@ -450,8 +464,8 @@ export default function RiderDashboard() {
                 <button
                   onClick={() => updateOrderStatus(current.id, 'DELIVERED')}
                   disabled={updatingStatus}
-                  className="w-full py-3 rounded-xl font-semibold text-sm disabled:opacity-50"
-                  style={{ background: '#22C55E', color: '#000' }}
+                  className="w-full rounded-xl font-bold text-base disabled:opacity-50 active:scale-[0.98] transition-transform"
+                  style={{ background: '#22C55E', color: '#000', minHeight: 52 }}
                 >
                   {updatingStatus ? 'Updating…' : 'Mark as Delivered'}
                 </button>
@@ -461,8 +475,8 @@ export default function RiderDashboard() {
               <button
                 onClick={() => updateOrderStatus(current.id, 'COMPLETED')}
                 disabled={updatingStatus}
-                className="w-full py-3 rounded-xl font-semibold text-sm disabled:opacity-50"
-                style={{ background: '#22C55E', color: '#000' }}
+                className="w-full rounded-xl font-bold text-base disabled:opacity-50 active:scale-[0.98] transition-transform"
+                style={{ background: '#22C55E', color: '#000', minHeight: 52 }}
               >
                 {updatingStatus ? 'Updating…' : 'Complete Delivery ✓'}
               </button>
@@ -495,9 +509,10 @@ export default function RiderDashboard() {
             <button
               onClick={toggleStatus}
               disabled={statusLoading}
-              className="mt-4 px-6 py-2.5 rounded-xl font-semibold text-sm transition-transform active:scale-95"
-              style={{ background: '#22C55E', color: '#000' }}
+              className="mt-4 px-7 rounded-xl font-bold text-base transition-transform active:scale-95 inline-flex items-center justify-center gap-2 disabled:opacity-60"
+              style={{ background: '#22C55E', color: '#000', minHeight: 48 }}
             >
+              {statusLoading && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="animate-spin" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>}
               Go Online
             </button>
           </div>
@@ -536,10 +551,12 @@ export default function RiderDashboard() {
                 <button
                   onClick={() => acceptOrder(order.id)}
                   disabled={acceptingId !== null || !!current}
-                  className="lx-btn-amber w-full py-3 text-sm"
-                  style={{ borderRadius: 12 }}
+                  className="lx-btn-amber w-full text-base font-bold flex items-center justify-center gap-2 active:scale-[0.98]"
+                  style={{ borderRadius: 12, minHeight: 52 }}
                 >
-                  {acceptingId === order.id ? 'Accepting…' : current ? 'Finish current order first' : 'Accept Order'}
+                  {acceptingId === order.id ? (
+                    <><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="animate-spin" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Accepting…</>
+                  ) : current ? 'Finish current order first' : 'Accept Order'}
                 </button>
               </div>
             ))}
@@ -621,7 +638,7 @@ function DeliverPanel({
         {summary}
         <p className="text-xs text-white/65 mb-2">📷 Leave-at-gate for <span className="font-semibold text-white/90">{firstName}</span> — drop it at the gate. A proof photo is optional.</p>
         {arrivedWa && (
-          <a href={arrivedWa} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-2.5 mb-2 rounded-lg text-xs font-semibold" style={{ background: 'rgba(37,211,102,0.16)', color: '#25D366' }}>
+          <a href={arrivedWa} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full mb-2 rounded-lg text-sm font-semibold active:scale-[0.98] transition-transform" style={{ background: 'rgba(37,211,102,0.16)', color: '#25D366', minHeight: 44 }}>
             📲 Tell {firstName} you’ve arrived (WhatsApp)
           </a>
         )}
@@ -629,7 +646,7 @@ function DeliverPanel({
           {uploading ? 'Uploading…' : order.delivery_photo_url ? '✓ Photo added — retake' : 'Add proof photo (optional)'}
           <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void pickPhoto(e.target.files?.[0] ?? null)} disabled={uploading || busy} />
         </label>
-        <button onClick={confirmGate} disabled={busy} className="w-full py-3 rounded-lg text-sm font-semibold disabled:opacity-50" style={{ background: '#22C55E', color: '#000' }}>
+        <button onClick={confirmGate} disabled={busy} className="w-full rounded-lg text-base font-bold disabled:opacity-50 active:scale-[0.98] transition-transform" style={{ background: '#22C55E', color: '#000', minHeight: 48 }}>
           {busy ? 'Confirming…' : 'Confirm drop'}
         </button>
         {err && <p className="text-xs text-red-400 mt-1.5">{err}</p>}
@@ -649,12 +666,14 @@ function DeliverPanel({
       {/* Stacked (not side-by-side): the confirm button is full-width BELOW the input
           so it can never be clipped off the right edge of the card on a narrow phone. */}
       <input
-        inputMode="text" autoCapitalize="characters" autoCorrect="off" spellCheck={false} maxLength={6} value={code}
+        inputMode="text" autoCapitalize="characters" autoCorrect="off" spellCheck={false} autoComplete="off" maxLength={6} value={code}
         onChange={(e) => { setCode(e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 6)); setErr('') }}
         placeholder="ABC234"
-        className="lx-field w-full min-w-0 px-3 py-3 text-lg tracking-[0.4em] text-center font-semibold outline-none uppercase"
+        aria-label="6-character delivery code"
+        className="lx-field w-full min-w-0 px-3 text-xl tracking-[0.4em] text-center font-semibold outline-none uppercase"
+        style={{ minHeight: 52 }}
       />
-      <button onClick={submitCode} disabled={busy || code.length !== 6} className="w-full mt-2 py-3 rounded-lg text-sm font-semibold disabled:opacity-50" style={{ background: '#22C55E', color: '#000' }}>
+      <button onClick={submitCode} disabled={busy || code.length !== 6} className="w-full mt-2 rounded-lg text-base font-bold disabled:opacity-50 active:scale-[0.98] transition-transform" style={{ background: '#22C55E', color: '#000', minHeight: 48 }}>
         {busy ? 'Confirming…' : 'Confirm delivery'}
       </button>
       {err && <p className="text-xs text-red-400 mt-1.5">{err}</p>}

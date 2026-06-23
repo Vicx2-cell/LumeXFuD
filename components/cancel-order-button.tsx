@@ -38,8 +38,8 @@ export function CancelOrderButton({ orderId }: { orderId: string }) {
       type="button"
       onClick={cancel}
       disabled={busy}
-      className="text-xs font-medium transition-opacity active:opacity-60 disabled:opacity-50"
-      style={{ color: '#f87171' }}
+      className="inline-flex items-center text-xs font-medium py-1.5 -my-1.5 transition-opacity active:opacity-60 disabled:opacity-50"
+      style={{ color: '#f87171', minHeight: 44 }}
     >
       {busy ? 'Cancelling…' : msg ? msg : '✕ Cancel order — full refund'}
     </button>

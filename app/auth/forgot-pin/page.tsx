@@ -197,8 +197,8 @@ export default function ForgotPinPage() {
 
   return (
     <div
-      className="min-h-dvh flex items-center justify-center px-5 py-12"
-      style={{ background: '#0A0A0B' }}
+      className="min-h-dvh flex items-start sm:items-center justify-center px-5 py-10 sm:py-12"
+      style={{ background: '#0A0A0B', paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
     >
       <div className="w-full max-w-xl space-y-6">
         {/* Header */}
@@ -225,9 +225,13 @@ export default function ForgotPinPage() {
               <input
                 value={phone}
                 onChange={(e) => { setPhone(normalizePhone(e.target.value)); setError('') }}
-                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                 placeholder="+2348012345678"
+                type="tel"
                 inputMode="tel"
+                autoComplete="tel"
+                autoCorrect="off"
+                spellCheck={false}
                 autoFocus
               />
             </label>
@@ -314,9 +318,10 @@ export default function ForgotPinPage() {
               <input
                 value={answer1}
                 onChange={(e) => { setAnswer1(e.target.value); setError('') }}
-                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                 placeholder="Type your answer"
                 autoComplete="off"
+                autoCorrect="off"
               />
             </label>
 
@@ -332,9 +337,10 @@ export default function ForgotPinPage() {
               <input
                 value={answer2}
                 onChange={(e) => { setAnswer2(e.target.value); setError('') }}
-                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                 placeholder="Type your answer"
                 autoComplete="off"
+                autoCorrect="off"
               />
             </label>
 
@@ -345,8 +351,10 @@ export default function ForgotPinPage() {
                   type="password"
                   value={newPin}
                   onChange={(e) => { setNewPin(e.target.value.replace(/[^0-9]/g, '')); setError('') }}
-                  className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                  className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="new-password"
                   maxLength={6}
                   placeholder="••••••"
                 />
@@ -357,8 +365,10 @@ export default function ForgotPinPage() {
                   type="password"
                   value={confirmPin}
                   onChange={(e) => { setConfirmPin(e.target.value.replace(/[^0-9]/g, '')); setError('') }}
-                  className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                  className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="new-password"
                   maxLength={6}
                   placeholder="••••••"
                 />
@@ -396,9 +406,11 @@ export default function ForgotPinPage() {
               <input
                 value={recoveryCode}
                 onChange={(e) => { setRecoveryCode(e.target.value); setError('') }}
-                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 font-mono text-white outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 font-mono text-base text-white outline-none focus:border-amber-400/60"
                 placeholder="LXMX-A7B9-K3MQ-P2RT"
                 autoComplete="off"
+                autoCapitalize="characters"
+                autoCorrect="off"
                 spellCheck={false}
               />
             </label>
@@ -410,8 +422,10 @@ export default function ForgotPinPage() {
                   type="password"
                   value={newPin}
                   onChange={(e) => { setNewPin(e.target.value.replace(/[^0-9]/g, '')); setError('') }}
-                  className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                  className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="new-password"
                   maxLength={6}
                   placeholder="••••••"
                 />
@@ -422,8 +436,10 @@ export default function ForgotPinPage() {
                   type="password"
                   value={confirmPin}
                   onChange={(e) => { setConfirmPin(e.target.value.replace(/[^0-9]/g, '')); setError('') }}
-                  className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                  className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="new-password"
                   maxLength={6}
                   placeholder="••••••"
                 />
@@ -465,10 +481,16 @@ export default function ForgotPinPage() {
                   <input
                     value={otpCode}
                     onChange={(e) => { setOtpCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6)); setError('') }}
-                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-center font-mono text-lg tracking-[0.4em] text-white outline-none"
+                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-center font-mono text-lg tracking-[0.4em] text-white outline-none focus:border-amber-400/60"
+                    type="text"
                     inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="one-time-code"
+                    autoCorrect="off"
+                    spellCheck={false}
                     maxLength={6}
                     placeholder="••••••"
+                    aria-label="6-digit code"
                     autoFocus
                   />
                 </label>
@@ -504,8 +526,10 @@ export default function ForgotPinPage() {
                       type="password"
                       value={newPin}
                       onChange={(e) => { setNewPin(e.target.value.replace(/[^0-9]/g, '')); setError('') }}
-                      className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                      className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                       inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoComplete="new-password"
                       maxLength={6}
                       placeholder="••••••"
                       autoFocus
@@ -517,8 +541,10 @@ export default function ForgotPinPage() {
                       type="password"
                       value={confirmPin}
                       onChange={(e) => { setConfirmPin(e.target.value.replace(/[^0-9]/g, '')); setError('') }}
-                      className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                      className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                       inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoComplete="new-password"
                       maxLength={6}
                       placeholder="••••••"
                     />

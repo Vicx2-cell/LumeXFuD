@@ -162,11 +162,11 @@ export default function AdminLodgesPage() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button onClick={() => patch(l.id, { is_verified: !l.is_verified }, l.is_verified ? 'Unverified' : 'Verified')}
-                    className="text-xs px-2 py-1 rounded-full font-medium"
+                    className="text-xs px-3 py-2 rounded-full font-medium"
                     style={{ background: l.is_verified ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', color: l.is_verified ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>
                     {l.is_verified ? '✓ Verified' : 'Verify'}
                   </button>
-                  <button onClick={() => remove(l.id)} aria-label="Delete lodge" className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
+                  <button onClick={() => remove(l.id)} aria-label="Delete lodge" className="text-xs px-3 py-2 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
                     Delete
                   </button>
                 </div>

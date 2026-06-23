@@ -211,7 +211,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
               <h1 className="font-semibold text-base truncate">{vendor.shop_name}</h1>
               {vendor.kyc_verified && <VerifiedBadge kind="vendor" />}
             </div>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <Badge color={vendor.status === 'OPEN' ? 'var(--lx-green)' : vendor.status === 'BUSY' ? 'var(--color-amber)' : 'var(--lx-red)'}>
                 {isPaused ? 'Paused' : vendor.status}
               </Badge>
@@ -291,8 +291,8 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
                 </div>
                 <div className="shrink-0 flex flex-col items-center justify-center">
                   <button onClick={() => handleAdd(item)} disabled={isClosed || soldOut}
-                    className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl disabled:opacity-30 relative transition-transform active:scale-90 hover:scale-105"
-                    style={{ background: '#F5A623', color: '#000', boxShadow: '0 0 16px rgba(245,166,35,0.35)' }} aria-label={`Add ${item.name}`}>
+                    className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-xl disabled:opacity-30 relative transition-transform active:scale-90 hover:scale-105"
+                    style={{ background: '#F5A623', color: '#000', boxShadow: '0 0 16px rgba(245,166,35,0.35)', minWidth: 44, minHeight: 44 }} aria-label={`Add ${item.name}`}>
                     +
                     {qty > 0 && (
                       <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-[11px] flex items-center justify-center font-bold" style={{ background: '#000', color: '#F5A623' }}>{qty}</span>
@@ -346,9 +346,9 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
         )}
       </div>
 
-      {/* Sticky cart bar */}
+      {/* Sticky cart bar — clears the bottom nav + the device safe-area inset */}
       {totalItems > 0 && cart.vendor_id === vendor.id && (
-        <div className="fixed bottom-20 left-0 right-0 z-40 px-4 lx-enter">
+        <div className="fixed left-0 right-0 z-40 px-4 lx-enter" style={{ bottom: 'calc(72px + env(safe-area-inset-bottom))' }}>
           <div className="max-w-lg mx-auto">
             <button onClick={() => router.push('/cart')} className="lx-btn-amber w-full py-4 flex items-center justify-between px-5" style={{ borderRadius: 16 }}>
               <span className="w-7 h-7 rounded-full flex items-center justify-center text-sm" style={{ background: 'rgba(0,0,0,0.15)' }}>{totalItems}</span>

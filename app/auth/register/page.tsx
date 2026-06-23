@@ -211,7 +211,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-5 py-12" style={{ background: '#0A0A0B' }}>
+    <div className="min-h-dvh flex items-start sm:items-center justify-center px-5 py-10 sm:py-12" style={{ background: '#0A0A0B', paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
       <div className="w-full max-w-lg space-y-6">
         <BackButton fallback="/auth" />
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
@@ -241,8 +241,10 @@ export default function RegisterPage() {
             <input
               value={form.name}
               onChange={(event) => handleChange('name', event.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+              className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
               placeholder="Chibuike Nwosu"
+              autoComplete="name"
+              autoCapitalize="words"
             />
           </label>
 
@@ -263,9 +265,13 @@ export default function RegisterPage() {
                 }
                 handleChange('phone', normalized)
               }}
-              className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+              className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
               placeholder="+2348012345678"
+              type="tel"
               inputMode="tel"
+              autoComplete="tel"
+              autoCorrect="off"
+              spellCheck={false}
             />
           </label>
 
@@ -294,16 +300,22 @@ export default function RegisterPage() {
                     <input
                       value={code}
                       onChange={(event) => { setCode(event.target.value.replace(/[^0-9]/g, '').slice(0, 6)); setVError('') }}
-                      className="flex-1 rounded-xl border border-white/10 bg-[#111113] px-4 py-3 text-center text-white tracking-[0.4em] outline-none"
+                      className="flex-1 min-w-0 rounded-xl border border-white/10 bg-[#111113] px-4 py-3 text-center text-base text-white tracking-[0.4em] outline-none focus:border-amber-400/60"
+                      type="text"
                       inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoComplete="one-time-code"
+                      autoCorrect="off"
+                      spellCheck={false}
                       maxLength={6}
                       placeholder="••••••"
+                      aria-label="6-digit verification code"
                     />
                     <button
                       type="button"
                       onClick={verifyCode}
                       disabled={vBusy || code.length !== 6}
-                      className="rounded-xl bg-amber-500 px-5 text-sm font-semibold text-black disabled:opacity-50"
+                      className="shrink-0 rounded-xl bg-amber-500 px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
                     >
                       {vBusy ? '…' : 'Verify'}
                     </button>
@@ -347,9 +359,13 @@ export default function RegisterPage() {
                   else if (!raw.startsWith('+')) normalized = '+234' + raw
                   setCallPhone(normalized)
                 }}
-                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                 placeholder="+2348012345678"
+                type="tel"
                 inputMode="tel"
+                autoComplete="tel"
+                autoCorrect="off"
+                spellCheck={false}
               />
             )}
           </div>
@@ -361,10 +377,13 @@ export default function RegisterPage() {
                 type="password"
                 value={form.pin}
                 onChange={(event) => handleChange('pin', event.target.value.replace(/[^0-9]/g, ''))}
-                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                 inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="new-password"
                 maxLength={6}
                 placeholder="123456"
+                aria-label="Choose a 6-digit PIN"
               />
             </label>
             <label className="block text-sm text-white/70">
@@ -373,10 +392,13 @@ export default function RegisterPage() {
                 type="password"
                 value={form.confirm_pin}
                 onChange={(event) => handleChange('confirm_pin', event.target.value.replace(/[^0-9]/g, ''))}
-                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                 inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="new-password"
                 maxLength={6}
                 placeholder="123456"
+                aria-label="Confirm your 6-digit PIN"
               />
             </label>
           </div>
@@ -393,8 +415,10 @@ export default function RegisterPage() {
               <input
                 value={form.answer_1}
                 onChange={(event) => handleChange('answer_1', event.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                 placeholder="Type your answer"
+                autoComplete="off"
+                autoCorrect="off"
               />
             </label>
             <SecurityQuestionSelect
@@ -408,8 +432,10 @@ export default function RegisterPage() {
               <input
                 value={form.answer_2}
                 onChange={(event) => handleChange('answer_2', event.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                 placeholder="Type your answer"
+                autoComplete="off"
+                autoCorrect="off"
               />
             </label>
           </div>

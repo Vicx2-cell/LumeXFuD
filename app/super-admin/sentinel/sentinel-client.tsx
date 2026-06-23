@@ -54,7 +54,7 @@ export function SentinelClient() {
     <>
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => router.back()} className="w-9 h-9 rounded-full flex items-center justify-center text-white/50" style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
+        <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 rounded-full flex items-center justify-center text-white/50" style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
         <div className="flex-1">
           <h1 className="text-xl font-bold text-white">Sentinel</h1>
           <p className="text-xs text-white/40">Your 24/7 platform watch{updatedAt ? ` · updated ${updatedAt}` : ''}</p>

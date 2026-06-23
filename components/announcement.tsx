@@ -176,11 +176,12 @@ export function Announcement() {
               </div>
               <button
                 onClick={() => dismiss(ann.id)}
-                className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-white/60 hover:text-white transition-colors"
-                style={{ background: 'rgba(255,255,255,0.1)' }}
-                aria-label="Dismiss"
+                className="-my-1.5 -mr-1.5 w-11 h-11 rounded-full flex items-center justify-center shrink-0 text-white/60 hover:text-white active:scale-95 transition-transform"
+                aria-label="Dismiss announcement"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <span className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </span>
               </button>
             </div>
           </div>

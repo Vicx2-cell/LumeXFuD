@@ -30,11 +30,11 @@ export default async function RefundsPage() {
 
   return (
     <main style={{ background: '#0A0A0B' }}>
-      <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto">
+      <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 3rem)' }}>
         <h1 className="text-2xl font-bold mb-2 text-white">Refund &amp; Cancellation Policy</h1>
         <p className="text-sm text-white/40 mb-8">Last updated: June 2026</p>
 
-        <div className="space-y-8 text-sm leading-relaxed text-white/70">
+        <div className="space-y-8 text-base leading-relaxed text-white/70 [overflow-wrap:anywhere]">
           <section>
             <p>LumeX Fud is a campus food delivery service for Abia State University (ABSU). When you place an order you pay for your food, a flat platform fee, and (for delivery) a flat delivery fee. All payments are digital and processed by Paystack — we never store your card details. This page explains exactly when you are and aren’t refunded.</p>
           </section>
@@ -97,7 +97,7 @@ export default async function RefundsPage() {
 
           <section>
             <h2 className="text-base font-semibold text-white mb-2">Need help?</h2>
-            <p>Email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#F5A623]">{SUPPORT_EMAIL}</a> with your order number, or use the support contact on your <a href="/contact" className="text-[#F5A623]">Contact</a> page. See also our <a href="/terms" className="text-[#F5A623]">Terms</a> and <a href="/privacy" className="text-[#F5A623]">Privacy Policy</a>.</p>
+            <p>Email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#F5A623] break-words">{SUPPORT_EMAIL}</a> with your order number, or use the support contact on your <a href="/contact" className="text-[#F5A623]">Contact</a> page. See also our <a href="/terms" className="text-[#F5A623]">Terms</a> and <a href="/privacy" className="text-[#F5A623]">Privacy Policy</a>.</p>
           </section>
         </div>
       </div>

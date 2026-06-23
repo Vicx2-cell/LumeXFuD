@@ -315,7 +315,7 @@ export default function CartPage() {
             const addonsKobo = item.addons.reduce((s, a) => s + a.price_kobo, 0)
             const eachKobo = item.price_kobo + addonsKobo
             return (
-            <div key={item.id} className={`flex items-center gap-3 px-4 py-3 ${idx < cart.items.length - 1 ? 'border-b border-white/5' : ''}`}>
+            <div key={item.id} className={`flex items-center gap-2 px-3 sm:px-4 py-3 ${idx < cart.items.length - 1 ? 'border-b border-white/5' : ''}`}>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{item.name}</p>
                 {item.addons.length > 0 && (
@@ -323,16 +323,16 @@ export default function CartPage() {
                 )}
                 <p className="text-xs text-white/40 mt-0.5">{formatPrice(eachKobo)} each</p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button onClick={() => setQuantity(item.id, item.quantity - 1)} aria-label={`Decrease ${item.name} quantity`}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-transform active:scale-90"
-                  style={{ background: 'rgba(255,255,255,0.08)', minWidth: 32, minHeight: 32 }}>−</button>
+                  className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold transition-transform active:scale-90"
+                  style={{ background: 'rgba(255,255,255,0.08)', minWidth: 44, minHeight: 44 }}>−</button>
                 <span className="text-sm font-semibold w-6 text-center tabular-nums">{item.quantity}</span>
                 <button onClick={() => setQuantity(item.id, item.quantity + 1)} aria-label={`Increase ${item.name} quantity`}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-transform active:scale-90"
-                  style={{ background: '#F5A623', color: '#000', minWidth: 32, minHeight: 32 }}>+</button>
+                  className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold transition-transform active:scale-90"
+                  style={{ background: '#F5A623', color: '#000', minWidth: 44, minHeight: 44 }}>+</button>
               </div>
-              <p className="text-sm font-semibold w-20 text-right shrink-0">{formatPrice(eachKobo * item.quantity)}</p>
+              <p className="text-sm font-semibold w-16 sm:w-20 text-right shrink-0 tabular-nums">{formatPrice(eachKobo * item.quantity)}</p>
             </div>
             )
           })}
@@ -464,6 +464,7 @@ export default function CartPage() {
           <label className="block text-sm font-medium text-white/70 mb-2">Delivery address</label>
           <input type="text" value={address} onChange={(e) => { setAddress(e.target.value); setCoords(null) }}
             placeholder="Hall/hostel, room number..."
+            autoComplete="street-address" enterKeyHint="done"
             className="lx-field w-full px-4 py-3 text-sm outline-none" />
           {/* Saved lodges — learned from past orders + verified ABSU catalog; tap to reuse. */}
           {savedAddresses.length > 0 && (
@@ -738,8 +739,9 @@ export default function CartPage() {
         )}
       </div>
 
-      {/* Fixed pay button */}
-      <div className="fixed bottom-16 left-0 right-0 z-40 px-4 pb-2">
+      {/* Fixed pay button — sits clear of the bottom nav (64px) AND the device
+          safe-area inset so the home indicator never clips it. */}
+      <div className="fixed left-0 right-0 z-40 px-4 pb-2" style={{ bottom: 'calc(64px + env(safe-area-inset-bottom))' }}>
         <div className="max-w-lg mx-auto">
           <button
             onClick={handleCheckout}

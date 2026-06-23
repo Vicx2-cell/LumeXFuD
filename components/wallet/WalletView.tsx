@@ -246,7 +246,7 @@ export default function WalletView({ userType }: Props) {
             Withdraw
           </button>
           <button
-            className="flex-1 border border-white/20 text-white font-medium py-3 rounded-xl hover:bg-white/5 transition-colors"
+            className="flex-1 border border-white/20 text-white font-medium py-3 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors"
             onClick={() => setTxPage(1)}
           >
             Refresh
@@ -265,10 +265,10 @@ export default function WalletView({ userType }: Props) {
               style={{ width: `${tierPct}%`, background: 'var(--color-amber)' }}
             />
           </div>
-          <div className="flex justify-between text-xs text-white/40">
-            <span>{tier}</span>
-            <span>{wallet.tier_progress.orders_to_next} more to {wallet.tier_progress.next_tier}</span>
-            <span>{wallet.tier_progress.next_tier}</span>
+          <div className="flex justify-between items-center gap-2 text-xs text-white/40">
+            <span className="shrink-0">{tier}</span>
+            <span className="text-center min-w-0 truncate">{wallet.tier_progress.orders_to_next} more to {wallet.tier_progress.next_tier}</span>
+            <span className="shrink-0">{wallet.tier_progress.next_tier}</span>
           </div>
           <button onClick={() => setTiersOpen(true)} className="lx-amber mt-3 text-xs font-medium">
             What do tiers mean? View all →
@@ -278,11 +278,11 @@ export default function WalletView({ userType }: Props) {
 
       {/* ── Trust Tiers guide ──────────────────────────────── */}
       {tiersOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setTiersOpen(false)}>
-          <div className="w-full max-w-md rounded-2xl p-5 lx-enter" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.1)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setTiersOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl p-5 lx-enter max-h-[88dvh] overflow-y-auto" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.1)' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-1">
               <h3 className="font-bold text-white">Trust Tiers</h3>
-              <button onClick={() => setTiersOpen(false)} className="text-white/40 text-xl leading-none">×</button>
+              <button onClick={() => setTiersOpen(false)} aria-label="Close" className="text-white/40 text-2xl leading-none w-11 h-11 -mr-2 -mt-2 flex items-center justify-center active:opacity-70">×</button>
             </div>
             <p className="text-xs text-white/45 mb-4">
               You’re {wallet?.tier_emoji} <b className="text-white">{tier}</b> with <b className="text-white">{tierCount}</b> completed order{tierCount === 1 ? '' : 's'}. Tiers reward your track record.
@@ -515,9 +515,9 @@ export default function WalletView({ userType }: Props) {
 
       {/* ── Set PIN sheet ──────────────────────────────────── */}
       {setPinOpen && (
-        <div className="fixed inset-0 z-50 flex items-end">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setSetPinOpen(false)} />
-          <div className="relative w-full bg-[#111] rounded-t-2xl p-6">
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/60 lx-scrim" onClick={() => setSetPinOpen(false)} />
+          <div className="lx-sheet relative w-full sm:max-w-md bg-[#111] rounded-t-2xl sm:rounded-2xl sm:mb-4 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[92dvh] overflow-y-auto">
             <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
             {pinStep === 1 && (
               <div>

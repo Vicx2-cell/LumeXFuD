@@ -365,6 +365,8 @@ export function ProfileClient({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              autoComplete="name"
+              autoCapitalize="words"
               className="lx-field w-full px-4 py-3 text-sm outline-none"
             />
           </div>

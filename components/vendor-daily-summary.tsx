@@ -57,7 +57,7 @@ export function VendorDailySummary() {
           <span className="text-base">📊</span>
           <h3 className="text-sm font-semibold" style={{ color: AMBER }}>Today&apos;s summary{stats ? ` · ${stats.date_label}` : ''}</h3>
         </div>
-        <button onClick={load} disabled={loading} className="text-xs text-white/45 hover:text-white/80 disabled:opacity-50">
+        <button onClick={load} disabled={loading} className="lx-tap text-xs text-white/45 hover:text-white/80 disabled:opacity-50 px-2.5 py-1.5 -mr-1.5 rounded-lg">
           {loading ? '…' : 'Refresh'}
         </button>
       </div>

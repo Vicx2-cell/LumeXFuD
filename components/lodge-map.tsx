@@ -101,5 +101,8 @@ export function LodgeMap({ lodges, height = 280, onPick, onSelect, pin }: LodgeM
     mapRef.current.setView([pin.lat, pin.lng], Math.max(mapRef.current.getZoom(), 16))
   }, [pin])
 
-  return <div ref={elRef} style={{ height, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }} />
+  // Fixed height keeps the reserved box stable (no layout shift while Leaflet
+  // boots); width is clamped so the tile canvas can never push past a 360px
+  // viewport. Container sizing only — map logic above is untouched.
+  return <div ref={elRef} style={{ height, width: '100%', maxWidth: '100%', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }} />
 }

@@ -16,11 +16,11 @@ export default async function TermsPage() {
   const minOrder = Number.isFinite(minKobo) && minKobo > 0 ? minKobo : 50000
   return (
     <main style={{ background: '#0A0A0B' }}>
-      <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto">
+      <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 3rem)' }}>
       <h1 className="text-2xl font-bold mb-2">Terms of Service</h1>
       <p className="text-sm text-white/40 mb-8">Last updated: June 2026</p>
 
-      <div className="space-y-8 text-sm leading-relaxed text-white/70">
+      <div className="space-y-8 text-base leading-relaxed text-white/70 [overflow-wrap:anywhere]">
         <section>
           <h2 className="text-base font-semibold text-white mb-2">1. Acceptance of terms</h2>
           <p>By using LumeX Fud, you agree to these terms. LumeX Fud is a campus food delivery service operated by Lumex, serving students at Abia State University (ABSU), Nigeria. These terms, together with our <a href="/refunds" className="text-[#F5A623]">Refund &amp; Cancellation Policy</a> and <a href="/privacy" className="text-[#F5A623]">Privacy Policy</a>, govern your use of the service.</p>
@@ -87,7 +87,7 @@ export default async function TermsPage() {
 
         <section>
           <h2 className="text-base font-semibold text-white mb-2">9. Contact</h2>
-          <p>Questions? Email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#F5A623]">{SUPPORT_EMAIL}</a> or see our <a href="/contact" className="text-[#F5A623]">Contact</a> page.</p>
+          <p>Questions? Email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#F5A623] break-words">{SUPPORT_EMAIL}</a> or see our <a href="/contact" className="text-[#F5A623]">Contact</a> page.</p>
         </section>
       </div>
       </div>

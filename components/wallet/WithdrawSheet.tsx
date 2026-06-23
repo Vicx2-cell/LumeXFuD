@@ -96,12 +96,12 @@ export default function WithdrawSheet({
   // Pre-flight checks
   if (!pinSet) {
     return (
-      <div className="fixed inset-0 z-50 flex items-end">
-        <div className="absolute inset-0 bg-black/60" onClick={handleClose} />
-        <div className="relative w-full bg-[#111] rounded-t-2xl p-6">
+      <div className="fixed inset-0 z-50 flex items-end justify-center">
+        <div className="absolute inset-0 bg-black/60 lx-scrim" onClick={handleClose} />
+        <div className="lx-sheet relative w-full sm:max-w-md bg-[#111] rounded-t-2xl sm:rounded-2xl sm:mb-4 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[90dvh] overflow-y-auto">
           <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
           <p className="text-white/60 text-center mb-4">Set a wallet PIN first to enable withdrawals.</p>
-          <button className="w-full bg-amber-500 text-black font-semibold py-4 rounded-xl" onClick={handleClose}>
+          <button className="w-full bg-amber-500 text-black font-semibold py-4 rounded-xl active:scale-[0.98] transition-transform" onClick={handleClose}>
             Close
           </button>
         </div>
@@ -111,12 +111,12 @@ export default function WithdrawSheet({
 
   if (!bankConnected) {
     return (
-      <div className="fixed inset-0 z-50 flex items-end">
-        <div className="absolute inset-0 bg-black/60" onClick={handleClose} />
-        <div className="relative w-full bg-[#111] rounded-t-2xl p-6">
+      <div className="fixed inset-0 z-50 flex items-end justify-center">
+        <div className="absolute inset-0 bg-black/60 lx-scrim" onClick={handleClose} />
+        <div className="lx-sheet relative w-full sm:max-w-md bg-[#111] rounded-t-2xl sm:rounded-2xl sm:mb-4 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[90dvh] overflow-y-auto">
           <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
           <p className="text-white/60 text-center mb-4">Add a bank account to withdraw earnings.</p>
-          <button className="w-full bg-amber-500 text-black font-semibold py-4 rounded-xl" onClick={handleClose}>
+          <button className="w-full bg-amber-500 text-black font-semibold py-4 rounded-xl active:scale-[0.98] transition-transform" onClick={handleClose}>
             Close
           </button>
         </div>
@@ -129,15 +129,15 @@ export default function WithdrawSheet({
       day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
     }) : 'soon'
     return (
-      <div className="fixed inset-0 z-50 flex items-end">
-        <div className="absolute inset-0 bg-black/60" onClick={handleClose} />
-        <div className="relative w-full bg-[#111] rounded-t-2xl p-6">
+      <div className="fixed inset-0 z-50 flex items-end justify-center">
+        <div className="absolute inset-0 bg-black/60 lx-scrim" onClick={handleClose} />
+        <div className="lx-sheet relative w-full sm:max-w-md bg-[#111] rounded-t-2xl sm:rounded-2xl sm:mb-4 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[90dvh] overflow-y-auto">
           <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
           <p className="text-amber-400 text-center font-semibold mb-2">New bank account</p>
           <p className="text-white/60 text-center text-sm mb-4">
             Withdrawals from this bank available from {readyAt}.
           </p>
-          <button className="w-full bg-amber-500 text-black font-semibold py-4 rounded-xl" onClick={handleClose}>
+          <button className="w-full bg-amber-500 text-black font-semibold py-4 rounded-xl active:scale-[0.98] transition-transform" onClick={handleClose}>
             Got it
           </button>
         </div>
@@ -146,9 +146,9 @@ export default function WithdrawSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end">
-      <div className="absolute inset-0 bg-black/60" onClick={handleClose} />
-      <div className="relative w-full bg-[#111] rounded-t-2xl p-6">
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/60 lx-scrim" onClick={handleClose} />
+      <div className="lx-sheet relative w-full sm:max-w-md bg-[#111] rounded-t-2xl sm:rounded-2xl sm:mb-4 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[90dvh] overflow-y-auto">
         <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
 
         {/* Step 1: Enter amount */}
@@ -158,7 +158,7 @@ export default function WithdrawSheet({
             <div className="relative mb-2">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 text-xl">₦</span>
               <input
-                className="w-full bg-white/10 text-white text-xl text-right rounded-xl px-4 py-4 pr-4 outline-none focus:ring-1 focus:ring-amber-500"
+                className="w-full bg-white/10 text-white text-xl text-right rounded-xl px-4 py-4 pl-10 pr-4 outline-none focus:ring-1 focus:ring-amber-500"
                 placeholder="0"
                 value={amountStr}
                 onChange={(e) => {
@@ -166,6 +166,9 @@ export default function WithdrawSheet({
                   setAmountStr(v)
                 }}
                 inputMode="numeric"
+                autoComplete="off"
+                enterKeyHint="done"
+                aria-label="Amount to withdraw in naira"
                 autoFocus
               />
             </div>
@@ -183,7 +186,7 @@ export default function WithdrawSheet({
               <p className="text-red-400 text-sm mb-3">Maximum ₦25,000 per transaction</p>
             )}
             <button
-              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold py-4 rounded-xl disabled:opacity-40 transition-colors"
+              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold py-4 rounded-xl disabled:opacity-40 transition-colors active:scale-[0.98]"
               disabled={!canProceedAmount()}
               onClick={() => { setError(''); setStep(2) }}
             >
@@ -234,7 +237,7 @@ export default function WithdrawSheet({
             )}
 
             <button
-              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold py-4 rounded-xl disabled:opacity-40 transition-colors"
+              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold py-4 rounded-xl disabled:opacity-40 transition-colors active:scale-[0.98]"
               disabled={pin.length < 4 || loading}
               onClick={handleWithdraw}
             >

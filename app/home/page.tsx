@@ -64,27 +64,27 @@ export default async function CustomerHomePage() {
     <main className="lx-page pb-24">
       {/* Header */}
       <div className="lx-topbar sticky top-0 z-40 px-4 py-3">
-        <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <BackButton />
             <BrandLogo size={34} rounded={10} />
-            <div>
+            <div className="min-w-0">
               <span className="text-xs text-white/40">LumeX Fud</span>
-              <h1 className="text-base font-semibold leading-tight lx-foodie-text">What are you eating today?</h1>
+              <h1 className="text-sm sm:text-base font-semibold leading-tight lx-foodie-text truncate">What are you eating today?</h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <a
               href="/profile/wallet"
-              className="lx-card-amber-strong h-9 px-3 rounded-full flex items-center gap-1.5"
+              className="lx-card-amber-strong h-11 px-3 rounded-full flex items-center gap-1.5"
               aria-label="Wallet"
             >
-              <span className="text-sm">💰</span>
+              <span className="text-sm" aria-hidden="true">💰</span>
               <span className="lx-amber text-xs font-semibold">Wallet</span>
             </a>
             <a
               href="/profile"
-              className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
+              className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center"
               aria-label="Profile"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

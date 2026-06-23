@@ -137,7 +137,7 @@ function CcmasFootnote({ sel }: { sel: CompleteSelection }) {
         href={CCMAS_SOURCE_URL}
         target="_blank"
         rel="noreferrer noopener"
-        className="inline-block text-xs underline text-white/45"
+        className="inline-flex items-center min-h-[44px] py-1.5 text-xs underline text-white/45"
       >
         Source: NUC CCMAS
       </a>

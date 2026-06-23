@@ -534,11 +534,11 @@ function MyEarningsTab() {
       {range === 'custom' && (
         <div className="flex gap-2 mb-4">
           <input type="date" value={customFrom} onChange={(e) => { setCustomFrom(e.target.value); setPage(1) }}
-            className="flex-1 rounded-xl px-3 py-2 text-sm text-white outline-none"
-            style={{ background: '#1a1a1c', border: '1px solid rgba(255,255,255,0.1)' }} />
+            className="flex-1 rounded-xl px-3 py-2.5 text-base text-white outline-none"
+            style={{ background: '#1a1a1c', border: '1px solid rgba(255,255,255,0.1)', colorScheme: 'dark' }} />
           <input type="date" value={customTo}   onChange={(e) => { setCustomTo(e.target.value);   setPage(1) }}
-            className="flex-1 rounded-xl px-3 py-2 text-sm text-white outline-none"
-            style={{ background: '#1a1a1c', border: '1px solid rgba(255,255,255,0.1)' }} />
+            className="flex-1 rounded-xl px-3 py-2.5 text-base text-white outline-none"
+            style={{ background: '#1a1a1c', border: '1px solid rgba(255,255,255,0.1)', colorScheme: 'dark' }} />
         </div>
       )}
 
@@ -740,8 +740,8 @@ export default function SuperAdminFinancials() {
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-white/50"
+          <button onClick={() => router.back()} aria-label="Go back"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-white/50"
             style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
           <div>
             <span className="inline-block px-2 py-0.5 rounded text-xs font-bold mb-1"

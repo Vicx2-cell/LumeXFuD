@@ -137,7 +137,7 @@ export default function CompleteSignupPage() {
   }
 
   return (
-    <main className="min-h-dvh flex items-center justify-center px-5 py-12" style={{ background: '#0A0A0B' }}>
+    <main className="min-h-dvh flex items-start sm:items-center justify-center px-5 py-10 sm:py-12" style={{ background: '#0A0A0B', paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
       <div className="w-full max-w-md space-y-6">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <h1 className="text-2xl font-semibold text-white">Almost there</h1>
@@ -152,8 +152,10 @@ export default function CompleteSignupPage() {
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+              className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
               placeholder="Chibuike Nwosu"
+              autoComplete="name"
+              autoCapitalize="words"
             />
           </label>
 
@@ -164,16 +166,20 @@ export default function CompleteSignupPage() {
                 value={phone}
                 onChange={(e) => onPhoneChange(e.target.value)}
                 disabled={phoneVerified}
-                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none disabled:opacity-60"
+                className="w-full min-w-0 rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60 disabled:opacity-60"
                 placeholder="+2348012345678"
+                type="tel"
                 inputMode="tel"
+                autoComplete="tel"
+                autoCorrect="off"
+                spellCheck={false}
               />
               {verificationRequired && !phoneVerified && (
                 <button
                   type="button"
                   onClick={sendCode}
                   disabled={busy || !phoneOk}
-                  className="shrink-0 rounded-2xl border border-white/15 px-4 text-sm font-medium text-white disabled:opacity-50"
+                  className="shrink-0 rounded-2xl border border-white/15 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
                 >
                   {codeSent ? 'Resend' : 'Send code'}
                 </button>
@@ -188,15 +194,22 @@ export default function CompleteSignupPage() {
                 <input
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none tracking-[0.4em]"
+                  className="w-full min-w-0 rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60 tracking-[0.4em]"
                   placeholder="••••••"
+                  type="text"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="one-time-code"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  maxLength={6}
+                  aria-label="6-digit verification code"
                 />
                 <button
                   type="button"
                   onClick={verifyCode}
                   disabled={busy || code.length !== 6}
-                  className="shrink-0 rounded-2xl bg-amber-500 px-4 text-sm font-semibold text-black disabled:opacity-50"
+                  className="shrink-0 rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-black disabled:opacity-50"
                 >
                   Verify
                 </button>

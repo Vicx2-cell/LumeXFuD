@@ -27,7 +27,7 @@ export function LogoutButton({ className = '' }: { className?: string }) {
     <button
       onClick={handleLogout}
       disabled={busy}
-      className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-xs font-semibold shrink-0 transition-colors disabled:opacity-50 ${className}`}
+      className={`h-9 px-3.5 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold shrink-0 transition-transform active:scale-95 disabled:opacity-50 ${className}`}
       style={{ background: 'rgba(239,68,68,0.10)', color: '#F87171', border: '1px solid rgba(239,68,68,0.22)' }}
       aria-label="Log out"
     >

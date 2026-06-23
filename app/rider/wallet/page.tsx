@@ -12,7 +12,8 @@ export default async function RiderWalletPage() {
       <div className="lx-topbar sticky top-0 z-10 px-4 py-4 flex items-center gap-3">
         <a
           href="/rider"
-          className="w-8 h-8 flex items-center justify-center rounded-full text-white/50 hover:text-white transition-colors"
+          aria-label="Back to rider home"
+          className="w-11 h-11 flex items-center justify-center rounded-full text-white/50 hover:text-white active:opacity-70 transition-colors"
           style={{ background: 'rgba(255,255,255,0.06)' }}
         >
           ←

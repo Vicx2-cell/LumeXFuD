@@ -55,10 +55,10 @@ export default function RiderReviews() {
   const written = reviews.filter((r) => r.rider_review)
 
   return (
-    <div className="lx-page pb-16 overflow-hidden">
-      <div className="sticky top-0 z-40 glass-thin" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
+    <div className="lx-page overflow-hidden" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
+      <div className="sticky top-0 z-40 glass-thin" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0, paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => router.back()} className="w-9 h-9 rounded-full flex items-center justify-center text-white/50" style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
+          <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 -ml-1 rounded-full flex items-center justify-center text-lg text-white/60 active:scale-90 transition-transform" style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
           <h1 className="font-semibold text-white">Your reviews</h1>
         </div>
       </div>

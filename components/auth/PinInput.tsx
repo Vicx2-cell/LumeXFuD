@@ -80,7 +80,7 @@ export default function PinInput({
       <label
         htmlFor="lx-pin"
         key={shakeKey}
-        className={`flex justify-center gap-3 cursor-text ${error ? 'lx-shake' : ''}`}
+        className={`flex justify-center gap-3 max-[360px]:gap-2 cursor-text ${error ? 'lx-shake' : ''}`}
         aria-hidden="true"
       >
         {cells.map((_, i) => {
@@ -96,11 +96,9 @@ export default function PinInput({
           return (
             <div
               key={i}
-              className="relative flex items-center justify-center w-12 h-14 rounded-2xl transition-colors"
+              className="relative flex items-center justify-center w-12 h-14 max-[360px]:w-[2.6rem] rounded-2xl transition-colors"
               style={{
                 background: 'rgba(255,255,255,0.05)',
-                backdropFilter: 'blur(20px) saturate(180%)',
-                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
                 border: `1.5px solid ${borderColor}`,
                 boxShadow: active ? '0 0 0 4px rgba(245,166,35,0.18)' : 'inset 0 1px 0 rgba(255,255,255,0.06)',
               }}

@@ -51,8 +51,9 @@ export function RiderAssistant() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-4 z-40 flex items-center gap-2.5 pl-2 pr-4 py-2 rounded-full active:scale-95 transition-transform"
+          className="fixed right-4 z-40 flex items-center gap-2.5 pl-2 pr-4 rounded-full active:scale-95 transition-transform"
           style={{
+            bottom: 'calc(1.5rem + env(safe-area-inset-bottom))', minHeight: 48,
             background: 'rgba(20,20,22,0.72)', border: '1px solid rgba(245,166,35,0.35)',
             backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
             boxShadow: '0 10px 34px rgba(245,166,35,0.25)',
@@ -81,7 +82,7 @@ export function RiderAssistant() {
                 <p className="font-semibold text-[15px] leading-tight">Earnings assistant</p>
                 <p className="text-[11px] text-white/45 leading-tight mt-0.5">Payouts, holds & balance · online</p>
               </div>
-              <button onClick={() => setOpen(false)} className="w-8 h-8 rounded-full flex items-center justify-center active:scale-90" style={{ background: 'rgba(255,255,255,0.06)' }} aria-label="Close">
+              <button onClick={() => setOpen(false)} className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center active:scale-90" style={{ background: 'rgba(255,255,255,0.06)' }} aria-label="Close">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             </div>
@@ -115,7 +116,7 @@ export function RiderAssistant() {
             {msgs.length === 1 && (
               <div className="px-4 pb-1.5 flex flex-wrap gap-2">
                 {QUICK.map((q) => (
-                  <button key={q} onClick={() => send(q)} className="text-xs px-3 py-1.5 rounded-full active:scale-95"
+                  <button key={q} onClick={() => send(q)} className="text-xs px-3.5 py-2 rounded-full active:scale-95 transition-transform"
                     style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.07)' }}>{q}</button>
                 ))}
               </div>
@@ -128,11 +129,12 @@ export function RiderAssistant() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') send(input) }}
                 placeholder="Ask about your earnings…"
-                className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none"
+                enterKeyHint="send"
+                className="flex-1 min-w-0 rounded-full px-4 py-2.5 text-base outline-none"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
               />
               <button onClick={() => send(input)} disabled={loading || !input.trim()}
-                className="w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-40 active:scale-90 transition-transform"
+                className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center disabled:opacity-40 active:scale-90 transition-transform"
                 style={{ background: AMBER_GRADIENT, color: '#1a1205' }} aria-label="Send">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
               </button>

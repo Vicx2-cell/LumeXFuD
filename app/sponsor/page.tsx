@@ -143,7 +143,7 @@ export default function SponsorPage() {
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-4">
           <label className="block">
             <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Student’s WhatsApp number</span>
-            <input value={phone} inputMode="tel"
+            <input value={phone} inputMode="tel" type="tel" autoComplete="tel" autoCapitalize="off" autoCorrect="off"
               onChange={(e) => { let v = e.target.value; if (!v.startsWith('+234')) v = '+234' + v.replace(/^\+?234?/, ''); setPhone(v); setError('') }}
               placeholder="+2348012345678" className={inputCls} />
           </label>
@@ -153,7 +153,7 @@ export default function SponsorPage() {
             <div className="grid grid-cols-4 gap-2 mb-2">
               {PRESETS.map((p) => (
                 <button key={p} onClick={() => { setAmount(String(p)); setError('') }}
-                  className="py-2 rounded-xl text-sm font-semibold"
+                  className="py-2 rounded-xl text-sm font-semibold min-h-[44px]"
                   style={{ background: amount === String(p) ? 'rgba(245,166,35,0.2)' : 'rgba(255,255,255,0.06)', color: amount === String(p) ? '#F5A623' : '#fff', border: `1px solid ${amount === String(p) ? '#F5A62355' : 'rgba(255,255,255,0.1)'}` }}>
                   ₦{p.toLocaleString()}
                 </button>
@@ -161,14 +161,14 @@ export default function SponsorPage() {
             </div>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-white/40">₦</span>
-              <input type="number" min="1" value={amount} onChange={(e) => { setAmount(e.target.value); setError('') }}
+              <input type="number" min="1" inputMode="numeric" value={amount} onChange={(e) => { setAmount(e.target.value); setError('') }}
                 placeholder="Other amount" className={`${inputCls} pl-7`} />
             </div>
           </div>
 
           <label className="block">
             <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Your name (so they know it’s from you)</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Mum, Dad, Uncle Chidi" className={inputCls} />
+            <input value={name} type="text" autoComplete="name" autoCapitalize="words" onChange={(e) => setName(e.target.value)} placeholder="e.g. Mum, Dad, Uncle Chidi" className={inputCls} />
           </label>
 
           {error && <p className="text-sm text-red-400">{error}</p>}
@@ -184,4 +184,4 @@ export default function SponsorPage() {
   )
 }
 
-const inputCls = 'w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none focus:border-amber-500/60'
+const inputCls = 'w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-500/60'

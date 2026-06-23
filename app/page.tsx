@@ -57,20 +57,20 @@ export default async function LandingPage() {
 
       {/* ── Nav ── */}
       <nav className="sticky top-0 z-50 glass-thin" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
-        <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
-          <span className="lx-display font-bold text-lg tracking-tight">
+        <div className="max-w-5xl mx-auto px-4 sm:px-5 h-14 flex items-center justify-between gap-2">
+          <span className="lx-display font-bold text-lg tracking-tight shrink-0">
             <span className="lx-amber">LumeX</span> Fud
           </span>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <Link
               href="/auth"
-              className="px-4 py-2 text-sm font-medium text-white/80 hover:text-white transition-colors"
+              className="px-3 sm:px-4 py-2 text-sm font-medium text-white/80 hover:text-white transition-colors"
             >
               Login
             </Link>
             <Link
               href="/auth/register"
-              className="lx-btn-amber px-4 py-2 text-sm"
+              className="lx-btn-amber px-3 sm:px-4 py-2 text-sm whitespace-nowrap"
             >
               Create account
             </Link>

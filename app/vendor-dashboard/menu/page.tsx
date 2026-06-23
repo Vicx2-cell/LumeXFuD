@@ -178,13 +178,13 @@ export default function VendorMenuPage() {
   return (
     <div className="lx-page pb-28">
       {/* Header */}
-      <div className="lx-topbar sticky top-0 z-40">
+      <div className="lx-topbar sticky top-0 z-40" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => router.push('/vendor-dashboard')} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          <button onClick={() => router.push('/vendor-dashboard')} aria-label="Back to dashboard" className="lx-tap w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
-          <h1 className="font-semibold flex-1">My Menu</h1>
-          <button onClick={openAdd} className="lx-btn-amber text-xs px-4 py-2">+ Add food</button>
+          <h1 className="font-semibold flex-1 truncate">My Menu</h1>
+          <button onClick={openAdd} className="lx-btn-amber lx-tap text-xs px-4 min-h-[44px] shrink-0">+ Add food</button>
         </div>
       </div>
 
@@ -209,13 +209,13 @@ export default function VendorMenuPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.name}</p>
                   <p className="lx-amber text-sm font-semibold mt-0.5">{formatPrice(item.price_kobo)}</p>
-                  <p className="text-xs text-white/30 mt-0.5">{item.category}{item.prep_time_minutes != null ? ` · ${item.prep_time_minutes} min` : ''}{item.addons.length > 0 ? ` · ${item.addons.length} add-on${item.addons.length === 1 ? '' : 's'}` : ''}</p>
-                  <div className="flex gap-3 mt-2">
-                    <button onClick={() => openEdit(item)} className="lx-amber text-xs font-medium">Edit</button>
-                    <button onClick={() => removeItem(item)} className="text-xs font-medium text-red-400">Delete</button>
+                  <p className="text-xs text-white/30 mt-0.5 truncate">{item.category}{item.prep_time_minutes != null ? ` · ${item.prep_time_minutes} min` : ''}{item.addons.length > 0 ? ` · ${item.addons.length} add-on${item.addons.length === 1 ? '' : 's'}` : ''}</p>
+                  <div className="flex gap-1 mt-1.5 -ml-1.5">
+                    <button onClick={() => openEdit(item)} className="lx-tap lx-amber text-xs font-medium px-2.5 py-1.5 min-h-[36px] rounded-lg">Edit</button>
+                    <button onClick={() => removeItem(item)} className="lx-tap text-xs font-medium text-red-400 px-2.5 py-1.5 min-h-[36px] rounded-lg">Delete</button>
                   </div>
                 </div>
-                <button onClick={() => toggleAvailable(item)} className="shrink-0 self-start text-xs font-semibold px-2.5 py-1 rounded-full"
+                <button onClick={() => toggleAvailable(item)} aria-pressed={item.is_available} className="lx-tap shrink-0 self-start text-xs font-semibold px-3 py-1.5 min-h-[36px] rounded-full"
                   style={{ background: item.is_available ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.08)', color: item.is_available ? '#4ade80' : 'rgba(255,255,255,0.4)' }}>
                   {item.is_available ? 'Available' : 'Hidden'}
                 </button>
@@ -228,7 +228,7 @@ export default function VendorMenuPage() {
       {/* Add/Edit sheet */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => !saving && setShowForm(false)}>
-          <div className="w-full max-w-lg rounded-t-3xl p-5 space-y-4 max-h-[90vh] overflow-y-auto" style={{ background: '#111113' }} onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-lg rounded-t-3xl p-5 space-y-4 max-h-[90vh] overflow-y-auto" style={{ background: '#111113', paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-lg">{editingId ? 'Edit food' : 'Add food'}</h3>
               <button onClick={() => setShowForm(false)} className="text-white/40 text-sm">Close</button>
@@ -241,7 +241,7 @@ export default function VendorMenuPage() {
                   ? <Image src={form.image_url} alt="" fill className="object-cover" sizes="80px" />
                   : <div className="w-full h-full flex items-center justify-center text-2xl opacity-20">🍽️</div>}
               </div>
-              <label className="text-sm px-3 py-2 rounded-xl cursor-pointer" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.8)' }}>
+              <label className="lx-tap text-sm px-4 min-h-[44px] inline-flex items-center rounded-xl cursor-pointer" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.8)' }}>
                 {uploading ? 'Uploading…' : form.image_url ? 'Change photo' : 'Add photo'}
                 <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={uploading}
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage(f) }} />
@@ -286,7 +286,7 @@ export default function VendorMenuPage() {
                   <div key={i} className="flex gap-2 items-center">
                     <input value={a.name} onChange={(e) => { const next = [...form.addons]; next[i] = { ...a, name: e.target.value }; setForm({ ...form, addons: next }) }} placeholder="Extra meat" className={addonInputCls + ' flex-1 min-w-0'} />
                     <input value={a.price} inputMode="numeric" onChange={(e) => { const next = [...form.addons]; next[i] = { ...a, price: e.target.value.replace(/[^0-9]/g, '') }; setForm({ ...form, addons: next }) }} placeholder="₦300" className={addonInputCls + ' w-20 shrink-0'} />
-                    <button onClick={() => setForm({ ...form, addons: form.addons.filter((_, j) => j !== i) })} className="px-2 text-red-400 text-lg shrink-0">×</button>
+                    <button type="button" aria-label="Remove add-on" onClick={() => setForm({ ...form, addons: form.addons.filter((_, j) => j !== i) })} className="lx-tap text-red-400 text-lg shrink-0 w-9 h-9 flex items-center justify-center rounded-lg">×</button>
                   </div>
                 ))}
               </div>
@@ -309,9 +309,10 @@ export default function VendorMenuPage() {
   )
 }
 
-const inputCls = 'lx-field w-full px-3 py-2.5 text-sm outline-none'
+// text-base (16px) on inputs prevents iOS Safari from auto-zooming on focus.
+const inputCls = 'lx-field w-full px-3 py-2.5 text-base outline-none'
 // Same styling minus w-full, for the flex add-on rows (w-full would fight flex-1/w-20).
-const addonInputCls = 'lx-field px-3 py-2.5 text-sm outline-none'
+const addonInputCls = 'lx-field px-3 py-2.5 text-base outline-none'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

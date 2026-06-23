@@ -237,13 +237,13 @@ export default function VendorDashboard() {
   return (
     <div className="lx-page pb-10 overflow-hidden">
       {/* Header */}
-      <div className="sticky top-0 z-40 glass-thin" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      <div className="sticky top-0 z-40 glass-thin" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0, paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <BackButton />
-            <div>
+            <div className="min-w-0">
               <p className="text-[10px] text-white/30 uppercase tracking-widest">Vendor</p>
-              <p className="font-semibold text-white leading-tight">{vendor?.shop_name ?? '—'}</p>
+              <p className="font-semibold text-white leading-tight truncate">{vendor?.shop_name ?? '—'}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -574,26 +574,26 @@ function OrderCard({
             className="lx-field w-full min-w-0 px-3 py-3 text-lg tracking-[0.4em] text-center font-semibold outline-none uppercase"
           />
           <button onClick={submitCode} disabled={busy || code.length !== 6}
-            className="w-full mt-2 py-3 rounded-lg text-sm font-semibold disabled:opacity-40" style={{ background: 'var(--lx-green)', color: '#000' }}>
+            className="lx-tap w-full mt-2 min-h-[48px] py-3 rounded-lg text-sm font-semibold disabled:opacity-40" style={{ background: 'var(--lx-green)', color: '#000' }}>
             {busy ? 'Collecting…' : 'Collect order'}
           </button>
           {collectErr && <p className="text-xs text-red-400 mt-1.5">{collectErr}</p>}
         </div>
       )}
 
-      {/* Actions */}
-      <div className="pl-5 pr-3 pb-3 pt-1 flex gap-2 justify-end">
+      {/* Actions — destructive Decline kept to the left, primary Accept under the thumb (right) */}
+      <div className="pl-5 pr-3 pb-3 pt-1 flex gap-2 justify-end items-center">
         {order.status === 'PENDING' && (
           <>
-            <button onClick={() => act(() => onCancel(order.id))} disabled={busy} className="px-3.5 py-2 rounded-lg text-xs font-medium disabled:opacity-40" style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--lx-red)' }}>Decline</button>
-            <button onClick={() => act(() => onUpdate(order.id, 'VENDOR_ACCEPTED'))} disabled={busy} className="lx-btn-amber px-4 py-2 text-xs disabled:opacity-40">Accept</button>
+            <button onClick={() => act(() => onCancel(order.id))} disabled={busy} className="lx-tap px-4 min-h-[44px] rounded-lg text-xs font-medium disabled:opacity-40" style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--lx-red)' }}>Decline</button>
+            <button onClick={() => act(() => onUpdate(order.id, 'VENDOR_ACCEPTED'))} disabled={busy} className="lx-btn-amber lx-tap px-5 min-h-[44px] text-xs disabled:opacity-40">{busy ? '…' : 'Accept'}</button>
           </>
         )}
         {order.status === 'VENDOR_ACCEPTED' && (
-          <button onClick={() => act(() => onUpdate(order.id, 'PREPARING'))} disabled={busy} className="lx-btn-amber px-4 py-2 text-xs disabled:opacity-40">Start Preparing</button>
+          <button onClick={() => act(() => onUpdate(order.id, 'PREPARING'))} disabled={busy} className="lx-btn-amber lx-tap px-5 min-h-[44px] text-xs disabled:opacity-40">{busy ? '…' : 'Start Preparing'}</button>
         )}
         {order.status === 'PREPARING' && (
-          <button onClick={() => act(() => onUpdate(order.id, 'READY'))} disabled={busy} className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-40" style={{ background: 'var(--lx-green)', color: '#000' }}>Mark Ready</button>
+          <button onClick={() => act(() => onUpdate(order.id, 'READY'))} disabled={busy} className="lx-tap px-5 min-h-[44px] rounded-lg text-xs font-semibold disabled:opacity-40" style={{ background: 'var(--lx-green)', color: '#000' }}>{busy ? '…' : 'Mark Ready'}</button>
         )}
         {!isPickup && order.status === 'READY' && (
           <span className="px-2 py-2 text-xs text-white/30">Waiting for rider…</span>
@@ -638,11 +638,11 @@ function PickupSettings({
             <input
               type="number" min={0} max={100} inputMode="numeric" value={cap}
               onChange={(e) => setCap(e.target.value.replace(/\D/g, '').slice(0, 3))}
-              className="lx-field flex-1 px-3 py-2.5 text-sm outline-none tabular-nums"
+              className="lx-field flex-1 min-w-0 px-3 py-2.5 text-base outline-none tabular-nums"
             />
             <button
               onClick={() => onSave({ pickup_max_concurrent: Math.max(0, Math.min(100, Number(cap) || 0)) })}
-              className="lx-btn-amber px-4 py-2 text-xs shrink-0">Save</button>
+              className="lx-btn-amber lx-tap px-4 min-h-[44px] text-xs shrink-0">Save</button>
           </div>
           <p className="text-xs text-white/35 mt-1.5">0 = no limit. Above the cap, new orders get a later “ready by” time instead of stacking.</p>
         </div>

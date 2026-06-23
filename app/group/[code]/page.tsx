@@ -176,8 +176,25 @@ export default function GroupOrderPage() {
   }
 
   if (features.group_orders === false) return <Shell><p className="text-white/50 text-sm">Group ordering isn’t available right now.</p></Shell>
-  if (loading) return <Shell><p className="text-white/40 text-sm">Loading group order…</p></Shell>
-  if (error && !data) return <Shell><p className="text-red-400 text-sm">{error}</p></Shell>
+  if (loading) return (
+    <Shell>
+      <div className="space-y-3" aria-busy="true" aria-label="Loading group order">
+        <div className="lx-skeleton rounded-2xl" style={{ height: 28, width: '60%' }} />
+        <div className="lx-skeleton rounded-xl" style={{ height: 44 }} />
+        <div className="lx-skeleton rounded-2xl" style={{ height: 96 }} />
+        <div className="lx-skeleton rounded-2xl" style={{ height: 140 }} />
+      </div>
+    </Shell>
+  )
+  if (error && !data) return (
+    <Shell>
+      <div className="text-center py-16">
+        <p className="text-3xl mb-3" aria-hidden="true">⚠️</p>
+        <p className="text-red-400 text-sm">{error}</p>
+        <button onClick={() => { setLoading(true); void load() }} className="lx-btn-amber inline-block mt-5 px-6 py-3 text-sm">Try again</button>
+      </div>
+    </Shell>
+  )
   if (!data) return null
 
   const total = data.items.reduce((s, i) => s + i.price_kobo * i.quantity, 0)
@@ -310,7 +327,7 @@ export default function GroupOrderPage() {
               <p className="text-[11px] text-white/40">{naira(m.price_kobo)}</p>
             </div>
             <button onClick={() => addItem(m.id)} disabled={busyId === m.id || expired}
-              className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-50" style={{ background: '#F5A623' }}>
+              className="shrink-0 rounded-lg px-4 text-xs font-semibold text-black disabled:opacity-50" style={{ background: '#F5A623', minHeight: 44 }}>
               {busyId === m.id ? '…' : '+ Add'}
             </button>
           </div>
@@ -324,7 +341,7 @@ export default function GroupOrderPage() {
         const memberIds = people.filter((p) => p.id !== data.host_id).map((p) => p.id)
         const waiting = data.split_enabled && memberIds.some((id) => data.funded[id] === false)
         return (
-          <div className="fixed bottom-0 left-0 right-0 p-4" style={{ background: 'linear-gradient(to top, #0A0A0B, rgba(10,10,11,0.9))' }}>
+          <div className="fixed bottom-0 left-0 right-0 px-4 pt-4" style={{ background: 'linear-gradient(to top, #0A0A0B, rgba(10,10,11,0.9))', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
             <div className="mx-auto max-w-md">
               <button onClick={checkout} disabled={waiting}
                 className="w-full rounded-2xl py-4 text-sm font-bold text-black disabled:opacity-50" style={{ background: '#F5A623', minHeight: 52 }}>

@@ -99,9 +99,9 @@ export default function AddBankSheet({ open, onClose, onSuccess }: Props) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-full bg-[#111] rounded-t-2xl p-6 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/60 lx-scrim" onClick={onClose} />
+      <div className="lx-sheet relative w-full sm:max-w-md bg-[#111] rounded-t-2xl sm:rounded-2xl sm:mb-4 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[90dvh] overflow-y-auto">
         <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
 
         {/* Step 1: Select bank */}
@@ -109,13 +109,17 @@ export default function AddBankSheet({ open, onClose, onSuccess }: Props) {
           <div>
             <h3 className="text-white font-semibold text-lg mb-4">Select your bank</h3>
             <input
-              className="w-full bg-white/10 text-white placeholder-white/40 rounded-xl px-4 py-3 mb-3 outline-none focus:ring-1 focus:ring-amber-500"
+              className="w-full text-base bg-white/10 text-white placeholder-white/40 rounded-xl px-4 py-3 mb-3 outline-none focus:ring-1 focus:ring-amber-500"
               placeholder="Search banks..."
               value={bankSearch}
               onChange={(e) => setBankSearch(e.target.value)}
+              type="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              aria-label="Search banks"
               autoFocus
             />
-            <div className="max-h-64 overflow-y-auto space-y-1">
+            <div className="max-h-[50dvh] overflow-y-auto space-y-1 -mx-1 px-1">
               {filteredBanks.length === 0 && (
                 <p className="text-white/50 text-sm text-center py-4">
                   {banks.length === 0 ? 'Loading banks...' : 'No banks found'}
@@ -124,7 +128,7 @@ export default function AddBankSheet({ open, onClose, onSuccess }: Props) {
               {filteredBanks.map((b, i) => (
                 <button
                   key={`${b.code}-${i}`}
-                  className="w-full text-left px-4 py-3 rounded-xl text-white hover:bg-white/10 transition-colors"
+                  className="w-full text-left px-4 py-3 min-h-[48px] rounded-xl text-white break-words hover:bg-white/10 active:bg-white/15 transition-colors"
                   onClick={() => { setSelectedBank(b); setStep(2) }}
                 >
                   {b.name}
@@ -137,7 +141,7 @@ export default function AddBankSheet({ open, onClose, onSuccess }: Props) {
         {/* Step 2: Enter account number */}
         {step === 2 && (
           <div>
-            <button className="text-amber-400 text-sm mb-4" onClick={() => setStep(1)}>
+            <button className="text-amber-400 text-sm mb-4 inline-flex items-center min-h-[44px] -mt-2 active:opacity-70 text-left break-words" onClick={() => setStep(1)}>
               ← {selectedBank?.name}
             </button>
             <h3 className="text-white font-semibold text-lg mb-4">Enter account number</h3>
@@ -152,6 +156,9 @@ export default function AddBankSheet({ open, onClose, onSuccess }: Props) {
                 if (v.length === 10 && selectedBank) { verifyAccount(v, selectedBank) }
               }}
               inputMode="numeric"
+              autoComplete="off"
+              enterKeyHint="done"
+              aria-label="10-digit account number"
               autoFocus
             />
             {verifying && (
@@ -167,7 +174,7 @@ export default function AddBankSheet({ open, onClose, onSuccess }: Props) {
             {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
             {accountName && !verifying && (
               <button
-                className="w-full mt-4 bg-amber-500 hover:bg-amber-400 text-black font-semibold py-4 rounded-xl transition-colors"
+                className="w-full mt-4 bg-amber-500 hover:bg-amber-400 text-black font-semibold py-4 rounded-xl transition-colors active:scale-[0.98]"
                 onClick={() => setStep(3)}
               >
                 Yes, continue
@@ -216,7 +223,7 @@ export default function AddBankSheet({ open, onClose, onSuccess }: Props) {
             {error && <p className="text-red-400 text-sm text-center mb-3">{error}</p>}
 
             <button
-              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold py-4 rounded-xl disabled:opacity-50 transition-colors"
+              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold py-4 rounded-xl disabled:opacity-50 transition-colors active:scale-[0.98]"
               disabled={pin.length < 4 || saving}
               onClick={handleSave}
             >
@@ -236,7 +243,7 @@ export default function AddBankSheet({ open, onClose, onSuccess }: Props) {
               You&apos;ll get a WhatsApp confirmation.
             </p>
             <button
-              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold py-4 rounded-xl transition-colors"
+              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold py-4 rounded-xl transition-colors active:scale-[0.98]"
               onClick={() => { onSuccess(); onClose() }}
             >
               Done

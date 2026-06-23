@@ -5,11 +5,11 @@ export const dynamic = 'force-dynamic'
 export default function PrivacyPage() {
   return (
     <main style={{ background: '#0A0A0B' }}>
-      <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto">
+      <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 3rem)' }}>
       <h1 className="text-2xl font-bold mb-2">Privacy Policy</h1>
       <p className="text-sm text-white/40 mb-8">Last updated: June 2026 · NDPR Compliant</p>
 
-      <div className="space-y-8 text-sm leading-relaxed text-white/70">
+      <div className="space-y-8 text-base leading-relaxed text-white/70 [overflow-wrap:anywhere]">
         <section>
           <h2 className="text-base font-semibold text-white mb-2">1. Who we are</h2>
           <p>LumeX Fud is a campus food delivery platform operated by Lumex, serving students at Abia State University (ABSU), Nigeria. We are committed to protecting your personal data in accordance with the Nigeria Data Protection Regulation (NDPR) 2019.</p>
@@ -68,7 +68,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-base font-semibold text-white mb-2">7. Contact us</h2>
-          <p>For privacy-related requests or complaints, contact our Data Protection Officer at: <a href="mailto:hello@lumex.com.ng" className="text-[#F5A623]">hello@lumex.com.ng</a>. For anything else, see our <a href="/contact" className="text-[#F5A623]">Contact</a> page.</p>
+          <p>For privacy-related requests or complaints, contact our Data Protection Officer at: <a href="mailto:hello@lumex.com.ng" className="text-[#F5A623] break-words">hello@lumex.com.ng</a>. For anything else, see our <a href="/contact" className="text-[#F5A623]">Contact</a> page.</p>
         </section>
       </div>
       </div>

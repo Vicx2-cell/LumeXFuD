@@ -14,11 +14,11 @@ export default async function ContactPage() {
 
   return (
     <main style={{ background: '#0A0A0B' }}>
-      <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto">
+      <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 3rem)' }}>
         <h1 className="text-2xl font-bold mb-2 text-white">Contact &amp; support</h1>
         <p className="text-sm text-white/40 mb-8">We’re here to help with orders, payments and refunds.</p>
 
-        <div className="space-y-8 text-sm leading-relaxed text-white/70">
+        <div className="space-y-8 text-base leading-relaxed text-white/70 [overflow-wrap:anywhere]">
           <section>
             <h2 className="text-base font-semibold text-white mb-2">Who we are</h2>
             <p>{BRAND} is a campus food delivery service for students at Abia State University (ABSU), Nigeria, operated by {OPERATOR}. You order from campus vendors, pay securely with Paystack, and a rider brings it to you — or you skip the queue and collect it yourself.</p>
@@ -29,7 +29,7 @@ export default async function ContactPage() {
             <ul className="space-y-2">
               <li>
                 <span className="text-white/45">Support email: </span>
-                <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#F5A623]">{SUPPORT_EMAIL}</a>
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#F5A623] break-words">{SUPPORT_EMAIL}</a>
               </li>
               {phone ? (
                 <>

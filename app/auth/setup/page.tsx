@@ -112,7 +112,7 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-5 py-12" style={{ background: '#0A0A0B' }}>
+    <div className="min-h-dvh flex items-start sm:items-center justify-center px-5 py-10 sm:py-12" style={{ background: '#0A0A0B', paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
       <div className="w-full max-w-lg space-y-6">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <h1 className="text-2xl font-semibold text-white">{opts.optional ? 'Add a login PIN' : 'Set your permanent PIN'}</h1>
@@ -131,10 +131,13 @@ export default function SetupPage() {
                 type="password"
                 value={form.pin}
                 onChange={(event) => handleChange('pin', event.target.value.replace(/[^0-9]/g, ''))}
-                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                 inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="new-password"
                 maxLength={6}
                 placeholder="123456"
+                aria-label="Choose a 6-digit PIN"
               />
             </label>
             <label className="block text-sm text-white/70">
@@ -143,10 +146,13 @@ export default function SetupPage() {
                 type="password"
                 value={form.confirm_pin}
                 onChange={(event) => handleChange('confirm_pin', event.target.value.replace(/[^0-9]/g, ''))}
-                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
                 inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="new-password"
                 maxLength={6}
                 placeholder="123456"
+                aria-label="Confirm your 6-digit PIN"
               />
             </label>
           </div>
@@ -162,8 +168,10 @@ export default function SetupPage() {
             <input
               value={form.answer_1}
               onChange={(event) => handleChange('answer_1', event.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+              className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
               placeholder="Type your answer"
+              autoComplete="off"
+              autoCorrect="off"
             />
           </label>
           <SecurityQuestionSelect
@@ -177,8 +185,10 @@ export default function SetupPage() {
             <input
               value={form.answer_2}
               onChange={(event) => handleChange('answer_2', event.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-white outline-none"
+              className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
               placeholder="Type your answer"
+              autoComplete="off"
+              autoCorrect="off"
             />
           </label>
 

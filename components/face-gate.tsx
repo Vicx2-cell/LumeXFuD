@@ -40,7 +40,7 @@ export function FaceGate({ children }: { children: React.ReactNode }) {
 
   // state === 'needed'
   return (
-    <div className="lx-page flex items-center justify-center px-5 py-12 overflow-hidden">
+    <div className="lx-page flex items-start sm:items-center justify-center px-5 py-10 sm:py-12 overflow-x-hidden" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
       <div className="w-full max-w-md space-y-6 lx-enter">
         <div className="glass p-6">
           <span className="text-4xl" aria-hidden="true">🪪</span>

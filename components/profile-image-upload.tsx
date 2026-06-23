@@ -97,7 +97,7 @@ export function ProfileImageUpload({
       </button>
       {label && <p className="text-xs text-white/45 mt-1.5">{label}</p>}
       {deletable && url && !busy && (
-        <button type="button" onClick={remove} className="text-[11px] font-medium text-red-400/80 hover:text-red-400 mt-1.5">Remove photo</button>
+        <button type="button" onClick={remove} className="lx-tap inline-flex items-center text-[11px] font-medium text-red-400/80 hover:text-red-400 mt-1 px-2 py-1.5 -ml-2 min-h-[36px] rounded-lg">Remove photo</button>
       )}
       {err && <p className="text-xs text-red-400 mt-1">{err}</p>}
       <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"

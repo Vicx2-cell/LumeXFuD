@@ -229,6 +229,8 @@ function LoginForm() {
                   }}
                   autoComplete="tel"
                   inputMode="tel"
+                  autoCorrect="off"
+                  spellCheck={false}
                 />
               </div>
 
@@ -246,7 +248,7 @@ function LoginForm() {
 
               <button
                 onClick={() => router.push('/auth/forgot-pin')}
-                className="w-full py-2 text-sm text-center hover:opacity-80 transition-opacity"
+                className="w-full min-h-[44px] py-2 text-sm text-center hover:opacity-80 transition-opacity"
                 style={{ color: '#F5A623' }}
               >
                 Forgot PIN?
@@ -290,7 +292,7 @@ function LoginForm() {
               <div className="space-y-1 pt-1">
                 <button
                   onClick={() => router.push('/auth/forgot-pin')}
-                  className="w-full py-2 text-sm text-center hover:opacity-80 transition-opacity"
+                  className="w-full min-h-[44px] py-2 text-sm text-center hover:opacity-80 transition-opacity"
                   style={{ color: '#F5A623' }}
                   disabled={success}
                 >
@@ -298,7 +300,7 @@ function LoginForm() {
                 </button>
                 <button
                   onClick={() => { setPin(''); setError(''); setNotRegistered(false); setStep('phone') }}
-                  className="w-full py-2 text-sm text-white/35 text-center hover:text-white/60 transition-colors"
+                  className="w-full min-h-[44px] py-2 text-sm text-white/35 text-center hover:text-white/60 transition-colors"
                   disabled={success}
                 >
                   ← Change number
@@ -342,7 +344,7 @@ function LoginForm() {
 
               <button
                 onClick={() => { setPin(''); setError(''); setMfaError(''); setStep('phone') }}
-                className="w-full py-2 text-sm text-white/35 text-center hover:text-white/60 transition-colors"
+                className="w-full min-h-[44px] py-2 text-sm text-white/35 text-center hover:text-white/60 transition-colors"
                 disabled={success}
               >
                 ← Start over
