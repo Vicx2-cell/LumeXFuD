@@ -116,3 +116,12 @@ export function pickUsual<T extends SavedPlace>(places: readonly T[]): T | null 
 export function placeToAddress(place: Pick<SavedPlace, 'label' | 'landmark'>): string {
   return place.landmark ? `${place.label} — ${place.landmark}` : place.label
 }
+
+// A stored photo_path is a client-supplied string, but the upload route always
+// writes under "<ownerId>/<uuid>.webp". Reject any path that isn't inside the
+// caller's OWN folder so a customer can never point a place at — and then have the
+// list endpoint sign — another customer's private photo (IDOR / path traversal).
+export function photoPathBelongsTo(path: string, ownerId: string): boolean {
+  if (typeof path !== 'string' || !path || path.includes('..')) return false
+  return path.startsWith(`${ownerId}/`)
+}

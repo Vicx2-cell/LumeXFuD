@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { updateSavedPlaceInput } from '@/lib/validators'
-import { cleanPlaceFields } from '@/lib/saved-places'
+import { cleanPlaceFields, photoPathBelongsTo } from '@/lib/saved-places'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 
 const PHOTO_BUCKET = 'place-photos'
@@ -69,7 +69,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     update.latitude = clean.value.latitude
     update.longitude = clean.value.longitude
   }
-  if (parsed.data.photo_path !== undefined) update.photo_path = parsed.data.photo_path
+  if (parsed.data.photo_path !== undefined) {
+    // null clears the photo; a non-null path must be in the caller's own folder.
+    if (parsed.data.photo_path !== null && !photoPathBelongsTo(parsed.data.photo_path, cid)) {
+      return NextResponse.json({ error: 'Invalid photo' }, { status: 400 })
+    }
+    update.photo_path = parsed.data.photo_path
+  }
 
   if (Object.keys(update).length > 0) {
     update.updated_at = new Date().toISOString()

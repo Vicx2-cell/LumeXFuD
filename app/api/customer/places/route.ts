@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { createSavedPlaceInput } from '@/lib/validators'
-import { cleanPlaceFields, canAddPlace, sortPlaces, type SavedPlace } from '@/lib/saved-places'
+import { cleanPlaceFields, canAddPlace, sortPlaces, photoPathBelongsTo, type SavedPlace } from '@/lib/saved-places'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 
 const PHOTO_BUCKET = 'place-photos'
@@ -71,6 +71,11 @@ export async function POST(req: NextRequest) {
 
   const clean = cleanPlaceFields(parsed.data)
   if (!clean.ok) return NextResponse.json({ error: clean.error }, { status: 400 })
+
+  // A supplied photo must live in the caller's OWN upload folder (IDOR guard).
+  if (parsed.data.photo_path && !photoPathBelongsTo(parsed.data.photo_path, cid)) {
+    return NextResponse.json({ error: 'Invalid photo' }, { status: 400 })
+  }
 
   const db = createSupabaseAdmin()
 

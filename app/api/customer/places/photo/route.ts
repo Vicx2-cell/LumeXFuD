@@ -20,9 +20,11 @@ export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'customer') return NextResponse.json({ error: 'Customers only' }, { status: 403 })
+  // The folder IS the ownership boundary (see photoPathBelongsTo), so the upload
+  // must be scoped to a concrete customer id — never a fallback bucket.
+  if (!session.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const owner = session.userId ?? session.phone
-  const rl = await rateLimitGeneric(`place-photo:${owner}`, 20, 300)
+  const rl = await rateLimitGeneric(`place-photo:${session.userId}`, 20, 300)
   if (!rl.success) return NextResponse.json({ error: 'Too many uploads. Please slow down.' }, { status: 429 })
 
   let file: File | null = null
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
   }
 
   const db = createSupabaseAdmin()
-  const path = `${session.userId ?? 'unknown'}/${crypto.randomUUID()}.webp`
+  const path = `${session.userId}/${crypto.randomUUID()}.webp`
   const { error: uploadErr } = await db.storage
     .from(BUCKET)
     .upload(path, out, { contentType: 'image/webp', upsert: false })

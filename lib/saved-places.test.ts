@@ -5,6 +5,7 @@ import {
   sortPlaces,
   pickUsual,
   placeToAddress,
+  photoPathBelongsTo,
   MAX_SAVED_PLACES,
   LABEL_MAX,
   LANDMARK_MAX,
@@ -127,5 +128,24 @@ describe('placeToAddress', () => {
   })
   it('uses the label alone when no landmark', () => {
     expect(placeToAddress({ label: 'Hostel B', landmark: null })).toBe('Hostel B')
+  })
+})
+
+describe('photoPathBelongsTo', () => {
+  const me = 'cust-123'
+  it('accepts a path inside the owner folder', () => {
+    expect(photoPathBelongsTo('cust-123/abc.webp', me)).toBe(true)
+  })
+  it('rejects another owner folder', () => {
+    expect(photoPathBelongsTo('cust-999/abc.webp', me)).toBe(false)
+  })
+  it('rejects a prefix-collision folder', () => {
+    // "cust-1234" must not pass as "cust-123" — the slash boundary matters.
+    expect(photoPathBelongsTo('cust-1234/abc.webp', me)).toBe(false)
+  })
+  it('rejects traversal and empties', () => {
+    expect(photoPathBelongsTo('cust-123/../cust-999/x.webp', me)).toBe(false)
+    expect(photoPathBelongsTo('', me)).toBe(false)
+    expect(photoPathBelongsTo(undefined as unknown as string, me)).toBe(false)
   })
 })
