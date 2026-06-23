@@ -14,7 +14,11 @@ const REQUIRED_VARS = [
   // ADMIN_PHONE is optional — operational admins are provisioned via the
   // super-admin panel (admins table), not designated by env.
   'SUPER_ADMIN_PHONE',
-  'SUPER_ADMIN_DEFAULT_PIN',
+  // SUPER_ADMIN_DEFAULT_PIN is intentionally NOT required: it is a one-time
+  // bootstrap secret used only to CREATE the super-admin row on first login.
+  // Once that account exists it should be DELETED from the environment so it can
+  // never be used to re-create a super-admin (a standing backdoor). The login
+  // route treats it as optional and simply skips bootstrap when it is absent.
 ] as const
 
 export function validateEnv(): void {

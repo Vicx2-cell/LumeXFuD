@@ -12,10 +12,15 @@ import { isLockedDown } from '@/lib/controls'
 
 const LOCKOUT_MINUTES = 30
 
-// Required env var — startup validation in lib/env.ts ensures this is set
-const SUPER_ADMIN_DEFAULT_PIN = process.env.SUPER_ADMIN_DEFAULT_PIN!
+// OPTIONAL one-time bootstrap secret. When it is UNSET (the recommended state
+// after first login), bootstrap is disabled entirely: the super-admin account
+// already exists and signs in with its own PIN, and the default can no longer
+// (re-)create a super-admin row — closing a standing backdoor.
+const SUPER_ADMIN_DEFAULT_PIN = process.env.SUPER_ADMIN_DEFAULT_PIN
 
 async function ensureSuperAdminBootstrap(phone: string, pin: string) {
+  // No bootstrap secret configured → nothing to bootstrap.
+  if (!SUPER_ADMIN_DEFAULT_PIN) return null
   // `phone` is already E.164; normalize the env value too so a non-E.164 config
   // doesn't block the super-admin bootstrap.
   if (phone !== safeNormalizePhone(process.env.SUPER_ADMIN_PHONE)) return null

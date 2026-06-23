@@ -160,7 +160,19 @@ async function checkSecurityHeaders(): Promise<SecurityCheck> {
   }
   if (!appUrl) return { ...base, status: 'warn', detail: 'NEXT_PUBLIC_APP_URL not set — could not probe headers.' }
   try {
-    const res = await fetch(appUrl, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(8000) })
+    // FOLLOW redirects and send a browser-like UA: the apex sits behind Cloudflare,
+    // which bot-blocks (403) or redirects a bare server-side fetch — reading the
+    // headers off that intermediary response made HSTS look "missing" when it is in
+    // fact set on the real 200 (verified live). We want the headers a browser sees.
+    const res = await fetch(appUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        'user-agent': 'Mozilla/5.0 (compatible; LumeXSecurityCheck/1.0)',
+        accept: 'text/html',
+      },
+      signal: AbortSignal.timeout(8000),
+    })
     const h = res.headers
     const missing: string[] = []
     if (!h.get('strict-transport-security')) missing.push('HSTS')
