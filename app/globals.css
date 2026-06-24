@@ -667,6 +667,198 @@ html.lx-has-cursor.lx-cursor-grow .lx-cursor-lens {
 .lx-ah--armed.lx-ah--in .lx-ah-word { transform: translateY(0); }
 
 /* ============================================================
+   Premium hero — the one bold moment (full-bleed food + scrim)
+   Boldness is spent here; everything below the fold stays quiet.
+   ============================================================ */
+.lx-hero {
+  position: relative;
+  isolation: isolate;               /* contain the grain's mix-blend */
+  min-height: calc(100svh - 3.5rem); /* fill the first screen under the 56px nav */
+  display: flex;
+  align-items: center;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* ── Media stack ── */
+.lx-hero-media { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+
+/* Never-blank fallback (and the colour the parallax slack reveals — same palette) */
+.lx-hero-fallback {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(120% 100% at 72% 66%, rgba(245,166,35,0.18), transparent 55%),
+    linear-gradient(180deg, #121017, #0B0B0D);
+}
+
+/* Parallax wrapper — carries vertical slack so the upward drift never reveals
+   an edge. HeroMotion translates this on scroll (transform only). */
+.lx-hero-parallax {
+  position: absolute;
+  left: 0; right: 0;
+  top: -8%; height: 116%;
+  will-change: transform;
+}
+
+/* The photo: Ken Burns zoom out, settling on the final frame (forwards). */
+.lx-hero-img { object-fit: cover; }
+.lx-hero-img--wide { object-position: center 42%; }
+.lx-hero-img--tall { object-position: center 48%; }
+.lx-hero-img { animation: lx-kenburns 24s ease-out forwards; }
+@keyframes lx-kenburns { from { transform: scale(1.07); } to { transform: scale(1); } }
+
+/* Art direction: tall crop on phones, wide crop on tablet/desktop. */
+.lx-hero-img--wide { display: none; }
+.lx-hero-img--tall { display: block; }
+@media (min-width: 768px) {
+  .lx-hero-img--wide { display: block; }
+  .lx-hero-img--tall { display: none; }
+}
+
+/* Amber bloom over the lit dish — ties the photo to the brand. Subtle pulse. */
+.lx-hero-bloom {
+  position: absolute;
+  right: 6%; bottom: 12%;
+  width: 46vw; max-width: 640px; aspect-ratio: 1;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(245,166,35,0.20), transparent 62%);
+  filter: blur(24px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: lx-hero-bloom 6s ease-in-out infinite;
+}
+@keyframes lx-hero-bloom {
+  0%, 100% { opacity: 0.5;  transform: scale(1); }
+  50%      { opacity: 0.78; transform: scale(1.06); }
+}
+
+/* Readability scrim: dark-left → clear-right (desktop), plus a bottom lift. */
+.lx-hero-scrim {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(11,11,13,0.94) 0%, rgba(11,11,13,0.72) 36%, rgba(11,11,13,0.22) 68%, rgba(11,11,13,0.5) 100%),
+    linear-gradient(0deg, rgba(11,11,13,0.85) 0%, transparent 42%);
+}
+@media (max-width: 767px) {
+  /* Tall crop → a vertical veil reads better than a side scrim. */
+  .lx-hero-scrim {
+    background:
+      linear-gradient(180deg, rgba(11,11,13,0.62) 0%, rgba(11,11,13,0.28) 34%, rgba(11,11,13,0.74) 78%, rgba(11,11,13,0.96) 100%);
+  }
+}
+
+/* Film grain — kills the flat digital look; static, very low opacity. */
+.lx-hero-grain {
+  position: absolute; inset: 0; pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* ── Content ── */
+.lx-hero-inner {
+  position: relative; z-index: 2;
+  width: 100%; max-width: 1180px;
+  margin: 0 auto; padding: 0 1.5rem;
+  display: flex; flex-direction: column; align-items: flex-start;
+  text-align: left; gap: 1.35rem;
+}
+
+.lx-hero-kicker {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.4rem 0.85rem; border-radius: 9999px;
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em;
+  color: var(--color-amber);
+  background: rgba(245,166,35,0.10);
+  border: 1px solid rgba(245,166,35,0.28);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.lx-hero-kicker-dot {
+  width: 6px; height: 6px; border-radius: 9999px; background: currentColor;
+  box-shadow: 0 0 8px rgba(245,166,35,0.8);
+  animation: lx-hero-dot 2s ease-in-out infinite;
+}
+@keyframes lx-hero-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.lx-hero-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2.6rem, 7vw, 5.25rem);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  margin: 0;
+  text-shadow: 0 2px 34px rgba(0,0,0,0.45);
+}
+
+.lx-hero-sub {
+  max-width: 30rem;
+  font-size: clamp(1rem, 1.6vw, 1.18rem);
+  line-height: 1.55;
+  color: rgba(255,255,255,0.74);
+  text-shadow: 0 1px 18px rgba(0,0,0,0.4);
+}
+
+.lx-hero-cta {
+  display: flex; flex-direction: column; gap: 0.75rem;
+  width: 100%; margin-top: 0.25rem;
+}
+@media (min-width: 640px) { .lx-hero-cta { flex-direction: row; width: auto; } }
+
+.lx-hero-ghost {
+  color: #fff;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.16);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  transition: transform 0.25s var(--spring-snappy), background 0.25s ease, border-color 0.25s ease;
+}
+.lx-hero-ghost:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.28);
+  transform: translateY(-1px);
+}
+
+.lx-hero-fine { font-size: 0.72rem; color: rgba(255,255,255,0.45); margin-top: 0.1rem; }
+
+/* ── Choreographed entrance ── (heading runs its own word-stagger) */
+.lx-hero-choreo > * { animation: lx-hero-rise 0.7s var(--spring-smooth) both; }
+.lx-hero-choreo > *:nth-child(1) { animation-delay: 120ms; } /* kicker */
+.lx-hero-choreo > *:nth-child(2) { animation: none; }        /* AnimatedHeading */
+.lx-hero-choreo > *:nth-child(3) { animation-delay: 360ms; } /* sub */
+.lx-hero-choreo > *:nth-child(4) { animation-delay: 480ms; } /* CTAs */
+.lx-hero-choreo > *:nth-child(5) { animation-delay: 600ms; } /* fine print */
+@keyframes lx-hero-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+/* ── Scroll cue ── */
+.lx-scrollcue {
+  position: absolute; left: 50%; bottom: 1.5rem; transform: translateX(-50%);
+  z-index: 3; display: flex; align-items: center; justify-content: center;
+  animation: lx-hero-rise 0.7s var(--spring-smooth) 760ms both;
+}
+.lx-scrollcue-track {
+  width: 26px; height: 42px; border-radius: 14px;
+  border: 1.5px solid rgba(255,255,255,0.35);
+  display: flex; justify-content: center; padding-top: 7px;
+}
+.lx-scrollcue-dot {
+  width: 4px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.85);
+  animation: lx-scrollcue 1.8s ease-in-out infinite;
+}
+@keyframes lx-scrollcue {
+  0% { transform: translateY(0); opacity: 1; }
+  70% { transform: translateY(12px); opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* Accessibility: visible amber focus ring on hero links + scroll cue. */
+.lx-hero a:focus-visible,
+.lx-scrollcue:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+/* ============================================================
    Reduced motion — honour the OS preference everywhere
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {

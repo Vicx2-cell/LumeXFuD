@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Reveal } from '@/components/reveal'
-import { MarketingFx, AnimatedHeading, Magnetic, CountUp } from '@/components/fx'
+import { MarketingFx, Magnetic, CountUp } from '@/components/fx'
+import { Hero } from '@/components/hero/Hero'
 import { getControls } from '@/lib/controls'
 import { formatHoursRange } from '@/lib/hours'
 import { SiteFooter } from '@/components/site-footer'
@@ -85,53 +86,7 @@ export default async function LandingPage() {
       </nav>
 
       {/* ── Hero ── */}
-      <section className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-5 py-20">
-        <div className="max-w-2xl mx-auto space-y-6 lx-stagger">
-          <div className="lx-card-amber-strong lx-amber inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" aria-hidden="true" />
-            Now live on ABSU campus
-          </div>
-
-          <AnimatedHeading
-            as="h1"
-            className="text-4xl sm:text-5xl font-bold leading-tight tracking-tight"
-            segments={[
-              { text: 'Hot food, right to' },
-              { text: 'your hostel door.', className: 'lx-amber', breakBefore: true },
-            ]}
-          />
-
-          <p className="text-base sm:text-lg text-white/65 max-w-lg mx-auto leading-relaxed">
-            Order from your favourite campus restaurants in minutes.
-            Track your delivery live. Earn rewards every time you eat.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-            <Magnetic className="w-full sm:w-auto">
-              <Link
-                href="/auth/register"
-                className="lx-btn-amber px-8 py-4 text-base flex items-center justify-center w-full sm:w-auto"
-                style={{ minHeight: 56 }}
-              >
-                Start ordering
-              </Link>
-            </Magnetic>
-            <Magnetic className="w-full sm:w-auto">
-              <Link
-                href="/auth"
-                className="glass-thin px-8 py-4 text-base font-medium text-white flex items-center justify-center w-full sm:w-auto transition-transform hover:scale-[1.02]"
-                style={{ minHeight: 56, borderRadius: 14 }}
-              >
-                I already have an account
-              </Link>
-            </Magnetic>
-          </div>
-
-          <p className="text-xs text-white/35 pt-1">
-            Platform hours: {hoursLabel} daily
-          </p>
-        </div>
-      </section>
+      <Hero hoursLabel={hoursLabel} />
 
       {/* ── Stats strip ── */}
       <section className="relative z-10 border-y border-white/8 py-8">
@@ -152,7 +107,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ── How it works ── */}
-      <section className="relative z-10 py-16 px-5">
+      <section id="how-it-works" className="relative z-10 py-16 px-5 scroll-mt-20">
         <div className="max-w-4xl mx-auto">
           <Reveal>
             <h2 className="text-2xl sm:text-3xl font-bold text-center mb-10">
