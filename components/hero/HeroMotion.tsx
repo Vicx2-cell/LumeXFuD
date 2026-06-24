@@ -8,9 +8,10 @@ import { useEffect, useRef } from 'react'
  *
  * - Ken Burns zoom (scale 1.07 → 1 over 24s) is pure CSS on the <img> itself.
  * - Scroll parallax drifts the whole image wrapper upward at ~0.3× scroll speed
- *   (transform: translateY only, one throttled rAF-driven scroll listener).
- *   Desktop + fine pointer + motion-allowed ONLY; the wrapper carries vertical
- *   slack (top:-8%/height:116%) so the drift never reveals the fallback edge.
+ *   (transform: translateY only, one throttled rAF-driven scroll listener). It's
+ *   scroll-driven, so it runs on touch too (motion-allowed only) — the wrapper
+ *   carries vertical slack (top:-8%/height:116%) so the drift never reveals the
+ *   fallback edge.
  *
  * Two art-directed crops: a wide desktop frame and a tall phone frame, switched
  * by CSS breakpoint. Both `priority` so whichever is shown is the preloaded LCP.
@@ -26,9 +27,9 @@ export function HeroMotion() {
   const wrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const fine = window.matchMedia('(pointer: fine)').matches
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (!fine || reduce) return
+    // Scroll-driven, so it works on touch as well as a mouse — only motion
+    // preference gates it out.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
     const el = wrapRef.current
     if (!el) return

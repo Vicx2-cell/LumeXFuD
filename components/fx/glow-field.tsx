@@ -4,9 +4,9 @@ import { useEffect, useRef } from 'react'
 
 interface GlowFieldProps {
   /**
-   * When true (default) the amber bloom eases toward the pointer on a fine
-   * pointer. When false — or on touch / reduced motion — it stays a static
-   * ambient glow (the dashboard/auth tier).
+   * When true (default) the amber bloom eases toward the cursor (mouse) or the
+   * dragging finger (touch). When false — or with reduced motion — it stays a
+   * static ambient glow (the dashboard/auth tier).
    */
   track?: boolean
 }
@@ -26,9 +26,8 @@ export function GlowField({ track = true }: GlowFieldProps) {
   useEffect(() => {
     const orb = orbRef.current
     if (!orb || !track) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const fine = window.matchMedia('(pointer: fine)').matches
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (!fine || reduce) return
 
     let tx = window.innerWidth * 0.5
     let ty = window.innerHeight * 0.28
@@ -46,16 +45,22 @@ export function GlowField({ track = true }: GlowFieldProps) {
       if (Math.abs(tx - cx) < 0.5 && Math.abs(ty - cy) < 0.5) { running = false; return }
       raf = requestAnimationFrame(loop)
     }
-    const onMove = (e: PointerEvent) => {
-      tx = e.clientX
-      ty = e.clientY
-      if (!running) { running = true; raf = requestAnimationFrame(loop) }
+    const kick = () => { if (!running) { running = true; raf = requestAnimationFrame(loop) } }
+    const onPointer = (e: PointerEvent) => { tx = e.clientX; ty = e.clientY; kick() }
+    const onTouch = (e: TouchEvent) => {
+      const t = e.touches[0]
+      if (!t) return
+      tx = t.clientX; ty = t.clientY; kick()
     }
 
     draw()
-    window.addEventListener('pointermove', onMove, { passive: true })
+    // Mouse: follow the cursor. Touch: follow the finger as it drags — touchmove
+    // keeps firing through a scroll, unlike pointer events (which get cancelled).
+    if (fine) window.addEventListener('pointermove', onPointer, { passive: true })
+    else window.addEventListener('touchmove', onTouch, { passive: true })
     return () => {
-      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointermove', onPointer)
+      window.removeEventListener('touchmove', onTouch)
       cancelAnimationFrame(raf)
     }
   }, [track])
