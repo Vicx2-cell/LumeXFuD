@@ -6,6 +6,21 @@
   --color-surface: #111113;
   --color-border: rgba(255,255,255,0.08);
 
+  /* ── Theme tokens (DARK is the default/source) ────────────────────────────
+     New UI reads these instead of hardcoding #fff / rgba(255,255,255,…). The
+     [data-theme="light"] block below flips them; anything still hardcoded just
+     stays dark, so partial conversion is safe. Amber is intentionally the same
+     in both themes (the brand constant). */
+  --lx-text: #ffffff;                  /* primary text          */
+  --lx-text-muted: rgba(255,255,255,0.62);
+  --lx-text-faint: rgba(255,255,255,0.40);
+  --lx-surface: rgba(255,255,255,0.05);   /* card / field fill   */
+  --lx-surface-2: rgba(255,255,255,0.08); /* raised / hover fill */
+  --lx-surface-solid: #141416;            /* opaque panel (menus, sheets) */
+  --lx-border: rgba(255,255,255,0.08);
+  --lx-border-strong: rgba(255,255,255,0.14);
+  --lx-shadow: 0 8px 32px rgba(0,0,0,0.40);
+
   /* Display face (set on <html> by next/font in layout.tsx). The literal stack
      is the fallback for the brief window before the woff2 swaps in. */
   --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -24,11 +39,111 @@
 
 html, body {
   background-color: var(--color-bg);
-  color: #ffffff;
+  color: var(--lx-text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.01em;
 }
+
+/* ── Light theme ──────────────────────────────────────────────────────────────
+   Applied by ThemeProvider setting data-theme="light" on <html> (customer-facing
+   screens only for now — vendor/rider/admin keep the dark dashboards). A warm
+   off-white, not stark white, so the amber brand still feels at home. Only the
+   tokens flip here; converted screens read them, unconverted ones stay dark. */
+:root[data-theme="light"] {
+  --color-bg: #F6F4EF;
+  --color-surface: #ffffff;
+  --color-border: rgba(20,18,14,0.10);
+
+  --lx-text: #17150F;
+  --lx-text-muted: rgba(23,21,15,0.62);
+  --lx-text-faint: rgba(23,21,15,0.42);
+  --lx-surface: rgba(20,18,14,0.04);
+  --lx-surface-2: rgba(20,18,14,0.07);
+  --lx-surface-solid: #ffffff;
+  --lx-border: rgba(20,18,14,0.10);
+  --lx-border-strong: rgba(20,18,14,0.16);
+  --lx-shadow: 0 8px 28px rgba(60,50,30,0.10);
+}
+
+/* Block the first-paint flash: ThemeProvider writes the saved choice before
+   hydration (inline script in layout), but if a screen mounts mid-transition the
+   color-scheme hint keeps form controls/scrollbars sane. */
+:root { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
+/* Light-theme overrides for the shared primitives that bake in dark-only rgba.
+   Grouped here so the dark definitions below stay the readable source of truth. */
+:root[data-theme="light"] .lx-page {
+  background-image:
+    radial-gradient(ellipse 95% 55% at 10% -8%, rgba(245,166,35,0.16) 0%, transparent 55%),
+    radial-gradient(ellipse 85% 60% at 95% 108%, rgba(99,102,241,0.08) 0%, transparent 62%),
+    radial-gradient(rgba(20,18,14,0.030) 1px, transparent 1px);
+  background-color: var(--color-bg);
+}
+:root[data-theme="light"] body::before { display: none; }
+:root[data-theme="light"] .lx-topbar {
+  background: rgba(246,244,239,0.82);
+  border-bottom: 1px solid var(--lx-border);
+}
+:root[data-theme="light"] .glass,
+:root[data-theme="light"] .glass-thin,
+:root[data-theme="light"] .glass-thick,
+:root[data-theme="light"] .glass-ultrathin {
+  background: rgba(255,255,255,0.72);
+  border: 1px solid var(--lx-border);
+  box-shadow: var(--lx-shadow), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+:root[data-theme="light"] .lx-field {
+  background: var(--lx-surface);
+  border: 1px solid var(--lx-border-strong);
+  color: var(--lx-text);
+}
+:root[data-theme="light"] .lx-field::placeholder { color: var(--lx-text-faint); }
+:root[data-theme="light"] .lx-pill {
+  background: var(--lx-surface);
+  color: var(--lx-text-muted);
+  border: 1px solid var(--lx-border);
+}
+:root[data-theme="light"] ::selection { background: rgba(245,166,35,0.28); color: #17150F; }
+
+/* ── Light-theme utility remap ────────────────────────────────────────────────
+   The customer screens were authored 100% dark, leaning on Tailwind's
+   text-white / bg-white/N / border-white/N utilities (literal #fff). Rewriting
+   every className is hundreds of edits; instead — because data-theme="light" is
+   ONLY ever set on customer-facing routes (dashboards are forced dark) — we remap
+   those white utilities to ink tokens here. One contained, fully reversible layer.
+   Inline rgba(255,255,255,…) styles are NOT caught by this; the few high-traffic
+   ones are converted to tokens in the components themselves. */
+:root[data-theme="light"] .text-white { color: var(--lx-text) !important; }
+:root[data-theme="light"] .text-white\/90,
+:root[data-theme="light"] .text-white\/80,
+:root[data-theme="light"] .text-white\/75,
+:root[data-theme="light"] .text-white\/70 { color: var(--lx-text) !important; }
+:root[data-theme="light"] .text-white\/65,
+:root[data-theme="light"] .text-white\/60,
+:root[data-theme="light"] .text-white\/55,
+:root[data-theme="light"] .text-white\/50,
+:root[data-theme="light"] .text-white\/45 { color: var(--lx-text-muted) !important; }
+:root[data-theme="light"] .text-white\/40,
+:root[data-theme="light"] .text-white\/35,
+:root[data-theme="light"] .text-white\/30,
+:root[data-theme="light"] .text-white\/25,
+:root[data-theme="light"] .text-white\/20 { color: var(--lx-text-faint) !important; }
+
+:root[data-theme="light"] .bg-white\/5  { background-color: var(--lx-surface) !important; }
+:root[data-theme="light"] .bg-white\/8,
+:root[data-theme="light"] .bg-white\/10 { background-color: var(--lx-surface-2) !important; }
+:root[data-theme="light"] .bg-white\/12,
+:root[data-theme="light"] .bg-white\/15,
+:root[data-theme="light"] .bg-white\/20 { background-color: rgba(20,18,14,0.10) !important; }
+
+:root[data-theme="light"] .border-white\/5,
+:root[data-theme="light"] .border-white\/8,
+:root[data-theme="light"] .border-white\/10 { border-color: var(--lx-border) !important; }
+:root[data-theme="light"] .border-white\/12,
+:root[data-theme="light"] .border-white\/15,
+:root[data-theme="light"] .border-white\/20 { border-color: var(--lx-border-strong) !important; }
 
 /* ============================================================
    Desktop framing. The app is mobile-first and content is bound to a

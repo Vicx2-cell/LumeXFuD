@@ -7,6 +7,7 @@ import { BackButton } from '@/components/back-button'
 import { FaceIdSetup } from '@/components/face-id-setup'
 import { LumiMemoryCard } from '@/components/lumi-memory-card'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { useFeatures } from '@/lib/use-features'
 import type { CustomerProfile, StreakData, BadgeItem } from './page'
 
@@ -309,6 +310,12 @@ export function ProfileClient({
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </Link>
+
+        {/* Appearance — light / dark / auto (customer-facing only) */}
+        <div className="glass-thin rounded-2xl p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-white/70">Appearance</h3>
+          <ThemeToggle />
+        </div>
 
         {/* Streak — keep the flame alive by ordering each day */}
         {hasStreak && (

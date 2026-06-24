@@ -20,6 +20,7 @@ import { FeaturesProvider } from '@/lib/use-features'
 import { getAllFeatures } from '@/lib/features'
 import { StructuredData } from '@/components/structured-data'
 import { SpeculationRules } from '@/components/speculation-rules'
+import { themeNoFlashScript } from '@/components/theme-provider'
 
 if (process.env.NODE_ENV !== 'test') validateEnv()
 
@@ -110,6 +111,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const features = await getAllFeatures()
   return (
     <html lang="en" className={display.variable}>
+      <head>
+        {/* Set data-theme before first paint so light mode never flashes dark
+            (or vice-versa). Mirrors ThemeProvider; dashboards forced dark. */}
+        <script dangerouslySetInnerHTML={{ __html: themeNoFlashScript }} />
+      </head>
       <body>
         <StructuredData />
         <SpeculationRules />
