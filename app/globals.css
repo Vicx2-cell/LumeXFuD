@@ -587,6 +587,86 @@ a:active,
 }
 
 /* ============================================================
+   FX primitives — atmosphere for marketing + auth surfaces only.
+   The JS in components/fx/ adds .lx-has-cursor only on a fine pointer with
+   motion allowed, so everything here is inert on touch / reduced-motion.
+   ============================================================ */
+
+/* Custom cursor: a lerp-follow amber lens + an instant dot. Hidden until the
+   provider sets html.lx-has-cursor (fine pointer, motion allowed). cursor:none
+   is scoped under that class so it never applies on touch. */
+.lx-cursor-lens, .lx-cursor-dot { display: none; }
+html.lx-has-cursor { cursor: none; }
+html.lx-has-cursor a,
+html.lx-has-cursor button,
+html.lx-has-cursor [role="button"],
+html.lx-has-cursor input,
+html.lx-has-cursor textarea,
+html.lx-has-cursor select,
+html.lx-has-cursor label { cursor: none; }
+html.lx-has-cursor .lx-cursor-lens,
+html.lx-has-cursor .lx-cursor-dot {
+  display: block;
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 9998;
+  pointer-events: none;
+  border-radius: 9999px;
+  will-change: transform;
+}
+html.lx-has-cursor .lx-cursor-lens {
+  width: 38px; height: 38px;
+  background: radial-gradient(circle, rgba(245,166,35,0.22), rgba(245,166,35,0.06) 60%, transparent 72%);
+  border: 1px solid rgba(245,166,35,0.40);
+  transition: width 0.25s var(--spring-snappy), height 0.25s var(--spring-snappy), background 0.25s ease;
+}
+html.lx-has-cursor .lx-cursor-dot {
+  width: 6px; height: 6px;
+  background: var(--color-amber);
+  box-shadow: 0 0 10px rgba(245,166,35,0.7);
+}
+html.lx-has-cursor.lx-cursor-grow .lx-cursor-lens {
+  width: 64px; height: 64px;
+  background: radial-gradient(circle, rgba(245,166,35,0.30), rgba(245,166,35,0.08) 60%, transparent 72%);
+}
+
+/* Pointer-tracking ambient glow (marketing + auth). A single blurred orb moved
+   with transform (GPU-composited, no per-frame repaint). The static default
+   sits the orb top-centre; GlowField translates it toward the pointer when
+   tracking. */
+.lx-glowfield {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.lx-glowfield__orb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 56rem;
+  height: 56rem;
+  margin: -28rem 0 0 -28rem; /* anchor the orb's CENTRE at the translate origin */
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(245,166,35,0.13), transparent 60%);
+  /* Static fallback position (no JS / touch / reduced-motion): 50vw, 28vh. */
+  transform: translate3d(50vw, 28vh, 0);
+  will-change: transform;
+}
+
+/* Word-stagger heading. Renders visible by default (SSR / no-JS safe); the
+   component "arms" the masked state on the client, then plays once on view. */
+/* Magnetic wrapper — display lives here (not inline style) so callers can make
+   it full-width on mobile with utilities (e.g. `w-full sm:w-auto`). */
+.lx-magnetic { display: inline-block; }
+
+.lx-ah-mask { display: inline-block; overflow: hidden; vertical-align: top; }
+.lx-ah-word { display: inline-block; transition: transform 0.7s var(--spring-smooth); }
+.lx-ah--armed .lx-ah-word { transform: translateY(110%); }
+.lx-ah--armed.lx-ah--in .lx-ah-word { transform: translateY(0); }
+
+/* ============================================================
    Reduced motion — honour the OS preference everywhere
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {

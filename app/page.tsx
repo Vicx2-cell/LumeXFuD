@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Reveal } from '@/components/reveal'
+import { MarketingFx, AnimatedHeading, Magnetic, CountUp } from '@/components/fx'
 import { getControls } from '@/lib/controls'
 import { formatHoursRange } from '@/lib/hours'
 import { SiteFooter } from '@/components/site-footer'
@@ -52,6 +53,9 @@ export default async function LandingPage() {
   return (
     <div className="lx-page flex flex-col text-white overflow-hidden">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {/* Marketing-only atmosphere: custom cursor + pointer-tracking glow.
+          Inert on touch / reduced-motion (each primitive self-guards). */}
+      <MarketingFx />
       <div className="lx-orb lx-orb--amber" aria-hidden="true" />
       <div className="lx-orb lx-orb--indigo" aria-hidden="true" />
 
@@ -68,12 +72,14 @@ export default async function LandingPage() {
             >
               Login
             </Link>
-            <Link
-              href="/auth/register"
-              className="lx-btn-amber px-3 sm:px-4 py-2 text-sm whitespace-nowrap"
-            >
-              Create account
-            </Link>
+            <Magnetic>
+              <Link
+                href="/auth/register"
+                className="lx-btn-amber px-3 sm:px-4 py-2 text-sm whitespace-nowrap"
+              >
+                Create account
+              </Link>
+            </Magnetic>
           </div>
         </div>
       </nav>
@@ -86,10 +92,14 @@ export default async function LandingPage() {
             Now live on ABSU campus
           </div>
 
-          <h1 className="text-4xl sm:text-5xl font-bold leading-tight tracking-tight">
-            Hot food, right to<br />
-            <span className="lx-amber">your hostel door.</span>
-          </h1>
+          <AnimatedHeading
+            as="h1"
+            className="text-4xl sm:text-5xl font-bold leading-tight tracking-tight"
+            segments={[
+              { text: 'Hot food, right to' },
+              { text: 'your hostel door.', className: 'lx-amber', breakBefore: true },
+            ]}
+          />
 
           <p className="text-base sm:text-lg text-white/65 max-w-lg mx-auto leading-relaxed">
             Order from your favourite campus restaurants in minutes.
@@ -97,20 +107,24 @@ export default async function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-            <Link
-              href="/auth/register"
-              className="lx-btn-amber px-8 py-4 text-base flex items-center justify-center"
-              style={{ minHeight: 56 }}
-            >
-              Start ordering
-            </Link>
-            <Link
-              href="/auth"
-              className="glass-thin px-8 py-4 text-base font-medium text-white flex items-center justify-center transition-transform hover:scale-[1.02]"
-              style={{ minHeight: 56, borderRadius: 14 }}
-            >
-              I already have an account
-            </Link>
+            <Magnetic className="w-full sm:w-auto">
+              <Link
+                href="/auth/register"
+                className="lx-btn-amber px-8 py-4 text-base flex items-center justify-center w-full sm:w-auto"
+                style={{ minHeight: 56 }}
+              >
+                Start ordering
+              </Link>
+            </Magnetic>
+            <Magnetic className="w-full sm:w-auto">
+              <Link
+                href="/auth"
+                className="glass-thin px-8 py-4 text-base font-medium text-white flex items-center justify-center w-full sm:w-auto transition-transform hover:scale-[1.02]"
+                style={{ minHeight: 56, borderRadius: 14 }}
+              >
+                I already have an account
+              </Link>
+            </Magnetic>
           </div>
 
           <p className="text-xs text-white/35 pt-1">
@@ -123,12 +137,14 @@ export default async function LandingPage() {
       <section className="relative z-10 border-y border-white/8 py-8">
         <div className="max-w-4xl mx-auto px-5 grid grid-cols-3 gap-6 text-center">
           {[
-            { value: '< 25 min', label: 'Average delivery' },
-            { value: '100%',     label: 'Campus coverage' },
-            { value: '7 days',   label: 'Every week' },
-          ].map(({ value, label }, i) => (
+            { num: 25,  prefix: '< ', suffix: ' min', label: 'Average delivery' },
+            { num: 100, prefix: '',   suffix: '%',     label: 'Campus coverage' },
+            { num: 7,   prefix: '',   suffix: ' days', label: 'Every week' },
+          ].map(({ num, prefix, suffix, label }, i) => (
             <Reveal key={label} delay={i * 90}>
-              <p className="lx-display lx-amber text-2xl sm:text-3xl font-bold tabular-nums">{value}</p>
+              <p className="lx-display lx-amber text-2xl sm:text-3xl font-bold tabular-nums">
+                {prefix}<CountUp value={num} />{suffix}
+              </p>
               <p className="text-xs sm:text-sm text-white/55 mt-1">{label}</p>
             </Reveal>
           ))}
@@ -200,13 +216,15 @@ export default async function LandingPage() {
             <p className="text-white/60">
               Create your free account in under a minute and start ordering from campus restaurants now.
             </p>
-            <Link
-              href="/auth/register"
-              className="lx-btn-amber inline-flex items-center justify-center px-10 py-4 text-base"
-              style={{ minHeight: 56 }}
-            >
-              Get started — it&apos;s free
-            </Link>
+            <Magnetic>
+              <Link
+                href="/auth/register"
+                className="lx-btn-amber inline-flex items-center justify-center px-10 py-4 text-base"
+                style={{ minHeight: 56 }}
+              >
+                Get started — it&apos;s free
+              </Link>
+            </Magnetic>
           </div>
         </Reveal>
       </section>

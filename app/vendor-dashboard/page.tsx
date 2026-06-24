@@ -13,6 +13,7 @@ import { LaunchCounter } from '@/components/launch-counter'
 import { BusinessHours } from '@/components/business-hours'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { Badge } from '@/components/ui/badge'
+import { CountUp } from '@/components/fx'
 
 interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
 interface VendorOrder {
@@ -399,7 +400,7 @@ export default function VendorDashboard() {
               { label: 'Ready', value: readyCount, color: 'var(--lx-green)' },
             ].map((s) => (
               <div key={s.label} className="glass-thin rounded-2xl px-3 py-3 text-center">
-                <p className="lx-display text-2xl font-bold tabular-nums leading-none" style={{ color: s.value > 0 ? s.color : 'rgba(255,255,255,0.25)' }}>{s.value}</p>
+                <p className="lx-display text-2xl font-bold tabular-nums leading-none" style={{ color: s.value > 0 ? s.color : 'rgba(255,255,255,0.25)' }}><CountUp value={s.value} /></p>
                 <p className="text-[11px] text-white/45 mt-1.5">{s.label}</p>
               </div>
             ))}

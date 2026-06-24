@@ -6,6 +6,7 @@ import { startAuthentication } from '@simplewebauthn/browser'
 import PinInput from '@/components/auth/PinInput'
 import GoogleButton from '@/components/auth/GoogleButton'
 import { BrandLogo } from '@/components/brand-logo'
+import { GlowField } from '@/components/fx'
 import { useFeatures } from '@/lib/use-features'
 
 // Friendly text for the ?error= slugs the Google flow can redirect back with.
@@ -166,6 +167,7 @@ function LoginForm() {
 
   return (
     <main className="lx-page flex flex-col items-center justify-center px-5 py-12 overflow-hidden">
+      <GlowField track />
       <div className="lx-orb lx-orb--amber" aria-hidden="true" />
       <div className="lx-orb lx-orb--indigo" aria-hidden="true" />
 

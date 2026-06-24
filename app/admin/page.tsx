@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
 import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
+import { CountUp } from '@/components/fx'
 
 interface DashboardMetrics {
   orders_today: number
@@ -17,7 +18,7 @@ interface DashboardMetrics {
 
 interface MetricCardProps {
   label: string
-  value: string
+  value: React.ReactNode
   sub?: string
   status?: 'ok' | 'warn' | 'critical'
   href?: string
@@ -160,7 +161,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
             <MetricCard
               label="Orders today"
-              value={String(metrics.orders_today)}
+              value={<CountUp value={metrics.orders_today} />}
               sub="Target: 50+ by Month 3"
               status={metrics.orders_today >= 50 ? 'ok' : metrics.orders_today >= 20 ? 'warn' : 'critical'}
               href="/admin/orders"
@@ -179,14 +180,14 @@ export default function AdminDashboard() {
             />
             <MetricCard
               label="Riders online"
-              value={String(metrics.riders_online)}
+              value={<CountUp value={metrics.riders_online} />}
               sub="Currently active"
               status={metrics.riders_online > 0 ? 'ok' : 'warn'}
               href="/admin/riders"
             />
             <MetricCard
               label="Active disputes"
-              value={String(metrics.active_disputes)}
+              value={<CountUp value={metrics.active_disputes} />}
               sub={metrics.active_disputes === 0 ? 'All clear' : 'Needs attention'}
               status={disputeStatus(metrics.active_disputes)}
               href="/admin/disputes"
