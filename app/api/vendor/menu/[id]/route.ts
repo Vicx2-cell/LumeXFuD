@@ -6,6 +6,14 @@ import { updateMenuItemInput } from '@/lib/validators'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { toKobo } from '@/lib/money'
 
+// Next Africa/Lagos midnight (UTC+1, no DST) as a UTC ISO string. Computed
+// server-side so the auto-restore time can never be spoofed by the client clock.
+function nextLagosMidnightISO(): string {
+  const lagosNow = new Date(Date.now() + 60 * 60 * 1000) // shift to Lagos wall clock
+  const lagosMidnight = Date.UTC(lagosNow.getUTCFullYear(), lagosNow.getUTCMonth(), lagosNow.getUTCDate() + 1, 0, 0, 0)
+  return new Date(lagosMidnight - 60 * 60 * 1000).toISOString() // back to real UTC
+}
+
 // Confirm the item exists and belongs to the logged-in vendor (BOLA).
 async function loadOwnedItem(db: ReturnType<typeof createSupabaseAdmin>, id: string, vendorId: string) {
   const { data } = await db
@@ -48,7 +56,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (parsed.category !== undefined) updates.category = parsed.category
   if (parsed.description !== undefined) updates.description = parsed.description
   if (parsed.image_url !== undefined) updates.image_url = parsed.image_url
-  if (parsed.is_available !== undefined) updates.is_available = parsed.is_available
+  if (parsed.sold_out_today === true) {
+    // One-tap sell-out: hide now, auto-restore at next Lagos midnight (the cron).
+    updates.is_available = false
+    updates.sold_out_until = nextLagosMidnightISO()
+  } else if (parsed.is_available !== undefined) {
+    updates.is_available = parsed.is_available
+    // A manual re-enable cancels any pending timed sell-out.
+    if (parsed.is_available === true) updates.sold_out_until = null
+  }
   if (parsed.prep_time_minutes !== undefined) updates.prep_time_minutes = parsed.prep_time_minutes
   if (parsed.price_naira !== undefined) {
     const kobo = toKobo(parsed.price_naira)

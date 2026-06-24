@@ -29,5 +29,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'DB update failed' }, { status: 500 })
   }
 
-  return NextResponse.json({ reset: data?.length ?? 0 })
+  // Auto-restore "sold out for today" dishes whose restore time has passed
+  // (migration 078). Runs every midnight alongside the daily-limit reset.
+  const { data: restored } = await db
+    .from('menu_items')
+    .update({ is_available: true, sold_out_until: null })
+    .lte('sold_out_until', new Date().toISOString())
+    .not('sold_out_until', 'is', null)
+    .select('id')
+
+  return NextResponse.json({ reset: data?.length ?? 0, restored: restored?.length ?? 0 })
 }

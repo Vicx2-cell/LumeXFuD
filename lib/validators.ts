@@ -302,6 +302,9 @@ export const updateMenuItemInput = z.object({
   description:  z.string().max(300).nullable().optional(),
   image_url:    z.string().url().max(500).nullable().optional(),
   is_available: z.boolean().optional(),
+  // One-tap "sold out for today": hide the dish now, auto-restore next day. The
+  // restore time is computed server-side (never trust the client clock).
+  sold_out_today: z.boolean().optional(),
   prep_time_minutes: z.number().int().min(1).max(180).nullable().optional(),
   // When present, replaces the item's whole add-on list.
   addons:       z.array(menuAddonInput).max(20).optional(),

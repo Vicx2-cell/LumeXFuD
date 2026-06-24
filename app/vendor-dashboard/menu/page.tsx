@@ -17,6 +17,7 @@ interface MenuItem {
   image_url: string | null
   category: string
   is_available: boolean
+  sold_out_until: string | null
   prep_time_minutes: number | null
   display_order: number
   addons: Addon[]
@@ -162,10 +163,22 @@ export default function VendorMenuPage() {
   }
 
   async function toggleAvailable(item: MenuItem) {
-    setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, is_available: !i.is_available } : i))
+    const next = !item.is_available
+    // Re-enabling also cancels any pending "sold out today" timer (matches the API).
+    setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, is_available: next, sold_out_until: next ? null : i.sold_out_until } : i))
     await fetch(`/api/vendor/menu/${item.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_available: !item.is_available }),
+      body: JSON.stringify({ is_available: next }),
+    })
+  }
+
+  // One-tap "sold out for today" — hides the dish and auto-restores at the next
+  // Lagos midnight (server sets the exact time; this is an optimistic local mark).
+  async function soldOutToday(item: MenuItem) {
+    setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, is_available: false, sold_out_until: new Date(Date.now() + 86_400_000).toISOString() } : i))
+    await fetch(`/api/vendor/menu/${item.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sold_out_today: true }),
     })
   }
 
@@ -210,10 +223,16 @@ export default function VendorMenuPage() {
                   <p className="text-sm font-medium truncate">{item.name}</p>
                   <p className="lx-amber text-sm font-semibold mt-0.5">{formatPrice(item.price_kobo)}</p>
                   <p className="text-xs text-white/30 mt-0.5 truncate">{item.category}{item.prep_time_minutes != null ? ` · ${item.prep_time_minutes} min` : ''}{item.addons.length > 0 ? ` · ${item.addons.length} add-on${item.addons.length === 1 ? '' : 's'}` : ''}</p>
-                  <div className="flex gap-1 mt-1.5 -ml-1.5">
+                  <div className="flex flex-wrap gap-1 mt-1.5 -ml-1.5">
                     <button onClick={() => openEdit(item)} className="lx-tap lx-amber text-xs font-medium px-2.5 py-1.5 min-h-[36px] rounded-lg">Edit</button>
+                    {item.is_available && (
+                      <button onClick={() => soldOutToday(item)} className="lx-tap text-xs font-medium px-2.5 py-1.5 min-h-[36px] rounded-lg" style={{ color: '#f59e0b' }}>Sold out today</button>
+                    )}
                     <button onClick={() => removeItem(item)} className="lx-tap text-xs font-medium text-red-400 px-2.5 py-1.5 min-h-[36px] rounded-lg">Delete</button>
                   </div>
+                  {!item.is_available && item.sold_out_until && (
+                    <p className="text-[11px] mt-1" style={{ color: '#f59e0b' }}>🕛 Sold out — auto-returns tomorrow</p>
+                  )}
                 </div>
                 <button onClick={() => toggleAvailable(item)} aria-pressed={item.is_available} className="lx-tap shrink-0 self-start text-xs font-semibold px-3 py-1.5 min-h-[36px] rounded-full"
                   style={{ background: item.is_available ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.08)', color: item.is_available ? '#4ade80' : 'rgba(255,255,255,0.4)' }}>
