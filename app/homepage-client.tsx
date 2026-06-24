@@ -11,13 +11,29 @@ import { Pill } from '@/components/ui/pill'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks']
 
-export function HomepageClient({ initialVendors }: { initialVendors: VendorData[] }) {
+export function HomepageClient({ initialVendors, initialFavorites = [] }: { initialVendors: VendorData[]; initialFavorites?: string[] }) {
   // NOTE: realtime vendor-status subscription temporarily removed while isolating
   // the iOS "page couldn't load" crash on /home. Vendors are server-rendered
   // (revalidate 30), so the list still works without it.
   const [vendors] = useState<VendorData[]>(initialVendors)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
+  const [favorites, setFavorites] = useState<Set<string>>(() => new Set(initialFavorites))
+  const [favOnly, setFavOnly] = useState(false)
+
+  const toggleFavorite = (vendorId: string) => {
+    const willFav = !favorites.has(vendorId)
+    setFavorites((prev) => {
+      const next = new Set(prev)
+      if (willFav) next.add(vendorId); else next.delete(vendorId)
+      return next
+    })
+    fetch('/api/customer/favorites', {
+      method: willFav ? 'POST' : 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vendor_id: vendorId }),
+    }).catch(() => { /* optimistic — reverts on next load if it failed */ })
+  }
 
   const filtered = useMemo(() => {
     const matches = vendors.filter((v) => {
@@ -26,7 +42,8 @@ export function HomepageClient({ initialVendors }: { initialVendors: VendorData[
         v.shop_name.toLowerCase().includes(search.toLowerCase())
       const matchCategory =
         category === 'All' || v.category.toUpperCase() === category.toUpperCase()
-      return matchSearch && matchCategory
+      const matchFav = !favOnly || favorites.has(v.id)
+      return matchSearch && matchCategory && matchFav
     })
 
     // Availability rank: OPEN first, then BUSY, then CLOSED/paused last. A stable
@@ -39,7 +56,7 @@ export function HomepageClient({ initialVendors }: { initialVendors: VendorData[
       return 0
     }
     return matches.slice().sort((a, b) => rank(a) - rank(b))
-  }, [vendors, search, category])
+  }, [vendors, search, category, favOnly, favorites])
 
   return (
     <div className="space-y-4">
@@ -57,8 +74,18 @@ export function HomepageClient({ initialVendors }: { initialVendors: VendorData[
         </svg>
       </div>
 
-      {/* Category chips */}
+      {/* Category chips + Favourites filter (one-tap re-order shortcut) */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+        {favorites.size > 0 && (
+          <Pill
+            active={favOnly}
+            onClick={() => setFavOnly((v) => !v)}
+            className="shrink-0 px-4 py-2 text-sm"
+            style={{ minHeight: 44 }}
+          >
+            ❤️ Favourites
+          </Pill>
+        )}
         {CATEGORIES.map((cat) => (
           <Pill
             key={cat}
@@ -82,7 +109,12 @@ export function HomepageClient({ initialVendors }: { initialVendors: VendorData[
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filtered.map((vendor) => (
-            <VendorCard key={vendor.id} vendor={vendor} />
+            <VendorCard
+              key={vendor.id}
+              vendor={vendor}
+              favorited={favorites.has(vendor.id)}
+              onToggleFavorite={toggleFavorite}
+            />
           ))}
         </div>
       )}
@@ -90,7 +122,7 @@ export function HomepageClient({ initialVendors }: { initialVendors: VendorData[
   )
 }
 
-function VendorCard({ vendor }: { vendor: VendorData }) {
+function VendorCard({ vendor, favorited, onToggleFavorite }: { vendor: VendorData; favorited: boolean; onToggleFavorite: (id: string) => void }) {
   const isPaused =
     vendor.paused_until && new Date(vendor.paused_until) > new Date()
   const isClosed = vendor.status === 'CLOSED'
@@ -146,6 +178,20 @@ function VendorCard({ vendor }: { vendor: VendorData }) {
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} />
           {statusLabel}
         </div>
+
+        {/* Favourite heart — inside the Link, so stop the navigation on tap. */}
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(vendor.id) }}
+          aria-label={favorited ? `Remove ${vendor.shop_name} from favourites` : `Add ${vendor.shop_name} to favourites`}
+          aria-pressed={favorited}
+          className="absolute top-3 left-3 w-9 h-9 rounded-full flex items-center justify-center lx-tap"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill={favorited ? '#F5A623' : 'none'} stroke={favorited ? '#F5A623' : '#fff'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+        </button>
 
         {/* Vendor logo badge overlaid on the cover */}
         {vendor.logo_url && (

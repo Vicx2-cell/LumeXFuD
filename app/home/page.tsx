@@ -1,9 +1,11 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/session'
 import { formatPrice } from '@/lib/money'
 import { BottomNav } from '@/components/nav-bottom'
 import { BackButton } from '@/components/back-button'
 import { BrandLogo } from '@/components/brand-logo'
 import { Lumi } from '@/components/chow-ai'
+import { NotificationBell } from '@/components/notification-bell'
 import { StreakNudge } from '@/components/streak-nudge'
 import { LaunchCounter } from '@/components/launch-counter'
 import ActiveGroupBanner from '@/components/active-group-banner'
@@ -61,6 +63,20 @@ export default async function CustomerHomePage() {
     getFeature('customer_wallet_enabled'),
   ])
 
+  // The signed-in customer's favourite vendor ids — powers the heart state + the
+  // one-tap "Favourites" filter on the list. Empty for guests/other roles.
+  let favorites: string[] = []
+  try {
+    const session = await getCurrentUser()
+    if (session?.userId && session.role === 'customer') {
+      const { data } = await createSupabaseAdmin()
+        .from('customer_favorites')
+        .select('vendor_id')
+        .eq('customer_id', session.userId)
+      favorites = (data ?? []).map((r) => r.vendor_id as string)
+    }
+  } catch { /* favourites are non-critical — never block the home render */ }
+
   return (
     <main className="lx-page pb-24">
       {/* Header */}
@@ -85,6 +101,7 @@ export default async function CustomerHomePage() {
               <span className="lx-amber text-xs font-semibold">Wallet</span>
             </a>
             )}
+            <NotificationBell />
             <a
               href="/profile"
               className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center"
@@ -151,7 +168,7 @@ export default async function CustomerHomePage() {
 
         <div id="vendors" className="scroll-mt-20">
           <Suspense fallback={<SkeletonGrid />}>
-            <HomepageClient initialVendors={vendors as VendorData[]} />
+            <HomepageClient initialVendors={vendors as VendorData[]} initialFavorites={favorites} />
           </Suspense>
         </div>
       </div>
