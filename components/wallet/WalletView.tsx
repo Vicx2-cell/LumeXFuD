@@ -7,6 +7,8 @@ import AddBankSheet from './AddBankSheet'
 import { BackButton } from '@/components/back-button'
 import { downloadReceiptPng } from '@/lib/receipt-download'
 import { waLink, telLink } from '@/lib/contact'
+import { formatPrice } from '@/lib/money'
+import { CountUp } from '@/components/fx'
 
 interface TxParty { name: string; phone: string | null; call_phone: string | null; avatar: string | null }
 
@@ -211,7 +213,9 @@ export default function WalletView({ userType }: Props) {
         </div>
 
         <p className="text-white/50 text-xs mb-1">Total Balance</p>
-        <p className="text-white text-4xl font-bold mb-4">{wallet?.total_balance ?? '₦0'}</p>
+        <p className="text-white text-4xl font-bold mb-4">
+          <CountUp value={(wallet?.available_kobo ?? 0) + (wallet?.held_kobo ?? 0)} format={(n) => formatPrice(Math.round(n))} />
+        </p>
 
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="bg-white/5 rounded-xl p-3">

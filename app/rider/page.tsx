@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Image from 'next/image'
 import { formatPrice } from '@/lib/money'
+import { CountUp } from '@/components/fx'
 import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
 import { NotificationBell } from '@/components/notification-bell'
@@ -370,7 +371,9 @@ export default function RiderDashboard() {
               {wallet.trust_tier}
             </span>
           </div>
-          <p className="text-2xl font-bold text-white">{wallet.available_balance}</p>
+          <p className="text-2xl font-bold text-white">
+            <CountUp value={wallet.available_kobo ?? 0} format={(n) => formatPrice(Math.round(n))} />
+          </p>
           <p className="text-xs text-white/40 mt-0.5">available</p>
           {wallet.held_kobo > 0 && (
             <p className="text-xs text-amber-400/70 mt-2">

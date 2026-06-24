@@ -9,6 +9,7 @@ import { LumiMemoryCard } from '@/components/lumi-memory-card'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useFeatures } from '@/lib/use-features'
+import { CountUp } from '@/components/fx'
 import type { CustomerProfile, StreakData, BadgeItem } from './page'
 
 const KEYPAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'] as const
@@ -324,7 +325,7 @@ export function ProfileClient({
               <span className="text-3xl" aria-hidden="true">🔥</span>
               <div>
                 <p className="lx-amber text-2xl font-bold leading-none">
-                  {streak!.current_streak_days} day{streak!.current_streak_days === 1 ? '' : 's'}
+                  <CountUp value={streak!.current_streak_days} /> day{streak!.current_streak_days === 1 ? '' : 's'}
                 </p>
                 <p className="text-xs text-white/45 mt-1">Order each day to keep your streak alive</p>
               </div>

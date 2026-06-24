@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { downloadReceiptPng } from '@/lib/receipt-download'
 import { useFeatures } from '@/lib/use-features'
+import { formatPrice } from '@/lib/money'
+import { CountUp } from '@/components/fx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -230,7 +232,7 @@ export default function CustomerWalletClient() {
             )}
             <p className="text-xs uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Available Balance</p>
             <p className="text-5xl font-bold mb-5" style={{ color: '#F5A623' }}>
-              {wallet?.balance_formatted ?? '₦0'}
+              <CountUp value={wallet?.balance_kobo ?? 0} format={(n) => formatPrice(Math.round(n))} />
             </p>
 
             <div className="flex gap-3">

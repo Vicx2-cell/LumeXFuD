@@ -12,6 +12,7 @@ import ActiveGroupBanner from '@/components/active-group-banner'
 import { getFeature } from '@/lib/features'
 import { VendorCardSkeleton } from '@/components/ui/skeleton'
 import { HomepageClient } from '../homepage-client'
+import { CountUp } from '@/components/fx'
 import { Suspense } from 'react'
 
 // Always render fresh — vendor open/closed status and the ranked list must never
@@ -116,7 +117,7 @@ export default async function CustomerHomePage() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-5">
+      <div className="max-w-lg mx-auto px-4 py-4 space-y-5 lx-stagger">
         {/* Active group orders — always shows the way back into a group you're in */}
         <ActiveGroupBanner />
 
@@ -154,7 +155,7 @@ export default async function CustomerHomePage() {
             <span className="text-2xl">🔥</span>
             <div>
               <p className="lx-amber text-sm font-semibold">
-                {trending.orders_last_hour} orders in the last hour
+                <CountUp value={trending.orders_last_hour} /> orders in the last hour
               </p>
               {trending.top_item_name && (
                 <p className="text-xs text-white/60 mt-0.5">
