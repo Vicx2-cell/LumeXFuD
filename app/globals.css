@@ -702,8 +702,8 @@ html.lx-has-cursor.lx-cursor-grow .lx-cursor-lens {
 
 /* The photo: Ken Burns zoom out, settling on the final frame (forwards). */
 .lx-hero-img { object-fit: cover; }
-.lx-hero-img--wide { object-position: center 42%; }
-.lx-hero-img--tall { object-position: center 48%; }
+.lx-hero-img--wide { object-position: center 56%; } /* feature the grilled steak */
+.lx-hero-img--tall { object-position: center 46%; }
 .lx-hero-img { animation: lx-kenburns 24s ease-out forwards; }
 @keyframes lx-kenburns { from { transform: scale(1.07); } to { transform: scale(1); } }
 
