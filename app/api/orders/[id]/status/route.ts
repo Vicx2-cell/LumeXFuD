@@ -5,6 +5,8 @@ import { orderStatusInput } from '@/lib/validators'
 import { audit } from '@/lib/audit'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { renderTemplate } from '@/lib/notify-templates'
+import { notifyInApp } from '@/lib/notifications'
+import { sendPushToUser } from '@/lib/push'
 import { recordOrderCompletedEarnings } from '@/lib/platform-earnings'
 import { completeOrderPayout } from '@/lib/order-payout'
 import { getPickupConfig } from '@/lib/pickup'
@@ -295,14 +297,21 @@ async function sendNotificationForStatus(
     case 'COMPLETED': {
       const rider = await getRider()
       if (rider && order.rider_delivery_cut) {
+        const amount = Math.round((order.rider_delivery_cut as number) / 100)
         await sendWhatsAppWithFallback({
           to: rider.phone as string,
           message: renderTemplate('COMPLETED', {
-            amount: Math.round((order.rider_delivery_cut as number) / 100),
+            amount,
             order_number: orderNumber,
             hours: 24,
           }),
         })
+        if (order.rider_id) {
+          const title = 'Payout on the way 💰'
+          const body = `₦${amount.toLocaleString('en-NG')} for order ${orderNumber} (released after 24h).`
+          await notifyInApp({ userId: order.rider_id as string, userType: 'RIDER', title, body, link: '/rider/wallet' })
+          void sendPushToUser(order.rider_id as string, { title, body, url: '/rider/wallet', tag: `payout-${orderNumber}` })
+        }
       }
       break
     }
@@ -320,4 +329,61 @@ async function sendNotificationForStatus(
       break
     }
   }
+
+  // In-app bell + Web Push for the CUSTOMER. The WhatsApp copy above already went
+  // out; this lights up the in-app notification centre and pushes when the app is
+  // closed. Registered customers only (guests have no in-app inbox). READY is
+  // customer-relevant only for pickup orders (delivery customers aren't pinged at
+  // READY), matching the WhatsApp logic above.
+  if (order.customer_id) {
+    const skipReady = status === 'READY' && order.delivery_type !== 'PICKUP'
+    const copy = skipReady ? null : customerCopyForStatus(status, orderNumber)
+    if (copy) {
+      const link = `/order/${orderNumber}`
+      await notifyInApp({ userId: order.customer_id as string, userType: 'CUSTOMER', title: copy.title, body: copy.body, link })
+      void sendPushToUser(order.customer_id as string, { title: copy.title, body: copy.body, url: link, tag: `order-${orderNumber}` })
+    }
+  }
+
+  // Rider broadcast: a delivery order just hit READY — alert every ONLINE rider so
+  // the fastest one grabs it (the difference between a 5- and a 25-minute pickup).
+  if (status === 'READY' && order.delivery_type !== 'PICKUP') {
+    await broadcastNewDeliveryToRiders(db, orderNumber)
+  }
+}
+
+const CUSTOMER_STATUS_COPY: Partial<Record<OrderStatus, { title: string; body: (n: string) => string }>> = {
+  VENDOR_ACCEPTED: { title: 'Order confirmed 🍳', body: (n) => `The vendor is preparing order ${n}.` },
+  READY:           { title: 'Ready for pickup 🛍️', body: (n) => `Order ${n} is ready — open the app for your code.` },
+  RIDER_ASSIGNED:  { title: 'Rider assigned 🛵', body: (n) => `A rider is heading to pick up order ${n}.` },
+  PICKED_UP:       { title: 'On the way 🚀', body: (n) => `Your order ${n} is out for delivery.` },
+  DELIVERED:       { title: 'Delivered ✅', body: (n) => `Tap to confirm you received order ${n}.` },
+  COMPLETED:       { title: 'Order complete 🎉', body: (n) => `Enjoy! Order ${n} is complete.` },
+  CANCELLED:       { title: 'Order cancelled', body: (n) => `Order ${n} was cancelled.` },
+}
+
+function customerCopyForStatus(status: OrderStatus, orderNumber: string): { title: string; body: string } | null {
+  const c = CUSTOMER_STATUS_COPY[status]
+  return c ? { title: c.title, body: c.body(orderNumber) } : null
+}
+
+async function broadcastNewDeliveryToRiders(
+  db: ReturnType<typeof createSupabaseAdmin>,
+  orderNumber: string
+): Promise<void> {
+  const { data: riders } = await db
+    .from('riders')
+    .select('id')
+    .eq('status', 'ONLINE')
+    .eq('is_active', true)
+    .limit(50)
+  if (!riders || riders.length === 0) return
+  const title = 'New delivery available 🛵'
+  const body = `Order ${orderNumber} is ready for pickup. Grab it fast!`
+  await Promise.allSettled(
+    riders.map(async (r) => {
+      await notifyInApp({ userId: r.id as string, userType: 'RIDER', title, body, link: '/rider' })
+      await sendPushToUser(r.id as string, { title, body, url: '/rider', tag: 'new-delivery' })
+    })
+  )
 }

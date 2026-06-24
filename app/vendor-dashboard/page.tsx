@@ -6,6 +6,7 @@ import { formatPrice } from '@/lib/money'
 import { waLink, telLink } from '@/lib/contact'
 import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
+import { NotificationBell } from '@/components/notification-bell'
 import { DemandBanner } from '@/components/demand-banner'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
@@ -252,6 +253,7 @@ export default function VendorDashboard() {
             >
               {vendor?.status === 'OPEN' ? '● Open' : vendor?.status === 'BUSY' ? '● Busy' : '● Closed'}
             </Badge>
+            <NotificationBell />
             <LogoutButton />
           </div>
         </div>

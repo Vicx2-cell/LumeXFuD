@@ -1,6 +1,8 @@
 import { createSupabaseAdmin } from '../supabase/server'
 import { sendWhatsAppWithFallback } from '../notify'
 import { renderTemplate } from '../notify-templates'
+import { notifyInApp } from '../notifications'
+import { sendPushToUser } from '../push'
 import { recordPlatformEarning } from '../platform-earnings'
 import { processCustomerTopup, spendCustomerWallet, isCustomerWalletEnabled } from '../customer-wallet'
 import { refundTransaction } from './transfer'
@@ -219,6 +221,13 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
             dashboard_url: `${appUrl}/vendor-dashboard`,
           }),
         }).catch(() => {})
+
+        // In-app bell + Web Push (card-paid path) — same alert the wallet-paid
+        // path fires in app/api/orders/route.ts.
+        const title = 'New order! 🛎️'
+        const body = `${itemsSummary || 'A new order'} — ₦${Math.round((order.total_amount as number) / 100).toLocaleString('en-NG')} (${order.order_number}).`
+        await notifyInApp({ userId: order.vendor_id as string, userType: 'VENDOR', title, body, link: '/vendor-dashboard' })
+        void sendPushToUser(order.vendor_id as string, { title, body, url: '/vendor-dashboard', tag: `neworder-${order.order_number}` })
       }
 
       // Group order? Tell every participant the food is on the way + where to.

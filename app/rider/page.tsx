@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { formatPrice } from '@/lib/money'
 import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
+import { NotificationBell } from '@/components/notification-bell'
 import { RiderHotspots } from '@/components/rider-hotspots'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
@@ -353,6 +354,7 @@ export default function RiderDashboard() {
             )}
             {rider.status === 'BUSY' ? 'Busy' : isOnline ? 'Online' : 'Offline'}
           </button>
+            <NotificationBell />
             <LogoutButton />
           </div>
         </div>

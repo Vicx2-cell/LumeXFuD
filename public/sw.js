@@ -1,7 +1,7 @@
 // Bump on every release that must reach already-installed PWAs: a changed sw.js
 // triggers install→activate (purging old caches) and a controllerchange reload
 // in components/pwa.tsx, so clients pick up the new app instead of stale assets.
-const CACHE_NAME = 'lumexfud-v16';
+const CACHE_NAME = 'lumexfud-v17';
 
 // Pre-cache only assets that are SAME for everyone and never redirect.
 // IMPORTANT: do NOT precache "/" — for a logged-in user the auth proxy
@@ -99,4 +99,45 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
+});
+
+// ── Web Push ─────────────────────────────────────────────────────────────────
+// Real push so vendors/riders get the new-order alert even when the tab/PWA is
+// closed. Payload is JSON: { title, body, url, tag } (see lib/push.ts).
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (_) {
+    data = { title: 'LumeX Fud', body: event.data ? event.data.text() : '' };
+  }
+  const title = data.title || 'LumeX Fud';
+  const options = {
+    body: data.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    // tag collapses repeats (e.g. many status pings for one order) into one chip.
+    tag: data.tag || undefined,
+    renotify: Boolean(data.tag),
+    data: { url: data.url || '/' },
+    vibrate: [80, 40, 80],
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Tapping a push focuses an existing tab (navigating it) or opens a new one.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ('focus' in client) {
+          client.navigate(target).catch(() => {});
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(target);
+    })
+  );
 });

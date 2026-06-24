@@ -9,6 +9,8 @@ import { notifyGroupOrderPlaced, notifyGroupSplitPaid } from '@/lib/group-order'
 import { trackFeature } from '@/lib/usage'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { renderTemplate } from '@/lib/notify-templates'
+import { notifyInApp } from '@/lib/notifications'
+import { sendPushToUser } from '@/lib/push'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { getFeature } from '@/lib/features'
 import { getControls, withinHours } from '@/lib/controls'
@@ -717,4 +719,11 @@ async function notifyVendorNewOrder(
       dashboard_url: `${appUrl}/vendor-dashboard`,
     }),
   }).catch(() => {})
+
+  // In-app bell + Web Push so the vendor sees the order even with the dashboard
+  // closed — accept speed is the whole game (PENDING auto-cancels in 5 min).
+  const title = 'New order! 🛎️'
+  const body = `${itemsSummary || 'A new order'} — ₦${Math.round(totalAmount / 100).toLocaleString('en-NG')} (${orderNumber}).`
+  await notifyInApp({ userId: vendorId, userType: 'VENDOR', title, body, link: '/vendor-dashboard' })
+  void sendPushToUser(vendorId, { title, body, url: '/vendor-dashboard', tag: `neworder-${orderNumber}` })
 }
