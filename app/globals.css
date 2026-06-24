@@ -694,11 +694,28 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
 .lx-hero {
   position: relative;
   isolation: isolate;               /* contain the grain's mix-blend */
-  min-height: calc(100svh - 3.5rem); /* fill the first screen under the 56px nav */
+  min-height: 100svh;               /* full bleed — the nav floats over it */
   display: flex;
-  align-items: center;
+  align-items: flex-end;            /* mobile: copy sits low, food breathes on top */
+  padding-bottom: 3.25rem;
   width: 100%;
   overflow: hidden;
+}
+@media (min-width: 768px) {
+  .lx-hero { align-items: center; padding-bottom: 0; }
+}
+
+/* Floating landing nav: transparent over the hero photo, glass once scrolled. */
+.lx-landing-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  border-bottom: 1px solid transparent;
+  transition: background 0.35s ease, backdrop-filter 0.35s ease, border-color 0.35s ease;
+}
+.lx-landing-nav--solid {
+  background: rgba(12, 12, 14, 0.62);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
 /* ── Media stack ── */
@@ -753,18 +770,25 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
   50%      { opacity: 0.78; transform: scale(1.06); }
 }
 
-/* Readability scrim: dark-left → clear-right (desktop), plus a bottom lift. */
+/* Photographic scrim. Four jobs, none of them "flat dark veil": (1) a faint top
+   wash so the floating nav stays legible, (2) a directional wedge that darkens
+   ONLY the text side so the food stays vivid, (3) a cinematic vignette, (4) a
+   fade into the page background so the hero dissolves into the site below. */
 .lx-hero-scrim {
   position: absolute; inset: 0; pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(11,11,13,0.94) 0%, rgba(11,11,13,0.72) 36%, rgba(11,11,13,0.22) 68%, rgba(11,11,13,0.5) 100%),
-    linear-gradient(0deg, rgba(11,11,13,0.85) 0%, transparent 42%);
+    linear-gradient(180deg, rgba(8,8,10,0.5) 0%, rgba(8,8,10,0) 16%),
+    linear-gradient(100deg, rgba(8,8,10,0.9) 0%, rgba(8,8,10,0.55) 30%, rgba(8,8,10,0) 58%),
+    radial-gradient(135% 130% at 62% 38%, transparent 50%, rgba(0,0,0,0.42) 100%),
+    linear-gradient(180deg, transparent 48%, rgba(10,10,11,0.55) 78%, #0A0A0B 100%);
 }
 @media (max-width: 767px) {
-  /* Tall crop → a vertical veil reads better than a side scrim. */
+  /* Tall crop: food breathes up top, copy sits in a dark band that fades to page. */
   .lx-hero-scrim {
     background:
-      linear-gradient(180deg, rgba(11,11,13,0.62) 0%, rgba(11,11,13,0.28) 34%, rgba(11,11,13,0.74) 78%, rgba(11,11,13,0.96) 100%);
+      linear-gradient(180deg, rgba(8,8,10,0.5) 0%, rgba(8,8,10,0) 14%),
+      linear-gradient(180deg, transparent 28%, rgba(10,10,11,0.4) 55%, rgba(10,10,11,0.85) 80%, #0A0A0B 100%),
+      radial-gradient(120% 95% at 50% 32%, transparent 56%, rgba(0,0,0,0.34) 100%);
   }
 }
 
