@@ -630,6 +630,27 @@ html.lx-has-cursor.lx-cursor-grow .lx-cursor-lens {
   background: radial-gradient(circle, rgba(245,166,35,0.30), rgba(245,166,35,0.08) 60%, transparent 72%);
 }
 
+/* Touch: the lens follows the finger as a soft amber spotlight (offset above the
+   fingertip in JS so the touch doesn't occlude it — reads as a light moving over
+   the hero food). No system cursor to hide, so no `cursor:none`; the bare dot is
+   pointless under a fingertip, so touch shows the lens only and fades it out
+   shortly after release. */
+html.lx-has-touch-cursor .lx-cursor-lens {
+  display: block;
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 9998;
+  pointer-events: none;
+  border-radius: 9999px;
+  will-change: transform;
+  width: 72px; height: 72px;
+  background: radial-gradient(circle, rgba(245,166,35,0.30), rgba(245,166,35,0.08) 60%, transparent 72%);
+  border: 1px solid rgba(245,166,35,0.32);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
+
 /* Pointer-tracking ambient glow (marketing + auth). A single blurred orb moved
    with transform (GPU-composited, no per-frame repaint). The static default
    sits the orb top-centre; GlowField translates it toward the pointer when
