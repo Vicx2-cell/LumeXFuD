@@ -777,18 +777,23 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
 .lx-hero-scrim {
   position: absolute; inset: 0; pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(8,8,10,0.5) 0%, rgba(8,8,10,0) 16%),
-    linear-gradient(100deg, rgba(8,8,10,0.9) 0%, rgba(8,8,10,0.55) 30%, rgba(8,8,10,0) 58%),
-    radial-gradient(135% 130% at 62% 38%, transparent 50%, rgba(0,0,0,0.42) 100%),
-    linear-gradient(180deg, transparent 48%, rgba(10,10,11,0.55) 78%, #0A0A0B 100%);
+    /* (1) nav legibility wash */
+    linear-gradient(180deg, rgba(6,6,8,0.55) 0%, rgba(6,6,8,0) 15%),
+    /* (2) text wedge — strong on the copy side, clears off the food by ~62% */
+    linear-gradient(102deg, rgba(6,6,8,0.95) 0%, rgba(6,6,8,0.78) 24%, rgba(6,6,8,0.32) 46%, rgba(6,6,8,0) 62%),
+    /* (3) floor fade into the page background */
+    linear-gradient(180deg, transparent 50%, rgba(8,8,9,0.62) 82%, #0A0A0B 100%),
+    /* (4) gentle global tint + vignette so nothing is harsh-bright */
+    radial-gradient(140% 130% at 64% 40%, rgba(8,8,10,0.14) 38%, rgba(0,0,0,0.52) 100%);
 }
 @media (max-width: 767px) {
-  /* Tall crop: food breathes up top, copy sits in a dark band that fades to page. */
+  /* Tall crop: food breathes up top; the bottom-anchored copy sits on a strong
+     floor fade (NN/g) so white text clears the busy steak, then fades to page. */
   .lx-hero-scrim {
     background:
-      linear-gradient(180deg, rgba(8,8,10,0.5) 0%, rgba(8,8,10,0) 14%),
-      linear-gradient(180deg, transparent 28%, rgba(10,10,11,0.4) 55%, rgba(10,10,11,0.85) 80%, #0A0A0B 100%),
-      radial-gradient(120% 95% at 50% 32%, transparent 56%, rgba(0,0,0,0.34) 100%);
+      linear-gradient(180deg, rgba(6,6,8,0.55) 0%, rgba(6,6,8,0) 13%),
+      linear-gradient(180deg, transparent 18%, rgba(8,8,9,0.5) 44%, rgba(8,8,9,0.9) 72%, #0A0A0B 100%),
+      radial-gradient(130% 100% at 50% 30%, rgba(8,8,10,0.1) 42%, rgba(0,0,0,0.42) 100%);
   }
 }
 
@@ -833,15 +838,18 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
   line-height: 0.98;
   letter-spacing: -0.03em;
   margin: 0;
-  text-shadow: 0 2px 34px rgba(0,0,0,0.45);
+  color: #fff;
+  /* tight shadow for letter-edge separation + a soft halo to lift off the photo */
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5), 0 3px 30px rgba(0,0,0,0.55);
 }
 
 .lx-hero-sub {
-  max-width: 30rem;
+  max-width: 32rem;
   font-size: clamp(1rem, 1.6vw, 1.18rem);
+  font-weight: 500;
   line-height: 1.55;
-  color: rgba(255,255,255,0.74);
-  text-shadow: 0 1px 18px rgba(0,0,0,0.4);
+  color: rgba(255,255,255,0.94);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6), 0 2px 16px rgba(0,0,0,0.5);
 }
 
 .lx-hero-cta {
@@ -863,7 +871,10 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
   transform: translateY(-1px);
 }
 
-.lx-hero-fine { font-size: 0.72rem; color: rgba(255,255,255,0.45); margin-top: 0.1rem; }
+.lx-hero-fine {
+  font-size: 0.72rem; color: rgba(255,255,255,0.62); margin-top: 0.1rem;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+}
 
 /* ── Choreographed entrance ── (heading runs its own word-stagger) */
 .lx-hero-choreo > * { animation: lx-hero-rise 0.7s var(--spring-smooth) both; }
