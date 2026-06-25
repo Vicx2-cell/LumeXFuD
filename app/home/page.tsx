@@ -12,7 +12,7 @@ import ActiveGroupBanner from '@/components/active-group-banner'
 import { getFeature } from '@/lib/features'
 import { VendorCardSkeleton } from '@/components/ui/skeleton'
 import { HomepageClient } from '../homepage-client'
-import { CountUp } from '@/components/fx'
+import { CountUp, SmoothScroll } from '@/components/fx'
 import { Suspense } from 'react'
 
 // Always render fresh — vendor open/closed status and the ranked list must never
@@ -80,6 +80,9 @@ export default async function CustomerHomePage() {
 
   return (
     <main className="lx-page pb-24">
+      {/* Smooth scroll on the dashboard — native touch (no synced-touch) so fast
+          flicks to a vendor stay instant and the keyboard/nested scrollers behave. */}
+      <SmoothScroll />
       {/* Header */}
       <div className="lx-topbar sticky top-0 z-40 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between gap-2">

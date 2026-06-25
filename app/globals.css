@@ -843,6 +843,14 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
   text-shadow: 0 1px 2px rgba(0,0,0,0.5), 0 3px 30px rgba(0,0,0,0.55);
 }
 
+/* Kinetic hero title — characters un-blur, lift and scale into focus (HeroTitle).
+   SplitType wraps each glyph in .char; the h1's aria-label carries the full text
+   so screen readers never read it letter-by-letter. */
+.lx-hero-title--kinetic .char {
+  display: inline-block;
+  will-change: transform, filter, opacity;
+}
+
 .lx-hero-sub {
   max-width: 32rem;
   font-size: clamp(1rem, 1.6vw, 1.18rem);
@@ -912,6 +920,69 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
   outline: 2px solid var(--color-amber);
   outline-offset: 3px;
   border-radius: 12px;
+}
+
+/* ============================================================
+   Premium engine — Lenis smooth scroll + GSAP kinetic primitives
+   (SmoothScroll, KineticHeading, ClipReveal, Marquee)
+   ============================================================ */
+
+/* Lenis: it drives scroll itself, so disable native smooth behaviour and let
+   the body grow naturally. Nested scrollers opt out with data-lenis-prevent. */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+/* KineticHeading — words rise out of an overflow-hidden line mask. */
+.lx-kine { overflow: hidden; }                 /* fallback clip before split */
+.lx-kine .lx-kine-line { overflow: hidden; }   /* per-line mask after split */
+.lx-kine .word { display: inline-block; will-change: transform; }
+
+/* Marquee — infinite kinetic strip (transform loop). */
+.lx-marquee {
+  overflow: hidden; width: 100%;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.lx-marquee-track {
+  display: flex; width: max-content;
+  animation: lx-marquee var(--lx-marquee-dur, 26s) linear infinite;
+}
+.lx-marquee-track--rev { animation-direction: reverse; }
+.lx-marquee:hover .lx-marquee-track { animation-play-state: paused; }
+.lx-marquee-group { display: flex; align-items: center; flex: none; }
+.lx-marquee-item {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.1rem, 2.4vw, 1.7rem);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: rgba(255,255,255,0.78);
+  white-space: nowrap; padding: 0 1.1rem;
+}
+.lx-marquee-sep { color: var(--color-amber); font-size: 0.7em; opacity: 0.85; }
+@keyframes lx-marquee { to { transform: translateX(-50%); } }
+
+/* HowItWorks pinned story — progress rail + big step numbers. */
+.lx-hiw-stage { padding: 0.5rem 0; }
+.lx-hiw-num {
+  display: block;
+  font-size: 2.1rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em;
+}
+.lx-hiw-step { will-change: transform, opacity; }
+.lx-hiw-rail { display: none; }
+@media (min-width: 768px) {
+  .lx-hiw-rail {
+    display: block; position: relative;
+    height: 2px; margin: 0 0 2rem;
+    background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden;
+  }
+  .lx-hiw-rail-fill {
+    position: absolute; inset: 0;
+    transform: scaleX(0); transform-origin: left center;
+    background: linear-gradient(90deg, var(--color-amber), #FF7A3C);
+    box-shadow: 0 0 16px rgba(245,166,35,0.5);
+  }
 }
 
 /* ============================================================

@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { Reveal } from '@/components/reveal'
-import { MarketingFx, Magnetic, CountUp } from '@/components/fx'
+import { MarketingFx, Magnetic, CountUp, SmoothScroll, KineticHeading, ClipReveal, Marquee } from '@/components/fx'
 import { Hero } from '@/components/hero/Hero'
+import { HowItWorks } from '@/components/hero/HowItWorks'
 import { LandingNav } from '@/components/hero/LandingNav'
 import { getControls } from '@/lib/controls'
 import { formatHoursRange } from '@/lib/hours'
@@ -58,6 +59,10 @@ export default async function LandingPage() {
       {/* Marketing-only atmosphere: custom cursor + pointer-tracking glow.
           Inert on touch / reduced-motion (each primitive self-guards). */}
       <MarketingFx />
+      {/* Lenis smooth scroll synced to the GSAP ticker — the backbone of the
+          premium feel. Synced-touch ON so it glides on phones too. No-ops under
+          reduced-motion. */}
+      <SmoothScroll touch />
       <div className="lx-orb lx-orb--amber" aria-hidden="true" />
       <div className="lx-orb lx-orb--indigo" aria-hidden="true" />
 
@@ -85,40 +90,27 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ── How it works ── */}
+      {/* ── How it works (pinned scroll story on desktop) ── */}
       <section id="how-it-works" className="relative z-10 py-16 px-5 scroll-mt-20">
-        <div className="max-w-4xl mx-auto">
-          <Reveal>
-            <h2 className="text-2xl sm:text-3xl font-bold text-center mb-10">
-              How it works
-            </h2>
-          </Reveal>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {[
-              { step: '01', title: 'Browse',    desc: 'Open the app, see which campus restaurants are open right now, and pick what you want.' },
-              { step: '02', title: 'Order',     desc: 'Add items to your cart, choose delivery to your hostel or pick up, and pay securely.' },
-              { step: '03', title: 'Delivered', desc: 'A rider picks up your order and brings it straight to you. Track every step live.' },
-            ].map(({ step, title, desc }, i) => (
-              <Reveal key={step} delay={i * 110}>
-                <div className="glass-thin p-6 space-y-3 transition-transform hover:-translate-y-1 h-full">
-                  <span className="lx-display text-xs font-bold tracking-widest lx-amber">{step}</span>
-                  <h3 className="text-lg font-semibold">{title}</h3>
-                  <p className="text-sm text-white/60 leading-relaxed">{desc}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
+        <HowItWorks />
       </section>
+
+      {/* ── Kinetic marquee strip ── */}
+      <div className="relative z-10 py-5 border-y border-white/8 bg-white/[0.015]">
+        <Marquee
+          items={['Hot food', 'Delivered fast', 'Campus-wide', 'Track live', 'Pay securely', 'No cash, no stress']}
+          speed={30}
+        />
+      </div>
 
       {/* ── Why LumeX ── */}
       <section className="relative z-10 py-16 px-5 border-t border-white/8">
         <div className="max-w-4xl mx-auto">
-          <Reveal>
-            <h2 className="text-2xl sm:text-3xl font-bold text-center mb-10">
-              Built for campus life
-            </h2>
-          </Reveal>
+          <KineticHeading
+            as="h2"
+            text="Built for campus life"
+            className="text-2xl sm:text-3xl font-bold text-center mb-10"
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {[
               { Icon: BoltIcon,   title: 'Fast delivery',     desc: 'Our riders know every corner of ABSU campus. Average delivery under 25 minutes.' },
@@ -126,7 +118,7 @@ export default async function LandingPage() {
               { Icon: PinIcon,    title: 'Live tracking',      desc: 'See your order status in real time — from the kitchen to your doorstep.' },
               { Icon: LockIcon,   title: 'Safe payments',      desc: 'Pay with your card or bank transfer via Paystack. No cash, no stress.' },
             ].map(({ Icon, title, desc }, i) => (
-              <Reveal key={title} delay={i * 90}>
+              <ClipReveal key={title} delay={i * 0.08} className="h-full">
                 <div className="glass p-6 flex gap-4 items-start transition-transform hover:-translate-y-1 h-full">
                   <span className="lx-icon-badge flex-shrink-0 w-11 h-11 rounded-xl">
                     <Icon />
@@ -136,7 +128,7 @@ export default async function LandingPage() {
                     <p className="text-sm text-white/60 leading-relaxed">{desc}</p>
                   </div>
                 </div>
-              </Reveal>
+              </ClipReveal>
             ))}
           </div>
         </div>
@@ -146,7 +138,7 @@ export default async function LandingPage() {
       <section className="relative z-10 py-20 px-5 border-t border-white/8">
         <Reveal>
           <div className="max-w-xl mx-auto glass-thick p-8 text-center space-y-5">
-            <h2 className="text-3xl font-bold">Ready to eat?</h2>
+            <KineticHeading as="h2" text="Ready to eat?" className="text-3xl font-bold" />
             <p className="text-white/60">
               Create your free account in under a minute and start ordering from campus restaurants now.
             </p>

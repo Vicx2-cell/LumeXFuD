@@ -181,7 +181,7 @@ export function NotificationBell() {
             )}
           </div>
 
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div data-lenis-prevent className="max-h-[60vh] overflow-y-auto">
             {loading && items.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm" style={{ color: 'var(--lx-text-faint)' }}>Loading…</div>
             ) : items.length === 0 ? (

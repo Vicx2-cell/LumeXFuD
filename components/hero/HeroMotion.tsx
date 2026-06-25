@@ -1,17 +1,18 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
+import { useGSAP } from '@gsap/react'
+import { gsap, prefersReducedMotion } from '@/lib/gsap'
 
 /**
  * The moving image layer of the hero — the one bold moment.
  *
  * - Ken Burns zoom (scale 1.07 → 1 over 24s) is pure CSS on the <img> itself.
- * - Scroll parallax drifts the whole image wrapper upward at ~0.3× scroll speed
- *   (transform: translateY only, one throttled rAF-driven scroll listener). It's
- *   scroll-driven, so it runs on touch too (motion-allowed only) — the wrapper
- *   carries vertical slack (top:-8%/height:116%) so the drift never reveals the
- *   fallback edge.
+ * - Scroll parallax drifts the whole image wrapper upward via a GSAP
+ *   ScrollTrigger scrub, synced to Lenis (see SmoothScroll) for a buttery,
+ *   single-engine feel — transform only. The wrapper carries vertical slack
+ *   (top:-8%/height:116%) so the drift never reveals the fallback edge.
  *
  * Two art-directed crops: a wide desktop frame and a tall phone frame, switched
  * by CSS breakpoint. Both `priority` so whichever is shown is the preloaded LCP.
@@ -26,35 +27,28 @@ const BLUR =
 export function HeroMotion() {
   const wrapRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    // Scroll-driven, so it works on touch as well as a mouse — only motion
-    // preference gates it out.
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  useGSAP(
+    () => {
+      const el = wrapRef.current
+      // Scroll-driven, so it works on touch as well as a mouse — only motion
+      // preference gates it out.
+      if (!el || prefersReducedMotion()) return
 
-    const el = wrapRef.current
-    if (!el) return
-
-    let raf = 0
-    let queued = false
-    const apply = () => {
-      queued = false
-      // Drift up at 0.3× scroll, capped so the slack never runs out.
-      const y = Math.min(window.scrollY * 0.3, 90)
-      el.style.transform = `translate3d(0, ${-y}px, 0)`
-    }
-    const onScroll = () => {
-      if (queued) return
-      queued = true
-      raf = requestAnimationFrame(apply)
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true })
-    apply()
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-      cancelAnimationFrame(raf)
-    }
-  }, [])
+      // Drift the image wrapper upward as the hero scrolls past. Scrub ties it
+      // to scroll position (Lenis updates ScrollTrigger), capped by the slack.
+      gsap.to(el, {
+        yPercent: -8,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: el.closest('.lx-hero') ?? el,
+          start: 'top top',
+          end: 'bottom top',
+          scrub: 0.4,
+        },
+      })
+    },
+    { scope: wrapRef },
+  )
 
   return (
     <div ref={wrapRef} className="lx-hero-parallax">

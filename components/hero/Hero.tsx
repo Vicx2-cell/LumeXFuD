@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { AnimatedHeading, Magnetic } from '@/components/fx'
+import { Magnetic } from '@/components/fx'
 import { HeroMotion } from './HeroMotion'
+import { HeroTitle } from './HeroTitle'
 
 /**
  * Cinematic homepage hero: a full-bleed food photo with a directional scrim,
@@ -36,15 +37,7 @@ export function Hero({ hoursLabel }: { hoursLabel: string }) {
           Now live on ABSU campus
         </span>
 
-        <AnimatedHeading
-          as="h1"
-          delay={260}
-          className="lx-hero-title"
-          segments={[
-            { text: 'Hot food,' },
-            { text: 'delivered hot.', className: 'lx-amber', breakBefore: true },
-          ]}
-        />
+        <HeroTitle />
 
         <p className="lx-hero-sub">
           Order from your favourite campus restaurants in minutes. Track your

@@ -230,8 +230,9 @@ export function Lumi() {
               </button>
             </div>
 
-            {/* Messages */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+            {/* Messages — opt this nested scroller out of Lenis so wheel-scroll
+                here moves the chat, not the page behind it (inert without Lenis). */}
+            <div ref={scrollRef} data-lenis-prevent className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
               {msgs.map((m, i) => (
                 <div key={i}>
                   <div className={`flex items-end gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
