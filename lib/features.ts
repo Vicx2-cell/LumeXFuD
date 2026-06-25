@@ -31,6 +31,7 @@ export const FEATURES: FeatureDef[] = [
   { key: 'pickup_v1',    label: 'Pickup (Order Ahead)', description: 'Let customers order ahead and skip the queue — pay upfront (food + platform fee + ₦0 delivery), get a private 6-char collection code, and collect from the vendor. No riders needed. Held 1h25m once ready, then forfeited. Off = the Pickup option is hidden and pickup checkout is rejected.', default: false, enforced: true },
   { key: 'delivery_handover_v1', label: 'Delivery handover code', description: 'Require the rider to enter the customer’s private 6-char code at the door to confirm delivery and release funds (or an opt-in leave-at-gate drop with photo proof). Off = delivery completes the old way (no handover code).', default: false, enforced: true },
   { key: 'sponsor_topup', label: 'Parent / sponsor top-up', description: 'Public page where a parent/sponsor funds a student’s wallet, plus the "ask family to top up" share button on the wallet. Off = both are hidden and the page is disabled.', default: true, enforced: true },
+  { key: 'founder', label: 'Founder spotlight', description: 'Show the "Why I built LumeX" founder section on the public landing page. Off = the section is removed from the page entirely.', default: true, enforced: true },
 ]
 
 const settingId = (key: string) => `feature.${key}`

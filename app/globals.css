@@ -746,10 +746,12 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
 }
 
 /* The photo: Ken Burns zoom out, settling on the final frame (forwards).
-   Cinematic colour grade — pull the exposure WAY down so the hero reads dark
-   and filmic (premium), the amber accent + white type pop, and stock-photo
-   flatness disappears. This is the single biggest "looks $10k vs amateur" lever. */
-.lx-hero-img { object-fit: cover; filter: brightness(0.52) contrast(1.1) saturate(1.06); }
+   Light grade — keep the FOOD appetizing and clearly identifiable (this is a
+   food brand; a globally-dark hero reads "weird / not food"). The image is
+   already shot on a dark surround, so a gentle lift + a touch of saturation
+   makes the dish glow; text legibility comes from the floor-fade scrim below,
+   NOT from darkening the whole frame. */
+.lx-hero-img { object-fit: cover; filter: brightness(0.9) contrast(1.05) saturate(1.12); }
 .lx-hero-img--wide { object-position: center 56%; } /* feature the grilled steak */
 .lx-hero-img--tall { object-position: center 46%; }
 .lx-hero-img { animation: lx-kenburns 24s ease-out forwards; }
@@ -786,27 +788,27 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
    fade into the page background so the hero dissolves into the site below. */
 .lx-hero-scrim {
   position: absolute; inset: 0; pointer-events: none;
+  /* Floor-fade FIRST approach (premium food sites): darken only where the text
+     sits, leave the dish luminous. (1) top nav wash, (2) gentle left wedge for
+     the copy side, (3) strong floor fade for the bottom + blend to page, (4) a
+     soft vignette. No heavy global veil — the food must read appetizing. */
   background:
-    /* (1) nav legibility wash */
-    linear-gradient(180deg, rgba(6,6,8,0.72) 0%, rgba(6,6,8,0) 20%),
-    /* (2) text wedge — strong on the copy side, but still darkens across */
-    linear-gradient(102deg, rgba(6,6,8,0.96) 0%, rgba(6,6,8,0.84) 28%, rgba(6,6,8,0.5) 52%, rgba(6,6,8,0.2) 74%),
-    /* (3) floor fade into the page background */
-    linear-gradient(180deg, transparent 42%, rgba(8,8,9,0.78) 80%, #0A0A0B 100%),
-    /* (4) cinematic vignette — darken the edges, hold a touch of light centre */
-    radial-gradient(150% 130% at 62% 38%, rgba(0,0,0,0) 28%, rgba(0,0,0,0.62) 100%);
-  /* base veil (after the shorthand so it isn't reset) — kills residual brightness */
-  background-color: rgba(6,6,8,0.30);
+    linear-gradient(180deg, rgba(6,6,8,0.58) 0%, rgba(6,6,8,0) 18%),
+    linear-gradient(100deg, rgba(8,8,10,0.82) 0%, rgba(8,8,10,0.5) 30%, rgba(8,8,10,0.12) 55%, rgba(8,8,10,0) 72%),
+    linear-gradient(180deg, transparent 46%, rgba(8,8,9,0.72) 82%, #0A0A0B 100%),
+    radial-gradient(150% 130% at 60% 42%, rgba(0,0,0,0) 42%, rgba(0,0,0,0.40) 100%);
+  background-color: rgba(8,8,10,0.10);
 }
 @media (max-width: 767px) {
   /* Tall crop: food breathes up top; the bottom-anchored copy sits on a strong
-     floor fade so white text clears the busy photo, then fades to page. */
+     floor fade so white text clears the photo, then fades to page. Lighter up
+     top so the dish stays appetizing. */
   .lx-hero-scrim {
     background:
-      linear-gradient(180deg, rgba(6,6,8,0.7) 0%, rgba(6,6,8,0) 14%),
-      linear-gradient(180deg, transparent 12%, rgba(8,8,9,0.6) 42%, rgba(8,8,9,0.94) 72%, #0A0A0B 100%),
-      radial-gradient(130% 100% at 50% 28%, rgba(0,0,0,0.18) 40%, rgba(0,0,0,0.58) 100%);
-    background-color: rgba(6,6,8,0.34);
+      linear-gradient(180deg, rgba(6,6,8,0.58) 0%, rgba(6,6,8,0) 12%),
+      linear-gradient(180deg, transparent 24%, rgba(8,8,9,0.5) 50%, rgba(8,8,9,0.9) 76%, #0A0A0B 100%),
+      radial-gradient(130% 100% at 50% 30%, rgba(0,0,0,0) 46%, rgba(0,0,0,0.4) 100%);
+    background-color: rgba(8,8,10,0.12);
   }
 }
 

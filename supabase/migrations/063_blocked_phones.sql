@@ -28,3 +28,6 @@ CREATE TABLE IF NOT EXISTS blocked_phones (
 
 ALTER TABLE blocked_phones ENABLE ROW LEVEL SECURITY;
 -- No policy: anon/authenticated get zero rows; the service-role client bypasses RLS.
+
+
+

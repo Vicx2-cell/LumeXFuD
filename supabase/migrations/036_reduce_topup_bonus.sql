@@ -80,3 +80,5 @@ BEGIN
   RETURN v_tx_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+

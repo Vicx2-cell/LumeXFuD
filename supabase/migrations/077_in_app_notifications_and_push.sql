@@ -69,3 +69,5 @@ CREATE INDEX IF NOT EXISTS idx_push_subs_user
 DROP POLICY IF EXISTS "deny anon push_subscriptions" ON push_subscriptions;
 CREATE POLICY "deny anon push_subscriptions" ON push_subscriptions
   FOR ALL USING (auth.role() = 'service_role');
+
+

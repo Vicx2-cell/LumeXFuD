@@ -5,6 +5,7 @@ import { Hero } from '@/components/hero/Hero'
 import { HowItWorks } from '@/components/hero/HowItWorks'
 import { LandingNav } from '@/components/hero/LandingNav'
 import { getControls } from '@/lib/controls'
+import { getFeature } from '@/lib/features'
 import { formatHoursRange } from '@/lib/hours'
 import { SiteFooter } from '@/components/site-footer'
 
@@ -53,6 +54,9 @@ export default async function LandingPage() {
   // site, instead of the old hardcoded "7am – 10pm").
   const controls = await getControls()
   const hoursLabel = formatHoursRange(controls.hours_open, controls.hours_close)
+  // Founder spotlight is super-admin gated: when off it is not rendered at all
+  // (server-side, so it fully disappears — no client flash).
+  const founderOn = await getFeature('founder')
   return (
     <div className="lx-page lx-landing flex flex-col text-white overflow-hidden">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -124,9 +128,9 @@ export default async function LandingPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
             {[
-              { src: '/premium/dish-1.jpg', title: 'Grilled & spiced', sub: 'Smoky, fresh off the fire' },
-              { src: '/premium/dish-2.jpg', title: 'Plated hot', sub: 'Chef-prepared, every order' },
-              { src: '/premium/dish-3.jpg', title: 'Made to order', sub: 'Cooked when you tap' },
+              { src: '/premium/dish-1.jpg', title: 'Hot & fresh', sub: 'Straight from the kitchen' },
+              { src: '/premium/dish-2.jpg', title: 'Made to order', sub: 'Cooked when you tap' },
+              { src: '/premium/dish-3.jpg', title: 'Campus favourites', sub: 'What everyone’s ordering' },
             ].map(({ src, title, sub }) => (
               <ParallaxImage
                 key={src}
@@ -221,7 +225,8 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ── The founder ── */}
+      {/* ── The founder (super-admin gated via the `founder` feature flag) ── */}
+      {founderOn && (
       <section className="relative z-10 py-16 px-5">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[0.8fr_1.2fr] gap-10 md:gap-14 items-center">
           <ClipReveal>
@@ -247,6 +252,7 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ── Final CTA ── */}
       <section className="relative z-10 py-20 px-5">

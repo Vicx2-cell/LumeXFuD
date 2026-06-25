@@ -243,3 +243,6 @@ CREATE POLICY "own_study_streaks" ON study_streaks FOR SELECT USING (
 
 -- Reference + catalog tables intentionally have NO public/owner policy: they are
 -- read through the server (service_role) only. No USING (true) anywhere.
+
+
+
