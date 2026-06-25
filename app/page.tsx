@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Reveal } from '@/components/reveal'
-import { MarketingFx, Magnetic, CountUp, SmoothScroll, KineticHeading, ClipReveal, Marquee, ParallaxImage } from '@/components/fx'
+import { MarketingFx, Magnetic, CountUp, SmoothScroll, KineticHeading, ClipReveal, Marquee, ParallaxImage, ImageMarquee } from '@/components/fx'
 import { Hero } from '@/components/hero/Hero'
 import { HowItWorks } from '@/components/hero/HowItWorks'
 import { LandingNav } from '@/components/hero/LandingNav'
@@ -149,6 +149,14 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      {/* ── Image marquee — continuous food rail (premium motion) ── */}
+      <div className="relative z-10 py-6">
+        <ImageMarquee
+          images={['/premium/dish-2.jpg', '/premium/hero-food.jpg', '/premium/dish-3.jpg', '/premium/dish-1.jpg', '/premium/delivery.jpg']}
+          speed={45}
+        />
+      </div>
+
       {/* ── Why LumeX ── */}
       <section className="relative z-10 py-16 px-5">
         <div className="max-w-4xl mx-auto">
@@ -221,7 +229,7 @@ export default async function LandingPage() {
               </Magnetic>
             </Reveal>
           </div>
-          <ParallaxImage src="/premium/delivery.jpg" alt="Night delivery rider" className="aspect-[4/5] md:aspect-[3/4]" sizes="(max-width: 768px) 100vw, 50vw" />
+          <ParallaxImage src="/premium/delivery.jpg" alt="Night delivery rider" className="aspect-[16/11] md:aspect-[3/4]" sizes="(max-width: 768px) 100vw, 50vw" />
         </div>
       </section>
 

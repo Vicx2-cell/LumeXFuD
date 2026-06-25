@@ -978,6 +978,22 @@ html.lenis, html.lenis body { height: auto; }
 .lx-marquee-sep { color: var(--color-amber); font-size: 0.7em; opacity: 0.85; }
 @keyframes lx-marquee { to { transform: translateX(-50%); } }
 
+/* Image marquee — continuous food-photo rail (ImageMarquee). */
+.lx-imarquee {
+  overflow: hidden; width: 100%;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.lx-imarquee-track { display: flex; width: max-content; animation: lx-marquee var(--lx-marquee-dur, 42s) linear infinite; }
+.lx-imarquee:hover .lx-imarquee-track { animation-play-state: paused; }
+.lx-imarquee-group { display: flex; flex: none; }
+.lx-imarquee-item {
+  width: clamp(180px, 42vw, 300px); aspect-ratio: 3 / 2;
+  margin-right: 0.9rem; border-radius: 16px; overflow: hidden; flex: none;
+  border: 1px solid var(--lx-border);
+}
+.lx-imarquee-img { width: 100%; height: 100%; object-fit: cover; }
+
 /* HowItWorks pinned story — progress rail + big step numbers. */
 .lx-hiw-stage { padding: 0.5rem 0; }
 .lx-hiw-num {

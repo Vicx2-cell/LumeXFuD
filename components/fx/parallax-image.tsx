@@ -48,9 +48,9 @@ export function ParallaxImage({
       if (mover) {
         gsap.fromTo(
           mover,
-          { yPercent: -8 },
+          { yPercent: -11 },
           {
-            yPercent: 8,
+            yPercent: 11,
             ease: 'none',
             scrollTrigger: { trigger: f, start: 'top bottom', end: 'bottom top', scrub: true },
           },
