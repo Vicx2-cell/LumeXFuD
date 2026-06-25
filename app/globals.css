@@ -745,8 +745,11 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
   will-change: transform;
 }
 
-/* The photo: Ken Burns zoom out, settling on the final frame (forwards). */
-.lx-hero-img { object-fit: cover; }
+/* The photo: Ken Burns zoom out, settling on the final frame (forwards).
+   Cinematic colour grade — pull the exposure WAY down so the hero reads dark
+   and filmic (premium), the amber accent + white type pop, and stock-photo
+   flatness disappears. This is the single biggest "looks $10k vs amateur" lever. */
+.lx-hero-img { object-fit: cover; filter: brightness(0.52) contrast(1.1) saturate(1.06); }
 .lx-hero-img--wide { object-position: center 56%; } /* feature the grilled steak */
 .lx-hero-img--tall { object-position: center 46%; }
 .lx-hero-img { animation: lx-kenburns 24s ease-out forwards; }
@@ -766,15 +769,15 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
   right: 6%; bottom: 12%;
   width: 46vw; max-width: 640px; aspect-ratio: 1;
   border-radius: 9999px;
-  background: radial-gradient(circle, rgba(245,166,35,0.20), transparent 62%);
-  filter: blur(24px);
+  background: radial-gradient(circle, rgba(245,166,35,0.14), transparent 64%);
+  filter: blur(28px);
   mix-blend-mode: screen;
   pointer-events: none;
   animation: lx-hero-bloom 6s ease-in-out infinite;
 }
 @keyframes lx-hero-bloom {
-  0%, 100% { opacity: 0.5;  transform: scale(1); }
-  50%      { opacity: 0.78; transform: scale(1.06); }
+  0%, 100% { opacity: 0.32; transform: scale(1); }
+  50%      { opacity: 0.5;  transform: scale(1.06); }
 }
 
 /* Photographic scrim. Four jobs, none of them "flat dark veil": (1) a faint top
@@ -785,22 +788,25 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
   position: absolute; inset: 0; pointer-events: none;
   background:
     /* (1) nav legibility wash */
-    linear-gradient(180deg, rgba(6,6,8,0.55) 0%, rgba(6,6,8,0) 15%),
-    /* (2) text wedge — strong on the copy side, clears off the food by ~62% */
-    linear-gradient(102deg, rgba(6,6,8,0.95) 0%, rgba(6,6,8,0.78) 24%, rgba(6,6,8,0.32) 46%, rgba(6,6,8,0) 62%),
+    linear-gradient(180deg, rgba(6,6,8,0.72) 0%, rgba(6,6,8,0) 20%),
+    /* (2) text wedge — strong on the copy side, but still darkens across */
+    linear-gradient(102deg, rgba(6,6,8,0.96) 0%, rgba(6,6,8,0.84) 28%, rgba(6,6,8,0.5) 52%, rgba(6,6,8,0.2) 74%),
     /* (3) floor fade into the page background */
-    linear-gradient(180deg, transparent 50%, rgba(8,8,9,0.62) 82%, #0A0A0B 100%),
-    /* (4) gentle global tint + vignette so nothing is harsh-bright */
-    radial-gradient(140% 130% at 64% 40%, rgba(8,8,10,0.14) 38%, rgba(0,0,0,0.52) 100%);
+    linear-gradient(180deg, transparent 42%, rgba(8,8,9,0.78) 80%, #0A0A0B 100%),
+    /* (4) cinematic vignette — darken the edges, hold a touch of light centre */
+    radial-gradient(150% 130% at 62% 38%, rgba(0,0,0,0) 28%, rgba(0,0,0,0.62) 100%);
+  /* base veil (after the shorthand so it isn't reset) — kills residual brightness */
+  background-color: rgba(6,6,8,0.30);
 }
 @media (max-width: 767px) {
   /* Tall crop: food breathes up top; the bottom-anchored copy sits on a strong
-     floor fade (NN/g) so white text clears the busy steak, then fades to page. */
+     floor fade so white text clears the busy photo, then fades to page. */
   .lx-hero-scrim {
     background:
-      linear-gradient(180deg, rgba(6,6,8,0.55) 0%, rgba(6,6,8,0) 13%),
-      linear-gradient(180deg, transparent 18%, rgba(8,8,9,0.5) 44%, rgba(8,8,9,0.9) 72%, #0A0A0B 100%),
-      radial-gradient(130% 100% at 50% 30%, rgba(8,8,10,0.1) 42%, rgba(0,0,0,0.42) 100%);
+      linear-gradient(180deg, rgba(6,6,8,0.7) 0%, rgba(6,6,8,0) 14%),
+      linear-gradient(180deg, transparent 12%, rgba(8,8,9,0.6) 42%, rgba(8,8,9,0.94) 72%, #0A0A0B 100%),
+      radial-gradient(130% 100% at 50% 28%, rgba(0,0,0,0.18) 40%, rgba(0,0,0,0.58) 100%);
+    background-color: rgba(6,6,8,0.34);
   }
 }
 
@@ -990,6 +996,54 @@ html.lenis, html.lenis body { height: auto; }
     background: linear-gradient(90deg, var(--color-amber), #FF7A3C);
     box-shadow: 0 0 16px rgba(245,166,35,0.5);
   }
+}
+
+/* ── ParallaxImage — masked frame, slower-than-scroll travel, hover zoom ── */
+.lx-px { position: relative; overflow: hidden; border-radius: 18px; background: #0c0b0d; }
+.lx-px-mover { position: absolute; left: 0; right: 0; top: -20%; height: 140%; will-change: transform; }
+.lx-px-img { object-fit: cover; transition: transform 0.8s var(--spring-smooth); }
+@media (hover: hover) { .lx-px:hover .lx-px-img { transform: scale(1.06); } }
+
+/* ── Section eyebrow — wide-tracked label with a lead rule (premium fingerprint) ── */
+.lx-eyebrow {
+  display: inline-flex; align-items: center; gap: 0.65rem;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--color-amber);
+}
+.lx-eyebrow::before { content: ''; width: 1.7rem; height: 1px; background: currentColor; opacity: 0.55; }
+
+/* ── Editorial display scale for the big narrative sections ── */
+.lx-display-xl {
+  font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(2.1rem, 6vw, 4.4rem); line-height: 1.02; letter-spacing: -0.03em;
+}
+
+/* ── Gallery caption overlay ── */
+.lx-gal-cap {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  padding: 1rem 1.1rem 1.05rem;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.78));
+  font-weight: 600; font-size: 0.98rem; color: #fff;
+}
+.lx-gal-cap small { display: block; font-weight: 500; font-size: 0.74rem; color: rgba(255,255,255,0.62); margin-top: 0.1rem; }
+
+/* ── Founder monogram placeholder portrait (swap in a real photo when supplied) ── */
+.lx-founder-portrait {
+  position: relative; aspect-ratio: 4 / 5; border-radius: 22px; overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 28% 18%, rgba(245,166,35,0.20), transparent 58%),
+    linear-gradient(160deg, #1a1712, #0b0a0c);
+  border: 1px solid rgba(245,166,35,0.22);
+  display: flex; align-items: center; justify-content: center;
+}
+.lx-founder-mono {
+  font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(3.6rem, 11vw, 6.5rem); letter-spacing: -0.05em;
+  color: rgba(245,166,35,0.92); text-shadow: 0 0 56px rgba(245,166,35,0.35);
+}
+.lx-founder-portrait figcaption {
+  position: absolute; bottom: 0.9rem; left: 0; right: 0; text-align: center;
+  font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.5);
 }
 
 /* ============================================================

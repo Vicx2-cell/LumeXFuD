@@ -52,9 +52,9 @@ export function HeroMotion() {
 
   return (
     <div ref={wrapRef} className="lx-hero-parallax">
-      {/* Wide desktop crop */}
+      {/* Wide desktop crop — dark, cinematic grade (premium grill photography). */}
       <Image
-        src="/hero.jpg"
+        src="/premium/hero-food.jpg"
         alt=""
         aria-hidden="true"
         fill
@@ -67,7 +67,7 @@ export function HeroMotion() {
       />
       {/* Tall phone crop */}
       <Image
-        src="/hero-mobile.jpg"
+        src="/premium/hero-food-mobile.jpg"
         alt=""
         aria-hidden="true"
         fill

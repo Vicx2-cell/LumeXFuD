@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Reveal } from '@/components/reveal'
-import { MarketingFx, Magnetic, CountUp, SmoothScroll, KineticHeading, ClipReveal, Marquee } from '@/components/fx'
+import { MarketingFx, Magnetic, CountUp, SmoothScroll, KineticHeading, ClipReveal, Marquee, ParallaxImage } from '@/components/fx'
 import { Hero } from '@/components/hero/Hero'
 import { HowItWorks } from '@/components/hero/HowItWorks'
 import { LandingNav } from '@/components/hero/LandingNav'
@@ -74,7 +74,10 @@ export default async function LandingPage() {
       {/* Borderless: the whole landing sits on one flat near-black canvas
           (.lx-landing), so the hero's floor-fade resolves into the page with no
           tonal step and no divider line — sections separate by whitespace only. */}
-      <section className="relative z-10 py-10">
+      <section className="relative z-10 pt-14 pb-10">
+        <div className="max-w-4xl mx-auto px-5 mb-8 text-center">
+          <Reveal><span className="lx-eyebrow">01 — Built for the campus</span></Reveal>
+        </div>
         <div className="max-w-4xl mx-auto px-5 grid grid-cols-3 gap-6 text-center">
           {[
             { num: 25,  prefix: '< ', suffix: ' min', label: 'Average delivery' },
@@ -93,6 +96,9 @@ export default async function LandingPage() {
 
       {/* ── How it works (pinned scroll story on desktop) ── */}
       <section id="how-it-works" className="relative z-10 py-16 px-5 scroll-mt-20">
+        <div className="max-w-5xl mx-auto text-center mb-3">
+          <Reveal><span className="lx-eyebrow">02 — From craving to doorstep</span></Reveal>
+        </div>
         <HowItWorks />
       </section>
 
@@ -104,9 +110,47 @@ export default async function LandingPage() {
         />
       </div>
 
+      {/* ── Featured food gallery (buyers) — premium masked-parallax imagery ── */}
+      <section className="relative z-10 py-16 px-5">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-10">
+            <Reveal><span className="lx-eyebrow">03 — On the menu</span></Reveal>
+            <KineticHeading as="h2" text="Straight from the kitchen" className="lx-display-xl mt-3" />
+            <Reveal delay={120}>
+              <p className="text-white/55 mt-4 max-w-md">
+                Real food from real campus kitchens — grilled, plated and on its way to you in minutes.
+              </p>
+            </Reveal>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+            {[
+              { src: '/premium/dish-1.jpg', title: 'Grilled & spiced', sub: 'Smoky, fresh off the fire' },
+              { src: '/premium/dish-2.jpg', title: 'Plated hot', sub: 'Chef-prepared, every order' },
+              { src: '/premium/dish-3.jpg', title: 'Made to order', sub: 'Cooked when you tap' },
+            ].map(({ src, title, sub }) => (
+              <ParallaxImage
+                key={src}
+                src={src}
+                alt={title}
+                sizes="(max-width: 768px) 100vw, 33vw"
+                className="aspect-[4/5]"
+              >
+                <span className="lx-gal-cap">
+                  {title}
+                  <small>{sub}</small>
+                </span>
+              </ParallaxImage>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Why LumeX ── */}
       <section className="relative z-10 py-16 px-5">
         <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-3">
+            <Reveal><span className="lx-eyebrow">04 — Why LumeX</span></Reveal>
+          </div>
           <KineticHeading
             as="h2"
             text="Built for campus life"
@@ -131,6 +175,75 @@ export default async function LandingPage() {
                 </div>
               </ClipReveal>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── The bigger picture (investors) ── */}
+      <section className="relative z-10 py-20 px-5">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-14 items-center">
+          <div>
+            <Reveal><span className="lx-eyebrow">05 — The bigger picture</span></Reveal>
+            <KineticHeading as="h2" text="More than food." className="lx-display-xl mt-3" />
+            <Reveal delay={100}>
+              <p className="text-white/70 mt-5 text-lg leading-relaxed">
+                LumeX Fud is the first product from <span className="lx-amber font-semibold">Lumex</span> — we&apos;re
+                starting with the one thing every student needs daily, and building toward the everyday
+                operating system for campus life in Southeast Nigeria.
+              </p>
+            </Reveal>
+            <div className="mt-7 space-y-3">
+              {[
+                'Live at Abia State University, Uturu — built to scale campus by campus.',
+                'A three-sided network: students order, vendors earn, riders deliver.',
+                'Profitable on every order — digital-only, no cash, no subsidies.',
+              ].map((t, i) => (
+                <Reveal key={t} delay={160 + i * 90}>
+                  <div className="flex gap-3 items-start">
+                    <span className="lx-amber mt-1.5 shrink-0" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    </span>
+                    <p className="text-white/65 leading-relaxed">{t}</p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+            <Reveal delay={440}>
+              <Magnetic className="inline-block mt-8">
+                <Link href="/contact" className="lx-hero-ghost inline-flex items-center gap-2 px-7 py-3.5 text-sm font-medium" style={{ borderRadius: 14, minHeight: 52 }}>
+                  Partner with us
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
+                </Link>
+              </Magnetic>
+            </Reveal>
+          </div>
+          <ParallaxImage src="/premium/delivery.jpg" alt="Night delivery rider" className="aspect-[4/5] md:aspect-[3/4]" sizes="(max-width: 768px) 100vw, 50vw" />
+        </div>
+      </section>
+
+      {/* ── The founder ── */}
+      <section className="relative z-10 py-16 px-5">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[0.8fr_1.2fr] gap-10 md:gap-14 items-center">
+          <ClipReveal>
+            {/* Monogram placeholder — drop in a real portrait at /premium/founder.jpg */}
+            <figure className="lx-founder-portrait">
+              <span className="lx-founder-mono" aria-hidden="true">CV</span>
+              <figcaption>Founder portrait</figcaption>
+            </figure>
+          </ClipReveal>
+          <div>
+            <Reveal><span className="lx-eyebrow">06 — The founder</span></Reveal>
+            <KineticHeading as="h2" text="Why I built LumeX" className="lx-display-xl mt-3" />
+            <Reveal delay={100}>
+              <p className="text-white/75 mt-5 text-xl leading-relaxed font-medium">
+                &ldquo;Campus life in Southeast Nigeria deserves to run on rails that actually work. We&apos;re
+                starting with hot food, delivered fast — and we&apos;re not stopping there.&rdquo;
+              </p>
+            </Reveal>
+            <Reveal delay={200}>
+              <p className="mt-6 font-semibold">Chibuike Victor</p>
+              <p className="text-white/55 text-sm">Founder · Lumex</p>
+            </Reveal>
           </div>
         </div>
       </section>
