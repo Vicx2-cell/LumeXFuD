@@ -73,7 +73,10 @@ export default async function LandingPage() {
       <Hero hoursLabel={hoursLabel} />
 
       {/* ── Stats strip ── */}
-      <section className="relative z-10 border-y border-white/8 py-8">
+      {/* No top border: the hero's floor-fade scrim already resolves to the page
+          background (#0A0A0B), so the hero dissolves seamlessly into this strip.
+          A divider here would re-introduce the hard "cut line". */}
+      <section className="relative z-10 border-b border-white/8 py-8">
         <div className="max-w-4xl mx-auto px-5 grid grid-cols-3 gap-6 text-center">
           {[
             { num: 25,  prefix: '< ', suffix: ' min', label: 'Average delivery' },
