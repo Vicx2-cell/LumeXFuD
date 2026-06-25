@@ -122,14 +122,14 @@ export default async function LandingPage() {
             <KineticHeading as="h2" text="Straight from the kitchen" className="lx-display-xl mt-3" />
             <Reveal delay={120}>
               <p className="text-white/55 mt-4 max-w-md">
-                Real food from real campus kitchens — grilled, plated and on its way to you in minutes.
+                Real meals from your favourite campus vendors — packed hot and on their way to you in minutes.
               </p>
             </Reveal>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
             {[
-              { src: '/premium/dish-1.jpg', title: 'Hot & fresh', sub: 'Straight from the kitchen' },
-              { src: '/premium/dish-2.jpg', title: 'Made to order', sub: 'Cooked when you tap' },
+              { src: '/premium/dish-1.jpg', title: 'Hot & ready', sub: 'Straight from the vendor' },
+              { src: '/premium/dish-2.jpg', title: 'Ready in minutes', sub: 'Packed hot, delivered fast' },
               { src: '/premium/dish-3.jpg', title: 'Campus favourites', sub: 'What everyone’s ordering' },
             ].map(({ src, title, sub }) => (
               <ParallaxImage
