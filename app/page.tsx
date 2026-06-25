@@ -54,7 +54,7 @@ export default async function LandingPage() {
   const controls = await getControls()
   const hoursLabel = formatHoursRange(controls.hours_open, controls.hours_close)
   return (
-    <div className="lx-page flex flex-col text-white overflow-hidden">
+    <div className="lx-page lx-landing flex flex-col text-white overflow-hidden">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       {/* Marketing-only atmosphere: custom cursor + pointer-tracking glow.
           Inert on touch / reduced-motion (each primitive self-guards). */}
@@ -63,8 +63,6 @@ export default async function LandingPage() {
           premium feel. Synced-touch ON so it glides on phones too. No-ops under
           reduced-motion. */}
       <SmoothScroll touch />
-      <div className="lx-orb lx-orb--amber" aria-hidden="true" />
-      <div className="lx-orb lx-orb--indigo" aria-hidden="true" />
 
       {/* ── Nav (floats transparent over the hero, glass on scroll) ── */}
       <LandingNav />
@@ -73,10 +71,10 @@ export default async function LandingPage() {
       <Hero hoursLabel={hoursLabel} />
 
       {/* ── Stats strip ── */}
-      {/* No top border: the hero's floor-fade scrim already resolves to the page
-          background (#0A0A0B), so the hero dissolves seamlessly into this strip.
-          A divider here would re-introduce the hard "cut line". */}
-      <section className="relative z-10 border-b border-white/8 py-8">
+      {/* Borderless: the whole landing sits on one flat near-black canvas
+          (.lx-landing), so the hero's floor-fade resolves into the page with no
+          tonal step and no divider line — sections separate by whitespace only. */}
+      <section className="relative z-10 py-10">
         <div className="max-w-4xl mx-auto px-5 grid grid-cols-3 gap-6 text-center">
           {[
             { num: 25,  prefix: '< ', suffix: ' min', label: 'Average delivery' },
@@ -99,7 +97,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Kinetic marquee strip ── */}
-      <div className="relative z-10 py-5 border-y border-white/8 bg-white/[0.015]">
+      <div className="relative z-10 py-6">
         <Marquee
           items={['Hot food', 'Delivered fast', 'Campus-wide', 'Track live', 'Pay securely', 'No cash, no stress']}
           speed={30}
@@ -107,7 +105,7 @@ export default async function LandingPage() {
       </div>
 
       {/* ── Why LumeX ── */}
-      <section className="relative z-10 py-16 px-5 border-t border-white/8">
+      <section className="relative z-10 py-16 px-5">
         <div className="max-w-4xl mx-auto">
           <KineticHeading
             as="h2"
@@ -138,7 +136,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Final CTA ── */}
-      <section className="relative z-10 py-20 px-5 border-t border-white/8">
+      <section className="relative z-10 py-20 px-5">
         <Reveal>
           <div className="max-w-xl mx-auto glass-thick p-8 text-center space-y-5">
             <KineticHeading as="h2" text="Ready to eat?" className="text-3xl font-bold" />

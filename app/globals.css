@@ -201,6 +201,13 @@ h1, h2, h3, h4, .lx-display {
      combined with the orbs/glass — moved to the desktop-only .lx-rich tier. */
 }
 
+/* Landing page: one flat near-black canvas (no amber bloom / indigo wash / dot
+   grid). The hero's floor-fade scrim resolves to exactly this colour, so the
+   hero dissolves into the page with zero tonal step — sections blend seamlessly
+   with no divider lines, matching a cinematic single-surface feel. Scoped to the
+   marketing landing; the in-app surfaces keep the crafted .lx-page background. */
+.lx-landing { background-image: none; background-color: var(--color-bg); }
+
 /* Floating orbs for pages that want extra life (e.g. /auth). Decorative only. */
 .lx-orb {
   position: fixed;
