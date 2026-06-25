@@ -65,10 +65,10 @@ export function HeroMotion() {
         blurDataURL={BLUR}
         className="lx-hero-img lx-hero-img--wide"
       />
-      {/* Tall phone crop — SAME moody fried-rice frame as desktop (the skewers
-          shot read too shiny on mobile). object-position centres the plate. */}
+      {/* Tall phone crop — dedicated portrait: smoky, low-key grill (dark, not
+          shiny) so the mobile hero reads as moody as the desktop one. */}
       <Image
-        src="/premium/hero-food.jpg"
+        src="/premium/hero-food-mobile.jpg"
         alt=""
         aria-hidden="true"
         fill
