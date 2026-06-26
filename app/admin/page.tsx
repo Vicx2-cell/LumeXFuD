@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
-import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
 import { CountUp } from '@/components/fx'
+import { PageHeader } from '@/components/ui/page-header'
+import { StatCard } from '@/components/ui/stat-card'
 
 interface DashboardMetrics {
   orders_today: number
@@ -14,34 +15,6 @@ interface DashboardMetrics {
   riders_online: number
   active_disputes: number
   wallet_float_kobo: number
-}
-
-interface MetricCardProps {
-  label: string
-  value: React.ReactNode
-  sub?: string
-  status?: 'ok' | 'warn' | 'critical'
-  href?: string
-}
-
-function MetricCard({ label, value, sub, status = 'ok', href }: MetricCardProps) {
-  const router = useRouter()
-  const statusColor = status === 'critical' ? '#EF4444' : status === 'warn' ? '#F5A623' : '#22C55E'
-
-  return (
-    <button
-      onClick={() => href && router.push(href)}
-      className="glass-thin text-left p-4 transition-transform hover:-translate-y-0.5"
-      style={{ cursor: href ? 'pointer' : 'default' }}
-    >
-      <div className="flex items-start justify-between mb-2">
-        <p className="text-xs text-white/40 uppercase tracking-wide">{label}</p>
-        <span className="w-2 h-2 rounded-full mt-0.5 shrink-0" style={{ background: statusColor }} />
-      </div>
-      <p className="text-2xl font-bold text-white">{value}</p>
-      {sub && <p className="text-xs text-white/40 mt-1">{sub}</p>}
-    </button>
-  )
 }
 
 const svg = (path: React.ReactNode) => (
@@ -123,32 +96,29 @@ export default function AdminDashboard() {
     <div className="lx-page px-4 py-10 overflow-hidden">
       <div className="relative z-10 mx-auto max-w-2xl lg:max-w-4xl lx-enter">
         {/* Header */}
-        <div className="mb-6">
-          <div className="mb-3 flex items-center justify-between"><BackButton /><LogoutButton /></div>
-          <span className="inline-block px-3 py-1 rounded-lg text-xs font-bold mb-3"
-            style={{ background: '#F5A623', color: '#000' }}>Admin</span>
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-              <p className="text-sm text-white/40 mt-0.5">Daily metrics</p>
-            </div>
-            <div className="flex items-center gap-2">
+        <PageHeader
+          title="Dashboard"
+          subtitle="Daily metrics"
+          badge="Admin"
+          actions={
+            <>
               {lastRefresh && (
-                <p className="text-xs text-white/30">
+                <p className="text-xs text-white/30 lx-nums">
                   {lastRefresh.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}
                 </p>
               )}
               <button
                 onClick={fetchMetrics}
                 aria-label="Refresh metrics"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white/40 hover:text-white/70 transition-all active:rotate-180"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white/40 hover:text-white/70 transition-all active:rotate-180"
                 style={{ background: 'rgba(255,255,255,0.06)' }}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
               </button>
-            </div>
-          </div>
-        </div>
+              <LogoutButton />
+            </>
+          }
+        />
 
         {/* Metrics grid */}
         {loading ? (
@@ -159,40 +129,40 @@ export default function AdminDashboard() {
           </div>
         ) : metrics ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-            <MetricCard
+            <StatCard
               label="Orders today"
               value={<CountUp value={metrics.orders_today} />}
               sub="Target: 50+ by Month 3"
               status={metrics.orders_today >= 50 ? 'ok' : metrics.orders_today >= 20 ? 'warn' : 'critical'}
               href="/admin/orders"
             />
-            <MetricCard
+            <StatCard
               label="Profit / order"
               value={metrics.avg_profit_kobo > 0 ? formatPrice(metrics.avg_profit_kobo) : '—'}
               sub="Must be positive"
               status={profitStatus(metrics.avg_profit_kobo)}
             />
-            <MetricCard
+            <StatCard
               label="Avg delivery"
               value={metrics.avg_delivery_minutes != null ? `${Math.round(metrics.avg_delivery_minutes)}m` : '—'}
               sub="Target: under 25 min"
               status={deliveryStatus(metrics.avg_delivery_minutes)}
             />
-            <MetricCard
+            <StatCard
               label="Riders online"
               value={<CountUp value={metrics.riders_online} />}
               sub="Currently active"
               status={metrics.riders_online > 0 ? 'ok' : 'warn'}
               href="/admin/riders"
             />
-            <MetricCard
+            <StatCard
               label="Active disputes"
               value={<CountUp value={metrics.active_disputes} />}
               sub={metrics.active_disputes === 0 ? 'All clear' : 'Needs attention'}
               status={disputeStatus(metrics.active_disputes)}
               href="/admin/disputes"
             />
-            <MetricCard
+            <StatCard
               label="Wallet float"
               value={formatPrice(metrics.wallet_float_kobo)}
               sub="Vendor + rider held funds"

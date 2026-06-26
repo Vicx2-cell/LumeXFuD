@@ -1,8 +1,8 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
+import { PageHeader } from '@/components/ui/page-header'
 
 const svg = (path: React.ReactNode) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{path}</svg>
@@ -117,19 +117,12 @@ export default function SuperAdminDashboard() {
   return (
     <div className="lx-page px-5 py-10 overflow-hidden">
       <div className="relative z-10 mx-auto max-w-2xl lx-enter">
-        <div className="mb-8">
-          <div className="mb-3 flex items-center justify-between"><BackButton /><LogoutButton /></div>
-          <span
-            className="inline-block px-3 py-1 rounded-lg text-xs font-bold mb-3"
-            style={{ background: '#F5A623', color: '#000', boxShadow: '0 0 20px rgba(245,166,35,0.4)' }}
-          >
-            Super Admin
-          </span>
-          <h1 className="text-3xl font-bold tracking-tight" style={{ background: 'linear-gradient(135deg,#fff,#F5A623)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
-            God Mode
-          </h1>
-          <p className="text-sm text-white/45 mt-1">Full platform control</p>
-        </div>
+        <PageHeader
+          title="God Mode"
+          subtitle="Full platform control"
+          badge="Super Admin"
+          actions={<LogoutButton />}
+        />
 
         <div className="grid gap-3 sm:grid-cols-2 lx-stagger">
           {actions.map((a) => (
