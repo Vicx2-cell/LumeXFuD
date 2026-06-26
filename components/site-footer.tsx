@@ -20,7 +20,7 @@ export async function SiteFooter() {
   const waDigits = phone.replace(/[^\d]/g, '')
 
   return (
-    <footer className="relative z-10 border-t border-white/8 py-8 px-5" style={{ background: '#0A0A0B' }}>
+    <footer className="lx-footer relative z-10 border-t border-white/8 py-8 px-5" style={{ background: '#0A0A0B' }}>
       <div className="max-w-4xl mx-auto flex flex-col gap-5 text-xs text-white/40">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="space-y-1.5">

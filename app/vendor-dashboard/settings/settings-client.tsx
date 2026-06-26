@@ -7,13 +7,14 @@ import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { BusinessHours } from '@/components/business-hours'
 import { FaceIdSetup } from '@/components/face-id-setup'
 import { ConfirmSheet } from '@/components/ui/confirm-sheet'
+import { UtensilsCrossed, Wallet, Star, Share2, ChevronRight } from 'lucide-react'
 import type { VendorSettable } from './page'
 
 const LINKS = [
-  { href: '/vendor-dashboard/menu',     icon: '🍽️', label: 'Menu & items',     desc: 'Add, edit and price your food' },
-  { href: '/vendor-dashboard/earnings', icon: '💰', label: 'Earnings & payout', desc: 'Balance, withdrawals & bank account' },
-  { href: '/vendor-dashboard/reviews',  icon: '⭐', label: 'Reviews',           desc: 'See what customers are saying' },
-  { href: '/vendor-dashboard/share',    icon: '📲', label: 'Share your store',   desc: 'Your link & ready-made captions' },
+  { href: '/vendor-dashboard/menu',     Icon: UtensilsCrossed, label: 'Menu & items',     desc: 'Add, edit and price your food' },
+  { href: '/vendor-dashboard/earnings', Icon: Wallet,          label: 'Earnings & payout', desc: 'Balance, withdrawals & bank account' },
+  { href: '/vendor-dashboard/reviews',  Icon: Star,            label: 'Reviews',           desc: 'See what customers are saying' },
+  { href: '/vendor-dashboard/share',    Icon: Share2,          label: 'Share your store',   desc: 'Your link & ready-made captions' },
 ]
 
 /** A settings group: a mono section label over a tight cluster of cards, with a
@@ -130,14 +131,16 @@ export function VendorSettings({ vendor: v0 }: { vendor: VendorSettable }) {
           {LINKS.map((l, i) => (
             <Link
               key={l.href} href={l.href}
-              className={`flex items-center gap-3 p-4 lx-tap${i > 0 ? ' border-t border-white/6' : ''}`}
+              className={`flex items-center gap-3 p-4 lx-tap${i > 0 ? ' border-t border-white/[0.06]' : ''}`}
             >
-              <span className="text-xl shrink-0" aria-hidden="true">{l.icon}</span>
+              <span className="w-9 h-9 rounded-xl grid place-items-center text-white/55 shrink-0" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--lx-border)' }}>
+                <l.Icon size={18} strokeWidth={1.75} />
+              </span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white/85">{l.label}</p>
+                <p className="text-sm font-medium text-white/90">{l.label}</p>
                 <p className="text-xs text-white/40">{l.desc}</p>
               </div>
-              <span className="text-white/30" aria-hidden="true">→</span>
+              <ChevronRight size={16} strokeWidth={2} className="text-white/30 shrink-0" />
             </Link>
           ))}
         </div>

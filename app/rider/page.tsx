@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import Image from 'next/image'
 import { formatPrice } from '@/lib/money'
 import { CountUp, GlassSheen } from '@/components/fx'
+import { Settings2, ChevronRight } from 'lucide-react'
 import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
 import { NotificationBell } from '@/components/notification-bell'
@@ -582,12 +583,14 @@ export default function RiderDashboard() {
       <div className="mx-4 mt-5 mb-2">
         <a href="/rider/settings" className="block lx-surface lx-tap p-4">
           <div className="flex items-center gap-3">
-            <span className="text-xl shrink-0" aria-hidden="true">⚙️</span>
+            <span className="w-9 h-9 rounded-xl grid place-items-center text-white/55 shrink-0" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--lx-border)' }}>
+              <Settings2 size={18} strokeWidth={1.75} />
+            </span>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white">Account &amp; settings</p>
               <p className="text-xs text-white/45">Profile, payout, security &amp; sign out</p>
             </div>
-            <span className="text-white/30" aria-hidden="true">→</span>
+            <ChevronRight size={16} strokeWidth={2} className="text-white/30 shrink-0" />
           </div>
         </a>
       </div>

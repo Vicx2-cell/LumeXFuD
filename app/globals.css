@@ -107,6 +107,33 @@ html, body {
 }
 :root[data-theme="light"] ::selection { background: rgba(245,166,35,0.28); color: #17150F; }
 
+/* ── Light-mode visibility fixes ─────────────────────────────────────────── */
+/* The footer is intentionally DARK (it anchors the warm page, Stripe-style).
+   Keep its text light — the global ink-remap would otherwise turn it invisible
+   on its own dark background. */
+:root[data-theme="light"] .lx-footer { color: rgba(255,255,255,0.45); }
+:root[data-theme="light"] .lx-footer .text-white\/55 { color: rgba(255,255,255,0.6) !important; }
+:root[data-theme="light"] .lx-footer .text-white\/40 { color: rgba(255,255,255,0.45) !important; }
+:root[data-theme="light"] .lx-footer .text-white\/35 { color: rgba(255,255,255,0.4) !important; }
+:root[data-theme="light"] .lx-footer .text-white\/25 { color: rgba(255,255,255,0.28) !important; }
+:root[data-theme="light"] .lx-footer a:hover { color: #fff !important; }
+
+/* Ghost button on a LIGHT section (e.g. "Partner with us") → dark text on a
+   light surface. Inside the hero (over the always-dark photo) it stays light. */
+:root[data-theme="light"] .lx-hero-ghost {
+  color: var(--lx-text); background: rgba(20,18,14,0.05); border-color: var(--lx-border-strong);
+}
+:root[data-theme="light"] .lx-hero .lx-hero-ghost {
+  color: #fff; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2);
+}
+
+/* Stronger muted tiers in light — the dark-tuned alphas read too faint on warm
+   white. (These override the lighter values set above; later cascade wins.) */
+:root[data-theme="light"] {
+  --lx-text-muted: rgba(23,21,15,0.72);
+  --lx-text-faint: rgba(23,21,15,0.54);
+}
+
 /* ── Light-theme utility remap ────────────────────────────────────────────────
    The customer screens were authored 100% dark, leaning on Tailwind's
    text-white / bg-white/N / border-white/N utilities (literal #fff). Rewriting

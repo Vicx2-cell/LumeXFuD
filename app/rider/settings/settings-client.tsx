@@ -6,11 +6,12 @@ import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { FaceIdSetup } from '@/components/face-id-setup'
 import { KycPanel } from '@/components/kyc-panel'
 import { ConfirmSheet } from '@/components/ui/confirm-sheet'
+import { Wallet, Star, ChevronRight } from 'lucide-react'
 import type { RiderSettable } from './page'
 
 const LINKS = [
-  { href: '/rider/wallet',  icon: '💰', label: 'Wallet & payout', desc: 'Balance, withdrawals & bank account' },
-  { href: '/rider/reviews', icon: '⭐', label: 'Reviews',         desc: 'Private feedback from your deliveries' },
+  { href: '/rider/wallet',  Icon: Wallet, label: 'Wallet & payout', desc: 'Balance, withdrawals & bank account' },
+  { href: '/rider/reviews', Icon: Star,   label: 'Reviews',         desc: 'Private feedback from your deliveries' },
 ]
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -55,14 +56,16 @@ export function RiderSettings({ rider: r0 }: { rider: RiderSettable }) {
           {LINKS.map((l, i) => (
             <Link
               key={l.href} href={l.href}
-              className={`flex items-center gap-3 p-4 lx-tap${i > 0 ? ' border-t border-white/6' : ''}`}
+              className={`flex items-center gap-3 p-4 lx-tap${i > 0 ? ' border-t border-white/[0.06]' : ''}`}
             >
-              <span className="text-xl shrink-0" aria-hidden="true">{l.icon}</span>
+              <span className="w-9 h-9 rounded-xl grid place-items-center text-white/55 shrink-0" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--lx-border)' }}>
+                <l.Icon size={18} strokeWidth={1.75} />
+              </span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white/85">{l.label}</p>
+                <p className="text-sm font-medium text-white/90">{l.label}</p>
                 <p className="text-xs text-white/40">{l.desc}</p>
               </div>
-              <span className="text-white/30" aria-hidden="true">→</span>
+              <ChevronRight size={16} strokeWidth={2} className="text-white/30 shrink-0" />
             </Link>
           ))}
         </div>
