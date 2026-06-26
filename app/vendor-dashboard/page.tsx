@@ -10,8 +10,6 @@ import { NotificationBell } from '@/components/notification-bell'
 import { DemandBanner } from '@/components/demand-banner'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
-import { BusinessHours } from '@/components/business-hours'
-import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { Badge } from '@/components/ui/badge'
 import { CountUp, GlassSheen } from '@/components/fx'
 
@@ -211,15 +209,6 @@ export default function VendorDashboard() {
     return d.error ?? 'Could not collect this order.'
   }
 
-  const savePickup = async (patch: { pickup_enabled?: boolean; pickup_max_concurrent?: number }) => {
-    if (!vendor) return
-    setVendor((v) => v ? { ...v, ...patch } : v) // optimistic
-    await fetch(`/api/vendors/${vendor.id}/pickup-settings`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    }).catch(() => {})
-  }
-
   if (loading) {
     return (
       <div className="lx-page flex items-center justify-center">
@@ -273,52 +262,22 @@ export default function VendorDashboard() {
         {/* KYC verification — upload & track documents, verified badge */}
         <KycPanel role="vendor" />
 
-        {/* Compact entry to the dedicated share page (keeps the dashboard light) */}
-        <button onClick={() => router.push('/vendor-dashboard/share')}
-          className="w-full lx-surface px-4 py-3 flex items-center justify-between text-left">
-          <span className="text-sm font-medium text-white/80">📲 Share your store link</span>
-          <span className="lx-amber">→</span>
-        </button>
-
-        {/* Store appearance — cover + logo shown to customers */}
-        {vendor && (
-          <div className="lx-surface p-4 space-y-3">
-            <p className="lx-mono">Store appearance</p>
-            <ProfileImageUpload
-              slot="cover" shape="cover" current={vendor.shop_photo_url}
-              deletable
-              onUploaded={(u) => setVendor((v) => v ? { ...v, shop_photo_url: u } : v)}
-              onRemoved={() => setVendor((v) => v ? { ...v, shop_photo_url: null } : v)}
-              label="Cover photo — customers see this on your store"
-            />
-            <div className="flex items-center gap-3 pt-1">
-              <ProfileImageUpload
-                slot="avatar" shape="circle" current={vendor.logo_url}
-                onUploaded={(u) => setVendor((v) => v ? { ...v, logo_url: u } : v)}
-              />
-              <div>
-                <p className="text-sm font-medium text-white/80">Store logo</p>
-                <p className="text-xs text-white/40">Required</p>
-              </div>
+        {/* All store settings consolidated on one dedicated page (store
+            appearance, hours, pickup, payout, security) — keeps this screen
+            focused on live operations. */}
+        <button
+          onClick={() => router.push('/vendor-dashboard/settings')}
+          className="w-full lx-surface lx-tap p-4 text-left"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl shrink-0" aria-hidden="true">⚙️</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white">Settings</p>
+              <p className="text-xs text-white/45">Store appearance, hours, pickup, payout &amp; more</p>
             </div>
+            <span className="text-white/30" aria-hidden="true">→</span>
           </div>
-        )}
-
-        {/* Opening / closing time */}
-        {vendor && (
-          <BusinessHours
-            id={vendor.id}
-            initialOpen={vendor.opening_time}
-            initialClose={vendor.closing_time}
-          />
-        )}
-
-        {/* Pickup (Order Ahead) — opt out + pacing cap */}
-        {vendor && <PickupSettings vendor={vendor} onSave={savePickup} />}
-
-        <div className="pt-2 flex justify-center">
-          <LogoutButton />
-        </div>
+        </button>
         </div>
 
         {/* Orders — FIRST on mobile, left column on desktop */}
@@ -607,50 +566,3 @@ function OrderCard({
   )
 }
 
-// Vendor pickup (order ahead) preferences: offer pickup or not, and a pacing cap
-// on simultaneous pickup orders so the kitchen never stacks.
-function PickupSettings({
-  vendor,
-  onSave,
-}: {
-  vendor: VendorInfo
-  onSave: (patch: { pickup_enabled?: boolean; pickup_max_concurrent?: number }) => Promise<void>
-}) {
-  const [cap, setCap] = useState(String(vendor.pickup_max_concurrent ?? 0))
-  const enabled = vendor.pickup_enabled !== false
-
-  return (
-    <div className="lx-surface p-4 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-white/80 flex items-center gap-1.5">🛍️ Pickup (Order Ahead)</p>
-          <p className="text-xs text-white/45 mt-0.5">Let customers order ahead and collect — no rider, ₦0 delivery.</p>
-        </div>
-        <button
-          type="button" role="switch" aria-checked={enabled}
-          onClick={() => onSave({ pickup_enabled: !enabled })}
-          className="relative w-12 h-7 rounded-full transition-colors shrink-0"
-          style={{ background: enabled ? '#F5A623' : 'rgba(255,255,255,0.15)' }}
-        >
-          <span className="absolute top-1 w-5 h-5 rounded-full bg-white transition-all" style={{ left: enabled ? 26 : 4 }} />
-        </button>
-      </div>
-      {enabled && (
-        <div className="lx-enter">
-          <label className="text-xs text-white/50 block mb-1">Max pickup orders at once (pacing)</label>
-          <div className="flex gap-2">
-            <input
-              type="number" min={0} max={100} inputMode="numeric" value={cap}
-              onChange={(e) => setCap(e.target.value.replace(/\D/g, '').slice(0, 3))}
-              className="lx-field flex-1 min-w-0 px-3 py-2.5 text-base outline-none tabular-nums"
-            />
-            <button
-              onClick={() => onSave({ pickup_max_concurrent: Math.max(0, Math.min(100, Number(cap) || 0)) })}
-              className="lx-btn-amber lx-tap px-4 min-h-[44px] text-xs shrink-0">Save</button>
-          </div>
-          <p className="text-xs text-white/35 mt-1.5">0 = no limit. Above the cap, new orders get a later “ready by” time instead of stacking.</p>
-        </div>
-      )}
-    </div>
-  )
-}
