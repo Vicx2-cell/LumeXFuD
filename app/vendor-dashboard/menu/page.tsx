@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
-import { GlassSheen } from '@/components/fx'
+import { GlassSheen, PremiumImage } from '@/components/fx'
 import { EmptyState } from '@/components/ui/empty-state'
 
 const CATEGORIES = ['RICE', 'PROTEIN', 'DRINKS', 'SNACKS', 'OTHER'] as const
@@ -219,7 +219,7 @@ export default function VendorMenuPage() {
               <div key={item.id} className="lx-surface flex gap-3 rounded-2xl p-3" style={{ opacity: item.is_available ? 1 : 0.55 }}>
                 <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-white/5">
                   {item.image_url
-                    ? <Image src={item.image_url} alt={item.name} fill className="object-cover" sizes="64px" />
+                    ? <PremiumImage src={item.image_url} alt={item.name} fill sizes="64px" frameClassName="absolute inset-0" className="object-cover" />
                     : <div className="w-full h-full flex items-center justify-center text-xl opacity-20">🍽️</div>}
                 </div>
                 <div className="flex-1 min-w-0">

@@ -1,7 +1,7 @@
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { EmptyState } from '@/components/ui/empty-state'
-import { GlassSheen } from '@/components/fx'
+import { GlassSheen, PremiumImage } from '@/components/fx'
 
 // TEMPORARY no-auth visual preview of the console dashboard aesthetic.
 // Not linked anywhere; used to verify the redesign. Safe to delete.
@@ -66,6 +66,31 @@ export default function StylePreview() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* Image treatment demo (PremiumImage: shimmer → reveal → hover zoom) */}
+        <div className="mb-9">
+          <span className="lx-mono">Top vendors</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+            {[
+              { src: '/premium/dish-1.jpg', name: 'Mama Chidinma' },
+              { src: '/premium/dish-2.jpg', name: 'Suya Spot' },
+              { src: '/premium/dish-3.jpg', name: 'Campus Bites' },
+              { src: '/premium/delivery.jpg', name: 'Night Kitchen' },
+            ].map((v) => (
+              <div key={v.name} className="lx-surface p-2.5">
+                <PremiumImage
+                  src={v.src}
+                  alt={v.name}
+                  fill
+                  sizes="(max-width: 640px) 50vw, 22vw"
+                  frameClassName="aspect-[4/3] rounded-xl mb-2.5"
+                />
+                <p className="text-sm font-semibold text-white px-0.5">{v.name}</p>
+                <p className="lx-mono mt-1 px-0.5">Open · 18 min</p>
+              </div>
+            ))}
           </div>
         </div>
 

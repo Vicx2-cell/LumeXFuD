@@ -1065,6 +1065,36 @@ html.lenis, html.lenis body { height: auto; }
 }
 
 /* ============================================================
+   PremiumImage — shimmer skeleton → eased reveal → hover zoom
+   For the app's real imagery (vendor photos, food, avatars).
+   ============================================================ */
+.lx-img { position: relative; overflow: hidden; display: block; background: rgba(255,255,255,0.03); }
+.lx-img-shimmer {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(100deg, rgba(255,255,255,0.03) 28%, rgba(255,255,255,0.085) 50%, rgba(255,255,255,0.03) 72%);
+  background-size: 220% 100%;
+  animation: lx-img-shimmer 1.3s ease-in-out infinite;
+  transition: opacity 0.45s ease;
+}
+.lx-img-shimmer--gone { opacity: 0; }
+@keyframes lx-img-shimmer { 0% { background-position: 220% 0; } 100% { background-position: -220% 0; } }
+.lx-img-el {
+  position: relative; z-index: 0;
+  opacity: 0; transform: scale(1.06);
+  transition: opacity 0.7s ease, transform 0.9s var(--spring-smooth);
+}
+.lx-img-el--in { opacity: 1; transform: scale(1); }
+@media (hover: hover) and (pointer: fine) {
+  .lx-img:hover .lx-img-el--in { transform: scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lx-img-el { transition: opacity 0.3s ease; transform: none; }
+  .lx-img-el--in { transform: none; }
+  .lx-img-shimmer { animation: none; }
+  .lx-img:hover .lx-img-el--in { transform: none; }
+}
+
+/* ============================================================
    Dashboard premium primitives (additive — opt-in per surface)
    PageHeader / StatCard / EmptyState + status tokens + tables.
    ============================================================ */

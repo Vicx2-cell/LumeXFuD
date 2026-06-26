@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { FOOD_BLUR } from '@/lib/blur'
+import { PremiumImage } from '@/components/fx'
 import type { VendorData } from './home/page'
 import { vendorTrustBadges } from '@/lib/vendor-trust'
 import { VerifiedBadge } from '@/components/verified-badge'
@@ -144,14 +144,13 @@ function VendorCard({ vendor, favorited, onToggleFavorite }: { vendor: VendorDat
       {/* Photo */}
       <div className="relative h-40 bg-white/5">
         {vendor.shop_photo_url ? (
-          <Image
+          <PremiumImage
             src={vendor.shop_photo_url}
             alt={vendor.shop_name}
             fill
-            className="object-cover"
             sizes="(max-width: 512px) 100vw, 512px"
-            placeholder="blur"
-            blurDataURL={FOOD_BLUR}
+            frameClassName="absolute inset-0"
+            className="object-cover"
             style={unavailable ? { filter: 'grayscale(1)' } : undefined}
           />
         ) : (
