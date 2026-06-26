@@ -1110,15 +1110,18 @@ html.lenis, html.lenis body { height: auto; }
    backdrop-filter is auto-stripped on phones by the global iOS-safety rule, which
    leaves a clean translucent fill. */
 .lx-surface {
-  position: relative; overflow: hidden;
+  position: relative;
   background: rgba(255,255,255,0.045);
   -webkit-backdrop-filter: blur(16px) saturate(1.4);
   backdrop-filter: blur(16px) saturate(1.4);
   border: 1px solid var(--lx-border);
   border-radius: 14px;
 }
+/* Sheen clips to the card's rounded corners via border-radius (NOT overflow:hidden)
+   so cards containing pop-overs/dropdowns don't clip them. */
 .lx-surface::before, .lx-statcard::before {
   content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  border-radius: inherit;
   background: radial-gradient(240px circle at var(--mx, 50%) var(--my, -30%), rgba(245,166,35,0.16), transparent 62%);
   opacity: 0; transition: opacity 0.4s ease;
 }
@@ -1149,7 +1152,7 @@ html.lenis, html.lenis body { height: auto; }
 
 /* ── KPI / stat card (glassy console tile) ── */
 .lx-statcard {
-  position: relative; overflow: hidden;
+  position: relative;
   display: block; padding: 1.15rem 1.2rem; border-radius: 14px;
   background: rgba(255,255,255,0.045);
   -webkit-backdrop-filter: blur(16px) saturate(1.4);

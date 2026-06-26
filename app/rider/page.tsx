@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Image from 'next/image'
 import { formatPrice } from '@/lib/money'
-import { CountUp } from '@/components/fx'
+import { CountUp, GlassSheen } from '@/components/fx'
 import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
 import { NotificationBell } from '@/components/notification-bell'
@@ -298,9 +298,10 @@ export default function RiderDashboard() {
     // customer app + vendor dashboard) instead of sprawling edge-to-edge on wide
     // screens. The faint side borders read as an intentional surface on ≥sm.
     <main
-      className="lx-page overflow-hidden mx-auto w-full max-w-lg lg:max-w-2xl sm:border-x sm:border-white/5"
+      className="lx-page lx-console overflow-hidden mx-auto w-full max-w-lg lg:max-w-2xl sm:border-x sm:border-white/5"
       style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom))' }}
     >
+      <GlassSheen />
       {/* Toast */}
       {toast && (
         <div className="fixed left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg lx-scale-in max-w-[92vw] text-center"
@@ -363,7 +364,7 @@ export default function RiderDashboard() {
 
       {/* Wallet card */}
       {wallet && (
-        <div className="glass-thin mx-4 mb-5 p-4 lx-enter">
+        <div className="lx-surface mx-4 mb-5 p-4 lx-enter">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs text-white/40 uppercase tracking-wide">Wallet</p>
             <span className="text-xs px-2 py-0.5 rounded-full font-bold"
@@ -505,7 +506,7 @@ export default function RiderDashboard() {
         </div>
 
         {!isOnline && (
-          <div className="glass-thin p-6 text-center">
+          <div className="lx-surface p-6 text-center">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
             </div>
@@ -524,7 +525,7 @@ export default function RiderDashboard() {
         )}
 
         {isOnline && available.length === 0 && !current && (
-          <div className="glass-thin p-6 text-center">
+          <div className="lx-surface p-6 text-center">
             <div className="lx-icon-badge w-14 h-14 rounded-2xl mb-3">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5h-5l-2.5-6"/><path d="M12 6h3l2 5"/><path d="M6 11h7"/></svg>
             </div>
@@ -536,7 +537,7 @@ export default function RiderDashboard() {
         {isOnline && available.length > 0 && (
           <div className="space-y-3">
             {available.map((order) => (
-              <div key={order.id} className="glass-thin p-4 lx-enter">
+              <div key={order.id} className="lx-surface p-4 lx-enter">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <p className="font-semibold text-white tabular-nums">{order.order_number}</p>

@@ -13,7 +13,7 @@ import { LaunchCounter } from '@/components/launch-counter'
 import { BusinessHours } from '@/components/business-hours'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { Badge } from '@/components/ui/badge'
-import { CountUp } from '@/components/fx'
+import { CountUp, GlassSheen } from '@/components/fx'
 
 interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
 interface VendorOrder {
@@ -237,9 +237,10 @@ export default function VendorDashboard() {
   const readyCount = orders.filter((o) => o.status === 'READY').length
 
   return (
-    <div className="lx-page pb-10 overflow-hidden">
+    <div className="lx-page lx-console pb-10 overflow-hidden">
+      <GlassSheen />
       {/* Header */}
-      <div className="sticky top-0 z-40 glass-thin" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0, paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      <div className="sticky top-0 z-40 lx-surface" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0, paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <BackButton />
@@ -274,15 +275,15 @@ export default function VendorDashboard() {
 
         {/* Compact entry to the dedicated share page (keeps the dashboard light) */}
         <button onClick={() => router.push('/vendor-dashboard/share')}
-          className="w-full glass-thin px-4 py-3 flex items-center justify-between text-left">
+          className="w-full lx-surface px-4 py-3 flex items-center justify-between text-left">
           <span className="text-sm font-medium text-white/80">📲 Share your store link</span>
           <span className="lx-amber">→</span>
         </button>
 
         {/* Store appearance — cover + logo shown to customers */}
         {vendor && (
-          <div className="glass-thin p-4 space-y-3">
-            <p className="text-xs text-white/40 uppercase tracking-widest">Store appearance</p>
+          <div className="lx-surface p-4 space-y-3">
+            <p className="lx-mono">Store appearance</p>
             <ProfileImageUpload
               slot="cover" shape="cover" current={vendor.shop_photo_url}
               deletable
@@ -330,7 +331,7 @@ export default function VendorDashboard() {
               { label: 'Reviews', href: '/vendor-dashboard/reviews', icon: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/> },
             ].map((a) => (
               <button key={a.label} onClick={() => router.push(a.href)}
-                className="glass-thin lx-tap flex flex-col items-center gap-2 py-3.5 rounded-2xl">
+                className="lx-surface lx-tap flex flex-col items-center gap-2 py-3.5 rounded-2xl">
                 <span className="lx-icon-badge w-9 h-9 rounded-xl">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{a.icon}</svg>
                 </span>
@@ -340,8 +341,8 @@ export default function VendorDashboard() {
           </div>
 
           {/* Shop status */}
-          <div className="glass-thin p-4 space-y-3">
-            <p className="text-xs text-white/40 uppercase tracking-widest">Shop Status</p>
+          <div className="lx-surface p-4 space-y-3">
+            <p className="lx-mono">Shop Status</p>
             <div className="grid grid-cols-3 gap-2">
               {(['OPEN', 'BUSY', 'CLOSED'] as const).map((s) => {
                 const active_ = vendor?.status === s
@@ -399,7 +400,7 @@ export default function VendorDashboard() {
               { label: 'Preparing', value: prepCount, color: 'var(--lx-violet)' },
               { label: 'Ready', value: readyCount, color: 'var(--lx-green)' },
             ].map((s) => (
-              <div key={s.label} className="glass-thin rounded-2xl px-3 py-3 text-center">
+              <div key={s.label} className="lx-surface rounded-2xl px-3 py-3 text-center">
                 <p className="lx-display text-2xl font-bold tabular-nums leading-none" style={{ color: s.value > 0 ? s.color : 'rgba(255,255,255,0.25)' }}><CountUp value={s.value} /></p>
                 <p className="text-[11px] text-white/45 mt-1.5">{s.label}</p>
               </div>
@@ -418,7 +419,7 @@ export default function VendorDashboard() {
           </div>
 
           {active.length === 0 ? (
-            <div className="glass-thin py-12 text-center">
+            <div className="lx-surface py-12 text-center">
               <div className="lx-icon-badge w-14 h-14 rounded-2xl mb-3">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
               </div>
@@ -440,7 +441,7 @@ export default function VendorDashboard() {
             <button
               onClick={() => setRecentOpen((v) => !v)}
               aria-expanded={recentOpen}
-              className="w-full glass-thin rounded-xl px-4 py-3 flex items-center justify-between"
+              className="w-full lx-surface rounded-xl px-4 py-3 flex items-center justify-between"
             >
               <span className="text-sm font-medium text-white/70 flex items-center gap-2">
                 Recent orders
@@ -509,7 +510,7 @@ function OrderCard({
 
   return (
     <div
-      className="glass-thin relative overflow-hidden rounded-2xl lx-enter"
+      className="lx-surface relative overflow-hidden rounded-2xl lx-enter"
       style={{
         border: `1px solid ${order.status === 'PENDING' ? 'rgba(245,166,35,0.5)' : 'rgba(255,255,255,0.08)'}`,
         boxShadow: order.status === 'PENDING' ? '0 0 20px rgba(245,166,35,0.12), inset 0 1px 0 rgba(255,255,255,0.06)' : undefined,
@@ -619,7 +620,7 @@ function PickupSettings({
   const enabled = vendor.pickup_enabled !== false
 
   return (
-    <div className="glass-thin p-4 space-y-3">
+    <div className="lx-surface p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-white/80 flex items-center gap-1.5">🛍️ Pickup (Order Ahead)</p>
