@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from 'react'
 import 'leaflet/dist/leaflet.css'
-import type { Map as LMap, DivIcon } from 'leaflet'
+import type { Map as LMap, DivIcon, Marker as LMarker } from 'leaflet'
+type LeafletModule = typeof import('leaflet')
 
 export interface MapLodge {
   id: string
@@ -33,6 +34,9 @@ interface LodgeMapProps {
 export function LodgeMap({ lodges, height = 280, onPick, onSelect, pin }: LodgeMapProps) {
   const elRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<LMap | null>(null)
+  const lRef = useRef<LeafletModule | null>(null)
+  const iconRef = useRef<DivIcon | null>(null)
+  const pinMarkerRef = useRef<LMarker | null>(null)
   // Keep the latest callbacks without forcing a full map re-init.
   const onPickRef = useRef(onPick)
   const onSelectRef = useRef(onSelect)
@@ -54,6 +58,7 @@ export function LodgeMap({ lodges, height = 280, onPick, onSelect, pin }: LodgeM
 
       const map = L.map(elRef.current).setView(center, 15)
       mapRef.current = map
+      lRef.current = L
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
@@ -66,6 +71,7 @@ export function LodgeMap({ lodges, height = 280, onPick, onSelect, pin }: LodgeM
         iconSize: [22, 22],
         iconAnchor: [11, 22],
       })
+      iconRef.current = icon
 
       for (const lo of withCoords) {
         const m = L.marker([lo.latitude as number, lo.longitude as number], { icon }).addTo(map)
@@ -73,15 +79,10 @@ export function LodgeMap({ lodges, height = 280, onPick, onSelect, pin }: LodgeM
         if (onSelectRef.current) m.on('click', () => onSelectRef.current?.(lo))
       }
 
-      // Admin pin-drop: tap to set coordinates (single moving marker).
-      let dropped: ReturnType<typeof L.marker> | null = null
+      // Tap to set coordinates. The VISIBLE marker is driven by the `pin` prop
+      // (effect below) so a tap AND a geolocation capture both drop a pin.
       if (onPick) {
-        map.on('click', (e) => {
-          const { lat, lng } = e.latlng
-          if (dropped) dropped.setLatLng(e.latlng)
-          else dropped = L.marker(e.latlng, { icon }).addTo(map)
-          onPickRef.current?.(lat, lng)
-        })
+        map.on('click', (e) => onPickRef.current?.(e.latlng.lat, e.latlng.lng))
       }
 
       // Leaflet needs a size recalc after layout settles.
@@ -95,10 +96,26 @@ export function LodgeMap({ lodges, height = 280, onPick, onSelect, pin }: LodgeM
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lodges])
 
-  // Reflect an externally-controlled provisional pin (admin form lat/lng inputs).
+  // Reflect an externally-controlled pin (geolocation capture OR the lat/lng the
+  // user taps in): drop/move a VISIBLE marker there and recenter on it. Without
+  // the marker, capturing location just panned the map with nothing to see —
+  // which read as "it isn't pinpointing".
   useEffect(() => {
-    if (!pin || !mapRef.current) return
-    mapRef.current.setView([pin.lat, pin.lng], Math.max(mapRef.current.getZoom(), 16))
+    const map = mapRef.current
+    const L = lRef.current
+    if (!map || !L) return
+    if (pin) {
+      const ll: [number, number] = [pin.lat, pin.lng]
+      if (pinMarkerRef.current) {
+        pinMarkerRef.current.setLatLng(ll)
+      } else {
+        pinMarkerRef.current = L.marker(ll, iconRef.current ? { icon: iconRef.current } : undefined).addTo(map)
+      }
+      map.setView(ll, Math.max(map.getZoom(), 16))
+    } else if (pinMarkerRef.current) {
+      pinMarkerRef.current.remove()
+      pinMarkerRef.current = null
+    }
   }, [pin])
 
   // Fixed height keeps the reserved box stable (no layout shift while Leaflet

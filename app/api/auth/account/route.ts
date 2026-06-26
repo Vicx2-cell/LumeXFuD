@@ -28,12 +28,18 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Account not found' }, { status: 404 })
   }
 
-  // Block deletion if active orders exist
+  // Block deletion ONLY if a genuinely IN-FLIGHT order exists — i.e. one being
+  // actively fulfilled, where deleting now would strand a live delivery. Use a
+  // WHITELIST (not "anything non-terminal"): the old blacklist also caught
+  // abandoned PENDING_PAYMENT checkouts and DELIVERED orders that never
+  // auto-completed (the cron is unreliable), wrongly blocking deletion forever
+  // even when the customer has nothing actually in progress.
+  const IN_FLIGHT = ['PENDING', 'VENDOR_ACCEPTED', 'PREPARING', 'READY', 'RIDER_ASSIGNED', 'PICKED_UP']
   const { data: activeOrders } = await db
     .from('orders')
     .select('id')
     .eq('customer_id', customerId)
-    .not('status', 'in', '("COMPLETED","CANCELLED","REFUNDED")')
+    .in('status', IN_FLIGHT)
     .limit(1)
 
   if (activeOrders && activeOrders.length > 0) {

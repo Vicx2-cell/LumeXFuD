@@ -273,6 +273,10 @@ export function ProfileClient({
     // navigating away, so the button stays in its "Deleting…" state.
   }
 
+  // The delete endpoint returns a 409 with this wording when in-progress orders
+  // block deletion — we turn the sheet into a clear "finish your orders" prompt.
+  const blockedByOrders = /active order/i.test(deleteError)
+
   const hasStreak = !!streak && streak.current_streak_days > 0
 
   return (
@@ -615,15 +619,19 @@ export function ProfileClient({
       />
       <ConfirmSheet
         open={confirmDelete}
-        title="Delete your account?"
-        body={<>This permanently anonymizes your data and signs you out. <span className="text-white/85 font-medium">It can&apos;t be undone.</span></>}
-        confirmLabel="Yes, delete my account"
+        title={blockedByOrders ? 'Finish your orders first' : 'Delete your account?'}
+        body={
+          blockedByOrders
+            ? <>You still have <span className="text-white/85 font-medium">orders in progress</span>, so your account can&apos;t be deleted yet — this stops a paid order from being stranded. Finish or cancel them, then come back. <Link href="/orders" className="lx-amber font-medium whitespace-nowrap">View your orders →</Link></>
+            : <>This permanently anonymizes your data and signs you out. <span className="text-white/85 font-medium">It can&apos;t be undone.</span></>
+        }
+        confirmLabel={blockedByOrders ? 'View my orders' : 'Yes, delete my account'}
         loadingLabel="Deleting your account…"
-        danger
+        danger={!blockedByOrders}
         loading={deleting}
-        error={deleteError}
-        onConfirm={handleDeleteAccount}
-        onCancel={() => { if (!deleting) setConfirmDelete(false) }}
+        error={blockedByOrders ? undefined : deleteError}
+        onConfirm={blockedByOrders ? () => { window.location.href = '/orders' } : handleDeleteAccount}
+        onCancel={() => { if (!deleting) { setConfirmDelete(false); setDeleteError('') } }}
       />
     </>
   )
