@@ -93,7 +93,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="lx-page px-4 py-10 overflow-hidden">
+    <div className="lx-page lx-console px-4 py-10 overflow-hidden">
       <div className="relative z-10 mx-auto max-w-2xl lg:max-w-4xl lx-enter">
         {/* Header */}
         <PageHeader
@@ -170,7 +170,7 @@ export default function AdminDashboard() {
             />
           </div>
         ) : (
-          <div className="glass-thin p-5 mb-6 text-center text-white/45 text-sm">
+          <div className="lx-surface p-5 mb-6 text-center text-white/45 text-sm">
             Could not load metrics
           </div>
         )}
@@ -193,15 +193,16 @@ export default function AdminDashboard() {
         )}
 
         {/* Navigation */}
+        <p className="lx-mono mb-4">Manage</p>
         <div className="grid gap-3 sm:grid-cols-2 lx-stagger">
           {NAV_ACTIONS.map((a) => (
             <button
               key={a.href}
               onClick={() => router.push(a.href)}
-              className="glass-thin text-left p-4 transition-transform hover:-translate-y-0.5 group"
+              className="lx-surface lx-focusable text-left p-4 transition-colors hover:border-white/15 group"
             >
               <div className="flex items-center gap-2.5 mb-1">
-                <span className="lx-icon-badge w-9 h-9 rounded-xl">
+                <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white/55" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--lx-border)' }}>
                   {a.icon}
                 </span>
                 <p className="font-semibold text-white">{a.label}</p>

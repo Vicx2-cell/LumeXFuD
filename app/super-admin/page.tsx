@@ -115,7 +115,7 @@ export default function SuperAdminDashboard() {
   const router = useRouter()
 
   return (
-    <div className="lx-page px-5 py-10 overflow-hidden">
+    <div className="lx-page lx-console px-5 py-10 overflow-hidden">
       <div className="relative z-10 mx-auto max-w-2xl lx-enter">
         <PageHeader
           title="God Mode"
@@ -129,16 +129,16 @@ export default function SuperAdminDashboard() {
             <button
               key={a.href}
               onClick={() => router.push(a.href)}
-              className={`text-left p-5 transition-transform hover:-translate-y-0.5 ${a.highlight ? 'glass' : 'glass-thin'}`}
-              style={a.highlight ? { background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.28)' } : undefined}
+              className="lx-surface lx-focusable text-left p-5 transition-colors hover:border-white/15"
+              style={a.highlight ? { background: 'rgba(245,166,35,0.07)', borderColor: 'rgba(245,166,35,0.28)' } : undefined}
             >
               <div className="flex items-center gap-2.5 mb-1">
                 <span
                   className="flex items-center justify-center w-9 h-9 rounded-xl"
                   style={{
-                    background: a.highlight ? 'rgba(245,166,35,0.18)' : 'rgba(255,255,255,0.06)',
-                    border: `1px solid ${a.highlight ? 'rgba(245,166,35,0.3)' : 'rgba(255,255,255,0.1)'}`,
-                    color: a.highlight ? '#F5A623' : 'rgba(255,255,255,0.7)',
+                    background: a.highlight ? 'rgba(245,166,35,0.16)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${a.highlight ? 'rgba(245,166,35,0.3)' : 'var(--lx-border)'}`,
+                    color: a.highlight ? '#F5A623' : 'rgba(255,255,255,0.6)',
                   }}
                 >
                   {a.icon}

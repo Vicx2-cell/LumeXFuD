@@ -30,10 +30,10 @@ export function StatCard({ label, value, sub, status = 'none', href }: StatCardP
   )
   if (href) {
     return (
-      <Link href={href} className="lx-statcard glass-thin lx-tap lx-focusable">
+      <Link href={href} className="lx-statcard lx-focusable">
         {inner}
       </Link>
     )
   }
-  return <div className="lx-statcard glass-thin">{inner}</div>
+  return <div className="lx-statcard">{inner}</div>
 }
