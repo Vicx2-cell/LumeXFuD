@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { GlassSheen } from '@/components/fx'
 
 interface AuditLog {
   id: string
@@ -14,7 +16,6 @@ interface AuditLog {
 }
 
 export default function AdminAudit() {
-  const router = useRouter()
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -43,13 +44,10 @@ export default function AdminAudit() {
   }
 
   return (
-    <div className="lx-page px-4 py-8">
-      <div className="mx-auto max-w-2xl">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 rounded-full flex items-center justify-center text-white/50"
-            style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-          <h1 className="text-xl font-bold text-white">Audit Log</h1>
-        </div>
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
+      <div className="relative z-10 mx-auto max-w-2xl">
+        <PageHeader title="Audit Log" badge="Admin" />
 
         {loading ? (
           <div className="space-y-2">
@@ -58,14 +56,14 @@ export default function AdminAudit() {
             ))}
           </div>
         ) : logs.length === 0 ? (
-          <div className="text-center py-16 text-white/30 text-sm">No audit logs yet</div>
+          <EmptyState title="No audit logs yet" description="Admin actions will be recorded here." />
         ) : (
           <>
             <div className="space-y-1.5">
               {logs.map((log) => {
                 const color = Object.entries(ACTION_COLORS).find(([k]) => log.action.includes(k))?.[1] ?? '#aaa'
                 return (
-                  <div key={log.id} className="glass-thin rounded-xl px-4 py-3 flex items-center gap-3">
+                  <div key={log.id} className="lx-surface rounded-xl px-4 py-3 flex items-center gap-3">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white truncate">

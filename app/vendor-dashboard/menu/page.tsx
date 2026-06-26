@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
+import { GlassSheen } from '@/components/fx'
+import { EmptyState } from '@/components/ui/empty-state'
 
 const CATEGORIES = ['RICE', 'PROTEIN', 'DRINKS', 'SNACKS', 'OTHER'] as const
 type Category = (typeof CATEGORIES)[number]
@@ -189,7 +191,8 @@ export default function VendorMenuPage() {
   }
 
   return (
-    <div className="lx-page pb-28">
+    <div className="lx-page lx-console pb-28 overflow-hidden">
+      <GlassSheen />
       {/* Header */}
       <div className="lx-topbar sticky top-0 z-40" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
@@ -205,15 +208,15 @@ export default function VendorMenuPage() {
         {loading ? (
           <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-20 rounded-2xl lx-skeleton" />)}</div>
         ) : items.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-4xl mb-3">🍽️</p>
-            <p className="text-white/40 text-sm mb-4">No foods yet. Add your first item.</p>
-            <button onClick={openAdd} className="lx-btn-amber px-5 py-3">+ Add food</button>
-          </div>
+          <EmptyState
+            title="No foods yet"
+            description="Add your first item so customers can start ordering."
+            action={<button onClick={openAdd} className="lx-btn-amber px-5 py-3">+ Add food</button>}
+          />
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
-              <div key={item.id} className="glass-thin flex gap-3 rounded-2xl p-3" style={{ opacity: item.is_available ? 1 : 0.55 }}>
+              <div key={item.id} className="lx-surface flex gap-3 rounded-2xl p-3" style={{ opacity: item.is_available ? 1 : 0.55 }}>
                 <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-white/5">
                   {item.image_url
                     ? <Image src={item.image_url} alt={item.name} fill className="object-cover" sizes="64px" />
@@ -221,7 +224,7 @@ export default function VendorMenuPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.name}</p>
-                  <p className="lx-amber text-sm font-semibold mt-0.5">{formatPrice(item.price_kobo)}</p>
+                  <p className="lx-amber text-sm font-semibold mt-0.5 lx-nums">{formatPrice(item.price_kobo)}</p>
                   <p className="text-xs text-white/30 mt-0.5 truncate">{item.category}{item.prep_time_minutes != null ? ` · ${item.prep_time_minutes} min` : ''}{item.addons.length > 0 ? ` · ${item.addons.length} add-on${item.addons.length === 1 ? '' : 's'}` : ''}</p>
                   <div className="flex flex-wrap gap-1 mt-1.5 -ml-1.5">
                     <button onClick={() => openEdit(item)} className="lx-tap lx-amber text-xs font-medium px-2.5 py-1.5 min-h-[36px] rounded-lg">Edit</button>
@@ -285,7 +288,7 @@ export default function VendorMenuPage() {
             </Field>
             <div className="block">
               <div className="mb-1.5 flex items-center justify-between">
-                <span className="text-xs uppercase tracking-[0.18em] text-white/40">Description (optional)</span>
+                <span className="lx-mono">Description (optional)</span>
                 <button type="button" onClick={describeWithAI} disabled={describing || !form.name.trim()}
                   className="lx-amber text-xs font-semibold disabled:opacity-40">
                   {describing ? 'Writing…' : (form.image_url ? '✨ Write from photo' : '✨ Write with AI')}
@@ -297,7 +300,7 @@ export default function VendorMenuPage() {
             {/* Add-ons */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs uppercase tracking-[0.18em] text-white/40">Add-ons (optional)</span>
+                <span className="lx-mono">Add-ons (optional)</span>
                 <button onClick={() => setForm({ ...form, addons: [...form.addons, { name: '', price: '' }] })} className="lx-amber text-xs font-semibold">+ Add-on</button>
               </div>
               <div className="space-y-2">
@@ -336,7 +339,7 @@ const addonInputCls = 'lx-field px-3 py-2.5 text-base outline-none'
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs uppercase tracking-[0.18em] text-white/40">{label}</span>
+      <span className="lx-mono mb-1.5 block">{label}</span>
       {children}
     </label>
   )

@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { Pill } from '@/components/ui/pill'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { GlassSheen } from '@/components/fx'
 
 interface ReviewRow {
   id: string
@@ -50,7 +52,6 @@ function Stars({ value }: { value: number }) {
 }
 
 export default function AdminReviews() {
-  const router = useRouter()
   const [reviews, setReviews] = useState<ReviewRow[]>([])
   const [loading, setLoading] = useState(true)
   const [lowOnly, setLowOnly] = useState(false)
@@ -90,31 +91,29 @@ export default function AdminReviews() {
   }
 
   return (
-    <div className="lx-page px-4 py-8">
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg"
           style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
       )}
 
-      <div className="mx-auto max-w-2xl">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 rounded-full flex items-center justify-center text-white/50"
-            style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-white">Reviews</h1>
-            {!loading && (
-              <p className="text-sm text-white/40">{reviews.length} {lowOnly ? 'low (1–2★)' : 'recent'} — newest first</p>
-            )}
-          </div>
-          <Pill
-            active={lowOnly}
-            variant="danger"
-            onClick={() => setLowOnly((v) => !v)}
-            className="px-3 py-1.5 text-xs font-medium"
-          >
-            {lowOnly ? 'Showing low ratings' : 'Low ratings only'}
-          </Pill>
-        </div>
+      <div className="relative z-10 mx-auto max-w-2xl">
+        <PageHeader
+          title="Reviews"
+          subtitle={!loading ? `${reviews.length} ${lowOnly ? 'low (1–2★)' : 'recent'} — newest first` : undefined}
+          badge="Admin"
+          actions={
+            <Pill
+              active={lowOnly}
+              variant="danger"
+              onClick={() => setLowOnly((v) => !v)}
+              className="px-3 py-1.5 text-xs font-medium"
+            >
+              {lowOnly ? 'Showing low ratings' : 'Low ratings only'}
+            </Pill>
+          }
+        />
 
         {loading ? (
           <div className="space-y-3">
@@ -123,11 +122,10 @@ export default function AdminReviews() {
             ))}
           </div>
         ) : reviews.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-3xl mb-3">💬</p>
-            <p className="font-semibold text-white/60">{lowOnly ? 'No low ratings' : 'No reviews yet'}</p>
-            <p className="text-sm text-white/30 mt-1">{lowOnly ? 'Nothing needs screening' : 'Reviews will appear here as customers post them'}</p>
-          </div>
+          <EmptyState
+            title={lowOnly ? 'No low ratings' : 'No reviews yet'}
+            description={lowOnly ? 'Nothing needs screening' : 'Reviews will appear here as customers post them'}
+          />
         ) : (
           <div className="space-y-3">
             {reviews.map((r) => {
@@ -159,7 +157,7 @@ export default function AdminReviews() {
                   {r.rider_stars != null && (
                     <div className="mb-3 p-2.5 rounded-xl" style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.18)' }}>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] uppercase tracking-wide text-white/40">Rider · {rider?.full_name ?? 'Unknown'}</span>
+                        <span className="lx-mono">Rider · {rider?.full_name ?? 'Unknown'}</span>
                         <Stars value={r.rider_stars} />
                       </div>
                       {r.rider_review && <p className="text-sm text-white/70 mt-1.5 leading-relaxed">“{r.rider_review}”</p>}
@@ -168,7 +166,7 @@ export default function AdminReviews() {
 
                   {/* The account behind the public "Anonymous" review */}
                   <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl mb-3" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    <span className="text-[11px] uppercase tracking-wide text-white/35">Posted by</span>
+                    <span className="lx-mono">Posted by</span>
                     {customer ? (
                       <a href={`tel:${customer.phone}`} className="text-sm text-amber-400 font-medium truncate">
                         {customer.name ?? 'Unnamed'} · {customer.phone}

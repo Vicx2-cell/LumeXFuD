@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { formatPrice } from '@/lib/money'
 import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
+import { GlassSheen } from '@/components/fx'
 import type { MapPoint } from './ops-map'
 
 // Leaflet must never SSR (it touches window) — load the map only on the client.
@@ -178,7 +179,8 @@ export function LiveOpsClient() {
   const s = feed?.summary
 
   return (
-    <div className="lx-page px-4 py-10 overflow-hidden">
+    <div className="lx-page lx-console px-4 py-10 overflow-hidden">
+      <GlassSheen />
       <div className="relative z-10 mx-auto max-w-2xl lx-enter">
         {/* Header */}
         <div className="mb-5">
@@ -252,9 +254,9 @@ export function LiveOpsClient() {
         {loading ? (
           <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="lx-skeleton h-24" style={{ borderRadius: 18 }} />)}</div>
         ) : error ? (
-          <div className="glass-thin p-5 text-center text-white/45 text-sm">Couldn’t load live operations. Retrying…</div>
+          <div className="lx-surface p-5 text-center text-white/45 text-sm">Couldn’t load live operations. Retrying…</div>
         ) : feed && feed.orders.length === 0 ? (
-          <div className="glass-thin p-8 text-center">
+          <div className="lx-surface p-8 text-center">
             <p className="text-3xl mb-2">✅</p>
             <p className="text-white/70 font-medium">No active orders</p>
             <p className="text-white/35 text-sm mt-1">Everything’s settled. New orders appear here live.</p>
@@ -266,7 +268,7 @@ export function LiveOpsClient() {
               const isOpen = openId === o.id
               const canCancel = o.status === 'PENDING' || o.status === 'VENDOR_ACCEPTED'
               return (
-                <div key={o.id} className="glass-thin p-4" style={{ borderLeft: `3px solid ${SEV_COLOR[o.severity]}` }}>
+                <div key={o.id} className="lx-surface p-4" style={{ borderLeft: `3px solid ${SEV_COLOR[o.severity]}` }}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -358,7 +360,7 @@ export function LiveOpsClient() {
 
 function Stat({ label, value, color }: { label: string; value: number; color?: string }) {
   return (
-    <div className="glass-thin p-3 text-center">
+    <div className="lx-surface p-3 text-center">
       <p className="text-xl font-bold tabular-nums" style={{ color: color ?? '#fff' }}>{value}</p>
       <p className="text-[10px] text-white/40 uppercase tracking-wide mt-0.5">{label}</p>
     </div>

@@ -1,13 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 interface Found { found: boolean; role?: string; name?: string; suspended?: boolean; reason?: string | null; blocked?: boolean }
 
 export default function AdminAccounts() {
-  const router = useRouter()
   const [phone, setPhone] = useState('')
   const [result, setResult] = useState<Found | null>(null)
   const [reason, setReason] = useState('')
@@ -112,15 +112,13 @@ export default function AdminAccounts() {
   }
 
   return (
-    <div className="lx-page px-4 py-8">
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg" style={{ background: '#F5A623', color: '#000' }}>{toast}</div>}
-      <div className="mx-auto max-w-md">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 rounded-full flex items-center justify-center text-white/50" style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-          <h1 className="text-xl font-bold text-white">Accounts</h1>
-        </div>
+      <div className="relative z-10 mx-auto max-w-md">
+        <PageHeader title="Accounts" badge="Admin" />
 
-        <div className="glass-thin rounded-2xl p-5">
+        <div className="lx-surface rounded-2xl p-5">
           <label className="text-xs text-white/50 block mb-1.5">Find an account by phone</label>
           <div className="flex gap-2">
             <input value={phone} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') lookup() }} placeholder="+234… or 0…"
@@ -137,7 +135,7 @@ export default function AdminAccounts() {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="font-semibold text-white">{result.name}</p>
-                  <p className="text-xs text-white/45 uppercase tracking-wide">{result.role}</p>
+                  <p className="lx-mono">{result.role}</p>
                 </div>
                 <Badge color={(result.blocked || result.suspended) ? 'var(--lx-red)' : 'var(--lx-green)'}>
                   {result.blocked ? 'Banned' : result.suspended ? 'Suspended' : 'Active'}
@@ -187,7 +185,7 @@ export default function AdminAccounts() {
 
               {/* Ban & block number (super admin) — permanent restriction */}
               <div className="mt-5 pt-4 border-t border-white/8">
-                <p className="text-xs uppercase tracking-wide text-white/40 mb-2 font-semibold">Ban &amp; block number</p>
+                <p className="lx-mono mb-2">Ban &amp; block number</p>
                 {result.blocked ? (
                   <button onClick={() => banAct('unblock')} disabled={banBusy} className="w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-50" style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
                     {banBusy ? 'Working…' : 'Unblock this number'}
@@ -202,7 +200,7 @@ export default function AdminAccounts() {
 
               {/* Wallet adjustment (super admin) */}
               <div className="mt-5 pt-4 border-t border-white/8">
-                <p className="text-xs uppercase tracking-wide text-white/40 mb-2 font-semibold">Adjust wallet</p>
+                <p className="lx-mono mb-2">Adjust wallet</p>
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <button onClick={() => setAdjDir('credit')} className="py-2 rounded-xl text-xs font-semibold" style={{ background: adjDir === 'credit' ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)', color: adjDir === 'credit' ? '#22C55E' : 'rgba(255,255,255,0.6)', border: `1px solid ${adjDir === 'credit' ? '#22C55E55' : 'rgba(255,255,255,0.1)'}` }}>+ Credit</button>
                   <button onClick={() => setAdjDir('debit')} className="py-2 rounded-xl text-xs font-semibold" style={{ background: adjDir === 'debit' ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.06)', color: adjDir === 'debit' ? '#EF4444' : 'rgba(255,255,255,0.6)', border: `1px solid ${adjDir === 'debit' ? '#EF444455' : 'rgba(255,255,255,0.1)'}` }}>− Debit</button>

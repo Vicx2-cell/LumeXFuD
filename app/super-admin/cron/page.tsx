@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { BackButton } from '@/components/back-button'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 import { Badge } from '@/components/ui/badge'
 
 interface CronRun {
@@ -107,10 +108,10 @@ export default function CronHealthPage() {
   const moneyOverdue = jobs.filter((j) => j.overdue && j.money).length
 
   return (
-    <div className="lx-page px-5 py-10">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-6"><BackButton fallback="/super-admin" /></div>
-        <h1 className="text-2xl font-bold text-white mb-1">Cron Health</h1>
+    <div className="lx-page lx-console px-5 py-10 overflow-hidden">
+      <GlassSheen />
+      <div className="relative z-10 mx-auto max-w-2xl">
+        <PageHeader title="Cron Health" badge="Super Admin" />
         <p className="text-sm text-white/45 mb-6">
           Background jobs and their last heartbeat. A job that stops running silently can strand money —
           if one is <span className="text-red-400 font-medium">overdue</span>, run it now and check Vercel.

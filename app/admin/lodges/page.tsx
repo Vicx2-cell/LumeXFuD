@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BackButton } from '@/components/back-button'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 import { LodgeMap } from '@/components/lodge-map'
 
 interface Lodge {
@@ -101,16 +102,17 @@ export default function AdminLodgesPage() {
   }
 
   return (
-    <div className="lx-page px-5 py-10 overflow-hidden">
+    <div className="lx-page lx-console px-5 py-10 overflow-hidden">
+      <GlassSheen />
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg" style={{ background: '#F5A623', color: '#000' }}>{toast}</div>}
 
-      <div className="mx-auto max-w-lg lx-enter">
-        <div className="mb-6 flex items-center gap-3"><BackButton /><h1 className="text-xl font-bold text-white">ABSU Lodges</h1></div>
+      <div className="relative z-10 mx-auto max-w-lg lx-enter">
+        <PageHeader title="ABSU Lodges" badge="Admin" />
         <p className="text-sm text-white/45 mb-5">Add as many campus lodges/landmarks as you like. Verified lodges show up for customers at checkout. Coordinates are optional (used by the campus map).</p>
 
         {/* Add form */}
-        <div className="glass-thin p-4 mb-6 space-y-3">
-          <p className="text-xs uppercase tracking-wide text-white/40 font-semibold">Add a lodge</p>
+        <div className="lx-surface p-4 mb-6 space-y-3">
+          <p className="lx-mono">Add a lodge</p>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Lodge name (e.g. Chinaza Lodge)"
             className="lx-field w-full px-3 py-2.5 text-sm" />
           <input value={area} onChange={(e) => setArea(e.target.value)} placeholder="Area / landmark (optional, e.g. Behind Main Gate)"
@@ -152,7 +154,7 @@ export default function AdminLodgesPage() {
           <div className="space-y-2">
             <p className="text-xs text-white/40">{lodges.length} lodge{lodges.length === 1 ? '' : 's'}</p>
             {lodges.map((l) => (
-              <div key={l.id} className="glass-thin p-3 flex items-center justify-between gap-3">
+              <div key={l.id} className="lx-surface p-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium text-white text-sm truncate">{l.name}</p>
                   <p className="text-xs text-white/40 truncate">

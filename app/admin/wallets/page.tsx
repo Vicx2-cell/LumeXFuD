@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Pill } from '@/components/ui/pill'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { GlassSheen } from '@/components/fx'
 
 interface FloatStats {
   total_wallet:        string
@@ -121,59 +124,50 @@ export default function AdminWalletsPage() {
   }
 
   return (
-    <div className="lx-page px-4 py-8">
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg"
           style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
       )}
 
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} aria-label="Go back"
-            className="w-11 h-11 rounded-full flex items-center justify-center text-white/50"
-            style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-          <div>
-            <span className="inline-block px-2 py-0.5 rounded text-xs font-bold mb-1"
-              style={{ background: '#F5A623', color: '#000' }}>Admin</span>
-            <h1 className="text-xl font-bold text-white">Wallets</h1>
-          </div>
-        </div>
+      <div className="relative z-10 max-w-4xl mx-auto">
+        <PageHeader title="Wallets" badge="Admin" />
 
         {/* Platform Float Summary */}
         {float && (
-          <div className="glass-thin rounded-2xl p-5 mb-6">
-            <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Platform Float</p>
+          <div className="lx-surface rounded-2xl p-5 mb-6">
+            <p className="lx-mono mb-4">Platform Float</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
               <div>
                 <p className="text-xs text-white/40 mb-1">Vendor Wallets</p>
-                <p className="text-xl font-bold text-white">{float.vendor_total}</p>
+                <p className="text-xl font-bold text-white lx-nums">{float.vendor_total}</p>
               </div>
               <div>
                 <p className="text-xs text-white/40 mb-1">Rider Wallets</p>
-                <p className="text-xl font-bold text-white">{float.rider_total}</p>
+                <p className="text-xl font-bold text-white lx-nums">{float.rider_total}</p>
               </div>
               <div>
                 <p className="text-xs text-white/40 mb-1">Customer Wallets 💡</p>
-                <p className="text-xl font-bold" style={{ color: '#a78bfa' }}>{float.customer_float}</p>
+                <p className="text-xl font-bold lx-nums" style={{ color: '#a78bfa' }}>{float.customer_float}</p>
                 <p className="text-xs text-white/30 mt-0.5">Pre-loaded float</p>
               </div>
               <div>
                 <p className="text-xs text-white/40 mb-1">Available (V+R)</p>
-                <p className="text-lg font-semibold text-green-400">{float.total_available}</p>
+                <p className="text-lg font-semibold text-green-400 lx-nums">{float.total_available}</p>
               </div>
               <div>
                 <p className="text-xs text-white/40 mb-1">Still Held</p>
-                <p className="text-lg font-semibold text-amber-400">{float.total_held}</p>
+                <p className="text-lg font-semibold text-amber-400 lx-nums">{float.total_held}</p>
               </div>
               <div>
                 <p className="text-xs text-white/40 mb-1">Total Platform Float</p>
-                <p className="lx-amber text-lg font-semibold">{float.platform_total}</p>
+                <p className="lx-amber text-lg font-semibold lx-nums">{float.platform_total}</p>
               </div>
               {float.frozen_count > 0 && (
                 <div>
                   <p className="text-xs text-white/40 mb-1">Frozen Wallets</p>
-                  <p className="text-lg font-semibold text-red-400">{float.frozen_count}</p>
+                  <p className="text-lg font-semibold text-red-400 lx-nums">{float.frozen_count}</p>
                 </div>
               )}
             </div>
@@ -236,9 +230,7 @@ export default function AdminWalletsPage() {
             ))}
           </div>
         ) : wallets.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-white/30">No wallets found</p>
-          </div>
+          <EmptyState title="No wallets found" description="Try a different filter or search term." />
         ) : (
           <div className="space-y-2">
             {wallets.map((w) => {
@@ -262,11 +254,11 @@ export default function AdminWalletsPage() {
                       <p className="text-white/40 text-xs truncate">{w.phone}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-white font-semibold text-sm">{w.total_balance}</p>
+                      <p className="text-white font-semibold text-sm lx-nums">{w.total_balance}</p>
                       <div className="flex items-center gap-2 justify-end mt-0.5">
-                        <span className="text-green-400 text-xs">{w.available_balance} avail</span>
+                        <span className="text-green-400 text-xs lx-nums">{w.available_balance} avail</span>
                         {w.held_balance !== '₦0' && (
-                          <span className="text-amber-400 text-xs">{w.held_balance} held</span>
+                          <span className="text-amber-400 text-xs lx-nums">{w.held_balance} held</span>
                         )}
                       </div>
                     </div>
@@ -318,15 +310,15 @@ export default function AdminWalletsPage() {
             <div className="grid grid-cols-3 gap-3 mb-5">
               <div className="bg-white/5 rounded-xl p-3 text-center">
                 <p className="text-white/40 text-xs mb-1">Total</p>
-                <p className="text-white font-semibold text-sm">{selected.total_balance}</p>
+                <p className="text-white font-semibold text-sm lx-nums">{selected.total_balance}</p>
               </div>
               <div className="bg-white/5 rounded-xl p-3 text-center">
                 <p className="text-white/40 text-xs mb-1">Available</p>
-                <p className="text-green-400 font-semibold text-sm">{selected.available_balance}</p>
+                <p className="text-green-400 font-semibold text-sm lx-nums">{selected.available_balance}</p>
               </div>
               <div className="bg-white/5 rounded-xl p-3 text-center">
                 <p className="text-white/40 text-xs mb-1">Held</p>
-                <p className="text-amber-400 font-semibold text-sm">{selected.held_balance}</p>
+                <p className="text-amber-400 font-semibold text-sm lx-nums">{selected.held_balance}</p>
               </div>
             </div>
 

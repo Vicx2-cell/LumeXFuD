@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { GlassSheen } from '@/components/fx'
 
 interface RiderRow {
   id: string
@@ -81,7 +84,8 @@ export default function AdminRiders() {
   }
 
   return (
-    <div className="lx-page px-4 py-8 overflow-hidden">
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
       {/* Remove confirmation */}
       {removeTarget && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center lx-scrim px-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => !removing && setRemoveTarget(null)}>
@@ -113,17 +117,16 @@ export default function AdminRiders() {
           style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
       )}
 
-      <div className="mx-auto max-w-2xl">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 rounded-full flex items-center justify-center text-white/50"
-            style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-          <div>
-            <h1 className="text-xl font-bold text-white">Riders</h1>
-            <p className="text-sm text-white/40">{riders.length} total</p>
-          </div>
-          <button onClick={() => router.push('/admin/riders/new')}
-            className="lx-btn-amber ml-auto px-4 py-2 text-sm">+ Add</button>
-        </div>
+      <div className="relative z-10 mx-auto max-w-2xl">
+        <PageHeader
+          title="Riders"
+          subtitle={`${riders.length} total`}
+          badge="Admin"
+          actions={
+            <button onClick={() => router.push('/admin/riders/new')}
+              className="lx-btn-amber px-4 py-2 text-sm">+ Add</button>
+          }
+        />
 
         {loading ? (
           <div className="space-y-3">
@@ -132,11 +135,11 @@ export default function AdminRiders() {
             ))}
           </div>
         ) : riders.length === 0 ? (
-          <div className="text-center py-16 text-white/30 text-sm">No riders yet</div>
+          <EmptyState title="No riders yet" description="Onboard your first rider to get started." />
         ) : (
           <div className="space-y-3">
             {riders.map((r) => (
-              <div key={r.id} className="glass-thin rounded-2xl p-4">
+              <div key={r.id} className="lx-surface rounded-2xl p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">

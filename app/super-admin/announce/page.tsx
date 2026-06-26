@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BackButton } from '@/components/back-button'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 import { Pill } from '@/components/ui/pill'
 
 type Audience = 'ALL' | 'CUSTOMER' | 'VENDOR' | 'RIDER'
@@ -132,25 +133,26 @@ export default function AnnouncePage() {
   const levelMeta = LEVELS.find((l) => l.key === level)!
 
   return (
-    <div className="lx-page px-5 py-10 overflow-hidden">
+    <div className="lx-page lx-console px-5 py-10 overflow-hidden">
+      <GlassSheen />
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg" style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
       )}
 
-      <div className="mx-auto max-w-lg lx-enter">
-        <div className="mb-6 flex items-center gap-3"><BackButton /><h1 className="text-xl font-bold text-white">Broadcast a message</h1></div>
+      <div className="relative z-10 mx-auto max-w-lg lx-enter">
+        <PageHeader title="Broadcast a message" badge="Super Admin" />
 
         {/* All current announcements — each cleared independently */}
         {list.length > 0 && (
           <div className="mb-5 space-y-2.5">
-            <p className="text-xs uppercase tracking-wide text-white/40">Active messages ({list.length})</p>
+            <p className="lx-mono">Active messages ({list.length})</p>
             {list.map((a) => {
               const scheduledFuture = a.scheduled_at && new Date(a.scheduled_at).getTime() > Date.now()
               const expired = a.expires_at && new Date(a.expires_at).getTime() <= Date.now()
               const statusLabel = expired ? 'Ended' : scheduledFuture ? `Scheduled · ${fmtWhen(a.scheduled_at!)}` : 'Live now'
               const statusColor = expired ? 'rgba(255,255,255,0.4)' : scheduledFuture ? '#60a5fa' : '#22C55E'
               return (
-                <div key={a.id} className="glass-thin p-4">
+                <div key={a.id} className="lx-surface p-4">
                   <div className="flex items-center justify-between mb-2 gap-2">
                     <span className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: statusColor }}>
                       {statusLabel} · {AUDIENCES.find((x) => x.key === a.audience)?.label}
@@ -169,7 +171,7 @@ export default function AnnouncePage() {
         )}
 
         {/* Compose */}
-        <div className="glass-thin p-5 space-y-4">
+        <div className="lx-surface p-5 space-y-4">
           <div>
             <label className="text-xs text-white/50 mb-1.5 block">Title (optional)</label>
             <input value={title} onChange={(e) => setTitle(e.target.value.slice(0, 80))} placeholder="e.g. We’re open late tonight"

@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BackButton } from '@/components/back-button'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 interface FlagRow {
   key: string
@@ -63,21 +64,15 @@ export default function SuperAdminLaunchCounter() {
   }
 
   return (
-    <div className="lx-page px-4 py-8 overflow-hidden">
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium lx-scale-in"
           role="status" aria-live="polite" style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
       )}
 
       <div className="relative z-10 mx-auto max-w-2xl lx-enter">
-        <div className="flex items-center gap-3 mb-6">
-          <BackButton />
-          <div>
-            <span className="inline-block px-2 py-0.5 rounded text-xs font-bold mb-1" style={{ background: '#F5A623', color: '#000' }}>Super Admin</span>
-            <h1 className="text-xl font-bold text-white">Launch Counter</h1>
-            <p className="text-sm text-white/45">Show the &ldquo;students onboard before we go live&rdquo; progress bar</p>
-          </div>
-        </div>
+        <PageHeader title="Launch Counter" subtitle="Show the &ldquo;students onboard before we go live&rdquo; progress bar" badge="Super Admin" />
 
         {loading ? (
           <div className="space-y-3">
@@ -88,15 +83,15 @@ export default function SuperAdminLaunchCounter() {
             {/* Live account counts (always visible to super-admin) */}
             <div className="grid grid-cols-3 gap-3">
               {([['Customers', stats?.customers], ['Vendors', stats?.vendors], ['Riders', stats?.riders]] as const).map(([label, n]) => (
-                <div key={label} className="glass-thin p-4 text-center">
-                  <p className="text-2xl font-bold text-white tabular-nums">{(n ?? 0).toLocaleString()}</p>
+                <div key={label} className="lx-surface p-4 text-center">
+                  <p className="text-2xl font-bold text-white lx-nums">{(n ?? 0).toLocaleString()}</p>
                   <p className="text-xs text-white/45 mt-0.5">{label}</p>
                 </div>
               ))}
             </div>
 
             {/* On/off toggle */}
-            <div className="glass-thin p-4 flex items-center justify-between gap-4">
+            <div className="lx-surface p-4 flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="font-semibold text-white">Show launch counter</p>
                 <p className="text-xs text-white/50 mt-0.5">Renders the progress widget on customer, vendor & rider dashboards.</p>
@@ -119,7 +114,7 @@ export default function SuperAdminLaunchCounter() {
             </div>
 
             {/* Editable goal */}
-            <div className="glass-thin p-4">
+            <div className="lx-surface p-4">
               <label htmlFor="goal" className="font-semibold text-white">Goal (students before launch)</label>
               <div className="flex items-center gap-2 mt-2">
                 <input

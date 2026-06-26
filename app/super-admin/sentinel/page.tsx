@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/session'
+import { GlassSheen } from '@/components/fx'
 import { SentinelClient } from './sentinel-client'
 
 export default async function SentinelPage() {
@@ -7,8 +8,9 @@ export default async function SentinelPage() {
   if (!session || session.role !== 'super_admin') redirect('/auth')
 
   return (
-    <main className="lx-page px-4 py-6">
-      <div className="mx-auto max-w-2xl">
+    <main className="lx-page lx-console px-4 py-6 overflow-hidden">
+      <GlassSheen />
+      <div className="relative z-10 mx-auto max-w-2xl">
         <SentinelClient />
       </div>
     </main>

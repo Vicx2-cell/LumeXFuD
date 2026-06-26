@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFeatures } from '@/lib/use-features'
 import PhoneVerifyInline from '@/components/auth/PhoneVerifyInline'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 interface SuccessData {
   temp_pin: string
@@ -77,8 +79,9 @@ export default function NewAdminPage() {
 
   if (success) {
     return (
-      <div className="lx-page flex items-start justify-center px-5 py-12">
-        <div className="w-full max-w-md space-y-4">
+      <div className="lx-page lx-console flex items-start justify-center px-5 py-12 overflow-hidden">
+        <GlassSheen />
+        <div className="relative z-10 w-full max-w-md space-y-4">
           <div className="rounded-3xl border border-green-500/30 bg-green-500/10 p-6">
             <p className="text-lg font-semibold text-white">Admin account created</p>
             <div className="mt-3 space-y-1 text-sm text-white/60">
@@ -86,15 +89,15 @@ export default function NewAdminPage() {
               <p>Phone: <span className="text-white">{success.phone}</span></p>
             </div>
             <div className="mt-4">
-              <p className="text-xs text-white/40 mb-1 uppercase tracking-widest">Temporary PIN</p>
+              <p className="lx-mono mb-1">Temporary PIN</p>
               <p className="text-4xl font-bold tracking-[0.3em] text-amber-400">{success.temp_pin}</p>
             </div>
           </div>
 
-          <div className="glass-thin rounded-3xl p-5 space-y-3">
-            <p className="text-xs font-medium text-white/40 uppercase tracking-widest">Send this WhatsApp message to them</p>
+          <div className="lx-surface rounded-3xl p-5 space-y-3">
+            <p className="lx-mono">Send this WhatsApp message to them</p>
             <p
-              className="glass-thin rounded-xl p-3 text-sm text-white/80 whitespace-pre-wrap"
+              className="lx-surface rounded-xl p-3 text-sm text-white/80 whitespace-pre-wrap"
             >
               {success.whatsapp_message}
             </p>
@@ -128,17 +131,14 @@ export default function NewAdminPage() {
   }
 
   return (
-    <div className="lx-page px-5 py-10">
-      <div className="mx-auto max-w-md">
-        <button onClick={() => router.back()} className="mb-6 text-sm text-white/40 hover:text-white">
-          ← Back
-        </button>
-        <h1 className="text-2xl font-bold text-white mb-1">Add Admin</h1>
-        <p className="text-sm text-white/40 mb-8">Creates an operational admin account with a temp PIN.</p>
+    <div className="lx-page lx-console px-5 py-10 overflow-hidden">
+      <GlassSheen />
+      <div className="relative z-10 mx-auto max-w-md">
+        <PageHeader title="Add Admin" subtitle="Creates an operational admin account with a temp PIN." badge="Super Admin" />
 
-        <div className="glass-thin space-y-4 rounded-3xl p-6">
+        <div className="lx-surface space-y-4 rounded-3xl p-6">
           <label className="block">
-            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Full name</span>
+            <span className="mb-2 block lx-mono">Full name</span>
             <input
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
@@ -148,7 +148,7 @@ export default function NewAdminPage() {
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">WhatsApp number (+234)</span>
+            <span className="mb-2 block lx-mono">WhatsApp number (+234)</span>
             <input
               value={form.phone}
               onChange={(e) => {

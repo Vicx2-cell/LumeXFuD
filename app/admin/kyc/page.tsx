@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { BackButton } from '@/components/back-button'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 interface PendingDoc { key: string; label: string; url: string }
 interface PendingUser { phone: string; name: string; role: string; docs: PendingDoc[] }
@@ -55,10 +56,11 @@ export default function AdminKycQueue() {
   const totalDocs = items.reduce((s, u) => s + u.docs.length, 0)
 
   return (
-    <div className="lx-page px-5 py-10 overflow-hidden">
+    <div className="lx-page lx-console px-5 py-10 overflow-hidden">
+      <GlassSheen />
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg" style={{ background: '#F5A623', color: '#000' }}>{toast}</div>}
-      <div className="mx-auto max-w-2xl lx-enter">
-        <div className="mb-6 flex items-center gap-3"><BackButton /><h1 className="text-xl font-bold text-white">KYC review</h1></div>
+      <div className="relative z-10 mx-auto max-w-2xl lx-enter">
+        <PageHeader title="KYC review" badge="Admin" />
 
         {loading ? (
           <p className="text-white/40 text-sm text-center py-10">Loading…</p>
@@ -67,7 +69,7 @@ export default function AdminKycQueue() {
             {/* ── Pending review ───────────────────────────────── */}
             <p className="text-xs uppercase tracking-wide text-amber-400/80 mb-2 font-semibold">Awaiting review</p>
             {items.length === 0 ? (
-              <div className="glass-thin p-6 text-center mb-6">
+              <div className="lx-surface p-6 text-center mb-6">
                 <p className="text-2xl mb-1">✅</p>
                 <p className="text-white/55 text-sm">Nothing awaiting review.</p>
               </div>
@@ -76,14 +78,14 @@ export default function AdminKycQueue() {
                 <p className="text-xs text-white/40 mb-3">{totalDocs} document{totalDocs === 1 ? '' : 's'} from {items.length} account{items.length === 1 ? '' : 's'}</p>
                 <div className="space-y-4 mb-8">
                   {items.map((u) => (
-                    <div key={u.phone} className="glass-thin p-4">
+                    <div key={u.phone} className="lx-surface p-4">
                       <div className="mb-3">
                         <p className="font-semibold text-white">{u.name}</p>
-                        <p className="text-xs text-white/45 uppercase tracking-wide">{u.role} · {u.phone}</p>
+                        <p className="lx-mono">{u.role} · {u.phone}</p>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {u.docs.map((d) => (
-                          <div key={d.key} className="glass-thin rounded-xl p-3">
+                          <div key={d.key} className="lx-surface rounded-xl p-3">
                             <p className="text-xs text-white/60 mb-2">{d.label}</p>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={d.url} alt={d.label} className="w-full h-40 object-cover rounded-lg mb-3" style={{ border: '1px solid rgba(255,255,255,0.08)' }} />
@@ -106,11 +108,11 @@ export default function AdminKycQueue() {
                 <p className="text-xs uppercase tracking-wide text-green-400/80 mb-2 font-semibold">✓ Verified accounts ({verified.length})</p>
                 <div className="space-y-4">
                   {verified.map((u) => (
-                    <div key={u.phone} className="glass-thin p-4">
+                    <div key={u.phone} className="lx-surface p-4">
                       <div className="flex items-center justify-between gap-3 mb-3">
                         <div className="min-w-0">
                           <p className="font-semibold text-white truncate">{u.name} <span className="text-green-400 text-xs">✓</span></p>
-                          <p className="text-xs text-white/45 uppercase tracking-wide">{u.role} · {u.phone}</p>
+                          <p className="lx-mono">{u.role} · {u.phone}</p>
                         </div>
                         <button onClick={() => revoke(u.phone)} disabled={!!busy} className="shrink-0 px-3 py-2 rounded-lg text-xs font-semibold disabled:opacity-50" style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>
                           {busy === `${u.phone}:revoke` ? '…' : 'Revoke'}

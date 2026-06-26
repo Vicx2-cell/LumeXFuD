@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BackButton } from '@/components/back-button'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 interface FeatureRow {
   key: string
@@ -53,21 +54,15 @@ export default function SuperAdminFeatures() {
   }
 
   return (
-    <div className="lx-page px-4 py-8 overflow-hidden">
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium lx-scale-in"
           role="status" aria-live="polite" style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
       )}
 
       <div className="relative z-10 mx-auto max-w-2xl lx-enter">
-        <div className="flex items-center gap-3 mb-6">
-          <BackButton />
-          <div>
-            <span className="inline-block px-2 py-0.5 rounded text-xs font-bold mb-1" style={{ background: '#F5A623', color: '#000' }}>Super Admin</span>
-            <h1 className="text-xl font-bold text-white">Feature Toggles</h1>
-            <p className="text-sm text-white/45">Turn parts of the platform on or off instantly</p>
-          </div>
-        </div>
+        <PageHeader title="Feature Toggles" subtitle="Turn parts of the platform on or off instantly" badge="Super Admin" />
 
         {loading ? (
           <div className="space-y-3">
@@ -76,7 +71,7 @@ export default function SuperAdminFeatures() {
         ) : (
           <div className="space-y-3 lx-stagger">
             {features.map((f) => (
-              <div key={f.key} className="glass-thin p-4 flex items-center justify-between gap-4">
+              <div key={f.key} className="lx-surface p-4 flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-semibold text-white">{f.label}</p>

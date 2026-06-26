@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { BackButton } from '@/components/back-button'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 interface Feature { key: string; label: string; total: number; roles: Record<string, number>; last_used: string | null }
 
@@ -35,16 +36,18 @@ export default function FeatureUsagePage() {
   const max = features.reduce((m, f) => Math.max(m, f.total), 0) || 1
 
   return (
-    <div className="lx-page px-5 py-10">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-6 flex items-center justify-between">
-          <BackButton fallback="/super-admin" />
-          <button onClick={load} disabled={loading} className="lx-btn-amber px-4 py-2 text-sm disabled:opacity-50">
-            {loading ? 'Loading…' : 'Refresh'}
-          </button>
-        </div>
-
-        <h1 className="text-2xl font-bold text-white mb-1">Feature usage</h1>
+    <div className="lx-page lx-console px-5 py-10 overflow-hidden">
+      <GlassSheen />
+      <div className="relative z-10 mx-auto max-w-2xl">
+        <PageHeader
+          title="Feature usage"
+          badge="Super Admin"
+          actions={
+            <button onClick={load} disabled={loading} className="lx-btn-amber px-4 py-2 text-sm disabled:opacity-50">
+              {loading ? 'Loading…' : 'Refresh'}
+            </button>
+          }
+        />
         <p className="text-sm text-white/45 mb-6">What gets used most, and by whom — customers, vendors and riders. {totalEvents.toLocaleString()} total uses recorded.</p>
 
         {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
@@ -55,13 +58,13 @@ export default function FeatureUsagePage() {
 
         <div className="space-y-3">
           {features.map((f, i) => (
-            <div key={f.key} className="glass-thin rounded-2xl p-4">
+            <div key={f.key} className="lx-surface rounded-2xl p-4">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
                   {i === 0 && <span title="Most used">🔥</span>}
                   <p className="font-semibold text-white truncate">{f.label}</p>
                 </div>
-                <span className="lx-amber text-sm font-bold shrink-0">{f.total.toLocaleString()}</span>
+                <span className="lx-amber lx-nums text-sm font-bold shrink-0">{f.total.toLocaleString()}</span>
               </div>
 
               {/* Total bar */}

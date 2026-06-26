@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BackButton } from '@/components/back-button'
+import { GlassSheen } from '@/components/fx'
+import { PageHeader } from '@/components/ui/page-header'
 
 export default function ShareStorePage() {
   const [vendor, setVendor] = useState<{ id: string; shop_name?: string } | null>(null)
@@ -32,19 +33,19 @@ export default function ShareStorePage() {
   ] : []
 
   return (
-    <div className="lx-page px-5 py-10 overflow-hidden">
+    <div className="lx-page lx-console px-5 py-10 overflow-hidden">
+      <GlassSheen />
       <div className="mx-auto max-w-lg lx-enter">
-        <div className="mb-5 flex items-center gap-3"><BackButton fallback="/vendor-dashboard" /><h1 className="text-xl font-bold text-white truncate">Share your store</h1></div>
-        <p className="text-sm text-white/50 mb-5">Your store link, ready to paste anywhere. Customers tap it and order straight from you — new ones sign up and come right back.</p>
+        <PageHeader title="Share your store" subtitle="Your store link, ready to paste anywhere. Customers tap it and order straight from you — new ones sign up and come right back." />
 
         {!vendor ? (
           <p className="text-white/40 text-sm text-center py-8">Loading…</p>
         ) : (
           <div className="space-y-3">
             {captions.map((c) => (
-              <div key={c.id} className="glass-thin p-4">
+              <div key={c.id} className="lx-surface p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs uppercase tracking-wide text-white/45 font-semibold">{c.label}</p>
+                  <p className="lx-mono">{c.label}</p>
                   <button onClick={() => copy(c.text, c.id)} aria-label={`Copy ${c.label} text`} className="lx-tap text-xs font-semibold px-4 min-h-[40px] shrink-0 rounded-lg"
                     style={{ background: copied === c.id ? 'rgba(34,197,94,0.15)' : 'rgba(245,166,35,0.15)', color: copied === c.id ? '#22C55E' : '#F5A623', border: `1px solid ${copied === c.id ? 'rgba(34,197,94,0.3)' : 'rgba(245,166,35,0.25)'}` }}>
                     {copied === c.id ? 'Copied ✓' : 'Copy'}

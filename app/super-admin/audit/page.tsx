@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 interface SuperAuditLog {
   id: string
@@ -15,7 +16,6 @@ interface SuperAuditLog {
 }
 
 export default function SuperAdminAudit() {
-  const router = useRouter()
   const [logs, setLogs] = useState<SuperAuditLog[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -35,17 +35,10 @@ export default function SuperAdminAudit() {
   useEffect(() => { fetchLogs(1) }, [])
 
   return (
-    <div className="lx-page px-4 py-8">
-      <div className="mx-auto max-w-2xl">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 rounded-full flex items-center justify-center text-white/50"
-            style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-          <div>
-            <span className="inline-block px-2 py-0.5 rounded text-xs font-bold mb-1"
-              style={{ background: '#F5A623', color: '#000' }}>Super Admin</span>
-            <h1 className="text-xl font-bold text-white">Super Audit Log</h1>
-          </div>
-        </div>
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
+      <div className="relative z-10 mx-auto max-w-2xl">
+        <PageHeader title="Super Audit Log" badge="Super Admin" />
 
         {loading ? (
           <div className="space-y-2">
@@ -59,7 +52,7 @@ export default function SuperAdminAudit() {
           <>
             <div className="space-y-1.5">
               {logs.map((log) => (
-                <div key={log.id} className="glass-thin rounded-xl px-4 py-3 flex items-start gap-3">
+                <div key={log.id} className="lx-surface rounded-xl px-4 py-3 flex items-start gap-3">
                   <span className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: '#F5A623' }} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white">

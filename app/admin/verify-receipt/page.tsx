@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { BackButton } from '@/components/back-button'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 type Result = {
   result: 'valid' | 'tampered' | 'not_found'
@@ -45,12 +46,13 @@ export default function VerifyReceiptPage() {
   }, [])
 
   return (
-    <div className="lx-page px-5 py-10 overflow-hidden">
-      <div className="mx-auto max-w-md lx-enter">
-        <div className="mb-6 flex items-center gap-3"><BackButton /><h1 className="text-xl font-bold text-white">Verify a receipt</h1></div>
+    <div className="lx-page lx-console px-5 py-10 overflow-hidden">
+      <GlassSheen />
+      <div className="relative z-10 mx-auto max-w-md lx-enter">
+        <PageHeader title="Verify a receipt" badge="Admin" />
         <p className="text-sm text-white/45 mb-5">Paste the <b>reference</b> and <b>verification code</b> from a customer/vendor/rider receipt. We recompute the cryptographic seal from the real record — a doctored receipt fails.</p>
 
-        <div className="glass-thin p-4 space-y-3">
+        <div className="lx-surface p-4 space-y-3">
           <div>
             <label className="text-xs text-white/50 block mb-1">Reference</label>
             <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. RIDER-abc123… / WD-… / CWUSE-…"

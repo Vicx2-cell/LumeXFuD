@@ -34,7 +34,7 @@ export default function StylePreview() {
         />
 
         {/* KPI grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-9">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-9 lx-stagger">
           <StatCard label="Orders today" value="142" sub="Target 50+ · Month 3" status="ok" href="/style-preview" />
           <StatCard label="Profit / order" value="₦312" sub="Must stay positive" status="ok" />
           <StatCard label="Avg delivery" value="23m" sub="Target under 25 min" status="ok" />

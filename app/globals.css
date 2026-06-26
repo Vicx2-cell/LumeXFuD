@@ -1171,9 +1171,20 @@ a.lx-statcard:hover { border-color: rgba(245,166,35,0.3); background: rgba(255,2
   font-variant-numeric: tabular-nums;
 }
 .lx-kpi-sub { font-size: 0.74rem; color: var(--lx-text-faint); margin-top: 0.5rem; line-height: 1.3; }
-.lx-statcard-dot { width: 6px; height: 6px; border-radius: 9999px; margin-top: 0.3rem; flex: none; background: var(--lx-success); box-shadow: 0 0 8px currentColor; color: var(--lx-success); }
+.lx-statcard-dot { position: relative; width: 6px; height: 6px; border-radius: 9999px; margin-top: 0.3rem; flex: none; background: var(--lx-success); box-shadow: 0 0 8px currentColor; color: var(--lx-success); }
 .lx-statcard-dot[data-status="warn"] { background: var(--lx-warn); color: var(--lx-warn); }
 .lx-statcard-dot[data-status="critical"] { background: var(--lx-danger); color: var(--lx-danger); }
+/* Live radar ping — signals real-time data without being flashy. */
+.lx-statcard-dot::after {
+  content: ''; position: absolute; inset: 0; border-radius: 9999px;
+  background: currentColor; animation: lx-dot-ping 2.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes lx-dot-ping {
+  0%   { transform: scale(1);   opacity: 0.55; }
+  70%  { transform: scale(2.8); opacity: 0; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .lx-statcard-dot::after { animation: none; opacity: 0; } }
 
 /* ── Table ── */
 .lx-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }

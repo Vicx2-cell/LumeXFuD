@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 // settings is id-keyed with a JSONB value of varying shape
 // (e.g. {"amount_kobo": N}, {"value": N}, {"open":"07:00","close":"22:00"}).
@@ -12,7 +13,6 @@ interface Setting {
 }
 
 export default function SuperAdminSettings() {
-  const router = useRouter()
   const [settings, setSettings] = useState<Setting[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<string | null>(null)
@@ -82,23 +82,15 @@ export default function SuperAdminSettings() {
   }
 
   return (
-    <div className="lx-page px-4 py-8">
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium"
           style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
       )}
 
-      <div className="mx-auto max-w-2xl">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 rounded-full flex items-center justify-center text-white/50"
-            style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-          <div>
-            <span className="inline-block px-2 py-0.5 rounded text-xs font-bold mb-1"
-              style={{ background: '#F5A623', color: '#000' }}>Super Admin</span>
-            <h1 className="text-xl font-bold text-white">Platform Settings</h1>
-            <p className="text-sm text-white/40">Live-editable — changes take effect immediately</p>
-          </div>
-        </div>
+      <div className="relative z-10 mx-auto max-w-2xl">
+        <PageHeader title="Platform Settings" subtitle="Live-editable — changes take effect immediately" badge="Super Admin" />
 
         <div className="rounded-2xl mb-5 p-3 flex gap-2"
           style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
@@ -117,7 +109,7 @@ export default function SuperAdminSettings() {
         ) : (
           <div className="space-y-2">
             {settings.map((s) => (
-              <div key={s.id} className="glass-thin rounded-xl p-4">
+              <div key={s.id} className="lx-surface rounded-xl p-4">
                 {editing === s.id ? (
                   <div>
                     <p className="text-xs text-white/40 font-mono mb-2">{s.id}</p>

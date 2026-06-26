@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { GlassSheen } from '@/components/fx'
+import { PageHeader } from '@/components/ui/page-header'
 
 interface ReviewRow {
   id: string
@@ -55,16 +57,14 @@ export default function RiderReviews() {
   const written = reviews.filter((r) => r.rider_review)
 
   return (
-    <div className="lx-page overflow-hidden" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
-      <div className="sticky top-0 z-40 glass-thin" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0, paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 -ml-1 rounded-full flex items-center justify-center text-lg text-white/60 active:scale-90 transition-transform" style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-          <h1 className="font-semibold text-white">Your reviews</h1>
-        </div>
+    <div className="lx-page lx-console overflow-hidden" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
+      <GlassSheen />
+      <div className="max-w-lg mx-auto px-4 pt-6">
+        <PageHeader title="Your reviews" />
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-5 space-y-4 lx-enter">
-        <div className="glass rounded-3xl p-7 text-center relative overflow-hidden">
+        <div className="lx-surface rounded-3xl p-7 text-center relative overflow-hidden">
           <div aria-hidden="true" className="absolute inset-x-0 -top-12 h-32 pointer-events-none" style={{ background: 'radial-gradient(ellipse at center, rgba(245,166,35,0.28), transparent 70%)' }} />
           {total > 0 ? (
             <div className="relative">
@@ -87,7 +87,7 @@ export default function RiderReviews() {
         ) : reviews.length > 0 && (
           <div className="space-y-3">
             {reviews.map((r) => (
-              <div key={r.id} className="glass rounded-2xl p-4">
+              <div key={r.id} className="lx-surface rounded-2xl p-4">
                 <div className="flex items-center gap-3">
                   <span className="lx-icon-badge w-9 h-9 rounded-full shrink-0">
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>

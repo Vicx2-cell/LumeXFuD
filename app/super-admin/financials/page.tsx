@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
 import { Pill } from '@/components/ui/pill'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,15 +82,15 @@ function StatCard({
       background: highlight ? 'rgba(245,166,35,0.07)' : warn ? 'rgba(239,68,68,0.07)' : '#111113',
       border: `1px solid ${highlight ? 'rgba(245,166,35,0.2)' : warn ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.07)'}`,
     }}>
-      <p className="text-xs text-white/40 uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-2xl font-bold" style={{ color }}>{value}</p>
+      <p className="lx-mono mb-1">{label}</p>
+      <p className="text-2xl font-bold lx-nums" style={{ color }}>{value}</p>
       {sub && <p className="text-xs text-white/40 mt-1">{sub}</p>}
     </div>
   )
 }
 
 function Section({ title }: { title: string }) {
-  return <p className="text-xs text-white/30 uppercase tracking-widest mb-3 mt-6">{title}</p>
+  return <p className="lx-mono mb-3 mt-6">{title}</p>
 }
 
 function Skeleton() {
@@ -210,7 +212,7 @@ function WithdrawModal({
             </div>
 
             <label className="block mb-4">
-              <span className="text-xs text-white/40 uppercase tracking-wide mb-1 block">Amount (₦)</span>
+              <span className="lx-mono mb-1 block">Amount (₦)</span>
               <input
                 type="number"
                 min="500"
@@ -223,7 +225,7 @@ function WithdrawModal({
             </label>
 
             <label className="block mb-5">
-              <span className="text-xs text-white/40 uppercase tracking-wide mb-1 block">Note (optional)</span>
+              <span className="lx-mono mb-1 block">Note (optional)</span>
               <input
                 type="text"
                 placeholder="e.g. Weekly payout"
@@ -340,7 +342,7 @@ function FounderEarnings() {
       }}>
         {/* Header row */}
         <div className="flex items-center justify-between mb-4">
-          <p className="text-sm font-bold text-amber-400 uppercase tracking-widest">💰 Your Earnings</p>
+          <p className="lx-mono text-amber-400">💰 Your Earnings</p>
           <button
             onClick={() => setShowWithdraw(true)}
             className="px-4 py-1.5 rounded-full text-xs font-bold text-black"
@@ -370,7 +372,7 @@ function FounderEarnings() {
         {breakdownItems.length > 0 && (
           <>
             <div className="border-t mb-3" style={{ borderColor: 'rgba(255,255,255,0.06)' }} />
-            <p className="text-xs text-white/30 uppercase tracking-widest mb-2">Breakdown Today</p>
+            <p className="lx-mono mb-2">Breakdown Today</p>
             <div className="space-y-1.5 mb-3">
               {breakdownItems.map(({ label, icon, amount }) => (
                 <div key={label} className="flex items-center justify-between">
@@ -392,7 +394,7 @@ function FounderEarnings() {
 
         {/* Your Actual Money */}
         <div className="border-t mt-4 pt-4" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-          <p className="text-xs text-white/30 uppercase tracking-widest mb-3">Paystack Balance Breakdown</p>
+          <p className="lx-mono mb-3">Paystack Balance Breakdown</p>
           <div className="space-y-1.5 mb-3">
             <div className="flex justify-between">
               <span className="text-sm text-white/50">Paystack account balance</span>
@@ -629,7 +631,7 @@ function PlatformOverview({ data }: { data: Financials }) {
         background: 'rgba(245,166,35,0.05)',
         border: '1px solid rgba(245,166,35,0.18)',
       }}>
-        <p className="text-xs text-white/40 uppercase tracking-widest mb-3">Today's Platform Snapshot</p>
+        <p className="lx-mono mb-3">Today's Platform Snapshot</p>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <p className="text-xs text-white/40 mb-1">Orders today</p>
@@ -735,21 +737,12 @@ export default function SuperAdminFinancials() {
   }, [router])
 
   return (
-    <div className="lx-page px-4 py-8">
-      <div className="mx-auto max-w-2xl">
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
+      <div className="relative z-10 mx-auto max-w-2xl">
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} aria-label="Go back"
-            className="w-11 h-11 rounded-full flex items-center justify-center text-white/50"
-            style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-          <div>
-            <span className="inline-block px-2 py-0.5 rounded text-xs font-bold mb-1"
-              style={{ background: '#F5A623', color: '#000' }}>Super Admin</span>
-            <h1 className="text-xl font-bold text-white">Financials</h1>
-            <p className="text-sm text-white/40">{monthName}</p>
-          </div>
-        </div>
+        <PageHeader title="Financials" subtitle={monthName} badge="Super Admin" />
 
         {/* ── Founder Earnings — always at top ─────────────── */}
         <FounderEarnings />

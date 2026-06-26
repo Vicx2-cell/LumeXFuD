@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
 import { Badge } from '@/components/ui/badge'
 import { Pill } from '@/components/ui/pill'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { GlassSheen } from '@/components/fx'
 
 interface OrderRow {
   id: string
@@ -40,7 +42,6 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export default function AdminOrders() {
-  const router = useRouter()
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
@@ -66,13 +67,10 @@ export default function AdminOrders() {
   }, [statusFilter])
 
   return (
-    <div className="lx-page px-4 py-8">
-      <div className="mx-auto max-w-3xl">
-        <div className="flex items-center gap-3 mb-5">
-          <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 rounded-full flex items-center justify-center text-white/50"
-            style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-          <h1 className="text-xl font-bold text-white">Orders</h1>
-        </div>
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
+      <div className="relative z-10 mx-auto max-w-3xl">
+        <PageHeader title="Orders" badge="Admin" />
 
         {/* Status filter */}
         <div className="flex gap-2 flex-wrap mb-5">
@@ -95,12 +93,12 @@ export default function AdminOrders() {
             ))}
           </div>
         ) : orders.length === 0 ? (
-          <div className="text-center py-16 text-white/30 text-sm">No orders found</div>
+          <EmptyState title="No orders yet" description="Orders will appear here as customers place them." />
         ) : (
           <>
             <div className="space-y-2">
               {orders.map((o) => (
-                <div key={o.id} className="glass-thin rounded-2xl px-4 py-3 flex items-center gap-3">
+                <div key={o.id} className="lx-surface rounded-2xl px-4 py-3 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold text-white truncate">{o.order_number}</p>
@@ -113,8 +111,8 @@ export default function AdminOrders() {
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-semibold text-white">{formatPrice(o.total_amount)}</p>
-                    <p className="text-xs text-white/30">{new Date(o.created_at).toLocaleDateString('en-NG')}</p>
+                    <p className="text-sm font-semibold text-white lx-nums">{formatPrice(o.total_amount)}</p>
+                    <p className="text-xs text-white/30 lx-nums">{new Date(o.created_at).toLocaleDateString('en-NG')}</p>
                   </div>
                 </div>
               ))}

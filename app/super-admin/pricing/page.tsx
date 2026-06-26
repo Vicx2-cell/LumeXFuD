@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BackButton } from '@/components/back-button'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 type Pricing = {
   platform_markup_kobo: number
@@ -81,35 +82,29 @@ export default function SuperAdminPricing() {
   const doorPlatform = naira ? (naira.delivery_fee_door_kobo - naira.rider_cut_door_kobo) * 100 : 0
 
   return (
-    <div className="lx-page px-4 py-8 overflow-hidden">
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium lx-scale-in"
           role="status" aria-live="polite" style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
       )}
 
       <div className="relative z-10 mx-auto max-w-lg lx-enter">
-        <div className="flex items-center gap-3 mb-6">
-          <BackButton />
-          <div>
-            <span className="inline-block px-2 py-0.5 rounded text-xs font-bold mb-1" style={{ background: '#F5A623', color: '#000' }}>Super Admin</span>
-            <h1 className="text-xl font-bold text-white">Pricing</h1>
-            <p className="text-sm text-white/45">Markup and rider pay — applies to new orders instantly</p>
-          </div>
-        </div>
+        <PageHeader title="Pricing" subtitle="Markup and rider pay — applies to new orders instantly" badge="Super Admin" />
 
         {loading || !naira ? (
           <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="lx-skeleton h-32" style={{ borderRadius: 20 }} />)}</div>
         ) : (
           <div className="space-y-4">
             {/* Your markup */}
-            <div className="glass-thin p-4 space-y-3">
+            <div className="lx-surface p-4 space-y-3">
               <h2 className="text-sm font-semibold text-white/80">Your markup</h2>
               <NairaInput label="Platform markup (per order)" value={naira.platform_markup_kobo}
                 onChange={(n) => set('platform_markup_kobo', n)} hint="Added to every order as your platform fee." />
             </div>
 
             {/* Bike */}
-            <div className="glass-thin p-4 space-y-3">
+            <div className="lx-surface p-4 space-y-3">
               <h2 className="text-sm font-semibold text-white/80">Bike delivery</h2>
               <NairaInput label="Delivery fee (customer pays)" value={naira.delivery_fee_bike_kobo} onChange={(n) => set('delivery_fee_bike_kobo', n)} />
               <NairaInput label="Rider pay (rider keeps)" value={naira.rider_cut_bike_kobo} onChange={(n) => set('rider_cut_bike_kobo', n)} />
@@ -119,7 +114,7 @@ export default function SuperAdminPricing() {
             </div>
 
             {/* Door */}
-            <div className="glass-thin p-4 space-y-3">
+            <div className="lx-surface p-4 space-y-3">
               <h2 className="text-sm font-semibold text-white/80">Door delivery</h2>
               <NairaInput label="Delivery fee (customer pays)" value={naira.delivery_fee_door_kobo} onChange={(n) => set('delivery_fee_door_kobo', n)} />
               <NairaInput label="Rider pay (rider keeps)" value={naira.rider_cut_door_kobo} onChange={(n) => set('rider_cut_door_kobo', n)} />
@@ -129,7 +124,7 @@ export default function SuperAdminPricing() {
             </div>
 
             {/* Min order */}
-            <div className="glass-thin p-4 space-y-3">
+            <div className="lx-surface p-4 space-y-3">
               <h2 className="text-sm font-semibold text-white/80">Minimum order</h2>
               <NairaInput label="Minimum order amount" value={naira.min_order_kobo} onChange={(n) => set('min_order_kobo', n)} />
             </div>

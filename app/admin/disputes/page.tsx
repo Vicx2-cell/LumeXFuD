@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { GlassSheen } from '@/components/fx'
 
 interface DisputeRow {
   reason: string
@@ -48,7 +50,6 @@ const RESOLUTION_META: Record<DisputeBrief['suggested_resolution'], { label: str
 }
 
 export default function AdminDisputes() {
-  const router = useRouter()
   const [disputes, setDisputes] = useState<DisputeOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [resolving, setResolving] = useState<string | null>(null)
@@ -104,23 +105,19 @@ export default function AdminDisputes() {
   }
 
   return (
-    <div className="lx-page px-4 py-8">
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg"
           style={{ background: '#F5A623', color: '#000' }}>{toast}</div>
       )}
 
-      <div className="mx-auto max-w-2xl">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 rounded-full flex items-center justify-center text-white/50"
-            style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-          <div>
-            <h1 className="text-xl font-bold text-white">Disputes</h1>
-            {!loading && (
-              <p className="text-sm text-white/40">{disputes.length} open — oldest first</p>
-            )}
-          </div>
-        </div>
+      <div className="relative z-10 mx-auto max-w-2xl">
+        <PageHeader
+          title="Disputes"
+          subtitle={!loading ? `${disputes.length} open — oldest first` : undefined}
+          badge="Admin"
+        />
 
         {/* Alert banner if any disputes */}
         {!loading && disputes.length > 0 && (
@@ -140,11 +137,7 @@ export default function AdminDisputes() {
             ))}
           </div>
         ) : disputes.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-3xl mb-3">✅</p>
-            <p className="font-semibold text-white/60">No open disputes</p>
-            <p className="text-sm text-white/30 mt-1">All clear</p>
-          </div>
+          <EmptyState title="No open disputes" description="All clear — nothing needs resolution right now." />
         ) : (
           <div className="space-y-4">
             {disputes.map((d) => {
@@ -162,9 +155,9 @@ export default function AdminDisputes() {
                       <p className="text-xs text-white/40 mt-0.5">{d.vendors?.shop_name}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-white">{formatPrice(d.total_amount)}</p>
+                      <p className="font-bold text-white lx-nums">{formatPrice(d.total_amount)}</p>
                       {ageMinutes !== null && (
-                        <p className="text-xs text-red-400 mt-0.5">{ageMinutes}m ago</p>
+                        <p className="text-xs text-red-400 mt-0.5 lx-nums">{ageMinutes}m ago</p>
                       )}
                     </div>
                   </div>
@@ -192,7 +185,7 @@ export default function AdminDisputes() {
                   {/* What the customer reported (+ optional photo) */}
                   {row && (row.reason || row.description || row.customer_photo_url) && (
                     <div className="mb-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                      <p className="text-[11px] uppercase tracking-wide text-white/35 mb-1">Customer reported</p>
+                      <p className="lx-mono mb-1">Customer reported</p>
                       {row.reason && <p className="text-sm text-white/85">{row.reason}</p>}
                       {row.description && <p className="text-xs text-white/55 mt-1">{row.description}</p>}
                       {row.customer_photo_url && (

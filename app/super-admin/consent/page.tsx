@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 interface ConsentRow {
   id: string
@@ -31,7 +32,6 @@ const ACTION_LABEL: Record<string, string> = {
 }
 
 export default function SuperAdminConsent() {
-  const router = useRouter()
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -51,15 +51,10 @@ export default function SuperAdminConsent() {
   }
 
   return (
-    <div className="lx-page px-4 py-8">
-      <div className="mx-auto max-w-2xl">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 rounded-full flex items-center justify-center text-white/50" style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-          <div>
-            <span className="inline-block px-2 py-0.5 rounded text-xs font-bold mb-1" style={{ background: '#F5A623', color: '#000' }}>Super Admin</span>
-            <h1 className="text-lg font-semibold">Consent record</h1>
-          </div>
-        </div>
+    <div className="lx-page lx-console px-4 py-8 overflow-hidden">
+      <GlassSheen />
+      <div className="relative z-10 mx-auto max-w-2xl">
+        <PageHeader title="Consent record" badge="Super Admin" />
 
         <p className="text-xs text-white/45 mb-3">
           Append-only record of every binding agreement on an order (the dispute record). Enter an order number (LXF-…) or id.
@@ -81,7 +76,7 @@ export default function SuperAdminConsent() {
         {err && <p className="text-sm text-red-400 mb-4">{err}</p>}
 
         {order && (
-          <div className="glass-thin p-3 mb-4 text-sm">
+          <div className="lx-surface p-3 mb-4 text-sm">
             <span className="font-semibold">{order.order_number}</span>
             <span className="text-white/45"> · {order.delivery_type} · {order.status}</span>
           </div>
@@ -94,7 +89,7 @@ export default function SuperAdminConsent() {
         {rows && rows.length > 0 && (
           <div className="space-y-2">
             {rows.map((r) => (
-              <div key={r.id} className="glass-thin p-3">
+              <div key={r.id} className="lx-surface p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm text-white/90">{ACTION_LABEL[r.action] ?? r.action}</p>

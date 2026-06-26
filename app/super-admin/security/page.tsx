@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { BackButton } from '@/components/back-button'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 type CheckStatus = 'pass' | 'warn' | 'fail'
 interface SecurityCheck {
@@ -86,17 +87,19 @@ export default function SecurityHealthPage() {
   const categories = Array.from(new Set(checks.map((c) => c.category)))
 
   return (
-    <div className="lx-page px-5 py-10">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-6 flex items-center justify-between">
-          <BackButton fallback="/super-admin" />
-          <button onClick={run} disabled={loading}
-            className="lx-btn-amber px-4 py-2 text-sm disabled:opacity-50">
-            {loading ? 'Running…' : 'Re-run checks'}
-          </button>
-        </div>
-
-        <h1 className="text-2xl font-bold text-white mb-1">Security Health</h1>
+    <div className="lx-page lx-console px-5 py-10 overflow-hidden">
+      <GlassSheen />
+      <div className="relative z-10 mx-auto max-w-2xl">
+        <PageHeader
+          title="Security Health"
+          badge="Super Admin"
+          actions={
+            <button onClick={run} disabled={loading}
+              className="lx-btn-amber px-4 py-2 text-sm disabled:opacity-50">
+              {loading ? 'Running…' : 'Re-run checks'}
+            </button>
+          }
+        />
         <p className="text-sm text-white/45 mb-6">
           A live self-audit of your secrets, encryption, access control and network hardening — including an
           active probe that tries to read private data with the public key. Re-run it any time.
@@ -169,7 +172,7 @@ export default function SecurityHealthPage() {
         <div className="space-y-5">
           {categories.map((cat) => (
             <div key={cat}>
-              <p className="text-xs uppercase tracking-[0.18em] text-white/35 mb-2">{cat}</p>
+              <p className="lx-mono mb-2">{cat}</p>
               <div className="space-y-2">
                 {checks.filter((c) => c.category === cat).map((c) => (
                   <div key={c.id} className="rounded-2xl border p-4"

@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
+import { PageHeader } from '@/components/ui/page-header'
 
 interface Issue { severity: 'SEV1' | 'SEV2' | 'SEV3'; code: string; message: string }
 interface Metrics {
@@ -25,7 +25,6 @@ const STATUS_META = {
 const SEV_COLOR: Record<Issue['severity'], string> = { SEV1: '#EF4444', SEV2: '#F5A623', SEV3: 'rgba(255,255,255,0.55)' }
 
 export function SentinelClient() {
-  const router = useRouter()
   const [data, setData] = useState<{ snapshot: Snapshot; triage: Triage | null } | null>(null)
   const [loading, setLoading] = useState(true)
   const [updatedAt, setUpdatedAt] = useState('')
@@ -53,16 +52,16 @@ export function SentinelClient() {
   return (
     <>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => router.back()} aria-label="Go back" className="w-11 h-11 rounded-full flex items-center justify-center text-white/50" style={{ background: 'rgba(255,255,255,0.06)' }}>←</button>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold text-white">Sentinel</h1>
-          <p className="text-xs text-white/40">Your 24/7 platform watch{updatedAt ? ` · updated ${updatedAt}` : ''}</p>
-        </div>
-        <button onClick={() => { setLoading(true); void fetchData() }} disabled={loading} className="text-xs text-white/45 hover:text-white/80 disabled:opacity-50">
-          {loading ? '…' : 'Refresh'}
-        </button>
-      </div>
+      <PageHeader
+        title="Sentinel"
+        subtitle={`Your 24/7 platform watch${updatedAt ? ` · updated ${updatedAt}` : ''}`}
+        badge="Super Admin"
+        actions={
+          <button onClick={() => { setLoading(true); void fetchData() }} disabled={loading} className="text-xs text-white/45 hover:text-white/80 disabled:opacity-50">
+            {loading ? '…' : 'Refresh'}
+          </button>
+        }
+      />
 
       {loading && !snap ? (
         <div className="lx-skeleton h-28 rounded-2xl" />
@@ -82,7 +81,7 @@ export function SentinelClient() {
           {/* AI triage (only when something's wrong) */}
           {data?.triage && (
             <div className="lx-card-amber-soft rounded-2xl p-4 space-y-2">
-              <p className="lx-amber text-xs font-bold tracking-wide">🤖 AI TRIAGE</p>
+              <p className="lx-amber lx-mono">🤖 AI TRIAGE</p>
               <p className="text-sm font-semibold text-white">{data.triage.headline}</p>
               <p className="text-sm text-white/70">{data.triage.what_broke}</p>
               <div className="text-xs text-white/55 space-y-1 pt-1">
@@ -104,7 +103,7 @@ export function SentinelClient() {
               ))}
             </div>
           ) : (
-            <div className="glass-thin rounded-xl p-3 text-sm text-white/50">
+            <div className="lx-surface rounded-xl p-3 text-sm text-white/50">
               No issues detected. Everything looks good. ✅
             </div>
           )}
@@ -138,9 +137,9 @@ export function SentinelClient() {
 function Tile({ label, value, sub, highlight, danger }: { label: string; value: string; sub?: string; highlight?: boolean; danger?: boolean }) {
   const color = danger ? '#EF4444' : highlight ? '#F5A623' : '#fff'
   return (
-    <div className="glass-thin rounded-xl px-3 py-2.5">
+    <div className="lx-surface rounded-xl px-3 py-2.5">
       <p className="text-[11px] text-white/40">{label}</p>
-      <p className="text-sm font-semibold truncate mt-0.5" style={{ color }}>{value}</p>
+      <p className="text-sm font-semibold truncate mt-0.5 lx-nums" style={{ color }}>{value}</p>
       {sub && <p className="text-[11px] text-white/30">{sub}</p>}
     </div>
   )

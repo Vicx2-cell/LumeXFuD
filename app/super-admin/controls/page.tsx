@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BackButton } from '@/components/back-button'
+import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 type PayoutsMode = 'auto' | 'manual' | 'frozen'
 
@@ -91,13 +92,14 @@ export default function ControlsPage() {
   if (!c) return <div className="lx-page flex items-center justify-center"><p className="text-white/40">Loading…</p></div>
 
   return (
-    <div className="lx-page px-5 py-10 overflow-hidden">
+    <div className="lx-page lx-console px-5 py-10 overflow-hidden">
+      <GlassSheen />
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg" style={{ background: '#F5A623', color: '#000' }}>{toast}</div>}
 
       {/* Money confirm dialog */}
       {confirmDlg && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-5" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="glass w-full max-w-sm p-5" style={{ border: '1px solid rgba(239,68,68,0.4)' }}>
+          <div className="lx-surface w-full max-w-sm p-5" style={{ border: '1px solid rgba(239,68,68,0.4)' }}>
             <p className="font-bold text-white text-lg mb-1">{confirmDlg.title}</p>
             <p className="text-sm text-white/55 mb-4">{confirmDlg.body}</p>
             <label className="text-xs text-white/50 block mb-1">Type <span className="font-mono text-amber-400">CONFIRM</span> to proceed</label>
@@ -116,12 +118,12 @@ export default function ControlsPage() {
         </div>
       )}
 
-      <div className="mx-auto max-w-lg lx-enter">
-        <div className="mb-6 flex items-center gap-3"><BackButton /><h1 className="text-xl font-bold text-white">Controls</h1></div>
+      <div className="relative z-10 mx-auto max-w-lg lx-enter">
+        <PageHeader title="Controls" badge="Super Admin" />
 
         {/* Status */}
-        <p className="text-xs uppercase tracking-wide text-red-400/80 mb-2 font-semibold">🚨 Status</p>
-        <div className="glass-thin divide-y divide-white/8 mb-6" style={{ border: '1px solid rgba(239,68,68,0.25)' }}>
+        <p className="lx-mono text-red-400/80 mb-2">🚨 Status</p>
+        <div className="lx-surface divide-y divide-white/8 mb-6" style={{ border: '1px solid rgba(239,68,68,0.25)' }}>
           <div className="p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -137,8 +139,8 @@ export default function ControlsPage() {
         </div>
 
         {/* Money — protected by confirm dialog */}
-        <p className="text-xs uppercase tracking-wide text-red-400/80 mb-2 font-semibold">💰 Money</p>
-        <div className="glass-thin divide-y divide-white/8 mb-6" style={{ border: '1px solid rgba(239,68,68,0.3)' }}>
+        <p className="lx-mono text-red-400/80 mb-2">💰 Money</p>
+        <div className="lx-surface divide-y divide-white/8 mb-6" style={{ border: '1px solid rgba(239,68,68,0.3)' }}>
           <div className="p-4">
             <p className="font-semibold text-white">Payouts</p>
             <p className="text-xs text-white/45 mt-0.5 mb-3">Gates the 15-min auto-release of vendor/rider earnings. <b>Frozen</b> stops all fund movement now; <b>Manual</b> pauses auto-release for admin to handle.</p>
@@ -176,8 +178,8 @@ export default function ControlsPage() {
         </div>
 
         {/* AI provider */}
-        <p className="text-xs uppercase tracking-wide text-white/40 mb-2 font-semibold">🤖 AI provider</p>
-        <div className="glass-thin mb-6">
+        <p className="lx-mono mb-2">🤖 AI provider</p>
+        <div className="lx-surface mb-6">
           <div className="p-4">
             <p className="font-semibold text-white">Active AI provider</p>
             <p className="text-xs text-white/45 mt-0.5 mb-3">Which engine powers ALL AI — Lumi, menu reader, Sentinel, dispute concierge, vendor/rider helpers, study. One switch, whole app. (The “AI features” master flag still turns AI off entirely.)</p>
@@ -200,8 +202,8 @@ export default function ControlsPage() {
         </div>
 
         {/* Operations */}
-        <p className="text-xs uppercase tracking-wide text-white/40 mb-2 font-semibold">Operations</p>
-        <div className="glass-thin divide-y divide-white/8">
+        <p className="lx-mono mb-2">Operations</p>
+        <div className="lx-surface divide-y divide-white/8">
           <div className="flex items-center justify-between gap-3 p-4">
             <div className="min-w-0">
               <p className="font-semibold text-white">Pause notifications</p>
@@ -248,8 +250,8 @@ export default function ControlsPage() {
         {/* Recent changes */}
         {recent.length > 0 && (
           <div className="mt-6">
-            <p className="text-xs uppercase tracking-wide text-white/40 mb-2 font-semibold">Last {recent.length} changes</p>
-            <div className="glass-thin divide-y divide-white/8">
+            <p className="lx-mono mb-2">Last {recent.length} changes</p>
+            <div className="lx-surface divide-y divide-white/8">
               {recent.map((r, i) => (
                 <div key={i} className="flex items-start justify-between gap-3 p-3">
                   <div className="min-w-0">
