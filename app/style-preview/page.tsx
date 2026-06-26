@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { EmptyState } from '@/components/ui/empty-state'
+import { GlassSheen } from '@/components/fx'
 
 // TEMPORARY no-auth visual preview of the console dashboard aesthetic.
 // Not linked anywhere; used to verify the redesign. Safe to delete.
@@ -23,6 +24,7 @@ const STATUS: Record<string, string> = {
 export default function StylePreview() {
   return (
     <div className="lx-page lx-console min-h-screen px-5 py-9 overflow-hidden">
+      <GlassSheen />
       <div className="relative z-10 mx-auto max-w-5xl">
         <PageHeader
           title="Dashboard"

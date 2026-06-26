@@ -1085,9 +1085,15 @@ html.lenis, html.lenis body { height: auto; }
   --lx-console-surface-hover: rgba(255,255,255,0.035);
 }
 
-/* Console page canvas — flat near-black, NO amber bloom / dot grid / orbs.
-   The $10k operator-tool look (Linear/Vercel) is restraint, not glassmorphism. */
-.lx-console { background-image: none !important; background-color: var(--lx-console-bg); }
+/* Console page canvas — near-black with a single warm amber bloom up top so the
+   glassy surfaces have brand light to refract (rhymes with the home hero). No
+   dot grid / orbs — restraint, but warm, not sterile. */
+.lx-page.lx-console {
+  background-color: var(--lx-console-bg);
+  background-image:
+    radial-gradient(115% 72% at 50% -12%, rgba(245,166,35,0.12), transparent 50%),
+    radial-gradient(75% 55% at 92% 112%, rgba(245,166,35,0.05), transparent 55%);
+}
 .lx-console .lx-orb { display: none !important; }
 
 /* Tabular numerals — apply to every number (KPIs, money, tables, counts). */
@@ -1099,12 +1105,25 @@ html.lenis, html.lenis body { height: auto; }
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--lx-text-faint);
 }
 
-/* Flat console surface (replaces glass on dashboards). */
+/* Glassy console surface — frosted dark glass + amber cursor sheen (the signature
+   "light under glass" interaction; --mx/--my set by GlassSheen, desktop only).
+   backdrop-filter is auto-stripped on phones by the global iOS-safety rule, which
+   leaves a clean translucent fill. */
 .lx-surface {
-  background: var(--lx-console-surface);
+  position: relative; overflow: hidden;
+  background: rgba(255,255,255,0.045);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
   border: 1px solid var(--lx-border);
   border-radius: 14px;
 }
+.lx-surface::before, .lx-statcard::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(240px circle at var(--mx, 50%) var(--my, -30%), rgba(245,166,35,0.16), transparent 62%);
+  opacity: 0; transition: opacity 0.4s ease;
+}
+.lx-surface:hover::before, .lx-statcard:hover::before { opacity: 1; }
+.lx-surface > *, .lx-statcard > * { position: relative; z-index: 1; }
 
 /* Hairline divider. */
 .lx-hairline { height: 1px; background: var(--lx-border); border: 0; width: 100%; }
@@ -1128,13 +1147,17 @@ html.lenis, html.lenis body { height: auto; }
 }
 .lx-ph-sub { font-size: 0.9rem; color: var(--lx-text-muted); margin-top: 0.4rem; max-width: 40rem; }
 
-/* ── KPI / stat card (flat console tile) ── */
+/* ── KPI / stat card (glassy console tile) ── */
 .lx-statcard {
+  position: relative; overflow: hidden;
   display: block; padding: 1.15rem 1.2rem; border-radius: 14px;
-  background: var(--lx-console-surface); border: 1px solid var(--lx-border);
+  background: rgba(255,255,255,0.045);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid var(--lx-border);
   transition: border-color 0.18s ease, background 0.18s ease;
 }
-a.lx-statcard:hover { border-color: var(--lx-border-strong); background: var(--lx-console-surface-hover); }
+a.lx-statcard:hover { border-color: rgba(245,166,35,0.3); background: rgba(255,255,255,0.06); }
 .lx-kpi-label {
   font-family: var(--font-mono); font-size: 0.64rem; font-weight: 500;
   letter-spacing: 0.11em; text-transform: uppercase; color: var(--lx-text-faint); line-height: 1.2;

@@ -7,6 +7,7 @@ import { LogoutButton } from '@/components/logout-button'
 import { CountUp } from '@/components/fx'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
+import { GlassSheen } from '@/components/fx'
 
 interface DashboardMetrics {
   orders_today: number
@@ -94,6 +95,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="lx-page lx-console px-4 py-10 overflow-hidden">
+      <GlassSheen />
       <div className="relative z-10 mx-auto max-w-2xl lg:max-w-4xl lx-enter">
         {/* Header */}
         <PageHeader

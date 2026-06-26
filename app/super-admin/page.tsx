@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { LogoutButton } from '@/components/logout-button'
 import { PageHeader } from '@/components/ui/page-header'
+import { GlassSheen } from '@/components/fx'
 
 const svg = (path: React.ReactNode) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{path}</svg>
@@ -116,6 +117,7 @@ export default function SuperAdminDashboard() {
 
   return (
     <div className="lx-page lx-console px-5 py-10 overflow-hidden">
+      <GlassSheen />
       <div className="relative z-10 mx-auto max-w-2xl lx-enter">
         <PageHeader
           title="God Mode"
