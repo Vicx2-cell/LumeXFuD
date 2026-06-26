@@ -29,6 +29,11 @@ const ROLE_TABLE: Record<string, string> = {
 // Public routes that logged-in users should be redirected away from
 const LANDING_ROUTES = new Set(['/', '/auth/register', '/auth/forgot-pin'])
 
+// Exploit-scanner probe paths — never legitimate here. Matched anywhere in the
+// path so nested probes (e.g. /foo/.git/config) are caught too.
+const SCANNER_RE =
+  /(?:^|\/)(?:\.env|\.git|\.aws|\.ssh|\.svn|\.hg|wp-login\.php|wp-admin|xmlrpc\.php|phpmyadmin|vendor\/phpunit|config\.php|\.htaccess|\.DS_Store|id_rsa|\.well-known\/[^/]*\.php)(?:$|\/|\.)/i
+
 // ─── Content-Security-Policy ──────────────────────────────────────────────────
 // NOTE: nonce + 'strict-dynamic' was tried and BROKE production. Next.js only
 // injects the per-request nonce into its <script> tags when a route is
@@ -83,6 +88,15 @@ async function hasPinResetPending(phone: string, role: string): Promise<boolean>
 // Next.js 16: function must be named "proxy" (renamed from "middleware")
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
+
+  // ─── Edge exploit-scanner firewall ──────────────────────────────────────────
+  // Instantly 404 automated probes for paths that are NEVER legitimate on this
+  // app (env files, VCS dirs, secrets, and other stacks' admin panels). Stops the
+  // noisy bot floods that hammer every public site before they reach app code,
+  // and never reveals that the path was "blocked". Real routes are unaffected.
+  if (SCANNER_RE.test(pathname)) {
+    return new NextResponse('Not found', { status: 404 })
+  }
 
   // Per-request CSP nonce. Global Web Crypto + btoa are available on the
   // Edge runtime (no Node imports needed here).

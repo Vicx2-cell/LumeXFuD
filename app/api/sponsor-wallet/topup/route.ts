@@ -68,7 +68,10 @@ export async function POST(req: NextRequest) {
 
   const bonusPct = await getTopupBonusPct()
   const bonusKobo = Math.floor((amountKobo * bonusPct) / 100)
-  const reference = `TOPUP-${customer.id.slice(0, 8)}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
+  // Full-UUID random tail (122 bits) so the reference is an UNGUESSABLE capability:
+  // the public sponsor-receipt endpoint is authorised purely by knowing this ref,
+  // so an 8-char tail (~32 bits) was brute-forceable. Never shorten this.
+  const reference = `TOPUP-${customer.id.slice(0, 8)}-${crypto.randomUUID().replace(/-/g, '').toUpperCase()}`
 
   const secret = process.env.PAYSTACK_SECRET_KEY
   if (!secret) return NextResponse.json({ error: 'Payment not configured' }, { status: 500 })

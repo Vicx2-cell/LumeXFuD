@@ -3,9 +3,18 @@ import crypto from 'crypto'
 // ─── HMAC ─────────────────────────────────────────────────────────────────────
 
 export function verifyHMAC(rawBody: string, signature: string, secret: string): boolean {
-  const hash = crypto.createHmac('sha512', secret).update(rawBody).digest('hex')
-  if (hash.length !== signature.length) return false
-  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(signature))
+  // Paystack signs with a lowercase hex HMAC-SHA512. Decode both sides to raw
+  // bytes and length-check the BUFFERS before the constant-time compare, so a
+  // malformed/forged signature string fails closed (returns false) instead of
+  // throwing on a buffer-size mismatch inside timingSafeEqual.
+  try {
+    const hash = crypto.createHmac('sha512', secret).update(rawBody).digest()
+    const sig = Buffer.from(signature, 'hex')
+    if (sig.length !== hash.length) return false
+    return crypto.timingSafeEqual(hash, sig)
+  } catch {
+    return false
+  }
 }
 
 export function constantTimeEqual(a: string, b: string): boolean {

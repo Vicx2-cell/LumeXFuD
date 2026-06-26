@@ -419,6 +419,23 @@ async function handleSubscriptionPayment(
   const vendorId = metadata.vendor_id as string
   if (!vendorId) return
 
+  // Re-verify the charge with Paystack and use the VERIFIED settled amount —
+  // NEVER trust metadata.amount (a client could inflate recorded revenue, or pay
+  // a token amount while claiming a full tier). Mirrors the order/top-up branches.
+  let subscriptionAmount = 0
+  try {
+    const verified = await verifyPaystackTransaction(reference)
+    if (verified.status !== 'success') {
+      console.warn(`[webhook] subscription charge ${reference} not 'success' on verify — not crediting`)
+      return
+    }
+    subscriptionAmount = Number(verified.amount)
+  } catch (err) {
+    console.error(`[webhook] subscription verify failed for ${reference} — not crediting:`, err)
+    return
+  }
+  if (!Number.isFinite(subscriptionAmount) || subscriptionAmount <= 0) return
+
   const { data: vendor } = await db
     .from('vendors')
     .select('subscription_tier')
@@ -430,8 +447,6 @@ async function handleSubscriptionPayment(
   const now = new Date()
   const periodEnd = new Date(now)
   periodEnd.setMonth(periodEnd.getMonth() + 1)
-
-  const subscriptionAmount = Number(metadata.amount ?? 0)
 
   await db.from('vendor_subscriptions').insert({
     vendor_id: vendorId,

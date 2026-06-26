@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
 // { pending:true } until the webhook has credited the wallet (a few seconds).
 export async function GET(req: NextRequest) {
   const ref = req.nextUrl.searchParams.get('ref') ?? ''
-  if (!/^TOPUP-[A-Za-z0-9-]{4,40}$/.test(ref)) {
+  if (!/^TOPUP-[A-Za-z0-9-]{4,60}$/.test(ref)) {
     return NextResponse.json({ error: 'Invalid reference' }, { status: 400 })
   }
 
