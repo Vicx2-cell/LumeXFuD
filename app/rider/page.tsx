@@ -577,8 +577,19 @@ export default function RiderDashboard() {
       <div className="mx-4 mt-5"><LaunchCounter /></div>
       <div className="mx-4 mt-5"><KycPanel role="rider" /></div>
 
-      <div className="pt-4 pb-6 flex justify-center">
-        <LogoutButton />
+      {/* Account & settings consolidated on one page (profile, payout, security,
+          sign out) — keeps this screen focused on deliveries. */}
+      <div className="mx-4 mt-5 mb-2">
+        <a href="/rider/settings" className="block lx-surface lx-tap p-4">
+          <div className="flex items-center gap-3">
+            <span className="text-xl shrink-0" aria-hidden="true">⚙️</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white">Account &amp; settings</p>
+              <p className="text-xs text-white/45">Profile, payout, security &amp; sign out</p>
+            </div>
+            <span className="text-white/30" aria-hidden="true">→</span>
+          </div>
+        </a>
       </div>
     </main>
   )

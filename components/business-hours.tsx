@@ -61,13 +61,13 @@ export function BusinessHours({
   } as const
 
   return (
-    <div className="glass-thin px-4 py-3">
+    <div className="lx-surface px-4 py-3.5">
       {/* Collapsed summary row — tap to edit */}
       <button
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center justify-between text-left"
       >
-        <span className="text-xs text-white/40 uppercase tracking-widest">{label}</span>
+        <span className="lx-mono">{label}</span>
         <span className="flex items-center gap-2">
           {msg && <span className="text-xs" style={{ color: msg === 'Saved' ? '#4ade80' : '#f87171' }}>{msg}</span>}
           <span className="text-sm font-medium tabular-nums" style={{ color: savedOpen ? '#F5A623' : 'rgba(255,255,255,0.35)' }}>
