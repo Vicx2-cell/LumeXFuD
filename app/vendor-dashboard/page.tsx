@@ -262,46 +262,40 @@ export default function VendorDashboard() {
         {/* KYC verification — upload & track documents, verified badge */}
         <KycPanel role="vendor" />
 
-        {/* All store settings consolidated on one dedicated page (store
-            appearance, hours, pickup, payout, security) — keeps this screen
-            focused on live operations. */}
-        <button
-          onClick={() => router.push('/vendor-dashboard/settings')}
-          className="w-full lx-surface lx-tap p-4 text-left"
-        >
-          <div className="flex items-center gap-3">
-            <span className="text-xl shrink-0" aria-hidden="true">⚙️</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white">Settings</p>
-              <p className="text-xs text-white/45">Store appearance, hours, pickup, payout &amp; more</p>
-            </div>
-            <span className="text-white/30" aria-hidden="true">→</span>
+        {/* Manage — all navigation consolidated into ONE grouped card instead of
+            scattered buttons + a separate settings tile. */}
+        <div>
+          <p className="lx-mono mb-3 px-1">Manage</p>
+          <div className="lx-surface overflow-hidden">
+            {[
+              { href: '/vendor-dashboard/menu',     icon: '🍽️', label: 'Menu & items',     desc: 'Add, edit & price your food' },
+              { href: '/vendor-dashboard/earnings', icon: '💰', label: 'Earnings & payout', desc: 'Balance, withdrawals & bank' },
+              { href: '/vendor-dashboard/reviews',  icon: '⭐', label: 'Reviews',           desc: 'What customers are saying' },
+              { href: '/vendor-dashboard/settings', icon: '⚙️', label: 'Settings',          desc: 'Store, hours, pickup, security' },
+            ].map((m, i) => (
+              <button
+                key={m.href}
+                onClick={() => router.push(m.href)}
+                className={`w-full flex items-center gap-3 p-4 lx-tap text-left${i > 0 ? ' border-t border-white/6' : ''}`}
+              >
+                <span className="text-xl shrink-0" aria-hidden="true">{m.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white/85">{m.label}</p>
+                  <p className="text-xs text-white/40">{m.desc}</p>
+                </div>
+                <span className="text-white/30" aria-hidden="true">→</span>
+              </button>
+            ))}
           </div>
-        </button>
+        </div>
         </div>
 
         {/* Orders — FIRST on mobile, left column on desktop */}
         <div className="space-y-4 order-1 lg:order-none lg:col-start-1 lg:row-start-1">
-          {/* Quick actions */}
-          <div className="grid grid-cols-3 gap-2.5">
-            {[
-              { label: 'Menu', href: '/vendor-dashboard/menu', icon: <><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></> },
-              { label: 'Earnings', href: '/vendor-dashboard/earnings', icon: <><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></> },
-              { label: 'Reviews', href: '/vendor-dashboard/reviews', icon: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/> },
-            ].map((a) => (
-              <button key={a.label} onClick={() => router.push(a.href)}
-                className="lx-surface lx-tap flex flex-col items-center gap-2 py-3.5 rounded-2xl">
-                <span className="lx-icon-badge w-9 h-9 rounded-xl">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{a.icon}</svg>
-                </span>
-                <span className="text-xs font-semibold text-white/85">{a.label}</span>
-              </button>
-            ))}
-          </div>
-
           {/* Shop status */}
+          <p className="lx-mono px-1">Live</p>
           <div className="lx-surface p-4 space-y-3">
-            <p className="lx-mono">Shop Status</p>
+            <p className="text-sm font-semibold text-white/80">Shop status</p>
             <div className="grid grid-cols-3 gap-2">
               {(['OPEN', 'BUSY', 'CLOSED'] as const).map((s) => {
                 const active_ = vendor?.status === s
