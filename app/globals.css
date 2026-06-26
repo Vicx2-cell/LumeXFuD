@@ -733,6 +733,33 @@ html.lx-has-touch-cursor.lx-touch-active .lx-cursor-lens { opacity: 1; }
   backdrop-filter: blur(14px) saturate(1.15);
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
+/* Solid nav in LIGHT mode → warm light glass with dark text (the remap colours
+   the links), instead of a dark bar with invisible dark-on-dark text. */
+:root[data-theme="light"] .lx-landing-nav--solid {
+  background: rgba(246, 244, 239, 0.85);
+  border-bottom-color: var(--lx-border);
+}
+/* Transparent nav floating over the ALWAYS-dark hero photo: force light chrome
+   in BOTH themes (don't let the light-mode ink-remap make it invisible on the
+   dark photo). The amber wordmark + amber CTA keep their colours. */
+.lx-landing-nav:not(.lx-landing-nav--solid) .lx-display,
+.lx-landing-nav:not(.lx-landing-nav--solid) a:not(.lx-btn-amber) { color: #fff !important; }
+.lx-landing-nav:not(.lx-landing-nav--solid) .lx-amber { color: var(--color-amber) !important; }
+.lx-landing-nav:not(.lx-landing-nav--solid) .lx-theme-btn {
+  color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2);
+}
+
+/* Compact light/dark switch button (nav). */
+.lx-theme-btn {
+  width: 36px; height: 36px; border-radius: 9999px; flex: none;
+  display: inline-grid; place-items: center;
+  color: var(--lx-text-muted);
+  background: var(--lx-surface);
+  border: 1px solid var(--lx-border);
+  transition: color 0.2s, background 0.2s, transform 0.15s;
+}
+.lx-theme-btn:hover { color: var(--lx-text); }
+.lx-theme-btn:active { transform: scale(0.94); }
 
 /* ── Media stack ── */
 .lx-hero-media { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
