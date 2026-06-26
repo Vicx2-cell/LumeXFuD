@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { ConfirmSheet } from '@/components/ui/confirm-sheet'
 import { BackButton } from '@/components/back-button'
 import { FaceIdSetup } from '@/components/face-id-setup'
 import { LumiMemoryCard } from '@/components/lumi-memory-card'
@@ -71,7 +71,6 @@ export function ProfileClient({
   supportPhone?: string
   hasPin: boolean
 }) {
-  const router = useRouter()
   const features = useFeatures()
   const [name, setName] = useState(profile?.name ?? '')
   const [hostel, setHostel] = useState(profile?.hostel ?? '')
@@ -107,10 +106,14 @@ export function ProfileClient({
   const [pinWorking, setPinWorking] = useState(false)
   const [pinSuccess, setPinSuccess] = useState('')
 
-  // NDPR account deletion (two-step confirm, so a stray tap can't wipe an account).
+  // NDPR account deletion (confirmation sheet, so a stray tap can't wipe an account).
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+
+  // Sign out — confirmation sheet + loading state.
+  const [signOutOpen, setSignOutOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   function resetPinFlow() {
     setPinFlow('idle')
@@ -236,9 +239,16 @@ export function ProfileClient({
   }
 
   async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    router.push('/')
-    router.refresh()
+    setSigningOut(true)
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch {
+      /* network blip — still navigate away; the cookie clears server-side */
+    }
+    // HARD navigation (not router.push): a full reload guarantees the cleared
+    // session takes effect and wipes all client/PWA state, so we never land in
+    // a half-logged-in limbo.
+    window.location.href = '/'
   }
 
   async function handleDeleteAccount() {
@@ -247,18 +257,20 @@ export function ProfileClient({
     try {
       const res = await fetch('/api/auth/account', { method: 'DELETE' })
       if (res.ok) {
-        // Account anonymized + session revoked server-side — drop them home.
-        router.push('/')
-        router.refresh()
+        // Account anonymized + session revoked + cookie cleared server-side.
+        // Hard reload home so no stale logged-in state lingers.
+        window.location.href = '/'
         return
       }
       const d = await res.json().catch(() => ({})) as { error?: string }
       setDeleteError(d.error ?? 'Could not delete your account. Please try again.')
+      setDeleting(false)
     } catch {
       setDeleteError('Network error. Please try again.')
-    } finally {
       setDeleting(false)
     }
+    // NOTE: on success we intentionally do NOT clear `deleting` — the page is
+    // navigating away, so the button stays in its "Deleting…" state.
   }
 
   const hasStreak = !!streak && streak.current_streak_days > 0
@@ -571,49 +583,48 @@ export function ProfileClient({
           <a href="/terms" className="block text-sm text-white/65 hover:text-white py-1.5 transition-colors">
             Terms of service
           </a>
-          {!confirmDelete ? (
-            <button
-              onClick={() => { setDeleteError(''); setConfirmDelete(true) }}
-              className="block text-sm py-1.5 w-full text-left"
-              style={{ color: '#ef4444' }}
-            >
-              Delete account
-            </button>
-          ) : (
-            <div className="rounded-xl p-3 space-y-2" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-              <p className="text-sm text-white/80">Delete your account? This anonymizes your data and signs you out. It can’t be undone.</p>
-              {deleteError && <p className="text-xs" style={{ color: '#ef4444' }}>{deleteError}</p>}
-              <div className="flex gap-2">
-                <button
-                  onClick={handleDeleteAccount}
-                  disabled={deleting}
-                  className="flex-1 rounded-lg py-2 text-sm font-medium disabled:opacity-50"
-                  style={{ background: '#ef4444', color: '#fff' }}
-                >
-                  {deleting ? 'Deleting…' : 'Yes, delete'}
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  disabled={deleting}
-                  className="flex-1 rounded-lg py-2 text-sm font-medium disabled:opacity-50"
-                  style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)' }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
+          <button
+            onClick={() => { setDeleteError(''); setConfirmDelete(true) }}
+            className="block text-sm py-1.5 w-full text-left transition-colors hover:opacity-80"
+            style={{ color: '#ef4444' }}
+          >
+            Delete account
+          </button>
         </div>
 
         {/* Sign out */}
         <button
-          onClick={handleLogout}
-          className="w-full rounded-xl py-3.5 text-sm font-medium"
-          style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.15)' }}
+          onClick={() => setSignOutOpen(true)}
+          className="w-full rounded-xl py-3.5 text-sm font-semibold transition-colors active:scale-[0.99]"
+          style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.18)' }}
         >
           Sign out
         </button>
       </div>
+
+      {/* Confirmation sheets — clear loading feedback, hard-reload on success. */}
+      <ConfirmSheet
+        open={signOutOpen}
+        title="Sign out?"
+        body="You'll need your PIN (or a one-time code) to sign back in."
+        confirmLabel="Sign out"
+        loadingLabel="Signing out…"
+        loading={signingOut}
+        onConfirm={handleLogout}
+        onCancel={() => setSignOutOpen(false)}
+      />
+      <ConfirmSheet
+        open={confirmDelete}
+        title="Delete your account?"
+        body={<>This permanently anonymizes your data and signs you out. <span className="text-white/85 font-medium">It can&apos;t be undone.</span></>}
+        confirmLabel="Yes, delete my account"
+        loadingLabel="Deleting your account…"
+        danger
+        loading={deleting}
+        error={deleteError}
+        onConfirm={handleDeleteAccount}
+        onCancel={() => { if (!deleting) setConfirmDelete(false) }}
+      />
     </>
   )
 }

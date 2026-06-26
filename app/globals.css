@@ -491,6 +491,15 @@ a:active,
 @keyframes lx-scale-in { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
 .lx-scale-in { animation: lx-scale-in 0.3s var(--spring-bouncy) both; }
 
+/* Inline button spinner — inherits the button's text colour (currentColor). */
+.lx-spinner {
+  width: 15px; height: 15px; flex: none; border-radius: 9999px;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: lx-spin 0.7s linear infinite;
+}
+@keyframes lx-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .lx-spinner { animation-duration: 1.4s; } }
+
 /* Flame pulse: gentle flicker on an at-risk streak to draw the eye (loss aversion) */
 @keyframes lx-flame-pulse {
   0%, 100% { transform: scale(1) rotate(-2deg); opacity: 0.9; }
