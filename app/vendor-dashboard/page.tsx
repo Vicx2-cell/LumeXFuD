@@ -11,7 +11,8 @@ import { DemandBanner } from '@/components/demand-banner'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
 import { Badge } from '@/components/ui/badge'
-import { CountUp, GlassSheen } from '@/components/fx'
+import { GlassSheen } from '@/components/fx'
+import { UtensilsCrossed, Wallet, Star, Settings2, ChevronRight } from 'lucide-react'
 
 interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
 interface VendorOrder {
@@ -268,22 +269,24 @@ export default function VendorDashboard() {
           <p className="lx-mono mb-3 px-1">Manage</p>
           <div className="lx-surface overflow-hidden">
             {[
-              { href: '/vendor-dashboard/menu',     icon: '🍽️', label: 'Menu & items',     desc: 'Add, edit & price your food' },
-              { href: '/vendor-dashboard/earnings', icon: '💰', label: 'Earnings & payout', desc: 'Balance, withdrawals & bank' },
-              { href: '/vendor-dashboard/reviews',  icon: '⭐', label: 'Reviews',           desc: 'What customers are saying' },
-              { href: '/vendor-dashboard/settings', icon: '⚙️', label: 'Settings',          desc: 'Store, hours, pickup, security' },
+              { href: '/vendor-dashboard/menu',     Icon: UtensilsCrossed, label: 'Menu & items',     desc: 'Add, edit & price your food' },
+              { href: '/vendor-dashboard/earnings', Icon: Wallet,          label: 'Earnings & payout', desc: 'Balance, withdrawals & bank' },
+              { href: '/vendor-dashboard/reviews',  Icon: Star,            label: 'Reviews',           desc: 'What customers are saying' },
+              { href: '/vendor-dashboard/settings', Icon: Settings2,       label: 'Settings',          desc: 'Store, hours, pickup, security' },
             ].map((m, i) => (
               <button
                 key={m.href}
                 onClick={() => router.push(m.href)}
-                className={`w-full flex items-center gap-3 p-4 lx-tap text-left${i > 0 ? ' border-t border-white/6' : ''}`}
+                className={`w-full flex items-center gap-3 p-4 lx-tap text-left${i > 0 ? ' border-t border-white/[0.06]' : ''}`}
               >
-                <span className="text-xl shrink-0" aria-hidden="true">{m.icon}</span>
+                <span className="w-9 h-9 rounded-xl grid place-items-center text-white/55 shrink-0" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--lx-border)' }}>
+                  <m.Icon size={18} strokeWidth={1.75} />
+                </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white/85">{m.label}</p>
+                  <p className="text-sm font-medium text-white/90">{m.label}</p>
                   <p className="text-xs text-white/40">{m.desc}</p>
                 </div>
-                <span className="text-white/30" aria-hidden="true">→</span>
+                <ChevronRight size={16} strokeWidth={2} className="text-white/30 shrink-0" />
               </button>
             ))}
           </div>
@@ -296,27 +299,21 @@ export default function VendorDashboard() {
           <p className="lx-mono px-1">Live</p>
           <div className="lx-surface p-4 space-y-3">
             <p className="text-sm font-semibold text-white/80">Shop status</p>
-            <div className="grid grid-cols-3 gap-2">
-              {(['OPEN', 'BUSY', 'CLOSED'] as const).map((s) => {
-                const active_ = vendor?.status === s
-                const colors = { OPEN: '#4ade80', BUSY: '#F5A623', CLOSED: '#f87171' }
-                return (
-                  <button
-                    key={s}
-                    onClick={() => setStatus(s)}
-                    disabled={statusBusy || active_}
-                    className="py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
-                    style={{
-                      background: active_ ? colors[s] : 'rgba(255,255,255,0.06)',
-                      color: active_ ? '#000' : 'rgba(255,255,255,0.6)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                    }}
-                  >
-                    {s}
-                  </button>
-                )
-              })}
-            </div>
+            {(() => {
+              const opts = ['OPEN', 'BUSY', 'CLOSED'] as const
+              const idx = Math.max(0, opts.indexOf((vendor?.status ?? 'OPEN') as (typeof opts)[number]))
+              const tint = ['#34d399', '#F5A623', '#f87171'][idx]
+              return (
+                <div className="lx-seg" style={{ ['--seg-n' as string]: 3, ['--seg-i' as string]: idx, ['--seg-tint' as string]: tint } as React.CSSProperties}>
+                  <span className="lx-seg-pill" />
+                  {opts.map((s) => (
+                    <button key={s} className="lx-seg-opt" data-on={vendor?.status === s} disabled={statusBusy} onClick={() => setStatus(s)}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
             <div className="relative">
               <button
                 onClick={() => setPauseMenuOpen((v) => !v)}
@@ -346,18 +343,22 @@ export default function VendorDashboard() {
             )}
           </div>
 
-          {/* Order pipeline at a glance */}
-          <div className="grid grid-cols-3 gap-2.5">
-            {[
-              { label: 'New', value: pendingCount, color: 'var(--color-amber)' },
-              { label: 'Preparing', value: prepCount, color: 'var(--lx-violet)' },
-              { label: 'Ready', value: readyCount, color: 'var(--lx-green)' },
-            ].map((s) => (
-              <div key={s.label} className="lx-surface rounded-2xl px-3 py-3 text-center">
-                <p className="lx-display text-2xl font-bold tabular-nums leading-none" style={{ color: s.value > 0 ? s.color : 'rgba(255,255,255,0.25)' }}><CountUp value={s.value} /></p>
-                <p className="text-[11px] text-white/45 mt-1.5">{s.label}</p>
-              </div>
-            ))}
+          {/* Order pipeline — shape, not just counts */}
+          <div className="lx-surface p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="lx-mono">Order pipeline</p>
+              <span className="text-xs text-white/45 lx-nums">{pendingCount + prepCount + readyCount} active</span>
+            </div>
+            <div className="lx-pipe">
+              {pendingCount > 0 && <span style={{ flexGrow: pendingCount, background: 'var(--color-amber)' }} />}
+              {prepCount > 0 && <span style={{ flexGrow: prepCount, background: 'var(--lx-blue)' }} />}
+              {readyCount > 0 && <span style={{ flexGrow: readyCount, background: 'var(--lx-green)' }} />}
+            </div>
+            <div className="flex items-center gap-3.5 mt-2.5 text-[11px] text-white/50 lx-nums">
+              <span><b className="text-white/85">{pendingCount}</b> New</span>
+              <span><b className="text-white/85">{prepCount}</b> Preparing</span>
+              <span><b className="text-white/85">{readyCount}</b> Ready</span>
+            </div>
           </div>
 
         {/* Active Orders */}

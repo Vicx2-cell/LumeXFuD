@@ -1150,11 +1150,20 @@ html.lenis, html.lenis body { height: auto; }
    leaves a clean translucent fill. */
 .lx-surface {
   position: relative;
-  background: rgba(255,255,255,0.045);
+  /* Crafted-glass material: a faint top→down gradient gives the surface a light
+     direction; the inset top highlight fakes a lit bevel (the detail that reads
+     "physical glass", not "grey box"); soft layered shadow lifts it off the page. */
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.032) 0%, rgba(255,255,255,0) 42%),
+    rgba(255,255,255,0.04);
   -webkit-backdrop-filter: blur(16px) saturate(1.4);
   backdrop-filter: blur(16px) saturate(1.4);
   border: 1px solid var(--lx-border);
-  border-radius: 14px;
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 1px 2px rgba(0,0,0,0.35),
+    0 14px 30px -18px rgba(0,0,0,0.65);
 }
 /* Sheen clips to the card's rounded corners via border-radius (NOT overflow:hidden)
    so cards containing pop-overs/dropdowns don't clip them. */
@@ -1192,11 +1201,17 @@ html.lenis, html.lenis body { height: auto; }
 /* ── KPI / stat card (glassy console tile) ── */
 .lx-statcard {
   position: relative;
-  display: block; padding: 1.15rem 1.2rem; border-radius: 14px;
-  background: rgba(255,255,255,0.045);
+  display: block; padding: 1.15rem 1.2rem; border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.032) 0%, rgba(255,255,255,0) 42%),
+    rgba(255,255,255,0.04);
   -webkit-backdrop-filter: blur(16px) saturate(1.4);
   backdrop-filter: blur(16px) saturate(1.4);
   border: 1px solid var(--lx-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 1px 2px rgba(0,0,0,0.35),
+    0 14px 30px -18px rgba(0,0,0,0.65);
   transition: border-color 0.18s ease, background 0.18s ease;
 }
 a.lx-statcard:hover { border-color: rgba(245,166,35,0.3); background: rgba(255,255,255,0.06); }
@@ -1254,6 +1269,62 @@ a.lx-statcard:hover { border-color: rgba(245,166,35,0.3); background: rgba(255,2
 }
 .lx-empty-title { font-weight: 600; color: var(--lx-text); font-size: 0.95rem; }
 .lx-empty-desc { font-size: 0.82rem; color: var(--lx-text-faint); margin-top: 0.4rem; max-width: 22rem; margin-left: auto; margin-right: auto; line-height: 1.45; }
+
+/* ── Hero metric — the "one big number" ── */
+.lx-hero-num {
+  font-family: var(--font-display); font-weight: 600; letter-spacing: -0.025em;
+  font-size: clamp(2.3rem, 10vw, 2.9rem); line-height: 1; color: #fafafa;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sliding segmented control (OPEN/BUSY/CLOSED) ── */
+.lx-seg {
+  position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--lx-border);
+  border-radius: 9999px; padding: 4px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.lx-seg-pill {
+  position: absolute; top: 4px; bottom: 4px; z-index: 0;
+  width: calc((100% - 8px) / var(--seg-n, 3));
+  left: calc(4px + var(--seg-i, 0) * ((100% - 8px) / var(--seg-n, 3)));
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--seg-tint, #34d399) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--seg-tint, #34d399) 42%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+  transition: left 0.26s cubic-bezier(0.32, 0.72, 0, 1), background 0.26s ease, border-color 0.26s ease;
+}
+.lx-seg-opt {
+  position: relative; z-index: 1; min-height: 44px; cursor: pointer;
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em;
+  color: var(--lx-text-faint); background: none; border: 0; transition: color 0.2s;
+}
+.lx-seg-opt[data-on="true"] { color: #fafafa; }
+
+/* ── Monogram avatar (no photo needed — a tinted initial) ── */
+.lx-mono-av {
+  width: 40px; height: 40px; border-radius: 12px; flex: none;
+  display: grid; place-items: center; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.01em;
+  color: var(--av, var(--color-amber));
+  background: color-mix(in srgb, var(--av, #F5A623) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--av, #F5A623) 24%, transparent);
+}
+
+/* ── Status pill ── */
+.lx-spill {
+  display: inline-block; font-size: 0.62rem; font-weight: 600; letter-spacing: 0.04em;
+  padding: 0.18rem 0.5rem; border-radius: 9999px; line-height: 1.1; white-space: nowrap;
+  color: var(--c, var(--color-amber));
+  background: color-mix(in srgb, var(--c, #F5A623) 16%, transparent);
+}
+
+/* ── Pipeline mini-bar — order state has shape, not just counts ── */
+.lx-pipe { display: flex; gap: 3px; height: 7px; border-radius: 9999px; overflow: hidden; background: rgba(255,255,255,0.05); }
+.lx-pipe > span { display: block; min-width: 3px; transition: flex-grow 0.5s var(--spring-smooth); }
+
+/* ── Hairline list row (orders) — rows on one surface, not nested cards ── */
+.lx-row { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem; }
+.lx-row + .lx-row { border-top: 1px solid var(--lx-border); }
+.lx-row-r { display: grid; justify-items: end; gap: 0.25rem; }
 
 /* ============================================================
    Reduced motion — honour the OS preference everywhere
