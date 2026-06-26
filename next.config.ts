@@ -36,6 +36,17 @@ const nextConfig: NextConfig = {
         source: '/(.*)',
         headers: securityHeaders,
       },
+      {
+        // The service worker MUST never be HTTP-cached, or the browser keeps
+        // serving the old sw.js and never sees a new CACHE_NAME — so deploys
+        // never reach already-installed PWAs (the "I don't see any change" bug).
+        // Always revalidate it so a new SW is picked up on the next foreground.
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
     ];
   },
 };
