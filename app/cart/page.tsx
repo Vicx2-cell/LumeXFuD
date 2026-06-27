@@ -8,15 +8,9 @@ import { formatPrice } from '@/lib/money'
 import { useFeatures } from '@/lib/use-features'
 import { estimateOrderPrepMinutes, prepRangeLabel } from '@/lib/prep-time'
 import { formatHoursRange } from '@/lib/hours'
-import dynamic from 'next/dynamic'
 import { type MapLodge } from '@/components/lodge-map'
-
-// Defer the map (and Leaflet's CSS) until the customer actually opens it — keeps
-// the cart's initial JS/CSS lean for fast first paint on slow connections.
-const LodgeMap = dynamic(() => import('@/components/lodge-map').then((m) => ({ default: m.LodgeMap })), {
-  ssr: false,
-  loading: () => <div className="lx-skeleton rounded-2xl" style={{ height: 240 }} />,
-})
+import { DeliveryAddress } from '@/components/delivery-address'
+import { composeDeliveryAddress, lodgeBlocksFor, type DeliveryAddressParts } from '@/lib/delivery-address'
 
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
 
@@ -29,7 +23,8 @@ export default function CartPage() {
   const [groupBusy, setGroupBusy] = useState(false)
 
   const [deliveryType,  setDeliveryType]  = useState<'BIKE' | 'DOOR' | 'PICKUP'>('BIKE')
-  const [address,       setAddress]       = useState('')
+  // Structured delivery address — composed into one rider-clear string at checkout.
+  const [addr,          setAddr]          = useState<DeliveryAddressParts>({ lodge: '', block: '', room: '', landmark: '' })
   const [instructions,  setInstructions]  = useState('')
   const [tip,           setTip]           = useState(0)
   const [loading,       setLoading]       = useState(false)
@@ -55,9 +50,9 @@ export default function CartPage() {
   const [paymentMethod,    setPaymentMethod]    = useState<PaymentMethod>('PAYSTACK')
   // Saved delivery addresses (learned over time from past orders).
   const [savedAddresses,   setSavedAddresses]   = useState<string[]>([])
-  // Verified ABSU lodges that have coordinates (for the pick-on-map picker).
-  const [mapLodges,        setMapLodges]        = useState<MapLodge[]>([])
-  const [showMap,          setShowMap]          = useState(false)
+  // Verified ABSU lodge catalog (names, coords, blocks) — feeds search, the map,
+  // and the per-lodge block dropdown.
+  const [catalogLodges,    setCatalogLodges]    = useState<MapLodge[]>([])
   // GPS for this delivery (from "use my location" or a map/lodge pin). Cleared
   // when the address is hand-edited so coords never mismatch the text.
   const [coords,           setCoords]           = useState<{ lat: number; lng: number } | null>(null)
@@ -105,13 +100,13 @@ export default function CartPage() {
       const merged: string[] = [...personal]
       for (const l of catalog) if (!merged.includes(l)) merged.push(l)
       setSavedAddresses(merged)
-      setMapLodges(lodges.filter((l) => l.latitude != null && l.longitude != null))
+      setCatalogLodges(lodges)
       // A "Saved places → Order here" tap pre-fills the chosen place (takes
       // priority over the learned default); otherwise fall back to most-used.
       let prefill: string | null = null
       try { prefill = sessionStorage.getItem('lx_prefill_address'); if (prefill) sessionStorage.removeItem('lx_prefill_address') } catch { /* ignore */ }
-      if (prefill) setAddress((cur) => cur || prefill!)
-      else if (personal.length > 0) setAddress((cur) => cur || personal[0])
+      const seed = prefill || (personal.length > 0 ? personal[0] : '')
+      if (seed) setAddr((cur) => cur.lodge ? cur : { ...cur, lodge: seed })
     }).catch(() => {})
 
     // Surface any items "Order again" had to drop (no longer on the menu).
@@ -125,6 +120,8 @@ export default function CartPage() {
   }, [])
 
   const isPickup        = deliveryType === 'PICKUP'
+  // Fold the structured parts into one rider-clear line ("Lodge · Block B · Room 12 · landmark").
+  const composedAddress = isPickup ? '' : composeDeliveryAddress(deliveryType as 'BIKE' | 'DOOR', addr)
   const deliveryFees    = fees ? { BIKE: fees.bike, DOOR: fees.door } : { BIKE: 50000, DOOR: 100000 }
   // Pickup charges the SAME platform fee as delivery — just ₦0 delivery, no tip.
   const platformMarkup  = fees?.markup ?? 25000
@@ -205,7 +202,16 @@ export default function CartPage() {
 
   async function handleCheckout() {
     if (loading) return // guard against double-submit before the disabled state paints
-    if (!isPickup && !address.trim()) { setError('Please enter a delivery address'); return }
+    if (!isPickup) {
+      if (!addr.lodge.trim()) { setError('Please tell us your lodge or hostel'); return }
+      if (deliveryType === 'DOOR') {
+        // If the chosen lodge has defined blocks, the customer must pick one.
+        const blocks = lodgeBlocksFor(catalogLodges, addr.lodge)
+        if (blocks.length > 0 && !addr.block?.trim()) { setError('Please choose your block'); return }
+        if (!addr.room?.trim()) { setError('Add your room number so the rider reaches your door'); return }
+      }
+      if (composedAddress.trim().length < 5) { setError('Please give a clearer delivery address'); return }
+    }
     if (!isPickup && scheduleOn && !scheduleAt) { setError('Pick a date and time for your scheduled order'); return }
     if (isPickup && !pickupAgree) { setError('Please accept the pickup collection terms to continue'); return }
     if (!isPickup && !orderAgree) { setError('Please accept the Terms and Refund Policy to continue'); return }
@@ -226,7 +232,11 @@ export default function CartPage() {
           delivery_type:         deliveryType,
           // Pickup has no address/tip/schedule/coords/group — the server synthesizes
           // "Pickup at <shop>" and rejects those extras.
-          delivery_address:      isPickup ? undefined : address,
+          delivery_address:      isPickup ? undefined : composedAddress,
+          // Structured parts stored alongside the string (rider sees them as chips).
+          delivery_lodge:        isPickup ? undefined : addr.lodge.trim() || undefined,
+          delivery_block:        isPickup ? undefined : addr.block?.trim() || undefined,
+          delivery_room:         isPickup ? undefined : addr.room?.trim() || undefined,
           delivery_instructions: instructions || undefined,
           tip_amount:            isPickup ? 0 : tip,
           payment_method:        effectivePaymentMethod,
@@ -469,53 +479,16 @@ export default function CartPage() {
         </div>
         )}
 
-        {/* Address — delivery only */}
+        {/* Address — delivery only. Structured composer adapts to bike vs door. */}
         {!isPickup && (
-        <div>
-          <label className="block text-sm font-medium text-white/70 mb-2">Delivery address</label>
-          <input type="text" value={address} onChange={(e) => { setAddress(e.target.value); setCoords(null) }}
-            placeholder="Hall/hostel, room number..."
-            autoComplete="street-address" enterKeyHint="done"
-            className="lx-field w-full px-4 py-3 text-sm outline-none" />
-          {/* Saved lodges — learned from past orders + verified ABSU catalog; tap to reuse. */}
-          {savedAddresses.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 mt-2 scrollbar-none">
-              {savedAddresses.map((a) => (
-                <button key={a} type="button" onClick={() => setAddress(a)}
-                  className="shrink-0 px-3 py-1.5 rounded-full text-xs transition-colors"
-                  style={{
-                    background: address === a ? 'rgba(245,166,35,0.15)' : 'rgba(255,255,255,0.06)',
-                    color: address === a ? '#F5A623' : 'rgba(255,255,255,0.6)',
-                    border: `1px solid ${address === a ? 'rgba(245,166,35,0.3)' : 'rgba(255,255,255,0.08)'}`,
-                  }}>
-                  📍 {a.length > 28 ? a.slice(0, 28) + '…' : a}
-                </button>
-              ))}
-            </div>
-          )}
-          {/* Pick a lodge on the ABSU map */}
-          {mapLodges.length > 0 && (
-            <div className="mt-2">
-              <button type="button" onClick={() => setShowMap((v) => !v)} className="lx-amber text-xs font-medium">
-                🗺️ {showMap ? 'Hide map' : 'Pick your lodge on the map'}
-              </button>
-              {showMap && (
-                <div className="mt-2 lx-enter">
-                  <LodgeMap
-                    lodges={mapLodges}
-                    height={240}
-                    onSelect={(lo) => {
-                      setAddress(lo.area ? `${lo.name} (${lo.area})` : lo.name)
-                      if (lo.latitude != null && lo.longitude != null) setCoords({ lat: lo.latitude, lng: lo.longitude })
-                      setShowMap(false)
-                    }}
-                  />
-                  <p className="text-xs text-white/35 mt-1">Tap your lodge’s 📍 pin to set it as your delivery address.</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+          <DeliveryAddress
+            deliveryType={deliveryType as 'BIKE' | 'DOOR'}
+            value={addr}
+            onChange={setAddr}
+            suggestions={savedAddresses}
+            lodges={catalogLodges}
+            onCoords={setCoords}
+          />
         )}
 
         {/* Instructions */}

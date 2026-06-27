@@ -28,6 +28,12 @@ export const createOrderInput = z.object({
   // BIKE/DOOR the route still requires a real address.
   delivery_type: z.enum(['BIKE', 'DOOR', 'PICKUP']),
   delivery_address: z.string().min(5).max(500).optional(),
+  // Structured parts behind delivery_address (lodge → block → room). Stored
+  // non-fatally after insert so an order never fails if migration 080 is pending;
+  // the rider reads them back as scannable chips.
+  delivery_lodge: z.string().max(160).optional(),
+  delivery_block: z.string().max(80).optional(),
+  delivery_room:  z.string().max(80).optional(),
   delivery_instructions: z.string().max(300).optional(),
   tip_amount: z.number().int().min(0).max(50000).optional().default(0),
   // How the customer intends to pay. The wallet split is ALWAYS recomputed

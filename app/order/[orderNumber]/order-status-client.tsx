@@ -345,15 +345,15 @@ export function OrderStatusClient({
                 <div key={step.key} className="flex items-start gap-3.5">
                   <div className="flex flex-col items-center self-stretch">
                     <div className="relative shrink-0 mt-0.5">
-                      {/* Pulsing ring on the current step */}
+                      {/* Pulsing ring on the current step — the live, "alive" beat */}
                       {current && (
-                        <span className="absolute inset-0 rounded-full animate-ping" style={{ background: 'rgba(245,166,35,0.5)' }} aria-hidden="true" />
+                        <span className="absolute rounded-full animate-ping" style={{ inset: -3, background: 'rgba(245,166,35,0.6)' }} aria-hidden="true" />
                       )}
                       <div
                         className="relative w-6 h-6 rounded-full flex items-center justify-center transition-colors"
                         style={{
                           background: done ? '#22c55e' : current ? '#F5A623' : 'rgba(255,255,255,0.1)',
-                          boxShadow: current ? '0 0 14px rgba(245,166,35,0.6)' : done ? '0 0 10px rgba(34,197,94,0.4)' : 'none',
+                          boxShadow: current ? '0 0 22px rgba(245,166,35,0.85)' : done ? '0 0 10px rgba(34,197,94,0.4)' : 'none',
                         }}
                       >
                         {done

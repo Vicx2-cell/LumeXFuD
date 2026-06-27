@@ -12,10 +12,14 @@ interface Lodge {
   area: string | null
   latitude: number | null
   longitude: number | null
+  blocks: string[] | null
   is_verified: boolean
   is_active: boolean
   created_at: string
 }
+
+// "Block A, Block B" → ["Block A","Block B"] (trimmed, no empties).
+const parseBlocks = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean)
 
 export default function AdminLodgesPage() {
   const router = useRouter()
@@ -28,9 +32,14 @@ export default function AdminLodgesPage() {
   // Add form
   const [name, setName] = useState('')
   const [area, setArea] = useState('')
+  const [blocksText, setBlocksText] = useState('')
   const [lat, setLat] = useState('')
   const [lng, setLng] = useState('')
   const [geoBusy, setGeoBusy] = useState(false)
+
+  // Inline per-lodge blocks editor.
+  const [editBlocksId, setEditBlocksId] = useState<string | null>(null)
+  const [editBlocksText, setEditBlocksText] = useState('')
 
   // Capture the device's GPS (use while standing at the lodge). HTTPS + a one-time
   // browser permission prompt required; both are fine on the live site.
@@ -66,6 +75,7 @@ export default function AdminLodgesPage() {
     try {
       const body: Record<string, unknown> = { name: name.trim() }
       if (area.trim()) body.area = area.trim()
+      if (blocksText.trim()) body.blocks = parseBlocks(blocksText)
       if (lat.trim() && !Number.isNaN(Number(lat))) body.latitude = Number(lat)
       if (lng.trim() && !Number.isNaN(Number(lng))) body.longitude = Number(lng)
       const res = await fetch('/api/admin/lodges', {
@@ -74,7 +84,7 @@ export default function AdminLodgesPage() {
       const d = await res.json() as { lodge?: Lodge; error?: string }
       if (res.ok && d.lodge) {
         setLodges((cur) => [d.lodge!, ...cur])
-        setName(''); setArea(''); setLat(''); setLng('')
+        setName(''); setArea(''); setBlocksText(''); setLat(''); setLng('')
         showToast('Lodge added')
       } else { showToast(d.error ?? 'Could not add') }
     } catch { showToast('Network error') }
@@ -89,6 +99,19 @@ export default function AdminLodgesPage() {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
       })
       if (res.ok) showToast(msg); else { setLodges(prev); showToast('Could not save') }
+    } catch { setLodges(prev); showToast('Network error') }
+  }
+
+  async function saveBlocks(id: string) {
+    const blocks = parseBlocks(editBlocksText)
+    const prev = lodges
+    setLodges((cur) => cur.map((l) => l.id === id ? { ...l, blocks } : l)) // optimistic
+    setEditBlocksId(null)
+    try {
+      const res = await fetch(`/api/admin/lodges/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }),
+      })
+      if (res.ok) showToast(blocks.length ? 'Blocks saved' : 'Blocks cleared'); else { setLodges(prev); showToast('Could not save blocks') }
     } catch { setLodges(prev); showToast('Network error') }
   }
 
@@ -117,6 +140,11 @@ export default function AdminLodgesPage() {
             className="lx-field w-full px-3 py-2.5 text-sm" />
           <input value={area} onChange={(e) => setArea(e.target.value)} placeholder="Area / landmark (optional, e.g. Behind Main Gate)"
             className="lx-field w-full px-3 py-2.5 text-sm" />
+          <div>
+            <input value={blocksText} onChange={(e) => setBlocksText(e.target.value)} placeholder="Blocks (optional, comma-separated — e.g. Block A, Block B, Block C)"
+              className="lx-field w-full px-3 py-2.5 text-sm" />
+            <p className="text-xs text-white/35 mt-1">If the lodge has blocks, list them here — customers pick their block from a dropdown at checkout.</p>
+          </div>
           <div className="flex gap-2">
             <input value={lat} onChange={(e) => setLat(e.target.value)} placeholder="Latitude (optional)" inputMode="decimal"
               className="lx-field flex-1 px-3 py-2.5 text-sm" />
@@ -154,23 +182,56 @@ export default function AdminLodgesPage() {
           <div className="space-y-2">
             <p className="text-xs text-white/40">{lodges.length} lodge{lodges.length === 1 ? '' : 's'}</p>
             {lodges.map((l) => (
-              <div key={l.id} className="lx-surface p-3 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium text-white text-sm truncate">{l.name}</p>
-                  <p className="text-xs text-white/40 truncate">
-                    {l.area ?? '—'}
-                    {l.latitude != null && l.longitude != null ? ` · 📍 ${l.latitude.toFixed(4)}, ${l.longitude.toFixed(4)}` : ' · no coords'}
-                  </p>
+              <div key={l.id} className="lx-surface p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-white text-sm truncate">{l.name}</p>
+                    <p className="text-xs text-white/40 truncate">
+                      {l.area ?? '—'}
+                      {l.latitude != null && l.longitude != null ? ` · 📍 ${l.latitude.toFixed(4)}, ${l.longitude.toFixed(4)}` : ' · no coords'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => patch(l.id, { is_verified: !l.is_verified }, l.is_verified ? 'Unverified' : 'Verified')}
+                      className="text-xs px-3 py-2 rounded-full font-medium"
+                      style={{ background: l.is_verified ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', color: l.is_verified ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>
+                      {l.is_verified ? '✓ Verified' : 'Verify'}
+                    </button>
+                    <button onClick={() => remove(l.id)} aria-label="Delete lodge" className="text-xs px-3 py-2 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
+                      Delete
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={() => patch(l.id, { is_verified: !l.is_verified }, l.is_verified ? 'Unverified' : 'Verified')}
-                    className="text-xs px-3 py-2 rounded-full font-medium"
-                    style={{ background: l.is_verified ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', color: l.is_verified ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>
-                    {l.is_verified ? '✓ Verified' : 'Verify'}
-                  </button>
-                  <button onClick={() => remove(l.id)} aria-label="Delete lodge" className="text-xs px-3 py-2 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
-                    Delete
-                  </button>
+
+                {/* Blocks row — chips + inline editor */}
+                <div className="mt-2.5 pt-2.5 border-t border-white/5">
+                  {editBlocksId === l.id ? (
+                    <div className="flex items-center gap-2">
+                      <input value={editBlocksText} onChange={(e) => setEditBlocksText(e.target.value)}
+                        placeholder="Block A, Block B, Block C" autoFocus
+                        className="lx-field flex-1 px-3 py-2 text-xs" />
+                      <button onClick={() => saveBlocks(l.id)} className="lx-btn-amber text-xs px-3 py-2 shrink-0">Save</button>
+                      <button onClick={() => setEditBlocksId(null)} className="lx-btn-secondary text-xs px-3 py-2 shrink-0">Cancel</button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {l.blocks && l.blocks.length > 0 ? (
+                        <>
+                          <span className="text-xs text-white/35">Blocks:</span>
+                          {l.blocks.map((b) => (
+                            <span key={b} className="text-xs px-2 py-0.5 rounded-md" style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623' }}>{b}</span>
+                          ))}
+                        </>
+                      ) : (
+                        <span className="text-xs text-white/30">No blocks (single building)</span>
+                      )}
+                      <button
+                        onClick={() => { setEditBlocksId(l.id); setEditBlocksText((l.blocks ?? []).join(', ')) }}
+                        className="text-xs lx-amber font-medium ml-auto shrink-0">
+                        {l.blocks && l.blocks.length > 0 ? 'Edit blocks' : 'Add blocks'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

@@ -12,14 +12,25 @@ export async function GET() {
 
   try {
     const db = createSupabaseAdmin()
-    const { data } = await db
+    // Try the richer select (with blocks); fall back to base columns if the
+    // blocks column isn't there yet (migration 081 pending) so the picker never
+    // breaks. Empty `blocks` simply means the lodge has no defined blocks.
+    const rich = await db
+      .from('lodges')
+      .select('id, name, area, latitude, longitude, blocks')
+      .eq('is_active', true)
+      .eq('is_verified', true)
+      .order('name', { ascending: true })
+      .limit(500)
+    if (!rich.error) return NextResponse.json({ lodges: rich.data ?? [] })
+    const base = await db
       .from('lodges')
       .select('id, name, area, latitude, longitude')
       .eq('is_active', true)
       .eq('is_verified', true)
       .order('name', { ascending: true })
       .limit(500)
-    return NextResponse.json({ lodges: data ?? [] })
+    return NextResponse.json({ lodges: base.data ?? [] })
   } catch {
     return NextResponse.json({ lodges: [] })
   }

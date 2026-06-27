@@ -11,6 +11,8 @@ export interface MapLodge {
   area?: string | null
   latitude: number | null
   longitude: number | null
+  // Ordered list of the lodge's blocks (Block A, Block B…). Empty = single block.
+  blocks?: string[] | null
 }
 
 // ABSU main campus, Uturu (Abia State). Default centre when nothing else fits.

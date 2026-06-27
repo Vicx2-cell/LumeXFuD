@@ -17,12 +17,36 @@ export async function GET() {
   const { err } = await authAdmin()
   if (err) return err
   const db = createSupabaseAdmin()
-  const { data } = await db
+  // Rich select (with blocks) with a base-column fallback if migration 081 is pending.
+  const rich = await db
+    .from('lodges')
+    .select('id, name, area, latitude, longitude, blocks, is_verified, is_active, created_at')
+    .order('created_at', { ascending: false })
+    .limit(1000)
+  if (!rich.error) return NextResponse.json({ lodges: rich.data ?? [] })
+  const base = await db
     .from('lodges')
     .select('id, name, area, latitude, longitude, is_verified, is_active, created_at')
     .order('created_at', { ascending: false })
     .limit(1000)
-  return NextResponse.json({ lodges: data ?? [] })
+  return NextResponse.json({ lodges: base.data ?? [] })
+}
+
+// Normalise a blocks list: trim, drop empties, de-dupe (case-insensitive), cap.
+function cleanBlocks(blocks?: string[]): string[] {
+  if (!blocks) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of blocks) {
+    const b = raw.replace(/\s+/g, ' ').trim()
+    if (!b) continue
+    const key = b.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(b)
+    if (out.length >= 50) break
+  }
+  return out
 }
 
 const createInput = z.object({
@@ -30,6 +54,7 @@ const createInput = z.object({
   area:      z.string().trim().max(120).optional(),
   latitude:  z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
+  blocks:    z.array(z.string().max(40)).max(80).optional(),
   verified:  z.boolean().optional().default(true),
 })
 
@@ -47,6 +72,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
 
   const { name, area, latitude, longitude, verified } = parsed.data
+  const blocks = cleanBlocks(parsed.data.blocks)
   const db = createSupabaseAdmin()
   const { data, error } = await db
     .from('lodges')
@@ -67,6 +93,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not save lodge' }, { status: 500 })
   }
 
+  // Store blocks in a separate, tolerant update (never the insert) so adding a
+  // lodge can't fail if migration 081 is still pending.
+  if (blocks.length) {
+    await db.from('lodges').update({ blocks }).eq('id', data.id).then(() => {}, () => {})
+  }
+
   await audit({
     actor_id: session.phone,
     actor_role: session.role,
@@ -77,5 +109,5 @@ export async function POST(req: NextRequest) {
     ip_address: req.headers.get('x-forwarded-for') ?? undefined,
   })
 
-  return NextResponse.json({ lodge: data })
+  return NextResponse.json({ lodge: { ...data, blocks } })
 }

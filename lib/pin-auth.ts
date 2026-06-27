@@ -3,13 +3,7 @@ import crypto from 'crypto'
 import { createSupabaseAdmin } from './supabase/server'
 import { normalizePhone, safeNormalizePhone } from './phone'
 import { SessionRole } from './session'
-
-const WEAK_PINS = new Set([
-  '000000', '111111', '222222', '333333', '444444', '555555',
-  '666666', '777777', '888888', '999999',
-  '123456', '654321', '012345', '234567', '121212', '123123',
-  '112233', '102030', '246810', '135791',
-])
+import { WEAK_PINS, pinStrengthError } from './pin-weak'
 
 const RECOVERY_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 const DUMMY_HASH = bcrypt.hashSync('lxmx-dummy-secret', 12)
@@ -44,18 +38,8 @@ export interface AuthUserRow {
 export { SECURITY_QUESTIONS } from './security-questions'
 
 export function validatePin(pin: string) {
-  if (!/^[0-9]{6}$/.test(pin)) {
-    throw new Error('PIN must be exactly 6 digits')
-  }
-  if (WEAK_PINS.has(pin)) {
-    throw new Error('Choose a stronger 6-digit PIN')
-  }
-  const digits = pin.split('').map((d) => Number(d))
-  const ascending = digits.every((digit, index) => index === 0 || digit === digits[index - 1] + 1)
-  const descending = digits.every((digit, index) => index === 0 || digit === digits[index - 1] - 1)
-  if (ascending || descending) {
-    throw new Error('PIN cannot be sequential')
-  }
+  const err = pinStrengthError(pin)
+  if (err) throw new Error(err)
 }
 
 export function normalizeRecoveryCode(raw: string) {

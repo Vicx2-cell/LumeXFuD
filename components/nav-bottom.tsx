@@ -60,7 +60,7 @@ export function BottomNav() {
                       padding: '0 3px',
                     }}
                   >
-                    {totalItems > 9 ? '9+' : totalItems}
+                    {totalItems > 99 ? '99+' : totalItems}
                   </span>
                 )}
               </div>

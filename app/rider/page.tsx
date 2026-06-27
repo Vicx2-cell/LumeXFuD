@@ -14,6 +14,7 @@ import { LaunchCounter } from '@/components/launch-counter'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { useFeatures } from '@/lib/use-features'
 import { waLink } from '@/lib/contact'
+import { formatAddressForRider } from '@/lib/delivery-address'
 
 type RiderStatus = 'ONLINE' | 'OFFLINE' | 'BUSY'
 
@@ -75,6 +76,32 @@ const STATUS_LABELS: Record<string, string> = {
   RIDER_ASSIGNED: 'Assigned to you',
   PICKED_UP: 'Picked up',
   DELIVERED: 'Delivered',
+}
+
+// Render the drop-off as a bold lodge line + scannable chips (Block B, Room 12,
+// landmarks) parsed from the composed address — so the rider sees exactly where
+// to go at a glance instead of one truncated run-on line. `emphasis` makes it
+// bigger on the active order the rider is actually delivering.
+function RiderAddress({ address, emphasis = false }: { address: string; emphasis?: boolean }) {
+  const { primary, chips } = formatAddressForRider(address)
+  return (
+    <div className="flex items-start gap-2">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 mt-0.5 ${emphasis ? 'text-[#F5A623]' : 'text-white/40'}`} aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+      <div className="min-w-0">
+        <p className={emphasis ? 'text-sm font-semibold text-white leading-snug' : 'text-sm text-white/65 leading-snug'}>{primary}</p>
+        {chips.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {chips.map((c, i) => (
+              <span key={i} className="text-xs px-2 py-0.5 rounded-md font-medium"
+                style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.2)' }}>
+                {c}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 const TRUST_COLORS: Record<string, string> = {
@@ -407,10 +434,10 @@ export default function RiderDashboard() {
             </div>
 
             <div className="space-y-2 mb-4">
-              <div className="flex items-center gap-2 text-sm text-white/65">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/40" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                <span className="truncate">{current.delivery_address}</span>
-              </div>
+              <RiderAddress address={current.delivery_address} emphasis />
+              <p className="text-[10px] text-white/30 uppercase tracking-wide pl-[23px] -mt-0.5">
+                {current.delivery_type === 'DOOR' ? 'Door — bring it to the room' : 'Bike — meet at the lodge'}
+              </p>
               {current.customers && (
                 <div className="flex items-center gap-2 text-sm text-white/65">
                   <span className="text-[10px] uppercase tracking-wide text-white/35 shrink-0 w-14">Customer</span>
@@ -426,7 +453,7 @@ export default function RiderDashboard() {
                     href={waLink(current.customers.phone, `Hi${current.customers.name ? ' ' + current.customers.name.split(' ')[0] : ''}, I’m your LumeX rider for order #${current.order_number}. I’m on my way!`)}
                     target="_blank" rel="noopener noreferrer"
                     aria-label="Message customer on WhatsApp"
-                    className="ml-auto inline-flex items-center text-[11px] px-3 rounded-lg font-medium shrink-0 active:scale-95 transition-transform" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366', minHeight: 36 }}
+                    className="ml-auto inline-flex items-center text-xs px-3.5 rounded-lg font-medium shrink-0 active:scale-95 transition-transform" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366', minHeight: 44 }}
                   >WhatsApp</a>
                 </div>
               )}
@@ -439,7 +466,7 @@ export default function RiderDashboard() {
                     href={waLink(current.vendors.phone, `Hi, I’m the LumeX rider for order #${current.order_number}. Is it ready for pickup?`)}
                     target="_blank" rel="noopener noreferrer"
                     aria-label="Message vendor on WhatsApp"
-                    className="ml-auto inline-flex items-center text-[11px] px-3 rounded-lg font-medium shrink-0 active:scale-95 transition-transform" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366', minHeight: 36 }}
+                    className="ml-auto inline-flex items-center text-xs px-3.5 rounded-lg font-medium shrink-0 active:scale-95 transition-transform" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366', minHeight: 44 }}
                   >WhatsApp</a>
                 </div>
               )}
@@ -550,9 +577,8 @@ export default function RiderDashboard() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-white/55 mb-3">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/40" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                  <span className="truncate">{order.delivery_address}</span>
+                <div className="mb-3">
+                  <RiderAddress address={order.delivery_address} />
                 </div>
 
                 <button

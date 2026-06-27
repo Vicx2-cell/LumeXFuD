@@ -76,8 +76,16 @@ export default function VendorDashboard() {
   const [statusBusy, setStatusBusy] = useState(false)
   const [pauseMenuOpen, setPauseMenuOpen] = useState(false)
   const [recentOpen, setRecentOpen] = useState(false)
+  const [toast, setToast] = useState('')
   const audioCtx = useRef<AudioContext | null>(null)
   const knownIds = useRef<Set<string>>(new Set())
+
+  // Lightweight error/status toast so a failed action is never silent — a vendor
+  // who taps "Mark Ready" and sees nothing happen will tap again, confused.
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3500)
+  }
 
   const alert = useCallback(() => {
     try {
@@ -183,16 +191,24 @@ export default function VendorDashboard() {
   }
 
   const updateOrder = async (orderId: string, newStatus: string) => {
-    const res = await fetch(`/api/orders/${orderId}/status`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    })
-    if (res.ok) setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: newStatus } : o))
+    try {
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (res.ok) { setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: newStatus } : o)); return }
+      const d = await res.json().catch(() => ({})) as { error?: string }
+      showToast(d.error ?? 'Could not update the order. Refresh and try again.')
+    } catch { showToast('Network error — check your connection and try again.') }
   }
 
   const cancelOrder = async (orderId: string) => {
-    const res = await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' })
-    if (res.ok) setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'CANCELLED' } : o))
+    try {
+      const res = await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' })
+      if (res.ok) { setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'CANCELLED' } : o)); return }
+      const d = await res.json().catch(() => ({})) as { error?: string }
+      showToast(d.error ?? 'Could not cancel the order. Refresh and try again.')
+    } catch { showToast('Network error — check your connection and try again.') }
   }
 
   // Pickup handover: enter the customer's 6-character code to release the order.
@@ -229,6 +245,14 @@ export default function VendorDashboard() {
   return (
     <div className="lx-page lx-console pb-10 overflow-hidden">
       <GlassSheen />
+      {/* Action toast — failures are never silent */}
+      {toast && (
+        <div className="fixed left-1/2 -translate-x-1/2 z-[60] px-4 py-3 rounded-xl text-sm font-medium lx-enter max-w-[90vw] text-center"
+          style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))', background: 'rgba(239,68,68,0.95)', color: '#fff', boxShadow: '0 8px 28px rgba(0,0,0,0.4)' }}
+          role="alert">
+          {toast}
+        </div>
+      )}
       {/* Header */}
       <div className="sticky top-0 z-40 lx-surface" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0, paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-2">

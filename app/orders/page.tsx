@@ -100,12 +100,12 @@ export default async function OrdersPage({
             </Link>
           </div>
         ) : view === 'empty' ? (
-          <div className="text-center py-20">
-            <p className="text-5xl mb-4">📋</p>
+          <div className="text-center py-20 px-6">
+            <p className="text-5xl mb-4">🍽️</p>
             <p className="font-semibold text-lg">No orders yet</p>
-            <p className="text-sm text-white/40 mt-1">Your order history will appear here</p>
-            <Link href="/" className="lx-btn-amber inline-block mt-6 px-6 py-3">
-              Order food
+            <p className="text-sm text-white/55 mt-1.5 max-w-xs mx-auto">Your first order is just a few taps away — find something delicious from a campus vendor.</p>
+            <Link href="/" className="lx-btn-amber inline-block mt-6 px-6 py-3.5">
+              Browse vendors
             </Link>
           </div>
         ) : (

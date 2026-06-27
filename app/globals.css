@@ -172,6 +172,14 @@ html, body {
 :root[data-theme="light"] .border-white\/15,
 :root[data-theme="light"] .border-white\/20 { border-color: var(--lx-border-strong) !important; }
 
+/* Light-mode legibility gaps the utility remap above doesn't reach: input
+   placeholders and skeleton shimmer are both tuned for a dark canvas and go
+   invisible on warm white. Re-tone them to ink tokens. */
+:root[data-theme="light"] .lx-field { background: rgba(20,18,14,0.04); border-color: var(--lx-border); color: var(--lx-text); }
+:root[data-theme="light"] .lx-field::placeholder { color: var(--lx-text-faint); }
+:root[data-theme="light"] .lx-skeleton { background: rgba(20,18,14,0.06); }
+:root[data-theme="light"] .lx-skeleton::after { background: linear-gradient(90deg, transparent, rgba(20,18,14,0.07), transparent); }
+
 /* ============================================================
    Desktop framing. The app is mobile-first and content is bound to a
    centered column (max-w-lg) — on a wide screen the empty gutters would
@@ -343,6 +351,40 @@ html:not(.lx-rich) * {
   pointer-events: none;
 }
 .lx-btn-amber:hover:not(:disabled)::after { transform: translateX(130%); }
+
+/* Canonical SECONDARY + GHOST buttons — a real, theme-aware alternative to the
+   amber primary so screens stop rendering secondary actions as bare, low-affordance
+   text links. Same radius/feedback language as lx-btn-amber. */
+.lx-btn-secondary {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.14);
+  transition: transform 0.2s var(--spring-snappy), background 0.2s ease, border-color 0.2s ease;
+}
+.lx-btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.22); }
+.lx-btn-secondary:active:not(:disabled) { transform: scale(0.97); }
+.lx-btn-secondary:disabled { opacity: 0.5; }
+
+.lx-btn-ghost {
+  background: transparent;
+  color: var(--color-amber);
+  font-weight: 600;
+  border-radius: 14px;
+  border: 1px solid rgba(245,166,35,0.35);
+  transition: transform 0.2s var(--spring-snappy), background 0.2s ease;
+}
+.lx-btn-ghost:hover:not(:disabled) { background: rgba(245,166,35,0.08); }
+.lx-btn-ghost:active:not(:disabled) { transform: scale(0.97); }
+.lx-btn-ghost:disabled { opacity: 0.5; }
+
+:root[data-theme="light"] .lx-btn-secondary {
+  background: rgba(20,18,14,0.05);
+  color: var(--lx-text);
+  border-color: var(--lx-border-strong);
+}
+:root[data-theme="light"] .lx-btn-secondary:hover:not(:disabled) { background: rgba(20,18,14,0.09); }
 
 /* ============================================================
    Universal tap feedback — EVERY button/link/card reacts to a press.

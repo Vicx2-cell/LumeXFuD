@@ -292,8 +292,8 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
                 </div>
                 <div className="shrink-0 flex flex-col items-center justify-center">
                   <button onClick={() => handleAdd(item)} disabled={isClosed || soldOut}
-                    className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-xl disabled:opacity-30 relative transition-transform active:scale-90 hover:scale-105"
-                    style={{ background: '#F5A623', color: '#000', boxShadow: '0 0 16px rgba(245,166,35,0.35)', minWidth: 44, minHeight: 44 }} aria-label={`Add ${item.name}`}>
+                    className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl disabled:opacity-30 relative transition-transform active:scale-90 hover:scale-105"
+                    style={{ background: '#F5A623', color: '#000', boxShadow: '0 0 16px rgba(245,166,35,0.35)', minWidth: 48, minHeight: 48 }} aria-label={`Add ${item.name}`}>
                     +
                     {qty > 0 && (
                       <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-[11px] flex items-center justify-center font-bold" style={{ background: '#000', color: '#F5A623' }}>{qty}</span>

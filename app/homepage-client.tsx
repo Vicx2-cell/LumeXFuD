@@ -140,7 +140,12 @@ function VendorCard({ vendor, favorited, onToggleFavorite }: { vendor: VendorDat
 
   return (
     <Link href={`/vendor/${vendor.id}`} className="lx-tap glass-thin block rounded-2xl overflow-hidden"
-      style={{ opacity: unavailable ? 0.72 : 1 }}>
+      style={{
+        opacity: unavailable ? 0.72 : 1,
+        // Ready vendors get a faint warm ring so the eye lands on them first;
+        // unavailable ones stay flat and recede.
+        boxShadow: vendor.status === 'OPEN' && !unavailable ? '0 0 0 1px rgba(245,166,35,0.20), 0 8px 28px rgba(245,166,35,0.06)' : undefined,
+      }}>
       {/* Photo */}
       <div className="relative h-40 bg-white/5">
         {vendor.shop_photo_url ? (

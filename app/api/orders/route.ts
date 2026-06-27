@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid order data', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { vendor_id, items, delivery_type, delivery_address, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate } = parsed.data
+  const { vendor_id, items, delivery_type, delivery_address, delivery_lodge, delivery_block, delivery_room, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate } = parsed.data
   const isScheduled = !!scheduled_for
   const isPickup = delivery_type === 'PICKUP'
   const hasCoords = typeof delivery_latitude === 'number' && typeof delivery_longitude === 'number'
@@ -483,11 +483,27 @@ export async function POST(req: NextRequest) {
   // customer orders by bumping a per-address use count, and pins it if the
   // student shared GPS (migration 052).
   if (customerId && !isPickup) {
+    // Remember the LODGE (not the full "Lodge · Block · Room" line) so the next
+    // cart suggests a reusable place, not a one-off room.
     db.rpc('remember_customer_address', {
       p_customer_id: customerId,
-      p_address: delivery_address,
+      p_address: (delivery_lodge && delivery_lodge.trim()) || delivery_address,
       ...(hasCoords ? { p_lat: delivery_latitude, p_lng: delivery_longitude } : {}),
     }).then(() => {}, () => {})
+  }
+
+  // Stamp the structured address parts for rider-side display (block/room chips).
+  // Separate NON-fatal update (never in the main insert) so an order can't fail
+  // if migration 080 hasn't run — missing columns just make this a no-op.
+  if (!isPickup && (delivery_lodge || delivery_block || delivery_room)) {
+    db.from('orders')
+      .update({
+        delivery_lodge: delivery_lodge?.trim() || null,
+        delivery_block: delivery_block?.trim() || null,
+        delivery_room:  delivery_room?.trim()  || null,
+      })
+      .eq('id', order.id)
+      .then(() => {}, () => {})
   }
 
   // Stamp the delivery GPS on the order for rider navigation. Separate, NON-fatal

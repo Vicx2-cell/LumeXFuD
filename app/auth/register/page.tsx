@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import RecoveryCodeDisplay from '@/components/auth/RecoveryCodeDisplay'
 import SecurityQuestionSelect from '@/components/auth/SecurityQuestionSelect'
 import { SECURITY_QUESTIONS } from '@/lib/security-questions'
+import { pinStrengthError } from '@/lib/pin-weak'
 import { BackButton } from '@/components/back-button'
 import { useFeatures } from '@/lib/use-features'
 import GoogleButton from '@/components/auth/GoogleButton'
@@ -125,6 +126,11 @@ export default function RegisterPage() {
     setError('')
     if (verificationRequired && !phoneVerified) {
       setError('Please verify your phone number first.')
+      return
+    }
+    const pinErr = pinStrengthError(form.pin)
+    if (pinErr) {
+      setError(pinErr)
       return
     }
     if (form.pin !== form.confirm_pin) {
