@@ -1,7 +1,8 @@
 export function Skeleton({ className = '' }: { className?: string }) {
+  // lx-skeleton = the branded shimmer sweep (theme-aware) instead of a flat pulse.
   return (
     <div
-      className={`animate-pulse rounded-lg bg-white/5 ${className}`}
+      className={`lx-skeleton rounded-lg ${className}`}
       aria-hidden="true"
     />
   )

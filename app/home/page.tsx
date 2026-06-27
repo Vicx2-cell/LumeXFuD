@@ -67,16 +67,25 @@ export default async function CustomerHomePage() {
   // The signed-in customer's favourite vendor ids — powers the heart state + the
   // one-tap "Favourites" filter on the list. Empty for guests/other roles.
   let favorites: string[] = []
+  let firstName = ''
   try {
     const session = await getCurrentUser()
     if (session?.userId && session.role === 'customer') {
-      const { data } = await createSupabaseAdmin()
-        .from('customer_favorites')
-        .select('vendor_id')
-        .eq('customer_id', session.userId)
-      favorites = (data ?? []).map((r) => r.vendor_id as string)
+      const db = createSupabaseAdmin()
+      const [{ data: favs }, { data: me }] = await Promise.all([
+        db.from('customer_favorites').select('vendor_id').eq('customer_id', session.userId),
+        db.from('customers').select('name').eq('id', session.userId).maybeSingle(),
+      ])
+      favorites = (favs ?? []).map((r) => r.vendor_id as string)
+      firstName = ((me?.name as string | null) ?? '').trim().split(' ')[0] ?? ''
     }
-  } catch { /* favourites are non-critical — never block the home render */ }
+  } catch { /* non-critical — never block the home render */ }
+
+  // Time-of-day greeting in campus (Lagos) time — a warm, personal header beats a
+  // static line. force-dynamic, so server time is correct per request.
+  const lagosHour = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'Africa/Lagos' }).format(new Date()))
+  const partOfDay = lagosHour < 12 ? 'morning' : lagosHour < 17 ? 'afternoon' : 'evening'
+  const greeting = `Good ${partOfDay}${firstName ? `, ${firstName}` : ''}`
 
   return (
     <main className="lx-page pb-24">
@@ -90,7 +99,7 @@ export default async function CustomerHomePage() {
             <BackButton />
             <BrandLogo size={34} rounded={10} />
             <div className="min-w-0">
-              <span className="text-xs text-white/40">LumeX Fud</span>
+              <span className="text-xs text-white/40">{greeting} 👋</span>
               <h1 className="text-sm sm:text-base font-semibold leading-tight lx-foodie-text truncate">What are you eating today?</h1>
             </div>
           </div>

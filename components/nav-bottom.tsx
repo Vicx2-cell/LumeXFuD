@@ -45,19 +45,44 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
-              className="flex flex-col items-center gap-1 min-w-[44px] min-h-[44px] justify-center relative"
+              aria-current={active ? 'page' : undefined}
+              className="flex flex-col items-center gap-1 min-w-[52px] min-h-[44px] justify-center relative active:scale-90 transition-transform"
             >
-              <div className="relative">
+              {/* Active indicator line riding the top edge of the bar */}
+              <span
+                className="absolute -top-px rounded-full"
+                style={{
+                  height: 2,
+                  width: active ? 22 : 0,
+                  background: '#F5A623',
+                  boxShadow: active ? '0 0 10px rgba(245,166,35,0.85)' : 'none',
+                  transition: 'width 0.3s var(--spring-snappy)',
+                }}
+                aria-hidden="true"
+              />
+              {/* Icon sits in a pill that lights amber + lifts when active */}
+              <div
+                className="relative flex items-center justify-center"
+                style={{
+                  width: 44,
+                  height: 30,
+                  borderRadius: 12,
+                  background: active ? 'rgba(245,166,35,0.14)' : 'transparent',
+                  transform: active ? 'translateY(-1px)' : 'none',
+                  transition: 'background 0.3s ease, transform 0.3s var(--spring-snappy)',
+                }}
+              >
                 <Icon active={active} />
                 {showBadge && totalItems > 0 && (
                   <span
-                    className="absolute -top-1 -right-1 text-[10px] font-bold rounded-full flex items-center justify-center"
+                    className="absolute -top-1.5 -right-0.5 text-[10px] font-bold rounded-full flex items-center justify-center"
                     style={{
                       background: '#F5A623',
                       color: '#000',
                       minWidth: 16,
                       height: 16,
                       padding: '0 3px',
+                      boxShadow: '0 0 0 2px rgba(10,10,11,0.95)',
                     }}
                   >
                     {totalItems > 99 ? '99+' : totalItems}
@@ -65,8 +90,8 @@ export function BottomNav() {
                 )}
               </div>
               <span
-                className="text-[10px] font-medium"
-                style={{ color: active ? '#F5A623' : 'rgba(255,255,255,0.5)' }}
+                className="text-[10px] font-semibold tracking-wide"
+                style={{ color: active ? '#F5A623' : 'rgba(255,255,255,0.5)', transition: 'color 0.3s ease' }}
               >
                 {label}
               </span>

@@ -99,6 +99,14 @@ export function HomepageClient({ initialVendors, initialFavorites = [] }: { init
         ))}
       </div>
 
+      {/* Section heading with a live count — orients the customer at a glance */}
+      {filtered.length > 0 && (
+        <div className="flex items-baseline justify-between pt-1">
+          <h2 className="lx-h2">{favOnly ? 'Your favourites' : category === 'All' ? 'Campus kitchens' : category}</h2>
+          <span className="text-xs text-white/40 tabular-nums">{filtered.length} {filtered.length === 1 ? 'place' : 'places'}</span>
+        </div>
+      )}
+
       {/* Vendor list */}
       {filtered.length === 0 ? (
         <div className="text-center py-16">
