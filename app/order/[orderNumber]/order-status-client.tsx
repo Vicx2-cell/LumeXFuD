@@ -418,6 +418,20 @@ export function OrderStatusClient({
           </div>
         )}
 
+        {/* Delivered celebration — a clear, satisfying "your food arrived" moment */}
+        {(order.status === 'DELIVERED' || order.status === 'COMPLETED') && (
+          <div className="rounded-2xl p-5 text-center lx-scale-in" style={{ background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.25)' }}>
+            <div className="relative inline-flex items-center justify-center mb-2.5">
+              <span className="absolute rounded-full lx-celebrate" style={{ inset: -10, border: '2px solid #22c55e' }} aria-hidden="true" />
+              <span className="lx-check-pop w-14 h-14 rounded-full flex items-center justify-center" style={{ background: '#22c55e', boxShadow: '0 0 28px rgba(34,197,94,0.55)' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              </span>
+            </div>
+            <p className="font-semibold text-white text-lg">Delivered 🎉</p>
+            <p className="text-sm text-white/55 mt-0.5">{isPickup ? 'Collected — enjoy your meal!' : 'Enjoy your meal!'}</p>
+          </div>
+        )}
+
         {/* Action buttons */}
         {order.status === 'DELIVERED' && (
           <div className="space-y-3">
