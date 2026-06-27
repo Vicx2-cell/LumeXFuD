@@ -99,14 +99,6 @@ export function HomepageClient({ initialVendors, initialFavorites = [] }: { init
         ))}
       </div>
 
-      {/* Section heading with a live count — orients the customer at a glance */}
-      {filtered.length > 0 && (
-        <div className="flex items-baseline justify-between pt-1">
-          <h2 className="lx-h2">{favOnly ? 'Your favourites' : category === 'All' ? 'Campus kitchens' : category}</h2>
-          <span className="text-xs text-white/40 tabular-nums">{filtered.length} {filtered.length === 1 ? 'place' : 'places'}</span>
-        </div>
-      )}
-
       {/* Vendor list */}
       {filtered.length === 0 ? (
         <div className="text-center py-16">
@@ -150,12 +142,7 @@ function VendorCard({ vendor, favorited, onToggleFavorite }: { vendor: VendorDat
 
   return (
     <Link href={`/vendor/${vendor.id}`} className="lx-tap glass-thin block rounded-2xl overflow-hidden"
-      style={{
-        opacity: unavailable ? 0.72 : 1,
-        // Ready vendors get a faint warm ring so the eye lands on them first;
-        // unavailable ones stay flat and recede.
-        boxShadow: vendor.status === 'OPEN' && !unavailable ? '0 0 0 1px rgba(245,166,35,0.20), 0 8px 28px rgba(245,166,35,0.06)' : undefined,
-      }}>
+      style={{ opacity: unavailable ? 0.72 : 1 }}>
       {/* Photo */}
       <div className="relative h-40 bg-white/5">
         {vendor.shop_photo_url ? (
