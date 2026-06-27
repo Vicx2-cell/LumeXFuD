@@ -1,7 +1,7 @@
 // Bump on every release that must reach already-installed PWAs: a changed sw.js
 // triggers install→activate (purging old caches) and a controllerchange reload
 // in components/pwa.tsx, so clients pick up the new app instead of stale assets.
-const CACHE_NAME = 'lumexfud-v24';
+const CACHE_NAME = 'lumexfud-v25';
 
 // Pre-cache only assets that are SAME for everyone and never redirect.
 // IMPORTANT: do NOT precache "/" — for a logged-in user the auth proxy
@@ -82,19 +82,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Content-hashed build assets: cache-first (immutable, filename changes on
-  // every build — safe to serve from cache and never goes stale).
+  // Content-hashed build assets (/_next/static/*, incl. CSS chunks): cache-first
+  // (immutable — the filename changes on every build, so a cached copy never goes
+  // stale). BUT with network resilience: a bare cache-first with no fallback let a
+  // single flaky CSS-chunk fetch REJECT respondWith, rendering the page unstyled
+  // with no retry — and since a normal reload still goes through the SW, it could
+  // not self-heal until a full relaunch. Now we fetch with one retry that bypasses
+  // the HTTP cache (in case a partial/corrupt copy was stored), and only ever
+  // cache complete 200s.
   if (url.pathname.startsWith('/_next/static/')) {
+    const fetchAndCache = (opts) =>
+      fetch(request, opts).then((response) => {
+        if (response.ok && !response.redirected) {
+          caches.open(CACHE_NAME).then((c) => c.put(request, response.clone()));
+        }
+        return response;
+      });
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
-        return fetch(request).then((response) => {
-          if (response.ok && !response.redirected) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((c) => c.put(request, clone));
-          }
-          return response;
-        });
+        return fetchAndCache().catch(() => fetchAndCache({ cache: 'reload' }));
       })
     );
     return;
