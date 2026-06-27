@@ -213,6 +213,7 @@ export async function POST(req: NextRequest) {
   const PRICING_IDS = [
     'platform_markup', 'delivery_fee_bike', 'delivery_fee_door',
     'rider_delivery_cut_bike', 'rider_delivery_cut_door', 'min_order_amount',
+    'reward_min_profit_kobo',
   ]
   const { data: settingsRows } = await db
     .from('settings')
@@ -452,7 +453,14 @@ export async function POST(req: NextRequest) {
   let rewardApplied = 0
   let rewardCreditId: string | null = null
   if (!linkedGroupId && customerId && apply_reward !== false && (await anyRewardFeatureOn())) {
-    const cap = platformMarkup + deliveryFee // platform-absorbable portion (excludes food + tip)
+    // Cap so EVERY order still clears a guaranteed minimum platform profit
+    // (Failure Prevention Rule #1: profitable on every order, never subsidize).
+    // Our margin = our markup + OUR share of the delivery fee (the rider's cut is
+    // never touched). A bigger credit just spreads across future orders — each one
+    // still keeps ≥ the floor. Floor is live-tunable via reward_min_profit_kobo.
+    const minProfit = kobo('reward_min_profit_kobo', 25000) // ₦250 floor
+    const platformMargin = platformMarkup + platformDeliveryCut
+    const cap = Math.max(0, platformMargin - minProfit)
     try {
       const { data: rsv } = await db.rpc('reserve_reward_credit', {
         p_customer: customerId,

@@ -25,11 +25,14 @@ We resolve this with a **separate promo-credit liability ledger** — rewards ar
   lifecycle: `ACTIVE → RESERVED → REDEEMED` (or `EXPIRED`/`VOID`).
 - `reward_ledger` — append-only, signed double-entry trail (`ISSUE` +,
   `REDEEM`/`EXPIRE`/`VOID` −). Outstanding liability = Σ over the ledger.
-- A credit is **redeemed as an order-level discount**, capped at
-  **platform fee + delivery fee** (never the food subtotal or the rider tip).
-  So **vendor and rider payouts are paid in full** (read from
-  `orders.subtotal` / `rider_delivery_cut` / `tip_amount`); only platform
-  revenue is reduced. The discount is real marketing spend, booked in the ledger.
+- A credit is **redeemed as an order-level discount**, capped so every order
+  still clears a **guaranteed minimum platform profit** (`reward_min_profit_kobo`,
+  default ₦250) — i.e. `cap = max(0, platform_margin − floor)` where
+  `platform_margin = markup + our delivery cut`. **Vendor and rider payouts are
+  never touched** (read from `orders.subtotal` / `rider_delivery_cut` /
+  `tip_amount`); only platform margin above the floor is given up, so **no order
+  is ever subsidized** (Failure Prevention Rule #1). A credit larger than one
+  order's cap simply **spreads across future orders**, each still above the floor.
 - `customer_wallets` stays exactly backed by Paystack top-ups → **reconciliation
   is untouched.** The reconciliation cron now also *reports* outstanding promo
   liability for exposure visibility, but deliberately keeps it **out** of the
