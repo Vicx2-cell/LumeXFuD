@@ -45,6 +45,8 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
 
   // Add-on selection sheet
   const [selecting, setSelecting] = useState<MenuItem | null>(null)
+  // Transient "+1" fly-to-cart cue: { id: which item, n: nonce to replay }.
+  const [fly, setFly] = useState<{ id: string; n: number } | null>(null)
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([])
 
   const isPaused = vendor.paused_until && new Date(vendor.paused_until) > new Date()
@@ -87,7 +89,10 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
     if (!success) {
       setPendingItem(cartItem)
       setShowConflict(true)
+      return
     }
+    // Trigger the floating "+1" on this item's button (nonce remounts → replays).
+    setFly({ id: cartItem.menu_item_id, n: Date.now() })
   }
 
   function handleAdd(item: MenuItem) {
@@ -294,7 +299,11 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
                   {item.addons.length > 0 && <p className="text-xs text-white/30 mt-0.5">{item.addons.length} add-on{item.addons.length === 1 ? '' : 's'} available</p>}
                   {soldOut && <p className="text-xs text-red-400 mt-1">Sold out</p>}
                 </div>
-                <div className="shrink-0 flex flex-col items-center justify-center">
+                <div className="shrink-0 flex flex-col items-center justify-center relative">
+                  {/* Floating "+1" cue rising from the button on add */}
+                  {fly?.id === item.id && (
+                    <span key={fly.n} className="lx-flyplus absolute top-0 left-1/2 -translate-x-1/2 font-bold text-sm pointer-events-none z-10" style={{ color: '#F5A623' }} aria-hidden="true">+1</span>
+                  )}
                   <button onClick={() => handleAdd(item)} disabled={isClosed || soldOut}
                     className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl disabled:opacity-30 relative transition-transform active:scale-90 hover:scale-105"
                     style={{ background: '#F5A623', color: '#000', boxShadow: '0 0 16px rgba(245,166,35,0.35)', minWidth: 48, minHeight: 48 }} aria-label={`Add ${item.name}`}>

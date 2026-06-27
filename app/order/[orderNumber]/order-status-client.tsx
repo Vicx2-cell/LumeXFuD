@@ -349,6 +349,10 @@ export function OrderStatusClient({
                       {current && (
                         <span className="absolute rounded-full animate-ping" style={{ inset: -3, background: 'rgba(245,166,35,0.6)' }} aria-hidden="true" />
                       )}
+                      {/* Delivered celebration — a green ring bursts out once on arrival */}
+                      {current && step.key === 'DELIVERED' && (
+                        <span className="absolute rounded-full lx-celebrate" style={{ inset: -4, border: '2px solid #22c55e' }} aria-hidden="true" />
+                      )}
                       <div
                         className="relative w-6 h-6 rounded-full flex items-center justify-center transition-colors"
                         style={{
@@ -362,7 +366,9 @@ export function OrderStatusClient({
                       </div>
                     </div>
                     {!isLast && (
-                      <div className="w-0.5 flex-1 min-h-[20px] my-1 rounded-full transition-colors" style={{ background: done ? '#22c55e' : 'rgba(255,255,255,0.08)' }} />
+                      <div className="w-0.5 flex-1 min-h-[20px] my-1 rounded-full relative overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                        {done && <div className="absolute inset-0 rounded-full lx-conn-fill" style={{ background: '#22c55e' }} />}
+                      </div>
                     )}
                   </div>
                   <div className="flex-1 pb-4">

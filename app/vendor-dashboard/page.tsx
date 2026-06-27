@@ -488,7 +488,7 @@ function OrderCard({
 
   return (
     <div
-      className="lx-surface relative overflow-hidden rounded-2xl lx-enter"
+      className={`lx-surface relative overflow-hidden rounded-2xl lx-enter ${order.status === 'PENDING' ? 'lx-neworder' : ''}`}
       style={{
         border: `1px solid ${order.status === 'PENDING' ? 'rgba(245,166,35,0.5)' : 'rgba(255,255,255,0.08)'}`,
         boxShadow: order.status === 'PENDING' ? '0 0 20px rgba(245,166,35,0.12), inset 0 1px 0 rgba(255,255,255,0.06)' : undefined,
