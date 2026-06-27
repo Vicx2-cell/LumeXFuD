@@ -405,7 +405,7 @@ export default function VendorDashboard() {
               <p className="text-xs text-white/40 mt-1">New orders will pop up here with a sound.</p>
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-2.5 lx-stagger">
               {active.map((order) => (
                 <OrderCard key={order.id} order={order} onUpdate={updateOrder} onCancel={cancelOrder} onCollect={collectOrder} />
               ))}

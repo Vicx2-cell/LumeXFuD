@@ -690,7 +690,8 @@ export default function CartPage() {
           )}
           <div className="flex justify-between font-semibold text-base pt-2 border-t border-white/8 mt-2">
             <span>Total</span>
-            <span className="lx-amber">{formatPrice(total)}</span>
+            {/* key={total} remounts on change so the bump replays each recalculation */}
+            <span key={total} className="lx-amber lx-bump">{formatPrice(total)}</span>
           </div>
         </div>
 

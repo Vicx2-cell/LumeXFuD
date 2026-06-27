@@ -89,7 +89,7 @@ export default async function OrdersPage({
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
+      <div className="max-w-lg mx-auto px-4 py-4 space-y-3 lx-stagger">
         {view === 'error' ? (
           <div className="text-center py-20">
             <p className="text-5xl mb-4">⚠️</p>

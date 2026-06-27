@@ -563,9 +563,9 @@ export default function RiderDashboard() {
         )}
 
         {isOnline && available.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-3 lx-stagger">
             {available.map((order) => (
-              <div key={order.id} className="lx-surface p-4 lx-enter">
+              <div key={order.id} className="lx-surface p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <p className="font-semibold text-white tabular-nums">{order.order_number}</p>
