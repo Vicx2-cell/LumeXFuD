@@ -7,6 +7,7 @@ import { BackButton } from '@/components/back-button'
 import { FaceIdSetup } from '@/components/face-id-setup'
 import { LumiMemoryCard } from '@/components/lumi-memory-card'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
+import { RewardsCard } from '@/components/rewards-card'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useFeatures } from '@/lib/use-features'
 import { CountUp } from '@/components/fx'
@@ -352,6 +353,11 @@ export function ProfileClient({
             </div>
           </div>
         )}
+
+        {/* Rewards hub — loyalty tier, reward credits, surprise + referral.
+            Self-fetching + self-gating: renders nothing if every reward flag is
+            off and there are no credits. */}
+        <RewardsCard />
 
         {/* Badges — tap one to read what it means + when it was earned */}
         {badges.length > 0 && (

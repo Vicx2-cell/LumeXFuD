@@ -92,6 +92,20 @@ export async function POST(req: NextRequest) {
   // Total money we OWE users and must be able to pay out at any moment.
   const liabilities = vendorRiderTotal + customerFloat
 
+  // Reward-credit liability (migration 082): promo credits we've issued but not
+  // yet redeemed/expired. This is a REAL liability we track, but it is NOT
+  // custodied user cash — it's a future DISCOUNT funded from platform revenue, so
+  // it must NOT enter the withdrawal-shortfall math (doing so would false-freeze).
+  // We surface it for exposure visibility only. Non-fatal: 0 if migration unrun.
+  let rewardLiability = 0
+  try {
+    const { data: rcRaw } = await db
+      .from('reward_credits')
+      .select('remaining_kobo')
+      .in('status', ['ACTIVE', 'RESERVED'])
+    rewardLiability = (rcRaw ?? []).reduce((acc, row) => acc + Number((row as { remaining_kobo: number }).remaining_kobo), 0)
+  } catch { /* table absent — treat as 0 */ }
+
   // Get Paystack balance
   let paystackBalance: number
   try {
@@ -129,7 +143,8 @@ export async function POST(req: NextRequest) {
           `  • vendor/rider: ${formatPrice(vendorRiderTotal)}\n` +
           `  • customer float: ${formatPrice(customerFloat)}\n` +
           `Paystack balance: ${formatPrice(paystackBalance)}\n` +
-          `Shortfall: ${formatPrice(shortfall)}\n\n` +
+          `Shortfall: ${formatPrice(shortfall)}\n` +
+          `(Promo credits outstanding: ${formatPrice(rewardLiability)} — not in shortfall)\n\n` +
           `All withdrawals have been frozen. Investigate immediately.`,
       }).catch(() => {})
     }
@@ -144,6 +159,7 @@ export async function POST(req: NextRequest) {
         customer_float:     customerFloat,
         paystack_balance:   paystackBalance,
         shortfall_kobo:     shortfall,
+        reward_liability:   rewardLiability,
         withdrawals_frozen: true,
       },
     })
@@ -154,6 +170,7 @@ export async function POST(req: NextRequest) {
       liabilities,
       vendor_rider_total: vendorRiderTotal,
       customer_float:     customerFloat,
+      reward_liability:   rewardLiability,
       paystack:           paystackBalance,
       shortfall,
       frozen:             true,
@@ -172,6 +189,7 @@ export async function POST(req: NextRequest) {
       customer_float:     customerFloat,
       paystack_balance:   paystackBalance,
       surplus_kobo:       surplus,
+      reward_liability:   rewardLiability,
     },
   })
 
@@ -180,6 +198,7 @@ export async function POST(req: NextRequest) {
     liabilities,
     vendor_rider_total: vendorRiderTotal,
     customer_float:     customerFloat,
+    reward_liability:   rewardLiability,
     paystack:           paystackBalance,
     surplus,
   })

@@ -57,6 +57,10 @@ export const createOrderInput = z.object({
   pickup_agreement: z.boolean().optional(),
   // Customer opts to waive the door code for a DELIVERY order (leave-at-gate).
   leave_at_gate: z.boolean().optional(),
+  // Apply the customer's best eligible reward credit as a discount on this order.
+  // Defaults to true (auto-apply) — the server still validates eligibility and
+  // computes the discount; a client-sent amount is never trusted.
+  apply_reward: z.boolean().optional().default(true),
 })
 
 export const orderStatusInput = z.object({
@@ -203,6 +207,9 @@ export const registerInput = z.object({
   answer_1:     answerField,
   question_2:   z.string().min(5).max(300),
   answer_2:     answerField,
+  // Optional referral code (from a /register?ref=CODE link). Validated + attached
+  // server-side; a bad/own code is silently ignored, never fails the sign-up.
+  referral_code: z.string().trim().min(4).max(12).optional(),
 })
 
 export const universalLoginInput = z.object({

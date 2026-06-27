@@ -5,6 +5,7 @@ import { BottomNav } from '@/components/nav-bottom'
 import { BackButton } from '@/components/back-button'
 import { getFeature } from '@/lib/features'
 import { isAIAvailable, resolveProvider } from '@/lib/ai/providers'
+import { trackGamification } from '@/lib/rewards'
 import { LeaderboardTabs, type Board, type LeaderEntry, type Commentary } from './leaderboard-client'
 
 // Always render fresh; Realtime keeps an open board live after first paint.
@@ -207,6 +208,10 @@ export default async function LeaderboardPage() {
   }
 
   const db = createSupabaseAdmin()
+
+  // Analytics: count a leaderboard view (aggregate, no PII) so we can measure
+  // engagement impact on repeat orders. Fire-and-forget; never blocks the page.
+  trackGamification('leaderboard_view', null, {})
 
   // The streaks tab is gated by the same super-admin flag as the profile panel.
   const streaksOn = await getFeature('streaks')

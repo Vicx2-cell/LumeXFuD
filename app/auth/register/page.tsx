@@ -40,6 +40,9 @@ export default function RegisterPage() {
   const [callPhone, setCallPhone] = useState('+234')
   // Deep-link destination (e.g. a vendor's store link) — land here after signup.
   const [nextPath, setNextPath] = useState('/')
+  // Referral code from a /auth/register?ref=CODE invite link. Sent with sign-up;
+  // the server does all fraud validation and silently ignores a bad code.
+  const [referralCode, setReferralCode] = useState('')
 
   // Phone-ownership verification (sign-up only).
   const [code, setCode] = useState('')
@@ -58,6 +61,8 @@ export default function RegisterPage() {
     if (p && p.startsWith('+')) setForm((current) => ({ ...current, phone: p }))
     const n = q.get('next')
     if (n && n.startsWith('/') && !n.startsWith('//')) setNextPath(n)
+    const ref = q.get('ref')
+    if (ref) setReferralCode(ref.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12))
   }, [])
 
   const question2Options = useMemo(
@@ -158,7 +163,7 @@ export default function RegisterPage() {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, call_phone: callSame ? undefined : callPhone }),
+        body: JSON.stringify({ ...form, call_phone: callSame ? undefined : callPhone, referral_code: referralCode || undefined }),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -226,6 +231,15 @@ export default function RegisterPage() {
             Secure your account with a PIN, security questions and a recovery code.
           </p>
         </div>
+
+        {referralCode && (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex items-center gap-3">
+            <span className="text-xl" aria-hidden="true">🎉</span>
+            <p className="text-sm text-amber-300/90">
+              You were invited! Complete your first orders and you’ll both earn a reward.
+            </p>
+          </div>
+        )}
 
         {googleEnabled && (
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-4">

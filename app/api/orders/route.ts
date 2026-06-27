@@ -16,6 +16,7 @@ import { getFeature } from '@/lib/features'
 import { getControls, withinHours } from '@/lib/controls'
 import { computePickupEta, countActivePickups } from '@/lib/pickup'
 import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
+import { anyRewardFeatureOn } from '@/lib/rewards'
 
 // Allowed delivery types from settings
 const DELIVERY_FEES: Record<string, number> = {
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid order data', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { vendor_id, items, delivery_type, delivery_address, delivery_lodge, delivery_block, delivery_room, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate } = parsed.data
+  const { vendor_id, items, delivery_type, delivery_address, delivery_lodge, delivery_block, delivery_room, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate, apply_reward } = parsed.data
   const isScheduled = !!scheduled_for
   const isPickup = delivery_type === 'PICKUP'
   const hasCoords = typeof delivery_latitude === 'number' && typeof delivery_longitude === 'number'
@@ -326,32 +327,10 @@ export async function POST(req: NextRequest) {
   // Absent header → random key (no cross-request dedup, but no regression).
   const idempotencyKey = req.headers.get('idempotency-key')?.trim() || crypto.randomUUID()
 
-  // ── Resolve the payment split SERVER-SIDE ───────────────────────────────────
-  // Never trust a client-supplied wallet amount (rule #4/#19): we read the live
-  // wallet balance and decide how much it covers ourselves.
-  //   walletApply === total → WALLET (paid here, no Paystack)
-  //   0 < walletApply < total → SPLIT (wallet debited in the webhook, card pays rest)
-  //   walletApply === 0       → PAYSTACK (card pays everything)
-  // Customer-wallet kill switch: when off, the wallet can NEVER pay an order —
-  // we force the normal per-order Paystack path regardless of what the client
-  // sent. (Group-split, which also pays from wallets, is rejected below.)
+  // Customer-wallet kill switch (also gates group-split below). The actual
+  // wallet/card SPLIT is resolved AFTER any reward discount is applied — a reward
+  // lowers what's left to charge — just before the payment branches.
   const customerWalletEnabled = await isCustomerWalletEnabled()
-  let walletApply = 0
-  let resolvedMethod: 'PAYSTACK' | 'WALLET' | 'SPLIT' = 'PAYSTACK'
-  if (customerWalletEnabled && (payment_method === 'WALLET' || payment_method === 'SPLIT') && customerId) {
-    const { data: cwRow } = await db
-      .from('customer_wallets')
-      .select('balance_kobo, is_frozen')
-      .eq('customer_id', customerId)
-      .maybeSingle()
-    const cw = cwRow as { balance_kobo: number; is_frozen: boolean } | null
-    const bal = cw && !cw.is_frozen ? Number(cw.balance_kobo) : 0
-    walletApply = Math.max(0, Math.min(bal, totalAmount))
-    if (walletApply >= totalAmount) { walletApply = totalAmount; resolvedMethod = 'WALLET' }
-    else if (walletApply > 0) { resolvedMethod = 'SPLIT' }
-    else { resolvedMethod = 'PAYSTACK' }
-  }
-  const paystackAmount = totalAmount - walletApply
 
   // If this checkout finalizes a group order, link it — but ONLY if the caller is
   // that group's host and it's still open for this vendor. Validated here so a
@@ -382,8 +361,10 @@ export async function POST(req: NextRequest) {
     rider_delivery_cut: riderCut,
     tip_amount: tipKobo,
     total_amount: totalAmount,
-    payment_method: resolvedMethod,
-    wallet_amount_kobo: walletApply,
+    // Placeholders — the real method/wallet split and any reward discount are
+    // resolved + persisted right after the order (and its items) exist.
+    payment_method: 'PAYSTACK',
+    wallet_amount_kobo: 0,
     paystack_reference: orderNumber,
     idempotency_key: idempotencyKey,
     payment_status: 'PENDING',
@@ -460,6 +441,72 @@ export async function POST(req: NextRequest) {
     }
   })
   await db.from('order_items').insert(orderItems)
+
+  // ── Reward credit (promo) reservation + payment split ───────────────────────
+  // A reward credit is redeemed as an ORDER-LEVEL DISCOUNT the platform absorbs:
+  // capped at the platform fee + delivery (never the food or tip), so the vendor
+  // and rider are still paid in full and only platform revenue is reduced. The
+  // credit is reserved now and COMMITTED to a real spend by a DB trigger when the
+  // order is paid (released if it never pays) — see migration 082. Skipped for
+  // group orders (their split accounting is separate).
+  let rewardApplied = 0
+  let rewardCreditId: string | null = null
+  if (!linkedGroupId && customerId && apply_reward !== false && (await anyRewardFeatureOn())) {
+    const cap = platformMarkup + deliveryFee // platform-absorbable portion (excludes food + tip)
+    try {
+      const { data: rsv } = await db.rpc('reserve_reward_credit', {
+        p_customer: customerId,
+        p_order_id: order.id,
+        p_order_total: totalAmount,
+        p_max_apply: cap,
+      })
+      const row = (rsv as Array<{ applied_kobo: number; credit_id: string | null }> | null)?.[0]
+      if (row && Number(row.applied_kobo) > 0) {
+        rewardApplied = Math.min(Number(row.applied_kobo), cap)
+        rewardCreditId = row.credit_id
+      }
+    } catch {
+      // Reward tables absent (migration 082 not run) or RPC error → charge full price.
+    }
+  }
+  const netTotal = totalAmount - rewardApplied
+
+  // Resolve the wallet/card split on the NET (post-discount) amount. Never trust
+  // a client wallet amount (rule #4/#19) — we read the live balance ourselves.
+  //   walletApply === net → WALLET (paid here, no Paystack)
+  //   0 < walletApply < net → SPLIT (wallet debited in the webhook, card pays rest)
+  //   walletApply === 0     → PAYSTACK (card pays everything)
+  let walletApply = 0
+  let resolvedMethod: 'PAYSTACK' | 'WALLET' | 'SPLIT' = 'PAYSTACK'
+  if (customerWalletEnabled && (payment_method === 'WALLET' || payment_method === 'SPLIT') && customerId) {
+    const { data: cwRow } = await db
+      .from('customer_wallets')
+      .select('balance_kobo, is_frozen')
+      .eq('customer_id', customerId)
+      .maybeSingle()
+    const cw = cwRow as { balance_kobo: number; is_frozen: boolean } | null
+    const bal = cw && !cw.is_frozen ? Number(cw.balance_kobo) : 0
+    walletApply = Math.max(0, Math.min(bal, netTotal))
+    if (walletApply >= netTotal) { walletApply = netTotal; resolvedMethod = 'WALLET' }
+    else if (walletApply > 0) { resolvedMethod = 'SPLIT' }
+    else { resolvedMethod = 'PAYSTACK' }
+  }
+  const paystackAmount = netTotal - walletApply
+
+  // Persist the resolved net total + split (the insert stored the gross placeholder).
+  // The order's total_amount is now what the customer actually pays, so the
+  // Paystack webhook's amount check and vendor/rider payouts need NO changes.
+  await db.from('orders')
+    .update({ total_amount: netTotal, payment_method: resolvedMethod, wallet_amount_kobo: walletApply })
+    .eq('id', order.id)
+  // Reward columns in a SEPARATE non-fatal update so an order can't fail if
+  // migration 082 hasn't run (rewardApplied is 0 in that case anyway).
+  if (rewardApplied > 0) {
+    db.from('orders')
+      .update({ reward_discount_kobo: rewardApplied, reward_credit_id: rewardCreditId })
+      .eq('id', order.id)
+      .then(() => {}, () => {})
+  }
 
   // Record the customer's binding place-order consent (Invariant I8) against the
   // current terms version. Append-only; fire-and-forget so it never blocks checkout.
@@ -600,7 +647,7 @@ export async function POST(req: NextRequest) {
     }).eq('id', order.id).eq('payment_status', 'PENDING')
 
     if (!isScheduled) {
-      await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, totalAmount, appUrl)
+      await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, netTotal, appUrl)
       await notifyGroupSplitPaid(db, { groupOrderId: linkedGroupId, orderNumber, deliveryAddress: resolvedAddress, appUrl, hostId: customerId!, shareByCid })
     }
     return NextResponse.json({ order_number: orderNumber, payment_method: 'GROUP_SPLIT', paid: true, scheduled: isScheduled })
@@ -649,7 +696,7 @@ export async function POST(req: NextRequest) {
       .eq('payment_status', 'PENDING')
 
     if (!isScheduled) {
-      await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, totalAmount, appUrl)
+      await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, netTotal, appUrl)
       // Wallet orders are paid right here (no webhook), so tell the group now.
       if (linkedGroupId) {
         await notifyGroupOrderPlaced(db, { groupOrderId: linkedGroupId, orderNumber, deliveryAddress: resolvedAddress, appUrl })

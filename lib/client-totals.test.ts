@@ -61,7 +61,7 @@ describe('createOrderInput rejects client-sent totals/prices', () => {
     expect(res.success).toBe(true)
     if (res.success) {
       expect(Object.keys(res.data).sort()).toEqual([
-        'delivery_address', 'delivery_type', 'items', 'payment_method', 'tip_amount', 'vendor_id',
+        'apply_reward', 'delivery_address', 'delivery_type', 'items', 'payment_method', 'tip_amount', 'vendor_id',
       ])
     }
   })

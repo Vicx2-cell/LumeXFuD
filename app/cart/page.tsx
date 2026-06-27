@@ -10,6 +10,7 @@ import { estimateOrderPrepMinutes, prepRangeLabel } from '@/lib/prep-time'
 import { formatHoursRange } from '@/lib/hours'
 import { type MapLodge } from '@/components/lodge-map'
 import { DeliveryAddress } from '@/components/delivery-address'
+import { CartRewardHint } from '@/components/cart-reward-hint'
 import { composeDeliveryAddress, lodgeBlocksFor, type DeliveryAddressParts } from '@/lib/delivery-address'
 
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
@@ -694,6 +695,9 @@ export default function CartPage() {
             <span key={total} className="lx-amber lx-bump">{formatPrice(total)}</span>
           </div>
         </div>
+
+        {/* Reward credit hint — applied server-side at checkout (charge is lower). */}
+        <CartRewardHint />
 
         {/* Delivery acceptance — explicit agreement to Terms + Refund policy, gates Pay */}
         {!isPickup && (

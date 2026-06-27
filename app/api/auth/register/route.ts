@@ -119,6 +119,18 @@ export async function POST(req: NextRequest) {
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
     const userAgent = req.headers.get('user-agent') ?? undefined
 
+    // Attach a referral if a valid code was supplied (and the feature is on). The
+    // RPC does all fraud checks server-side (code exists, not self, not already
+    // referred) and is a no-op otherwise — never block sign-up on it. Non-fatal.
+    if (data.referral_code && (await getFeature('referral'))) {
+      db.rpc('attach_referral', {
+        p_referred: user.id,
+        p_code: data.referral_code,
+        p_ip: ipAddress ?? null,
+        p_device: userAgent ?? null,
+      }).then(() => {}, () => {})
+    }
+
     // Record the customer's acceptance of the Terms, Privacy and Refund policies at
     // sign-up against the current terms version (append-only). The UI gates account
     // creation on an explicit tick; this is the durable proof. Non-fatal.
