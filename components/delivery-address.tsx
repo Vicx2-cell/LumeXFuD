@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { MapPin, Search, Map as MapIcon, DoorOpen, Navigation, ChevronDown } from 'lucide-react'
+import { MapPin, Search, Map as MapIcon, DoorOpen, Navigation, ChevronDown, BadgeCheck } from 'lucide-react'
 import { type MapLodge } from '@/components/lodge-map'
-import { type DeliveryAddressParts, lodgeBlocksFor } from '@/lib/delivery-address'
+import { type DeliveryAddressParts, lodgeBlocksFor, composeDeliveryAddress, formatAddressForRider } from '@/lib/delivery-address'
 
 // Defer the map (and Leaflet's CSS) until the customer actually opens it.
 const LodgeMap = dynamic(() => import('@/components/lodge-map').then((m) => ({ default: m.LodgeMap })), {
@@ -52,6 +52,14 @@ export function DeliveryAddress({ deliveryType, value, onChange, suggestions, lo
   // Blocks defined for whichever lodge is currently chosen (empty when the lodge
   // is free-typed or single-block). Drives whether Block is a dropdown or free text.
   const blocks = useMemo(() => lodgeBlocksFor(lodges, value.lodge), [lodges, value.lodge])
+
+  // Live "what your rider sees" preview. Confirming the resolved address back to
+  // the customer BEFORE payment is the single biggest lever on failed deliveries
+  // (Baymard / Veho: structured address + confirmation nudge cuts failures 30–77%).
+  const preview = useMemo(() => {
+    const composed = composeDeliveryAddress(deliveryType, value)
+    return composed ? formatAddressForRider(composed) : null
+  }, [deliveryType, value])
 
   const set = (patch: Partial<DeliveryAddressParts>) => onChange({ ...value, ...patch })
 
@@ -224,6 +232,24 @@ export function DeliveryAddress({ deliveryType, value, onChange, suggestions, lo
             For bike delivery the rider brings it to your lodge and calls you to come down.
           </p>
         </>
+      )}
+
+      {/* Live confirmation — exactly what the rider will read. Lets the customer
+          catch a wrong block/room before paying, not after a failed drop. */}
+      {value.lodge.trim() && preview && (
+        <div className="mt-3 rounded-xl p-3 lx-enter" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.18)' }}>
+          <p className="text-[10px] uppercase tracking-wide text-white/45 mb-1.5 flex items-center gap-1.5">
+            <BadgeCheck size={12} className="text-[#F5A623]" aria-hidden="true" /> What your rider sees
+          </p>
+          <p className="text-sm font-semibold text-white leading-snug">{preview.primary}</p>
+          {preview.chips.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {preview.chips.map((c, i) => (
+                <span key={i} className="text-xs px-2 py-0.5 rounded-md font-medium" style={{ background: 'rgba(245,166,35,0.14)', color: '#F5A623' }}>{c}</span>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

@@ -137,7 +137,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
             <button onClick={handleConflictConfirm} className="lx-btn-amber w-full py-3.5">
               Yes, start new cart
             </button>
-            <button onClick={() => { setShowConflict(false); setPendingItem(null) }} className="w-full py-3 text-sm text-white/55 hover:text-white/80 transition-colors">
+            <button onClick={() => { setShowConflict(false); setPendingItem(null) }} className="lx-btn-secondary w-full py-3 text-sm">
               Keep existing cart
             </button>
           </div>
@@ -176,9 +176,13 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
               })}
             </div>
 
-            <button onClick={confirmAddons} className="lx-btn-amber w-full rounded-2xl py-4">
-              Add to cart · {formatPrice(selectingTotal)}
-            </button>
+            {/* Sticky footer so the confirm button is always reachable, even with
+                a long add-on list on a small phone. */}
+            <div className="sticky bottom-0 -mx-5 -mb-5 px-5 pt-3 pb-5" style={{ background: 'linear-gradient(to top, var(--lx-surface-solid) 72%, transparent)' }}>
+              <button onClick={confirmAddons} className="lx-btn-amber w-full rounded-2xl py-4">
+                Add to cart · {formatPrice(selectingTotal)}
+              </button>
+            </div>
           </div>
         </div>
       )}
