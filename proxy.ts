@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySessionToken } from './lib/session'
+import { verifySessionToken, isSessionLive } from './lib/session'
 import { createSupabaseAdmin } from './lib/supabase/server'
+import { sessionCookieName } from './lib/session-cookie'
+import { recordSecurityEvent } from './lib/security-events'
 
 const PROTECTED: Array<{ pattern: RegExp; roles: string[] }> = [
   { pattern: /^\/home(\/|$)/,          roles: ['customer', 'admin', 'super_admin'] },
@@ -124,12 +126,32 @@ export async function proxy(req: NextRequest) {
   // /auth/setup is always accessible to authenticated users — don't intercept
   if (pathname.startsWith('/auth')) return next()
 
-  const token = req.cookies.get('session')?.value
+  const token = req.cookies.get(sessionCookieName())?.value
 
   if (token) {
     const session = await verifySessionToken(token)
 
     if (session) {
+      // Enforce server-side revocation/expiry at the EDGE too — not only in
+      // getCurrentUser. Without this, a revoked or re-keyed token keeps loading
+      // protected pages until its JWT exp. FAIL CLOSED: isSessionLive returns
+      // false on ANY DB error/timeout, so an unconfirmable session is treated as
+      // dead — clear the cookie, send to /auth, and log the attempt.
+      if (!(await isSessionLive(session.sessionId))) {
+        await recordSecurityEvent({
+          eventType: 'auth_fail', severity: 'warn', surface: 'jwt',
+          actorId: session.userId, actorRole: session.role, sessionId: session.sessionId,
+          ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined,
+          userAgent: req.headers.get('user-agent') ?? undefined,
+          detail: { reason: 'revoked_or_expired_token_at_edge', path: pathname },
+        })
+        const loginUrl = new URL('/auth', req.url)
+        loginUrl.searchParams.set('next', pathname)
+        const res = redirect(loginUrl)
+        res.cookies.delete(sessionCookieName())
+        return res
+      }
+
       // Redirect away from the public landing page and auth entry points
       if (LANDING_ROUTES.has(pathname)) {
         return redirect(new URL(ROLE_HOME[session.role] ?? '/home', req.url))
@@ -169,7 +191,7 @@ export async function proxy(req: NextRequest) {
     const loginUrl = new URL('/auth', req.url)
     loginUrl.searchParams.set('next', pathname)
     const res = redirect(loginUrl)
-    res.cookies.delete('session')
+    res.cookies.delete(sessionCookieName())
     return res
   }
 

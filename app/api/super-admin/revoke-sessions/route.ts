@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { audit, superAudit } from '@/lib/audit'
+import { recordSecurityEvent } from '@/lib/security-events'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
@@ -41,6 +42,12 @@ export async function POST(req: NextRequest) {
   }
   await audit(entry)
   await superAudit(entry)
+  await recordSecurityEvent({
+    eventType: 'session_revoked', severity: 'warn', surface: 'jwt',
+    actorId: session.userId, actorRole: session.role, sessionId: session.sessionId,
+    ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined,
+    detail: { revoked, scope: 'all_except_operator' },
+  })
 
   return NextResponse.json({ revoked })
 }

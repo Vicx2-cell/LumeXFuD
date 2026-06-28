@@ -126,6 +126,31 @@ function checkBootstrapPin(): SecurityCheck {
 
 // ─── Access control: attacker probe with the PUBLIC anon key ───────────────────
 
+// Tables that must NEVER return rows to the anon (public) key. This is the
+// active belt-and-suspenders probe; the AUTHORITATIVE coverage guarantee is
+// checkRlsCoverage() below (catalog-derived). The old list was only 8 tables —
+// it left every other private table (home addresses + GPS, AI memory, consent
+// records, push tokens, customer wallets, study data…) unverified, so the page
+// showed green without ever testing them. Expanded to the high-value PII/money
+// set so a real RLS regression on any of them is caught actively.
+const PRIVATE_TABLES = [
+  // identity & auth
+  'customers', 'riders', 'admins', 'sessions', 'admin_devices',
+  'webauthn_credentials', 'otp_attempts', 'pin_reset_audit', 'blocked_phones',
+  // money / ledger
+  'wallet_balances', 'wallet_transactions', 'customer_wallets',
+  'customer_wallet_transactions', 'wallet_payout_lots', 'refunds',
+  'platform_earnings', 'reward_credits', 'reward_ledger',
+  // orders & disputes
+  'orders', 'order_items', 'disputes',
+  // location / PII
+  'customer_addresses', 'saved_places', 'consent_log',
+  // AI & misc private
+  'lumi_memory', 'push_subscriptions', 'notifications',
+  // audit & control
+  'audit_logs', 'super_audit_logs', 'feature_flags', 'feature_flag_audit',
+]
+
 async function checkAnonExposure(): Promise<SecurityCheck> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -135,11 +160,9 @@ async function checkAnonExposure(): Promise<SecurityCheck> {
   }
   if (!url || !anonKey) return { ...base, status: 'warn', detail: 'Anon key not available — could not probe.' }
 
-  // Tables that must NEVER return rows to the anon (public) key.
-  const PRIVATE = ['customers', 'wallet_balances', 'wallet_transactions', 'audit_logs', 'super_audit_logs', 'blocked_phones', 'admins', 'sessions']
   const anon = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } })
   const exposed: string[] = []
-  for (const t of PRIVATE) {
+  for (const t of PRIVATE_TABLES) {
     try {
       const { data } = await anon.from(t).select('*').limit(1)
       if (data && data.length > 0) exposed.push(t) // rows came back ⇒ RLS off / leaking
@@ -148,7 +171,50 @@ async function checkAnonExposure(): Promise<SecurityCheck> {
   return {
     ...base,
     status: exposed.length ? 'fail' : 'pass',
-    detail: exposed.length ? `EXPOSED to anyone with the public key: ${exposed.join(', ')}` : 'No private table leaked rows to the public key.',
+    detail: exposed.length
+      ? `EXPOSED to anyone with the public key: ${exposed.join(', ')}`
+      : `No private table leaked rows to the public key (probed ${PRIVATE_TABLES.length}).`,
+  }
+}
+
+// ─── Access control: authoritative RLS coverage (catalog truth) ────────────────
+// The probe above can only test tables it lists. This asks the DATABASE which
+// tables have RLS turned off — covering ALL ~75 tables, including any added in a
+// future migration that forgot to enable RLS. Backed by public.rls_coverage_gaps()
+// (migration 084). Empty result = every table is RLS-protected.
+export interface CoverageRow { table_name: string }
+
+export function coverageCheckFromRows(
+  rows: CoverageRow[] | null,
+  rpcFailed: boolean,
+): SecurityCheck {
+  const base: Omit<SecurityCheck, 'status' | 'detail'> = {
+    id: 'rls-coverage', category: 'Access control', severity: 'critical',
+    label: 'Every table is RLS-protected (no coverage gap)',
+  }
+  if (rpcFailed) {
+    return { ...base, status: 'warn', detail: 'Coverage function unavailable — run migration 084 (rls_coverage_gaps).' }
+  }
+  const gaps = rows ?? []
+  if (gaps.length === 0) {
+    return { ...base, status: 'pass', detail: 'Every public table has Row-Level Security enabled — the anon key can reach none of them directly.' }
+  }
+  const names = gaps.map((g) => g.table_name).join(', ')
+  return {
+    ...base,
+    status: 'fail',
+    detail: `RLS is OFF on ${gaps.length} table(s) — directly reachable with the public key: ${names}. Run migration 084.`,
+  }
+}
+
+async function checkRlsCoverage(): Promise<SecurityCheck> {
+  try {
+    const db = createSupabaseAdmin()
+    const { data, error } = await db.rpc('rls_coverage_gaps')
+    if (error) return coverageCheckFromRows(null, true)
+    return coverageCheckFromRows((data ?? []) as CoverageRow[], false)
+  } catch {
+    return coverageCheckFromRows(null, true)
   }
 }
 
@@ -249,6 +315,7 @@ export async function runSecurityChecks(): Promise<SecurityCheck[]> {
     checkPaystackLiveKey(), checkRateLimiting(), checkNoPublicSecretLeak(), checkBootstrapPin(),
   ]
   const asyncChecks = await Promise.all([
+    checkRlsCoverage().catch((): SecurityCheck => coverageCheckFromRows(null, true)),
     checkAnonExposure().catch((): SecurityCheck => ({ id: 'anon-exposure', category: 'Access control', severity: 'critical', label: 'Private tables reject the public key (RLS)', status: 'warn', detail: 'Probe could not run.' })),
     checkSecurityHeaders().catch((): SecurityCheck => ({ id: 'security-headers', category: 'Network', severity: 'medium', label: 'Security headers present', status: 'warn', detail: 'Probe could not run.' })),
     checkPhoneVerification().catch((): SecurityCheck => ({ id: 'phone-verification', category: 'Auth posture', severity: 'medium', label: 'Phone verification (OTP) enforced', status: 'warn', detail: 'Could not read flag.' })),

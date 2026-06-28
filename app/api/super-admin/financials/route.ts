@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
+import { requireRole } from '@/lib/authz'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 
 export async function GET() {
-  const session = await getCurrentUser()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const gate = await requireRole(await getCurrentUser(), ['super_admin'], 'super-admin/financials')
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
   const db = createSupabaseAdmin()
   const now = new Date()

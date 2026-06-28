@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyHMAC } from '@/lib/security'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { recordSecurityEvent } from '@/lib/security-events'
 import { processWebhookAsync, type PaystackWebhookPayload } from '@/lib/paystack/webhook'
+
+const clientIp = (req: NextRequest) => req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +36,11 @@ export async function POST(req: NextRequest) {
   const signatureOk = candidateSecrets.some((s) => verifyHMAC(rawBody, signature, s))
   if (!signatureOk) {
     console.warn('[webhook] invalid Paystack signature')
+    // DETECT: a forged/garbled signature is a critical security event.
+    await recordSecurityEvent({
+      eventType: 'webhook_reject', severity: 'critical', surface: 'paystack_webhook',
+      ip: clientIp(req), detail: { reason: 'bad_signature' },
+    })
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
@@ -95,7 +103,19 @@ export async function POST(req: NextRequest) {
     })
     if (insErr) {
       if (insErr.code === '23505') return new NextResponse(null, { status: 200 })
-      console.error('[webhook] processed_webhooks insert error (continuing):', insErr.message)
+      // FAIL CLOSED (root-cause fix). The old code logged this and CONTINUED to
+      // process — so if the idempotency key could not be recorded, the money
+      // handlers ran with NO replay guard and every Paystack retry re-ran them
+      // (double-booked subscriptions/earnings). Now: if we cannot record the
+      // dedup key, we do NOT process. Return 200 so Paystack RETRIES; on a retry
+      // the insert may succeed and we process exactly once. Same fail-closed
+      // principle as isSessionLive (#2).
+      console.error('[webhook] processed_webhooks insert error (NOT processing):', insErr.message)
+      await recordSecurityEvent({
+        eventType: 'webhook_reject', severity: 'warn', surface: 'paystack_webhook',
+        ip: clientIp(req), detail: { reason: 'dedup_record_failed', event, code: insErr.code },
+      })
+      return new NextResponse(null, { status: 200 })
     }
   } catch {
     // Thrown (network) error recording the webhook — treat as already-processed

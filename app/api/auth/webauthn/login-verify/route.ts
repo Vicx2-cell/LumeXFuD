@@ -4,6 +4,8 @@ import { isoBase64URL } from '@simplewebauthn/server/helpers'
 import type { AuthenticationResponseJSON, AuthenticatorTransportFuture } from '@simplewebauthn/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { createSession, setCookieOptions } from '@/lib/session'
+import { sessionCookieName } from '@/lib/session-cookie'
+import { recordSecurityEvent } from '@/lib/security-events'
 import { getRoleRedirect } from '@/lib/pin-auth'
 import { decryptField } from '@/lib/crypto'
 import {
@@ -74,6 +76,13 @@ export async function POST(req: NextRequest) {
   }
 
   if (!verification.verified) {
+    await recordSecurityEvent({
+      eventType: 'stepup_fail', severity: 'warn', surface: 'webauthn',
+      actorId: mfa.userId, actorRole: mfa.role,
+      ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined,
+      userAgent: req.headers.get('user-agent') ?? undefined,
+      detail: { reason: 'assertion_not_verified' },
+    })
     return NextResponse.json({ error: 'Face ID verification failed' }, { status: 400 })
   }
 
@@ -89,7 +98,7 @@ export async function POST(req: NextRequest) {
   const { token } = await createSession(mfa.userId, mfa.phone, mfa.role, ipAddress, userAgent)
 
   const res = NextResponse.json({ role: mfa.role, redirect_path: getRoleRedirect(mfa.role) })
-  res.cookies.set('session', token, setCookieOptions(mfa.role))
+  res.cookies.set(sessionCookieName(), token, setCookieOptions(mfa.role))
   // Burn the step-up cookies — single use.
   res.cookies.set(MFA_COOKIE, '', clearCookie())
   res.cookies.set(WA_CHALLENGE_COOKIE, '', clearCookie())

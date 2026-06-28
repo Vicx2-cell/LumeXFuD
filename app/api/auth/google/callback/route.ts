@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { createSession, setCookieOptions, type SessionRole } from '@/lib/session'
+import { sessionCookieName } from '@/lib/session-cookie'
 import { getRoleRedirect } from '@/lib/pin-auth'
 import { getFeature } from '@/lib/features'
 import {
@@ -109,7 +110,7 @@ export async function GET(req: NextRequest) {
 
     const dest = next !== '/' ? next : getRoleRedirect(role)
     const res = NextResponse.redirect(new URL(dest, req.url))
-    res.cookies.set('session', token, setCookieOptions(role))
+    res.cookies.set(sessionCookieName(), token, setCookieOptions(role))
     res.cookies.set(GOOGLE_STATE_COOKIE, '', shortCookieOptions(0))
     return res
   }

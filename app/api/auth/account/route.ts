@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser, COOKIE_NAME } from '@/lib/session'
+import { getCurrentUser } from '@/lib/session'
+import { sessionCookieName } from '@/lib/session-cookie'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
@@ -81,6 +82,6 @@ export async function DELETE(req: NextRequest) {
   })
 
   const res = NextResponse.json({ success: true })
-  res.cookies.set(COOKIE_NAME, '', { maxAge: 0, path: '/' })
+  res.cookies.set(sessionCookieName(), '', { maxAge: 0, path: '/' })
   return res
 }

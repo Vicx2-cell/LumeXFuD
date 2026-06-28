@@ -7,6 +7,14 @@ import { recordPlatformEarning } from '../platform-earnings'
 import { processCustomerTopup, spendCustomerWallet, isCustomerWalletEnabled } from '../customer-wallet'
 import { refundTransaction } from './transfer'
 import { verifyPaystackTransaction } from './init'
+import { recordSecurityEvent } from '../security-events'
+
+// Naira for a refund notification, derived from the canonical kobo column.
+// Guards against NaN: a missing/garbled amount renders ₦0, never "NaN".
+export function refundNaira(amountKobo: unknown): number {
+  const n = Number(amountKobo)
+  return Number.isFinite(n) ? Math.round(n / 100) : 0
+}
 
 export type PaystackEvent =
   | 'charge.success'
@@ -108,6 +116,10 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
               `Order NOT marked paid. Manual review needed.`,
           }).catch(() => {})
         }
+        await recordSecurityEvent({
+          eventType: 'webhook_reject', severity: 'warn', surface: 'paystack_webhook',
+          detail: { reason: 'payment_shortfall', order: pending.order_number, charged: paidAmount, expected: expectedCharge },
+        })
         break
       }
       if (paidAmount > expectedCharge) {
@@ -149,14 +161,27 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
             .update({ status: 'CANCELLED', payment_status: 'FAILED', updated_at: new Date().toISOString() })
             .eq('id', pending.id)
             .eq('payment_status', 'PENDING')
-          await db.from('refunds').insert({
-            order_id:                       pending.id,
-            paystack_transaction_reference: reference,
-            amount_kobo:                    paidAmount,
-            reason:                         'Split payment: wallet portion could not be debited',
-            status:                         refundOk ? 'PROCESSING' : 'NEEDS_ATTENTION',
-            triggered_by:                   'SYSTEM_WEBHOOK',
-          })
+          // Idempotency: don't insert a second refund row if this split-failure
+          // was already recorded for this order+reference (a reprocess after the
+          // route-level dedup is bypassed). Kept as a direct system insert by
+          // decision; FUTURE: unify through reserve_order_refund() for the
+          // order-lock + cumulative cap.
+          const { data: priorRefund } = await db
+            .from('refunds')
+            .select('id')
+            .eq('order_id', pending.id)
+            .eq('paystack_transaction_reference', reference)
+            .maybeSingle()
+          if (!priorRefund) {
+            await db.from('refunds').insert({
+              order_id:                       pending.id,
+              paystack_transaction_reference: reference,
+              amount_kobo:                    paidAmount,
+              reason:                         'Split payment: wallet portion could not be debited',
+              status:                         refundOk ? 'PROCESSING' : 'NEEDS_ATTENTION',
+              triggered_by:                   'SYSTEM_WEBHOOK',
+            })
+          }
           const adminPhone = process.env.ADMIN_PHONE
           if (adminPhone) {
             void sendWhatsAppWithFallback({
@@ -359,7 +384,7 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
       // Notify customer
       const { data: refund } = await db
         .from('refunds')
-        .select('order_id, amount')
+        .select('order_id, amount_kobo')
         .eq('paystack_transaction_reference', orderRef)
         .single()
 
@@ -380,7 +405,7 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
             void sendWhatsAppWithFallback({
               to: phone,
               message: renderTemplate('REFUND_PROCESSED', {
-                amount: Math.round((refund.amount as number) / 100),
+                amount: refundNaira(refund.amount_kobo),
                 order_number: order.order_number as string,
               }),
             }).catch(() => {})
@@ -443,6 +468,19 @@ async function handleSubscriptionPayment(
     .single()
 
   if (!vendor) return
+
+  // Idempotency (handler-level second layer): a reprocessed SUBSCRIPTION charge
+  // must not double-book a period or double-count revenue. The 087
+  // UNIQUE(paystack_reference) is the race backstop under this check.
+  const { data: existingSub } = await db
+    .from('vendor_subscriptions')
+    .select('id')
+    .eq('paystack_reference', reference)
+    .maybeSingle()
+  if (existingSub) {
+    console.info(`[webhook] subscription ${reference} already recorded — skipping (idempotent)`)
+    return
+  }
 
   const now = new Date()
   const periodEnd = new Date(now)

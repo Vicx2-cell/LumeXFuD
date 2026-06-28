@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSession, setCookieOptions } from '@/lib/session'
+import { sessionCookieName } from '@/lib/session-cookie'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { forgotPinSecurityAnswersInput } from '@/lib/validators'
 import { compareSecret, findAuthUserByPhone, hashSecret, logPinResetAudit, normalizeSecurityAnswer, validatePin } from '@/lib/pin-auth'
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
     const userAgent = req.headers.get('user-agent') ?? undefined
     const { token } = await createSession(target.user.id, target.user.phone, target.role, ipAddress, userAgent)
     const res = NextResponse.json({ redirect_path: target.role === 'customer' ? '/' : target.role === 'vendor' ? '/vendor-dashboard' : target.role === 'rider' ? '/rider' : target.role === 'admin' ? '/admin' : '/super-admin' })
-    res.cookies.set('session', token, setCookieOptions(target.role))
+    res.cookies.set(sessionCookieName(), token, setCookieOptions(target.role))
     return res
   } catch (error) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })

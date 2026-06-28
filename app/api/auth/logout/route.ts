@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySessionToken, COOKIE_NAME } from '@/lib/session'
+import { verifySessionToken } from '@/lib/session'
+import { sessionCookieName } from '@/lib/session-cookie'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
-  const token = req.cookies.get(COOKIE_NAME)?.value
+  const token = req.cookies.get(sessionCookieName())?.value
 
   if (token) {
     const payload = await verifySessionToken(token)
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
   }
 
   const res = NextResponse.json({ success: true }, { status: 200 })
-  res.cookies.set(COOKIE_NAME, '', {
+  res.cookies.set(sessionCookieName(), '', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

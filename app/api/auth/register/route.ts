@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { createSession, setCookieOptions, type SessionRole } from '@/lib/session'
+import { sessionCookieName } from '@/lib/session-cookie'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone, safeNormalizePhone } from '@/lib/phone'
 import { registerInput } from '@/lib/validators'
@@ -149,7 +150,7 @@ export async function POST(req: NextRequest) {
     const { token } = await createSession(user.id, normalizedPhone, role, ipAddress, userAgent)
 
     const res = NextResponse.json({ success: true, recovery_code: recoveryCode })
-    res.cookies.set('session', token, setCookieOptions(role))
+    res.cookies.set(sessionCookieName(), token, setCookieOptions(role))
     // Burn the phone-verified cookie — single use.
     res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
     return res

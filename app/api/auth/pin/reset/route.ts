@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { normalizePhone } from '@/lib/phone'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { createSession, setCookieOptions } from '@/lib/session'
+import { sessionCookieName } from '@/lib/session-cookie'
 import {
   PHONE_VERIFIED_COOKIE,
   verifyPhoneVerified,
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
   const { token } = await createSession(target.user.id, target.user.phone, target.role, ipAddress, userAgent)
 
   const res = NextResponse.json({ redirect_path: getRoleRedirect(target.role) })
-  res.cookies.set('session', token, setCookieOptions(target.role))
+  res.cookies.set(sessionCookieName(), token, setCookieOptions(target.role))
   res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
   return res
 }

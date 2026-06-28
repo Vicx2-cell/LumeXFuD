@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z, ZodError } from 'zod'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { createSession, setCookieOptions, type SessionRole } from '@/lib/session'
+import { sessionCookieName } from '@/lib/session-cookie'
 import { getRoleRedirect } from '@/lib/pin-auth'
 import { normalizePhone } from '@/lib/phone'
 import { getFeature } from '@/lib/features'
@@ -153,7 +154,7 @@ export async function POST(req: NextRequest) {
 
       const { token } = await createSession(existing.id, normalizedPhone, role, ipAddress, userAgent)
       const res = NextResponse.json({ role, redirect_path: getRoleRedirect(role), linked: true })
-      res.cookies.set('session', token, setCookieOptions(role))
+      res.cookies.set(sessionCookieName(), token, setCookieOptions(role))
       res.cookies.set(SOCIAL_PENDING_COOKIE, '', shortCookieOptions(0))
       res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
       return res

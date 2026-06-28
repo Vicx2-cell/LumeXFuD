@@ -3,6 +3,7 @@ import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { createSupabaseAdmin } from './supabase/server'
 import { safeNormalizePhone } from './phone'
+import { sessionCookieName } from './session-cookie'
 
 export type SessionRole = 'customer' | 'vendor' | 'rider' | 'admin' | 'super_admin'
 
@@ -41,11 +42,13 @@ const SESSION_DURATIONS: Record<SessionRole, number> = {
   super_admin: 2 * 60 * 60,
 }
 
-const COOKIE_NAME = 'session'
-
 function getSecret(): Uint8Array {
   const s = process.env.JWT_SECRET
   if (!s) throw new Error('JWT_SECRET not set')
+  // Reject a weak signing key at RUNTIME, not just in the security-health page.
+  // HS256 with a short secret is brute-forceable; fail closed rather than mint
+  // forgeable tokens. 32 chars is the floor; 64 is the documented target.
+  if (s.length < 32) throw new Error('JWT_SECRET too short — use a 64-char random secret')
   return new TextEncoder().encode(s)
 }
 
@@ -228,26 +231,43 @@ export function setCookieOptions(role: SessionRole) {
   }
 }
 
+/**
+ * Is this session row still live (exists, not revoked, not expired)?
+ *
+ * FAIL CLOSED: any inability to CONFIRM liveness — a thrown error, a timeout, a
+ * Supabase blip, or simply no matching row — returns false (treated as DEAD).
+ * It must NEVER fail open: a revoked or re-keyed token must never survive a DB
+ * hiccup. Shared by getCurrentUser (API/components) AND the edge proxy so both
+ * gates enforce revocation identically.
+ */
+export async function isSessionLive(sessionId: string): Promise<boolean> {
+  try {
+    const db = createSupabaseAdmin()
+    const { data, error } = await db
+      .from('sessions')
+      .select('id')
+      .eq('id', sessionId)
+      .is('revoked_at', null)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle()
+    if (error) return false   // cannot confirm → DEAD
+    return !!data             // no row → DEAD; row → live
+  } catch {
+    return false              // thrown / timeout → DEAD
+  }
+}
+
 /** Retrieve and verify the current user from the session cookie (server-side). */
 export async function getCurrentUser(): Promise<SessionPayload | null> {
   const cookieStore = await cookies()
-  const token = cookieStore.get(COOKIE_NAME)?.value
+  const token = cookieStore.get(sessionCookieName())?.value
   if (!token) return null
 
   const payload = await verifySessionToken(token)
   if (!payload) return null
 
-  // Verify session still exists and is not revoked
-  const db = createSupabaseAdmin()
-  const { data } = await db
-    .from('sessions')
-    .select('id')
-    .eq('id', payload.sessionId)
-    .is('revoked_at', null)
-    .gt('expires_at', new Date().toISOString())
-    .single()
-
-  if (!data) return null
+  // Server-side revocation/expiry check — fail closed (see isSessionLive).
+  if (!(await isSessionLive(payload.sessionId))) return null
 
   // PANIC lockdown: when on, every role except super_admin is treated as
   // unauthenticated — so every API route and server component that gates on
@@ -262,5 +282,3 @@ export async function getCurrentUser(): Promise<SessionPayload | null> {
 
   return payload
 }
-
-export { COOKIE_NAME }

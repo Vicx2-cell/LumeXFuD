@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getCurrentUser } from '@/lib/session'
+import { requireRole } from '@/lib/authz'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { superAudit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
@@ -25,9 +26,8 @@ const bodySchema = z.object({
 
 // GET — current state of a flag, for the admin UI to render the toggle + goal.
 export async function GET(req: NextRequest) {
-  const session = await getCurrentUser()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const gate = await requireRole(await getCurrentUser(), ['super_admin'], 'admin/feature-flags')
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
   const key = req.nextUrl.searchParams.get('key')
   if (!key) return NextResponse.json({ error: 'Missing key' }, { status: 400 })
@@ -44,9 +44,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getCurrentUser()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const gate = await requireRole(await getCurrentUser(), ['super_admin'], 'admin/feature-flags')
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
+  const session = gate.session
 
   const rl = await rateLimitGeneric(`admin-feature-flags:${session.userId ?? session.phone}`, 20, 60)
   if (!rl.success) return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 })

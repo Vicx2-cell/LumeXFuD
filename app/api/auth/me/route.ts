@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySessionToken, COOKIE_NAME, type SessionRole } from '@/lib/session'
+import { verifySessionToken, type SessionRole } from '@/lib/session'
+import { sessionCookieName } from '@/lib/session-cookie'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 
 async function getUserDetails(phone: string, role: SessionRole) {
@@ -44,7 +45,7 @@ async function getUserDetails(phone: string, role: SessionRole) {
 }
 
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get(COOKIE_NAME)?.value
+  const token = req.cookies.get(sessionCookieName())?.value
   if (!token) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
@@ -80,7 +81,7 @@ export async function GET(req: NextRequest) {
 // (Customer: name, hostel, room_number.) Verifies the session the same way GET
 // does, then updates only the provided, trimmed fields on the user's own row.
 export async function PATCH(req: NextRequest) {
-  const token = req.cookies.get(COOKIE_NAME)?.value
+  const token = req.cookies.get(sessionCookieName())?.value
   if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const payload = await verifySessionToken(token)

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSession, setCookieOptions } from '@/lib/session'
+import { sessionCookieName } from '@/lib/session-cookie'
+import { recordSecurityEvent } from '@/lib/security-events'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone, safeNormalizePhone } from '@/lib/phone'
 import { loginPinInput } from '@/lib/validators'
@@ -122,6 +124,15 @@ export async function POST(req: NextRequest) {
         updates.pin_locked_until = new Date(Date.now() + LOCKOUT_MINUTES * 60000).toISOString()
       }
       await db.from(user.table).update(updates).eq('id', user.user.id)
+      await recordSecurityEvent({
+        eventType: 'auth_fail',
+        severity: attempts >= 5 ? 'critical' : 'warn',
+        surface: 'pin_login',
+        actorId: user.user.id, actorRole: user.role,
+        ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined,
+        userAgent: req.headers.get('user-agent') ?? undefined,
+        detail: { attempts, locked: attempts >= 5 },
+      })
       return NextResponse.json({ error: 'Invalid phone or PIN' }, { status: 400 })
     }
 
@@ -188,7 +199,7 @@ export async function POST(req: NextRequest) {
       redirect_path: resolvePostLoginRedirect(user.role, nextParam),
       pin_reset_pending: user.user.pin_reset_pending ?? false,
     })
-    res.cookies.set('session', token, setCookieOptions(user.role))
+    res.cookies.set(sessionCookieName(), token, setCookieOptions(user.role))
     return res
   } catch (error) {
     console.error('[auth/login] error', error)
