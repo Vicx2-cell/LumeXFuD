@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { getControls } from '@/lib/controls'
 
+// Always compute per-request from the live settings — never let this GET be
+// prerendered/cached at build, or a pricing change wouldn't reach the cart copy.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // Maps the cart's expected response keys → the id-keyed JSONB settings rows
 // seeded in 010 (each shaped {"amount_kobo": N}). Display-only; the authoritative
 // price calc happens server-side in POST /api/orders.
@@ -34,6 +39,11 @@ export async function GET() {
   const controls = await getControls()
   result.hours_open = controls.hours_open
   result.hours_close = controls.hours_close
+
+  // Live wallet top-up bonus % so copy ("get X% bonus") never hardcodes it.
+  const { data: bonusRow } = await db.from('settings').select('value').eq('id', 'wallet_topup_bonus_percent').maybeSingle()
+  const bonus = (bonusRow?.value as { value?: number } | undefined)?.value
+  result.topup_bonus_percent = typeof bonus === 'number' && Number.isFinite(bonus) ? bonus : 0
 
   // No caching: a stale fee here means the customer is shown a price that
   // differs from the authoritative server-side calc at checkout. Prices change

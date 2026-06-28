@@ -41,7 +41,7 @@ export default function CartPage() {
   const [scheduleOn,    setScheduleOn]    = useState(false)
   const [scheduleAt,    setScheduleAt]    = useState('') // datetime-local string
   const [reorderNote,   setReorderNote]   = useState('') // "some items skipped" after Order again
-  const [fees,          setFees]          = useState<{ bike: number; door: number; markup: number } | null>(null)
+  const [fees,          setFees]          = useState<{ bike: number; door: number; markup: number; bonus: number } | null>(null)
   const [hoursLabel,    setHoursLabel]    = useState('7am – 10pm') // live opening hours
 
   // ── Wallet state ──────────────────────────────────────────────────────────
@@ -61,9 +61,9 @@ export default function CartPage() {
   useEffect(() => {
     fetch('/api/settings/fees')
       .then((r) => r.ok ? r.json() : null)
-      .then((d: { bike_delivery_fee_kobo: number; door_delivery_fee_kobo: number; platform_markup_kobo: number; hours_open?: string; hours_close?: string } | null) => {
+      .then((d: { bike_delivery_fee_kobo: number; door_delivery_fee_kobo: number; platform_markup_kobo: number; topup_bonus_percent?: number; hours_open?: string; hours_close?: string } | null) => {
         if (d) {
-          setFees({ bike: d.bike_delivery_fee_kobo, door: d.door_delivery_fee_kobo, markup: d.platform_markup_kobo })
+          setFees({ bike: d.bike_delivery_fee_kobo, door: d.door_delivery_fee_kobo, markup: d.platform_markup_kobo, bonus: d.topup_bonus_percent ?? 0 })
           if (d.hours_open && d.hours_close) setHoursLabel(formatHoursRange(d.hours_open, d.hours_close))
         }
       })
@@ -587,7 +587,7 @@ export default function CartPage() {
               {!walletUsable && !walletFrozen && (
                 <div className="px-4 pb-4 -mt-2">
                   <button type="button" onClick={() => router.push('/profile/wallet')} className="lx-amber text-xs font-medium">
-                    Top up to pay with wallet + get 1% bonus →
+                    Top up to pay with wallet + get {fees?.bonus ?? 1}% bonus →
                   </button>
                 </div>
               )}
