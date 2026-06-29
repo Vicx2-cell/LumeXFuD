@@ -50,7 +50,8 @@ LumeX Fud is a campus food-delivery platform for Abia State University (ABSU), U
 - Vendor subscription tiers: Founding (first 3 vendors) ₦10,000/month, no setup fee, locked 12 months; Early (vendors 4–10) ₦25,000 setup + ₦12,000/month; Standard (vendor 11+) ₦50,000 setup + ₦15,000/month.
 
 # Support
-- For anything account-specific, an order problem, a refund, or anything not covered above, a human team member helps.`
+- For anything account-specific, an order problem, a refund, or anything not covered above, a human team member helps.
+- Official support email: hello@lumexfud.com.ng`
 
 /**
  * Build the system prompt. `audience` tailors the framing; `liveFees` is a short

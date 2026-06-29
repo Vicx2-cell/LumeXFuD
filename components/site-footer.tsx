@@ -4,7 +4,7 @@ import { formatHoursRange } from '@/lib/hours'
 
 // Single business email shown across the site (also in /terms + /privacy). Keep
 // this in sync with the email on the Paystack business profile.
-export const SUPPORT_EMAIL = 'hello@lumex.com.ng'
+export const SUPPORT_EMAIL = 'hello@lumexfud.com.ng'
 // Trading name (must match the Paystack profile) and the operating entity.
 export const BRAND = 'LumeX Fud'
 export const OPERATOR = 'Lumex'
