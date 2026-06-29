@@ -7,15 +7,16 @@ import crypto from 'node:crypto'
 
 const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION || 'v21.0'
 
-function phoneNumberId(): string {
-  const id = process.env.WHATSAPP_PHONE_NUMBER_ID
-  if (!id) throw new Error('WHATSAPP_PHONE_NUMBER_ID is not set')
-  return id
+// Read at REQUEST TIME (not cached at module load) so a redeploy/env change is
+// picked up without a cold-start race. Return null on missing so postMessage can
+// log a clear, actionable error instead of throwing an opaque one.
+function phoneNumberId(): string | null {
+  return process.env.WHATSAPP_PHONE_NUMBER_ID?.trim() || null
 }
-function token(): string {
-  const t = process.env.WHATSAPP_TOKEN
-  if (!t) throw new Error('WHATSAPP_TOKEN is not set')
-  return t
+function token(): string | null {
+  // trim() also strips a stray leading BOM/whitespace some shells prepend, which
+  // would otherwise corrupt the Authorization header and yield a 190/401.
+  return process.env.WHATSAPP_TOKEN?.trim() || null
 }
 
 /**
@@ -39,23 +40,85 @@ export function verifySignature(rawBody: string, signatureHeader: string | null)
 
 type GraphResult = { ok: boolean; id?: string; error?: string }
 
+// Meta error envelope (https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes).
+type GraphError = {
+  message?: string
+  type?: string
+  code?: number
+  error_subcode?: number
+  error_data?: { details?: string }
+  fbtrace_id?: string
+}
+type GraphResponse = { messages?: Array<{ id: string }>; error?: GraphError }
+
 async function postMessage(payload: Record<string, unknown>): Promise<GraphResult> {
-  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId()}/messages`
+  const pnid = phoneNumberId()
+  const tok = token()
+
+  // Guard: missing config → log a clear, actionable error rather than failing
+  // silently (or throwing an opaque "is not set" deep in the stack).
+  if (!tok) {
+    console.error('[whatsapp] WHATSAPP_TOKEN is missing/empty — cannot send. Set it in the Vercel env and redeploy.')
+    return { ok: false, error: 'WHATSAPP_TOKEN missing' }
+  }
+  if (!pnid) {
+    console.error('[whatsapp] WHATSAPP_PHONE_NUMBER_ID is missing/empty — cannot send. Set it in the Vercel env and redeploy.')
+    return { ok: false, error: 'WHATSAPP_PHONE_NUMBER_ID missing' }
+  }
+
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${pnid}/messages`
+  const requestBody = { messaging_product: 'whatsapp', ...payload }
+
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messaging_product: 'whatsapp', ...payload }),
+      headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
     })
-    const json = (await res.json().catch(() => ({}))) as {
-      messages?: Array<{ id: string }>
-      error?: { message?: string }
+
+    // Read the raw text first so we can log it verbatim even if it isn't JSON.
+    const rawText = await res.text()
+    let json: GraphResponse = {}
+    try { json = JSON.parse(rawText) as GraphResponse } catch { /* non-JSON body */ }
+
+    if (!res.ok || json.error) {
+      const e = json.error
+      // FULL error surface in the logs: HTTP status + Meta code/subcode + message
+      // + details + fbtrace_id, plus the message type we tried to send. This is
+      // the line to grep for in Vercel after a failed reply.
+      console.error('[whatsapp] send FAILED', JSON.stringify({
+        httpStatus: res.status,
+        code: e?.code,
+        subcode: e?.error_subcode,
+        message: e?.message,
+        details: e?.error_data?.details,
+        type: e?.type,
+        fbtrace_id: e?.fbtrace_id,
+        sentType: (payload as { type?: string }).type,
+        to: (payload as { to?: string }).to,
+        rawBody: rawText.slice(0, 1000),
+      }))
+      const code = e?.code != null ? ` (code ${e.code}${e.error_subcode ? `/${e.error_subcode}` : ''})` : ''
+      return { ok: false, error: `${e?.message || `HTTP ${res.status}`}${code}` }
     }
-    if (!res.ok) return { ok: false, error: json.error?.message || `HTTP ${res.status}` }
+
     return { ok: true, id: json.messages?.[0]?.id }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'network error' }
+  } catch (err) {
+    // Network/transport failure (DNS, timeout, TLS) — log with context.
+    console.error('[whatsapp] send THREW', {
+      error: err instanceof Error ? err.message : String(err),
+      sentType: (payload as { type?: string }).type,
+      to: (payload as { to?: string }).to,
+    })
+    return { ok: false, error: err instanceof Error ? err.message : 'network error' }
   }
+}
+
+// Truncate by CODE POINT, not UTF-16 unit, so an emoji is never split into a
+// lone surrogate (which Meta rejects with code 100 "invalid parameter").
+function clamp(s: string, max: number): string {
+  const cps = Array.from(s)
+  return cps.length <= max ? s : cps.slice(0, max).join('')
 }
 
 /** Send a plain text message to a WhatsApp number (E.164 with or without +). */
@@ -63,7 +126,7 @@ export function sendText(to: string, body: string): Promise<GraphResult> {
   return postMessage({
     to: to.replace(/^\+/, ''),
     type: 'text',
-    text: { preview_url: false, body: body.slice(0, 4096) },
+    text: { preview_url: false, body: clamp(body, 4096) },
   })
 }
 
@@ -77,7 +140,7 @@ export function sendButtons(to: string, body: string, buttons: WAButton[], heade
   const action = {
     buttons: buttons.slice(0, 3).map((b) => ({
       type: 'reply',
-      reply: { id: b.id.slice(0, 256), title: b.title.slice(0, 20) },
+      reply: { id: b.id.slice(0, 256), title: clamp(b.title, 20) },
     })),
   }
   return postMessage({
@@ -85,8 +148,8 @@ export function sendButtons(to: string, body: string, buttons: WAButton[], heade
     type: 'interactive',
     interactive: {
       type: 'button',
-      ...(header ? { header: { type: 'text', text: header.slice(0, 60) } } : {}),
-      body: { text: body.slice(0, 1024) },
+      ...(header ? { header: { type: 'text', text: clamp(header, 60) } } : {}),
+      body: { text: clamp(body, 1024) },
       action,
     },
   })
@@ -112,14 +175,14 @@ export function sendList(
       type: 'list',
       body: { text: body.slice(0, 1024) },
       action: {
-        button: buttonLabel.slice(0, 20),
+        button: clamp(buttonLabel, 20),
         sections: [
           {
-            title: sectionTitle.slice(0, 24),
+            title: clamp(sectionTitle, 24),
             rows: rows.slice(0, 10).map((r) => ({
               id: r.id.slice(0, 200),
-              title: r.title.slice(0, 24),
-              ...(r.description ? { description: r.description.slice(0, 72) } : {}),
+              title: clamp(r.title, 24),
+              ...(r.description ? { description: clamp(r.description, 72) } : {}),
             })),
           },
         ],
