@@ -934,12 +934,16 @@ async function saveApplication(db: DB, phone: string, conv: Conversation, area: 
     })
     .then(() => {}, () => {})
 
-  await patchConversation(db, phone, { state: 'IDLE', cart: EMPTY_CART, mode: 'human' })
+  // NOTE: we do NOT flip the conversation to mode=human here. The application is
+  // captured + surfaced in the admin inbox (whatsapp_applications) and the admin
+  // is pinged — but the applicant can keep using the bot (order food, ask, etc.)
+  // instead of being trapped in a silent human-only thread.
+  await patchConversation(db, phone, { state: 'IDLE', cart: EMPTY_CART })
   const what = apply.kind === 'vendor' ? 'sell your food' : 'deliver orders'
   await outText(
     db,
     phone,
-    `Thank you! 🙌 Your application to ${what} on LumeX Fud is in. Our team will verify your details and set you up — we’ll reach out right here.\n\n(Reminder: accounts are activated by the LumeX team, not automatically.)`,
+    `Thank you! 🙌 Your application to ${what} on LumeX Fud is in. Our team will verify your details and set you up — we’ll reach out right here.\n\n(Reminder: accounts are activated by the LumeX team, not automatically.)\n\nMeanwhile you can still order food — just type "menu".`,
   )
   const adminPhone = safeNormalizePhone(process.env.SUPER_ADMIN_PHONE) || safeNormalizePhone(process.env.ADMIN_PHONE)
   if (adminPhone) {
