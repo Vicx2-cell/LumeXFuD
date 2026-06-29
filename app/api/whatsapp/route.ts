@@ -80,6 +80,7 @@ type WAMessage = {
     list_reply?: { id: string; title: string }
   }
   button?: { text?: string; payload?: string }
+  location?: { latitude?: number; longitude?: number }
 }
 
 type WAValue = {
@@ -106,8 +107,14 @@ function extractMessage(value: WAValue, m: WAMessage): InboundMessage | null {
     case 'button':
       // Template quick-reply buttons carry their payload here.
       return { ...base, replyId: m.button?.payload ?? m.button?.text ?? '', text: m.button?.text ?? '' }
+    case 'location': {
+      const lat = m.location?.latitude
+      const lng = m.location?.longitude
+      if (typeof lat === 'number' && typeof lng === 'number') return { ...base, location: { latitude: lat, longitude: lng } }
+      return { ...base, text: '' }
+    }
     default:
-      // images/audio/location/etc. → treat as a nudge back to the menu.
+      // images/audio/etc. → treat as a nudge back to the menu.
       return { ...base, text: '' }
   }
 }

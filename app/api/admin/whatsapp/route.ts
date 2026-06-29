@@ -26,25 +26,46 @@ export async function GET(req: NextRequest) {
 
   if (phone) {
     const canonical = safeNormalizePhone(phone) ?? phone
-    const [{ data: conv }, { data: messages }] = await Promise.all([
-      db.from('whatsapp_conversations').select('phone, role, state, mode, updated_at').eq('phone', canonical).maybeSingle(),
+    // Thread + the full CONTEXT PACKAGE so the human picks up exactly where the
+    // bot left off: conversation (incl. live cart), customer profile, and the
+    // customer's most recent active order.
+    const [{ data: conv }, { data: messages }, { data: customer }] = await Promise.all([
+      db.from('whatsapp_conversations').select('phone, role, state, mode, cart, active_order_id, updated_at').eq('phone', canonical).maybeSingle(),
       db
         .from('whatsapp_messages')
         .select('id, direction, msg_type, body, created_at')
         .eq('phone', canonical)
         .order('created_at', { ascending: true })
         .limit(200),
+      db
+        .from('customers')
+        .select('id, name, phone, default_delivery_address, created_at, suspended_until')
+        .eq('phone', canonical)
+        .is('deleted_at', null)
+        .maybeSingle(),
     ])
-    return NextResponse.json({ conversation: conv ?? null, messages: messages ?? [] })
+
+    // Most recent live order for this customer (any non-terminal/just-placed state).
+    let order: unknown = null
+    if (customer?.id) {
+      const { data: o } = await db
+        .from('orders')
+        .select('order_number, status, payment_status, total_amount, delivery_type, delivery_address, created_at, vendors(shop_name)')
+        .eq('customer_id', customer.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      order = o ?? null
+    }
+
+    return NextResponse.json({ conversation: conv ?? null, messages: messages ?? [], customer: customer ?? null, order })
   }
 
-  // Inbox list: conversations needing a human, newest activity first.
-  const { data: convs } = await db
-    .from('whatsapp_conversations')
-    .select('phone, role, state, mode, updated_at')
-    .eq('mode', 'human')
-    .order('updated_at', { ascending: false })
-    .limit(100)
+  // Inbox list (conversations needing a human) + pending applications.
+  const [{ data: convs }, { data: applications }] = await Promise.all([
+    db.from('whatsapp_conversations').select('phone, role, state, mode, updated_at').eq('mode', 'human').order('updated_at', { ascending: false }).limit(100),
+    db.from('whatsapp_applications').select('id, phone, kind, name, details, status, created_at').eq('status', 'NEW').order('created_at', { ascending: false }).limit(50),
+  ])
 
   // Attach a last-message preview per conversation (small N, fine to loop).
   const list = await Promise.all(
@@ -60,7 +81,7 @@ export async function GET(req: NextRequest) {
     }),
   )
 
-  return NextResponse.json({ conversations: list })
+  return NextResponse.json({ conversations: list, applications: applications ?? [] })
 }
 
 const bodySchema = z
