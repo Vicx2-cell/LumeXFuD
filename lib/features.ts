@@ -37,6 +37,7 @@ export const FEATURES: FeatureDef[] = [
   { key: 'delivery_handover_v1', label: 'Delivery handover code', description: 'Require the rider to enter the customer’s private 6-char code at the door to confirm delivery and release funds (or an opt-in leave-at-gate drop with photo proof). Off = delivery completes the old way (no handover code).', default: false, enforced: true },
   { key: 'sponsor_topup', label: 'Parent / sponsor top-up', description: 'Public page where a parent/sponsor funds a student’s wallet, plus the "ask family to top up" share button on the wallet. Off = both are hidden and the page is disabled.', default: true, enforced: true },
   { key: 'founder', label: 'Founder spotlight', description: 'Show the "Why I built LumeX" founder section on the public landing page. Off = the section is removed from the page entirely.', default: true, enforced: true },
+  { key: 'whatsapp_bot', label: 'WhatsApp bot', description: 'MASTER switch for the WhatsApp Cloud API bot (ordering, AI FAQ, human handoff, vendor/rider applications). OFF = the webhook still verifies and returns 200 to Meta, but the bot does NOT process or reply to any message — so you can ship without it and flip it on when ready. Existing human-handoff threads in the inbox are unaffected.', default: false, enforced: true },
 ]
 
 const settingId = (key: string) => `feature.${key}`

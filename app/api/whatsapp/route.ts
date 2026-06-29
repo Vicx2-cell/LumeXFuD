@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifySignature } from '@/lib/whatsapp'
 import { handleInbound, logInboundOnce, type InboundMessage } from '@/lib/whatsapp-handler'
+import { getFeature } from '@/lib/features'
 
 // MUST run on Node (uses node:crypto for the HMAC + the Supabase service-role
 // client). Edge has no Node crypto and must never see the service-role key.
@@ -31,7 +32,15 @@ export async function POST(req: NextRequest) {
     return new NextResponse('Invalid signature', { status: 401 })
   }
 
-  // 2) Parse only after the signature passes.
+  // 2) Master kill switch: when the `whatsapp_bot` feature flag is OFF, ACK Meta
+  // with 200 (so it never retries or disables the webhook) but do NOT process or
+  // reply to anything. This lets the platform ship with the bot dark and flip it
+  // on later from /super-admin/features — no redeploy needed.
+  if (!(await getFeature('whatsapp_bot'))) {
+    return NextResponse.json({ received: true, bot: 'disabled' })
+  }
+
+  // 3) Parse only after the signature passes.
   let body: WebhookBody
   try {
     body = JSON.parse(raw) as WebhookBody
@@ -39,7 +48,7 @@ export async function POST(req: NextRequest) {
     return new NextResponse('Bad JSON', { status: 400 })
   }
 
-  // 3) Walk the payload, ignoring status callbacks / other change types gracefully.
+  // 4) Walk the payload, ignoring status callbacks / other change types gracefully.
   try {
     for (const entry of body.entry ?? []) {
       for (const change of entry.changes ?? []) {
