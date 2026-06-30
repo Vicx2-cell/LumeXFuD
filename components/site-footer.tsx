@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getControls } from '@/lib/controls'
 import { formatHoursRange } from '@/lib/hours'
+import { listGuides, guidePath } from '@/lib/seo/guides'
 
 // Single business email shown across the site (also in /terms + /privacy). Keep
 // this in sync with the email on the Paystack business profile.
@@ -44,6 +45,21 @@ export async function SiteFooter() {
               </p>
             )}
             <p>Open {hoursLabel} daily</p>
+          </div>
+        </div>
+
+        <div className="border-t border-white/8 pt-4">
+          <p className="text-white/55 font-medium mb-2">Helpful guides</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            {listGuides().map((g) => (
+              <Link
+                key={g.slug}
+                href={guidePath(g.slug)}
+                className="inline-flex items-center min-h-[44px] py-1.5 hover:text-white/70 transition-colors"
+              >
+                {g.shortLabel}
+              </Link>
+            ))}
           </div>
         </div>
 

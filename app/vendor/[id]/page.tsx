@@ -1,7 +1,9 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/session'
 import { BottomNav } from '@/components/nav-bottom'
+import { vendorPath } from '@/lib/seo/config'
 import { VendorMenuClient } from './vendor-menu-client'
 
 // Always render fresh — a vendor's menu, prices and open/closed status must not
@@ -15,7 +17,7 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
   const { data: vendor } = await db
     .from('vendors')
     .select(`
-      id, shop_name, owner_name, logo_url, shop_photo_url,
+      id, slug, shop_name, owner_name, logo_url, shop_photo_url,
       prep_time_minutes, status, paused_until, category, description,
       avg_rating, total_ratings, is_active, opening_time, closing_time
     `)
@@ -80,6 +82,20 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
   return (
     <main className="lx-page pb-32">
       <VendorMenuClient vendor={{ ...vendor, kyc_verified } as VendorInfo} menu={menuWithAddons} reviews={reviews} loggedOut={!session} />
+      {vendor.slug && (
+        <div className="max-w-xl mx-auto px-4 pb-4 text-center">
+          {/* Link to the public, shareable SEO page for this vendor. Useful for
+              sharing and discovery; the /uturu page is the canonical public one. */}
+          <Link
+            href={vendorPath(vendor.slug)}
+            className="lx-btn-ghost inline-flex items-center justify-center gap-1.5 px-5 py-2.5 text-sm"
+            style={{ minHeight: 44, borderRadius: 12 }}
+          >
+            View {vendor.shop_name}&apos;s public page
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7" /><path d="M7 7h10v10" /></svg>
+          </Link>
+        </div>
+      )}
       <BottomNav />
     </main>
   )

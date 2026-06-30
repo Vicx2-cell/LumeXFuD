@@ -13,6 +13,8 @@ export interface GuideDef {
   slug: string
   /** <h1> + <title> base. */
   title: string
+  /** Short label for compact link lists (footer, nav). */
+  shortLabel: string
   /** One-line meta description / page lead summary. */
   description: string
   /** Last content review date (Africa/Lagos), shown as the trust stamp. Bump
@@ -25,6 +27,7 @@ export const GUIDES: GuideDef[] = [
   {
     slug: 'how-to-spot-food-vendor-scams-uturu',
     title: 'How to spot food-vendor scams in Uturu (ABSU)',
+    shortLabel: 'Avoiding food scams',
     description:
       'A practical, local guide for ABSU students: how to avoid getting scammed when you order food in Uturu — the red flags, the safe way to pay, and what to do if an order goes wrong.',
     updated: '2026-06-30',
@@ -32,6 +35,7 @@ export const GUIDES: GuideDef[] = [
   {
     slug: 'whats-open-late-near-absu',
     title: "What's open late near ABSU",
+    shortLabel: "What's open late",
     description:
       'Where to find late-night food around Abia State University, Uturu — which campus vendors stay open late, the platform hours, and how to order when the kitchens are still on.',
     updated: '2026-06-30',
@@ -39,6 +43,7 @@ export const GUIDES: GuideDef[] = [
   {
     slug: 'how-escrow-protects-you-on-lumexfud',
     title: 'How escrow protects you on LumeX Fud',
+    shortLabel: 'How escrow protects you',
     description:
       'Plain-language explainer of how your money is protected when you order on LumeX Fud — you pay the platform, not the vendor directly, and the money is only released after your food arrives.',
     updated: '2026-06-30',
@@ -46,6 +51,7 @@ export const GUIDES: GuideDef[] = [
   {
     slug: 'eating-well-on-a-budget-near-absu',
     title: 'Eating well on a budget near ABSU',
+    shortLabel: 'Eating on a budget',
     description:
       'Honest, practical tips for ABSU students on stretching a small daily food budget in Uturu — how to spend less per meal, split delivery, and still eat enough good food.',
     updated: '2026-06-30',
