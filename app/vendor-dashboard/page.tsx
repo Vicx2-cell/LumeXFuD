@@ -12,7 +12,8 @@ import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
 import { Badge } from '@/components/ui/badge'
 import { GlassSheen } from '@/components/fx'
-import { UtensilsCrossed, Wallet, Star, Settings2, ChevronRight } from 'lucide-react'
+import { hasUsableLocation } from '@/lib/vendor-location'
+import { UtensilsCrossed, Wallet, Star, Settings2, ChevronRight, MapPin } from 'lucide-react'
 
 interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
 interface VendorOrder {
@@ -39,6 +40,10 @@ interface VendorInfo {
   shop_photo_url: string | null
   pickup_enabled: boolean
   pickup_max_concurrent: number
+  address_text: string | null
+  landmark: string | null
+  latitude: number | null
+  longitude: number | null
 }
 
 const ACTIVE = ['PENDING', 'VENDOR_ACCEPTED', 'PREPARING', 'READY']
@@ -278,6 +283,24 @@ export default function VendorDashboard() {
       <div className="max-w-lg lg:max-w-5xl mx-auto px-4 py-4 flex flex-col gap-5 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:items-start lx-enter">
         {/* Controls — sidebar on desktop (right), BELOW the orders on mobile */}
         <div className="space-y-5 order-2 lg:order-none lg:col-start-2">
+        {/* Location nudge — customers & riders can't find a store with no pin. */}
+        {vendor && !hasUsableLocation(vendor) && (
+          <button
+            onClick={() => router.push('/vendor-dashboard/settings')}
+            className="w-full text-left lx-surface p-4 flex items-center gap-3 lx-tap"
+            style={{ border: '1px solid rgba(245,166,35,0.3)' }}
+          >
+            <span className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623' }}>
+              <MapPin size={18} strokeWidth={1.9} />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white">Add your store location</p>
+              <p className="text-xs text-white/45">Drop a pin so customers & riders can find you.</p>
+            </div>
+            <ChevronRight size={16} strokeWidth={2} className="text-white/30 shrink-0" />
+          </button>
+        )}
+
         {/* Launch counter — self-hides unless the super-admin flag is on */}
         <LaunchCounter />
 

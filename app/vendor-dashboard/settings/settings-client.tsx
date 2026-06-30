@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { BusinessHours } from '@/components/business-hours'
+import { VendorLocationEditor } from '@/components/vendor-location-editor'
 import { FaceIdSetup } from '@/components/face-id-setup'
 import { ConfirmSheet } from '@/components/ui/confirm-sheet'
 import { UtensilsCrossed, Wallet, Star, Share2, ChevronRight } from 'lucide-react'
@@ -88,6 +89,16 @@ export function VendorSettings({ vendor: v0 }: { vendor: VendorSettable }) {
         </div>
 
         <BusinessHours id={vendor.id} initialOpen={vendor.opening_time} initialClose={vendor.closing_time} />
+
+        {/* Store location — address + map pinpoint customers & riders navigate to */}
+        <VendorLocationEditor initial={{
+          id: vendor.id,
+          address_text: vendor.address_text,
+          landmark: vendor.landmark,
+          latitude: vendor.latitude,
+          longitude: vendor.longitude,
+          location_photo_url: vendor.location_photo_url,
+        }} />
 
         {/* Pickup (Order Ahead) */}
         <div className="lx-surface p-4 space-y-3">

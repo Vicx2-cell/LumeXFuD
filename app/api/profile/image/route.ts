@@ -12,12 +12,13 @@ export const runtime = 'nodejs'
 
 const BUCKET = 'menu-images'
 
-// POST /api/profile/image — multipart { file, slot: 'avatar' | 'cover' }.
+// POST /api/profile/image — multipart { file, slot: 'avatar' | 'cover' | 'storefront' }.
 // Validates magic bytes, resizes via sharp, uploads to Storage, and saves the
 // resulting URL onto the CURRENT user's own row:
 //   • customer / rider → avatar_url
-//   • vendor → logo_url (avatar) or shop_photo_url (cover)
-// Returns { url }. Cover is vendor-only.
+//   • vendor → logo_url (avatar) | shop_photo_url (cover) | location_photo_url (storefront)
+// Returns { url }. Cover + storefront are vendor-only. The storefront photo is the
+// "what the shop looks like from the street" cue shown to customers and riders.
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -41,8 +42,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid upload' }, { status: 400 })
   }
   if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-  if (slot !== 'avatar' && slot !== 'cover') return NextResponse.json({ error: 'Invalid slot' }, { status: 400 })
-  if (slot === 'cover' && role !== 'vendor') return NextResponse.json({ error: 'Cover photo is for vendors' }, { status: 403 })
+  if (slot !== 'avatar' && slot !== 'cover' && slot !== 'storefront') return NextResponse.json({ error: 'Invalid slot' }, { status: 400 })
+  if ((slot === 'cover' || slot === 'storefront') && role !== 'vendor') return NextResponse.json({ error: 'That photo is for vendors' }, { status: 403 })
   if (file.size > MAX_IMAGE_BYTES) return NextResponse.json({ error: 'Image too large (max 5MB)' }, { status: 400 })
 
   const inputBuf = Buffer.from(await file.arrayBuffer())
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
   try {
     const pipeline = sharp(inputBuf).rotate() // honor EXIF orientation
     if (slot === 'cover') pipeline.resize(1280, 480, { fit: 'cover' })
+    else if (slot === 'storefront') pipeline.resize(1024, 768, { fit: 'cover' }) // 4:3 — a recognisable shopfront, not a letterbox
     else pipeline.resize(512, 512, { fit: 'cover' })
     out = await pipeline.webp({ quality: 82 }).toBuffer()
   } catch {
@@ -81,7 +83,9 @@ export async function POST(req: NextRequest) {
 
   // Save onto the current user's own row (keyed by their session phone + role).
   const table = role === 'customer' ? 'customers' : role === 'rider' ? 'riders' : 'vendors'
-  const column = role === 'vendor' ? (slot === 'cover' ? 'shop_photo_url' : 'logo_url') : 'avatar_url'
+  const column = role === 'vendor'
+    ? (slot === 'cover' ? 'shop_photo_url' : slot === 'storefront' ? 'location_photo_url' : 'logo_url')
+    : 'avatar_url'
   const { error: updErr } = await db.from(table).update({ [column]: url }).eq('phone', session.phone)
   if (updErr) {
     console.error('[profile/image] db error:', updErr.message)
@@ -100,7 +104,7 @@ export async function DELETE(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const role = session.role
   const slot = new URL(req.url).searchParams.get('slot') ?? 'avatar'
-  if (slot !== 'avatar' && slot !== 'cover') return NextResponse.json({ error: 'Invalid slot' }, { status: 400 })
+  if (slot !== 'avatar' && slot !== 'cover' && slot !== 'storefront') return NextResponse.json({ error: 'Invalid slot' }, { status: 400 })
 
   if (role === 'rider') {
     return NextResponse.json({ error: 'Your profile photo is required and can only be changed.' }, { status: 403 })
@@ -108,8 +112,8 @@ export async function DELETE(req: NextRequest) {
   if (role === 'vendor' && slot === 'avatar') {
     return NextResponse.json({ error: 'Your store logo is required and can only be changed.' }, { status: 403 })
   }
-  if (role === 'customer' && slot === 'cover') {
-    return NextResponse.json({ error: 'No cover photo' }, { status: 400 })
+  if (role === 'customer' && (slot === 'cover' || slot === 'storefront')) {
+    return NextResponse.json({ error: 'Not allowed' }, { status: 400 })
   }
   if (role !== 'customer' && role !== 'vendor') {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 })
@@ -117,7 +121,9 @@ export async function DELETE(req: NextRequest) {
 
   const db = createSupabaseAdmin()
   const table = role === 'customer' ? 'customers' : 'vendors'
-  const column = role === 'vendor' ? 'shop_photo_url' : 'avatar_url'
+  const column = role === 'vendor'
+    ? (slot === 'storefront' ? 'location_photo_url' : 'shop_photo_url')
+    : 'avatar_url'
   const { error } = await db.from(table).update({ [column]: null }).eq('phone', session.phone)
   if (error) {
     console.error('[profile/image] delete error:', error.message)

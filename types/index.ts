@@ -63,6 +63,13 @@ export interface Vendor {
   subscription_paid_until: string | null
   avg_rating: number
   total_ratings: number
+  // Public store location (migration 090) — shown to customers + riders so they
+  // can find and navigate to the shop. All optional; a pin is lat+lng together.
+  address_text: string | null
+  landmark: string | null
+  latitude: number | null
+  longitude: number | null
+  location_photo_url: string | null
   is_active: boolean
   approved_at: string | null
   approved_by: string | null

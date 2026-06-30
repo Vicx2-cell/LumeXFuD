@@ -36,7 +36,7 @@ export async function GET() {
           .select(`
             id, order_number, status, delivery_type, delivery_address, vendor_id, customer_id,
             rider_delivery_cut, picked_up_at, created_at, delivery_photo_url,
-            vendors ( shop_name, phone ),
+            vendors ( shop_name, phone, address_text, landmark, latitude, longitude, location_photo_url ),
             customers ( phone, name, avatar_url ),
             order_items ( name, quantity )
           `)

@@ -19,7 +19,8 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
     .select(`
       id, slug, shop_name, owner_name, logo_url, shop_photo_url,
       prep_time_minutes, status, paused_until, category, description,
-      avg_rating, total_ratings, is_active, opening_time, closing_time
+      avg_rating, total_ratings, is_active, opening_time, closing_time,
+      address_text, landmark, latitude, longitude, location_photo_url
     `)
     .eq('id', id)
     .eq('is_active', true)
@@ -129,6 +130,11 @@ export interface VendorInfo {
   total_ratings: number
   opening_time: string | null
   closing_time: string | null
+  address_text: string | null
+  landmark: string | null
+  latitude: number | null
+  longitude: number | null
+  location_photo_url: string | null
   kyc_verified?: boolean
 }
 

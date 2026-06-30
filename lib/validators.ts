@@ -286,6 +286,16 @@ export const updateSavedPlaceInput = z.object({
   ...placeCoordsShape,
 }).strict()
 
+// ─── Vendor store location (address + map pinpoint) ──────────────────────────
+// Shape validation only; trimming + cross-field rules (half-pin, ranges) live in
+// lib/vendor-location.ts (cleanVendorLocation) so they're shared + testable.
+export const vendorLocationInput = z.object({
+  address_text: z.string().max(160).nullable().optional(),
+  landmark:     z.string().max(120).nullable().optional(),
+  latitude:     z.number().min(-90).max(90).nullable().optional(),
+  longitude:    z.number().min(-180).max(180).nullable().optional(),
+}).strict()
+
 // ─── Vendor menu ────────────────────────────────────────────────────────────────
 
 export const MENU_CATEGORIES = ['RICE', 'PROTEIN', 'DRINKS', 'SNACKS', 'OTHER'] as const

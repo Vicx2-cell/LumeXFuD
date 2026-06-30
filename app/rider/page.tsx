@@ -15,6 +15,7 @@ import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { useFeatures } from '@/lib/use-features'
 import { waLink } from '@/lib/contact'
 import { formatAddressForRider } from '@/lib/delivery-address'
+import { directionsUrl } from '@/lib/maps'
 
 type RiderStatus = 'ONLINE' | 'OFFLINE' | 'BUSY'
 
@@ -39,7 +40,11 @@ interface CurrentOrder {
   picked_up_at: string | null
   leave_at_gate: boolean | null
   delivery_photo_url: string | null
-  vendors: { shop_name: string; phone: string; call_phone?: string | null } | null
+  vendors: {
+    shop_name: string; phone: string; call_phone?: string | null
+    address_text?: string | null; landmark?: string | null
+    latitude?: number | null; longitude?: number | null; location_photo_url?: string | null
+  } | null
   customers: { phone: string; name: string | null; avatar_url: string | null; call_phone?: string | null } | null
   order_items: { name: string; quantity: number }[] | null
 }
@@ -434,6 +439,31 @@ export default function RiderDashboard() {
             </div>
 
             <div className="space-y-2 mb-4">
+              {/* Pickup — where to collect the food. Most useful BEFORE pickup, so
+                  it leads the card and carries a one-tap navigate-to-vendor link. */}
+              {current.vendors && (current.vendors.address_text || current.vendors.landmark || (current.vendors.latitude != null && current.vendors.longitude != null)) && (
+                <div className="rounded-xl p-3 mb-1" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.18)' }}>
+                  <div className="flex items-start gap-2">
+                    <span className="text-[10px] uppercase tracking-wide font-semibold shrink-0 mt-0.5" style={{ color: '#F5A623' }}>Pickup</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-white leading-snug">{current.vendors.shop_name}</p>
+                      {current.vendors.address_text && <p className="text-xs text-white/60 leading-snug mt-0.5">{current.vendors.address_text}</p>}
+                      {current.vendors.landmark && <p className="text-xs text-white/45 leading-snug mt-0.5">🚩 {current.vendors.landmark}</p>}
+                    </div>
+                  </div>
+                  {directionsUrl(current.vendors.latitude, current.vendors.longitude) && (
+                    <a
+                      href={directionsUrl(current.vendors.latitude, current.vendors.longitude)!}
+                      target="_blank" rel="noopener noreferrer"
+                      className="mt-2.5 w-full inline-flex items-center justify-center gap-2 rounded-lg text-sm font-semibold active:scale-[0.98] transition-transform"
+                      style={{ background: '#F5A623', color: '#000', minHeight: 44 }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                      Navigate to pickup
+                    </a>
+                  )}
+                </div>
+              )}
               <RiderAddress address={current.delivery_address} emphasis />
               <p className="text-[10px] text-white/30 uppercase tracking-wide pl-[23px] -mt-0.5">
                 {current.delivery_type === 'DOOR' ? 'Door — bring it to the room' : 'Bike — meet at the lodge'}

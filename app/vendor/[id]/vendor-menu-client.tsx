@@ -10,6 +10,7 @@ import { vendorTrustBadges } from '@/lib/vendor-trust'
 import { VerifiedBadge } from '@/components/verified-badge'
 import { Badge } from '@/components/ui/badge'
 import { Pill } from '@/components/ui/pill'
+import { FindStoreCard } from '@/components/find-store-card'
 import type { VendorInfo, MenuItem, VendorReview } from './page'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks', 'Other']
@@ -261,6 +262,11 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
             </Pill>
           ))}
         </div>
+      </div>
+
+      {/* Find this store — address, landmark, storefront photo + one-tap directions */}
+      <div className="max-w-lg mx-auto px-4 pt-3">
+        <FindStoreCard vendor={vendor} shopName={vendor.shop_name} />
       </div>
 
       {menu.length > 10 && (

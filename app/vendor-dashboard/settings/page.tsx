@@ -17,7 +17,7 @@ export default async function VendorSettingsPage() {
   const db = createSupabaseAdmin()
   const { data: vendor } = await db
     .from('vendors')
-    .select('id, shop_name, shop_photo_url, logo_url, opening_time, closing_time, pickup_enabled, pickup_max_concurrent')
+    .select('id, shop_name, shop_photo_url, logo_url, opening_time, closing_time, pickup_enabled, pickup_max_concurrent, address_text, landmark, latitude, longitude, location_photo_url')
     .eq('id', session.userId)
     .single()
 
@@ -43,4 +43,9 @@ export interface VendorSettable {
   closing_time: string | null
   pickup_enabled: boolean
   pickup_max_concurrent: number
+  address_text: string | null
+  landmark: string | null
+  latitude: number | null
+  longitude: number | null
+  location_photo_url: string | null
 }
