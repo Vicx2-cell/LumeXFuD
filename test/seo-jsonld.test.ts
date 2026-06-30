@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildVendorJsonLd } from '@/lib/seo/jsonld'
+import { buildVendorJsonLd, buildGuideJsonLd } from '@/lib/seo/jsonld'
 import { slugify } from '@/lib/seo/slug'
 import type { SeoVendor } from '@/lib/seo/vendor-data'
 
@@ -65,6 +65,33 @@ describe('buildVendorJsonLd', () => {
     const ld = buildVendorJsonLd(makeVendor({ openingTime: null, closingTime: null }))
     const restaurant = ld['@graph'].find((g) => g['@type'] === 'Restaurant') as Record<string, unknown>
     expect(restaurant.openingHoursSpecification).toBeUndefined()
+  })
+})
+
+describe('buildGuideJsonLd', () => {
+  const base = { slug: 'how-escrow-protects-you-on-lumexfud', title: 'How escrow protects you', description: 'desc', updated: '2026-06-30' }
+
+  it('always emits Article + BreadcrumbList', () => {
+    const ld = buildGuideJsonLd({ ...base, faq: [] })
+    const types = ld['@graph'].map((g) => g['@type'])
+    expect(types).toContain('Article')
+    expect(types).toContain('BreadcrumbList')
+  })
+
+  it('GUARDRAIL: omits FAQPage entirely when there are no Q&A items', () => {
+    const ld = buildGuideJsonLd({ ...base, faq: [] })
+    expect(ld['@graph'].some((g) => g['@type'] === 'FAQPage')).toBe(false)
+  })
+
+  it('emits FAQPage with each real Q&A when present', () => {
+    const ld = buildGuideJsonLd({ ...base, faq: [
+      { question: 'Who holds my money?', answer: 'LumeX does until delivery.' },
+      { question: 'How do I pay?', answer: 'Paystack — card, transfer or USSD.' },
+    ] })
+    const faq = ld['@graph'].find((g) => g['@type'] === 'FAQPage') as { mainEntity: Array<{ name: string; acceptedAnswer: { text: string } }> }
+    expect(faq.mainEntity.length).toBe(2)
+    expect(faq.mainEntity[0].name).toBe('Who holds my money?')
+    expect(faq.mainEntity[0].acceptedAnswer.text).toContain('LumeX')
   })
 })
 

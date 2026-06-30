@@ -1,6 +1,7 @@
 import { SITE_URL, PLACE, seoUrl, vendorPath } from './config'
 import { allInKobo } from './pricing'
 import type { SeoVendor } from './vendor-data'
+import type { FaqItem } from './guides'
 
 // JSON-LD builders. Hard rule (guardrail §2.2): NEVER emit AggregateRating/Review
 // unless real ratings exist — fabricated review markup is a manual-penalty risk
@@ -104,4 +105,56 @@ export function buildVendorJsonLd(v: SeoVendor) {
   }
 
   return { '@context': 'https://schema.org', '@graph': [restaurant, breadcrumb] }
+}
+
+// ── Guide (T5) structured data ───────────────────────────────────────────────
+// FAQPage is emitted ONLY when there is a real Q&A array. Caller passes the SAME
+// faq array it renders visibly, so the schema can never describe Q&A the user
+// can't see (a Google requirement + an honesty guardrail). Returns null when
+// there are no FAQ items so the page omits the script entirely.
+export function buildGuideJsonLd(opts: {
+  slug: string
+  title: string
+  description: string
+  updated: string
+  faq: FaqItem[]
+}) {
+  const url = seoUrl(`/uturu/guides/${opts.slug}`)
+  const article = {
+    '@type': 'Article',
+    '@id': `${url}#article`,
+    headline: opts.title,
+    description: opts.description,
+    url,
+    inLanguage: 'en-NG',
+    datePublished: opts.updated,
+    dateModified: opts.updated,
+    about: PLACE.areaServed,
+    author: { '@type': 'Organization', name: 'LumeX Fud', url: SITE_URL },
+    publisher: { '@type': 'Organization', name: 'LumeX Fud', url: SITE_URL, logo: `${SITE_URL}/icons/icon-512-v2.png` },
+  }
+
+  const breadcrumb = {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: opts.title, item: url },
+    ],
+  }
+
+  const graph: Record<string, unknown>[] = [article, breadcrumb]
+
+  if (opts.faq.length > 0) {
+    graph.push({
+      '@type': 'FAQPage',
+      '@id': `${url}#faq`,
+      mainEntity: opts.faq.map((f) => ({
+        '@type': 'Question',
+        name: f.question,
+        acceptedAnswer: { '@type': 'Answer', text: f.answer },
+      })),
+    })
+  }
+
+  return { '@context': 'https://schema.org', '@graph': graph }
 }

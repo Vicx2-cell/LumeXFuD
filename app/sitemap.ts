@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { listSeoVendors } from '@/lib/seo/vendor-data'
+import { listGuides, guidePath } from '@/lib/seo/guides'
 
 const SITE = 'https://lumexfud.com.ng'
 
@@ -29,5 +30,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }))
 
-  return [...staticPages, ...vendorPages]
+  // T5 — guide / FAQ pages (evergreen, lightly updated).
+  const guidePages: MetadataRoute.Sitemap = listGuides().map((g) => ({
+    url: `${SITE}${guidePath(g.slug)}`,
+    lastModified: new Date(g.updated),
+    changeFrequency: 'monthly',
+    priority: 0.6,
+  }))
+
+  return [...staticPages, ...vendorPages, ...guidePages]
 }
