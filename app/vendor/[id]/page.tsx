@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { notCurrentlySuspendedOr } from '@/lib/vendor-visibility'
 import { getCurrentUser } from '@/lib/session'
 import { BottomNav } from '@/components/nav-bottom'
 import { vendorPath } from '@/lib/seo/config'
@@ -25,6 +26,7 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
     .eq('id', id)
     .eq('is_active', true)
     .is('deleted_at', null)
+    .or(notCurrentlySuspendedOr()) // a suspended vendor's storefront 404s
     .single()
 
   if (!vendor) notFound()

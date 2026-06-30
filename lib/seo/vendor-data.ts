@@ -1,4 +1,5 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { notCurrentlySuspendedOr } from '@/lib/vendor-visibility'
 import { getControls, withinHours } from '@/lib/controls'
 import { getPlatformFees, type PlatformFees } from './pricing'
 
@@ -125,6 +126,7 @@ export async function getSeoVendorBySlug(slug: string): Promise<SeoVendor | null
     .eq('slug', slug)
     .eq('is_active', true)
     .is('deleted_at', null)
+    .or(notCurrentlySuspendedOr()) // suspended vendor's SEO page 404s
     .maybeSingle()
 
   if (!data) return null
@@ -240,6 +242,7 @@ export async function listSeoVendors(): Promise<SeoVendorRef[]> {
       .select('slug, updated_at')
       .eq('is_active', true)
       .is('deleted_at', null)
+      .or(notCurrentlySuspendedOr()) // keep suspended vendors out of the sitemap
       .not('slug', 'is', null)
     return (data ?? [])
       .filter((r) => r.slug)

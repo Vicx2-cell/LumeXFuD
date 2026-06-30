@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { notCurrentlySuspendedOr } from '@/lib/vendor-visibility'
 
 export async function GET() {
   try {
@@ -15,6 +16,7 @@ export async function GET() {
       `)
       .eq('is_active', true)
       .is('deleted_at', null)
+      .or(notCurrentlySuspendedOr()) // hide suspended vendors from the public list
       .in('status', ['OPEN', 'BUSY'])
       .order('composite_score', { referencedTable: 'vendor_scores', ascending: false })
 

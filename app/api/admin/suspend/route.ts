@@ -93,11 +93,20 @@ export async function POST(req: NextRequest) {
   }
 
   const suspend = parsed.data.action === 'suspend'
-  const { error: upErr } = await db.from(found.table).update({
+  const update: Record<string, unknown> = {
     suspended_until: suspend ? INDEFINITE : null,
     suspend_reason:  suspend ? (parsed.data.reason ?? null) : null,
     updated_at: new Date().toISOString(),
-  }).eq('id', found.id)
+  }
+  // A suspended VENDOR must also disappear from the storefront, listings and SEO,
+  // which all gate on `is_active`. `suspended_until` alone only blocks login, so
+  // the shop stayed visible. Flip the visibility flag + close the store in
+  // lockstep (mirrors the approve/suspend PATCH), and restore on unsuspend.
+  if (found.table === 'vendors') {
+    update.is_active = !suspend
+    update.status = suspend ? 'CLOSED' : 'OPEN'
+  }
+  const { error: upErr } = await db.from(found.table).update(update).eq('id', found.id)
   if (upErr) return NextResponse.json({ error: 'Could not update the account' }, { status: 500 })
 
   await audit({

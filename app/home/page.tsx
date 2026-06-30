@@ -1,4 +1,5 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { notCurrentlySuspendedOr } from '@/lib/vendor-visibility'
 import { getCurrentUser } from '@/lib/session'
 import { formatPrice } from '@/lib/money'
 import { BottomNav } from '@/components/nav-bottom'
@@ -32,6 +33,7 @@ async function getVendorsAndTrending() {
       `)
       .eq('is_active', true)
       .is('deleted_at', null)
+      .or(notCurrentlySuspendedOr()) // a suspended vendor must drop off the home list
       // NOTE: no status filter — vendors NEVER disappear from home, even when
       // CLOSED or paused. The client sorts the unavailable ones to the bottom
       // and marks them clearly so customers don't waste time tapping them.
