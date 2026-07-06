@@ -58,9 +58,9 @@ export const createOrderInput = z.object({
   // Customer opts to waive the door code for a DELIVERY order (leave-at-gate).
   leave_at_gate: z.boolean().optional(),
   // Apply the customer's best eligible reward credit as a discount on this order.
-  // Defaults to true (auto-apply) — the server still validates eligibility and
-  // computes the discount; a client-sent amount is never trusted.
-  apply_reward: z.boolean().optional().default(true),
+  // Defaults to false so customers can save rewards for later. The server still
+  // validates eligibility and computes the discount; a client-sent amount is never trusted.
+  apply_reward: z.boolean().optional().default(false),
 })
 
 export const orderStatusInput = z.object({

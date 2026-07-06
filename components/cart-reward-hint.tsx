@@ -3,11 +3,9 @@
 import { useEffect, useState } from 'react'
 import { formatPrice } from '@/lib/money'
 
-// Honest pre-payment hint: tells the customer they have reward credit that will
-// be applied at checkout (the exact discount is resolved server-side at order
-// creation — capped at the platform fee + delivery — so the Paystack charge is
-// LOWER than the cart total shown above). Under-promises; never a fake countdown.
-export function CartRewardHint() {
+// Rewards are saved by default. Checkout only spends them when the customer
+// explicitly opts in; the server still computes the exact discount safely.
+export function CartRewardHint({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
   const [kobo, setKobo] = useState(0)
 
   useEffect(() => {
@@ -23,12 +21,18 @@ export function CartRewardHint() {
 
   if (kobo <= 0) return null
   return (
-    <div className="lx-card-amber-soft rounded-2xl px-4 py-3 flex items-center gap-3">
+    <label className="lx-card-amber-soft rounded-2xl px-4 py-3 flex items-start gap-3 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 w-4 h-4 shrink-0 accent-amber-400"
+      />
       <span className="text-xl" aria-hidden="true">🎁</span>
-      <p className="text-xs text-white/70 leading-relaxed">
-        You have <span className="lx-amber font-semibold tabular-nums">{formatPrice(kobo)}</span> in rewards.
-        We’ll apply it automatically — you’ll pay less than the total above at checkout.
-      </p>
-    </div>
+      <span className="text-xs text-white/70 leading-relaxed">
+        Use saved rewards now: <span className="lx-amber font-semibold tabular-nums">{formatPrice(kobo)}</span> available.
+        Leave unchecked to save them for a later order.
+      </span>
+    </label>
   )
 }

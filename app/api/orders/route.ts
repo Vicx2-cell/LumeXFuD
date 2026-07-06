@@ -452,7 +452,7 @@ export async function POST(req: NextRequest) {
   // group orders (their split accounting is separate).
   let rewardApplied = 0
   let rewardCreditId: string | null = null
-  if (!linkedGroupId && customerId && apply_reward !== false && (await anyRewardFeatureOn())) {
+  if (!linkedGroupId && customerId && apply_reward === true && (await anyRewardFeatureOn())) {
     // Cap so EVERY order still clears a guaranteed minimum platform profit
     // (Failure Prevention Rule #1: profitable on every order, never subsidize).
     // Our margin = our markup + OUR share of the delivery fee (the rider's cut is

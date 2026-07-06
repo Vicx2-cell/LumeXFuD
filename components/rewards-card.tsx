@@ -93,6 +93,28 @@ export function RewardsCard() {
 
   return (
     <div className="space-y-4">
+      {/* Saved reward balance */}
+      <div className="lx-card-amber-soft rounded-2xl p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-3xl" aria-hidden="true">ðŸŽ</span>
+            <div className="min-w-0">
+              <p className="text-xs text-white/50">Reward balance</p>
+              <p className="lx-amber text-3xl font-bold leading-tight tabular-nums">{naira(credits.total_kobo)}</p>
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-xs text-white/45 tabular-nums">
+              {credits.items.length === 0 ? 'No saved rewards yet' : `${credits.items.length} saved`}
+            </p>
+            <p className="text-xs text-white/45 mt-0.5">Use at checkout</p>
+          </div>
+        </div>
+        <p className="text-xs text-white/50 mt-3 leading-relaxed">
+          Your rewards stay here until you choose to use them in cart.
+        </p>
+      </div>
+
       {/* Loyalty tier + progress */}
       {enabled.tiers && (
         <div className="lx-card-amber-soft rounded-2xl p-5">
@@ -104,12 +126,6 @@ export function RewardsCard() {
                 <p className="text-xs text-white/45 mt-1 tabular-nums">{tier.orders_30d} orders in the last 30 days</p>
               </div>
             </div>
-            {credits.total_kobo > 0 && (
-              <div className="text-right shrink-0">
-                <p className="text-xs text-white/50">Rewards</p>
-                <p className="lx-amber text-lg font-bold tabular-nums">{naira(credits.total_kobo)}</p>
-              </div>
-            )}
           </div>
 
           {tier.next_tier && tier.orders_to_next !== null && (
@@ -132,22 +148,6 @@ export function RewardsCard() {
         </div>
       )}
 
-      {/* Active credits (when tiers card isn't showing the balance) */}
-      {!enabled.tiers && credits.total_kobo > 0 && (
-        <div className="lx-card-amber-soft rounded-2xl p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl" aria-hidden="true">🎁</span>
-            <div>
-              <p className="lx-amber font-semibold tabular-nums">{naira(credits.total_kobo)} in rewards</p>
-              <p className="text-xs text-white/45">Applied automatically at checkout</p>
-            </div>
-          </div>
-        </div>
-      )}
-      {enabled.tiers && credits.items.length > 0 && (
-        <p className="text-xs text-white/40 -mt-1 px-1">Rewards apply automatically at checkout — soonest to expire first.</p>
-      )}
-
       {/* Surprise scratch */}
       {enabled.surprise && surprise && !reveal && (
         <button
@@ -157,8 +157,8 @@ export function RewardsCard() {
         >
           <span className="text-2xl" aria-hidden="true">🎉</span>
           <div className="flex-1 min-w-0">
-            <p className="lx-amber font-semibold">{opening ? 'Opening…' : 'You’ve got a surprise!'}</p>
-            <p className="text-xs text-white/55">Tap to reveal your reward from your last order</p>
+            <p className="lx-amber font-semibold">{opening ? 'Saving…' : 'Save your reward'}</p>
+            <p className="text-xs text-white/55">Tap to save your reward from your last order.</p>
           </div>
         </button>
       )}
@@ -167,7 +167,7 @@ export function RewardsCard() {
           {reveal.amount_kobo > 0 ? (
             <>
               <p className="text-2xl font-bold lx-amber">🎉 {naira(reveal.amount_kobo)} off!</p>
-              <p className="text-xs text-white/55 mt-1">Added to your rewards — used automatically on your next order.</p>
+              <p className="text-xs text-white/55 mt-1">Saved to your rewards — use it whenever you choose at checkout.</p>
             </>
           ) : (
             <>

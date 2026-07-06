@@ -38,6 +38,7 @@ export default function CartPage() {
   const [leaveAtGate,   setLeaveAtGate]   = useState(false)
   const [feeInfo,       setFeeInfo]       = useState(false)
   const [deliveryInfo,  setDeliveryInfo]  = useState(false)
+  const [applyReward,   setApplyReward]   = useState(false)
   const [scheduleOn,    setScheduleOn]    = useState(false)
   const [scheduleAt,    setScheduleAt]    = useState('') // datetime-local string
   const [reorderNote,   setReorderNote]   = useState('') // "some items skipped" after Order again
@@ -242,6 +243,7 @@ export default function CartPage() {
           tip_amount:            isPickup ? 0 : tip,
           payment_method:        effectivePaymentMethod,
           wallet_amount_kobo:    effectivePaymentMethod !== 'PAYSTACK' ? walletAmount : 0,
+          apply_reward:          applyReward,
           scheduled_for:         !isPickup && scheduleOn && scheduleAt ? new Date(scheduleAt).toISOString() : undefined,
           delivery_latitude:     isPickup ? undefined : coords?.lat,
           delivery_longitude:    isPickup ? undefined : coords?.lng,
@@ -696,8 +698,8 @@ export default function CartPage() {
           </div>
         </div>
 
-        {/* Reward credit hint — applied server-side at checkout (charge is lower). */}
-        <CartRewardHint />
+        {/* Saved rewards — customer chooses whether to spend them now or later. */}
+        <CartRewardHint checked={applyReward} onChange={setApplyReward} />
 
         {/* Delivery acceptance — explicit agreement to Terms + Refund policy, gates Pay */}
         {!isPickup && (

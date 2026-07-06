@@ -208,3 +208,9 @@ export async function openSurprise(customerId: string, surpriseId: string): Prom
   }
   return { ok: true, outcome_kobo: kobo, label }
 }
+
+export function canSaveReward(outcome_kobo: number, status: 'UNOPENED' | 'OPENED' | 'EXPIRED' | string, reward_credit_id: string | null): boolean {
+  if (outcome_kobo <= 0) return false
+  if (reward_credit_id) return false
+  return status === 'UNOPENED' || status === 'OPENED'
+}

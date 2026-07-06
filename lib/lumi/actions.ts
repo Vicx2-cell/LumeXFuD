@@ -6,11 +6,12 @@ import type { Entities } from './intents'
 
 // Reuse existing wallet helpers where available
 import * as wallet from '@/lib/wallet'
+import { getCustomerWallet } from '@/lib/customer-wallet'
 
 export async function handleCheckBalance(userId: string): Promise<LumiReply> {
-  const db = createSupabaseAdmin()
-  const bal = await wallet.getCustomerBalanceByUserId(db, userId).catch(() => null)
-  const naira = bal?.balance ?? 0
+  const cw = await getCustomerWallet(userId).catch(() => null)
+  const kobo = cw?.balance_kobo ?? 0
+  const naira = Math.round(kobo / 100)
   return templates.balance(naira)
 }
 
