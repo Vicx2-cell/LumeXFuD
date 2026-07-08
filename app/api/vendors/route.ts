@@ -1,17 +1,19 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { notCurrentlySuspendedOr } from '@/lib/vendor-visibility'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const db = createSupabaseAdmin()
+    const cityId = req.nextUrl.searchParams.get('city_id')
+    const zoneId = req.nextUrl.searchParams.get('zone_id')
 
-    const { data: vendors, error } = await db
+    let query = db
       .from('vendors')
       .select(`
         id, shop_name, owner_name, logo_url, shop_photo_url,
         prep_time_minutes, status, paused_until, category, description,
-        avg_rating, total_ratings, is_active, subscription_paid_until,
+        avg_rating, total_ratings, is_active, subscription_paid_until, city_id, zone_id,
         vendor_scores ( composite_score, visibility_tier )
       `)
       .eq('is_active', true)
@@ -19,6 +21,14 @@ export async function GET() {
       .or(notCurrentlySuspendedOr()) // hide suspended vendors from the public list
       .in('status', ['OPEN', 'BUSY'])
       .order('composite_score', { referencedTable: 'vendor_scores', ascending: false })
+
+    if (zoneId) {
+      query = query.eq('zone_id', zoneId)
+    } else if (cityId) {
+      query = query.eq('city_id', cityId)
+    }
+
+    const { data: vendors, error } = await query
 
     if (error) {
       return NextResponse.json({ error: 'Failed to load vendors' }, { status: 500 })

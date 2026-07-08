@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { PremiumImage } from '@/components/fx'
@@ -11,15 +11,87 @@ import { Pill } from '@/components/ui/pill'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks']
 
-export function HomepageClient({ initialVendors, initialFavorites = [] }: { initialVendors: VendorData[]; initialFavorites?: string[] }) {
+type LocationRow = {
+  city_id: string
+  city_name: string
+  city_state: string
+  city_slug: string
+  zone_id: string
+  zone_name: string
+  uses_lodge_catalog: boolean
+}
+
+export function HomepageClient({
+  initialVendors,
+  initialFavorites = [],
+  initialLocations = [],
+}: {
+  initialVendors: VendorData[]
+  initialFavorites?: string[]
+  initialLocations?: LocationRow[]
+}) {
   // NOTE: realtime vendor-status subscription temporarily removed while isolating
   // the iOS "page couldn't load" crash on /home. Vendors are server-rendered
   // (revalidate 30), so the list still works without it.
-  const [vendors] = useState<VendorData[]>(initialVendors)
+  const [vendors, setVendors] = useState<VendorData[]>(initialVendors)
+  const [locations] = useState<LocationRow[]>(initialLocations)
+  const [selectedState, setSelectedState] = useState(initialLocations[0]?.city_state ?? '')
+  const [selectedCityId, setSelectedCityId] = useState(initialLocations[0]?.city_id ?? '')
+  const [selectedZoneId, setSelectedZoneId] = useState(initialLocations[0]?.zone_id ?? '')
+  const [loadingVendors, setLoadingVendors] = useState(false)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
   const [favorites, setFavorites] = useState<Set<string>>(() => new Set(initialFavorites))
   const [favOnly, setFavOnly] = useState(false)
+
+  const stateOptions = useMemo(() => Array.from(new Set(locations.map((row) => row.city_state))), [locations])
+  const cityOptions = useMemo(
+    () => locations.filter((row) => row.city_state === selectedState)
+      .filter((row, index, all) => all.findIndex((candidate) => candidate.city_id === row.city_id) === index),
+    [locations, selectedState],
+  )
+  const zoneOptions = useMemo(
+    () => locations.filter((row) => row.city_id === selectedCityId),
+    [locations, selectedCityId],
+  )
+  const selectedZone = useMemo(
+    () => zoneOptions.find((row) => row.zone_id === selectedZoneId) ?? null,
+    [zoneOptions, selectedZoneId],
+  )
+
+  useEffect(() => {
+    if (!selectedState && stateOptions.length > 0) setSelectedState(stateOptions[0])
+  }, [selectedState, stateOptions])
+
+  useEffect(() => {
+    if (cityOptions.length === 0) {
+      if (selectedCityId) setSelectedCityId('')
+      return
+    }
+    if (!cityOptions.some((row) => row.city_id === selectedCityId)) setSelectedCityId(cityOptions[0].city_id)
+  }, [cityOptions, selectedCityId])
+
+  useEffect(() => {
+    if (zoneOptions.length === 0) {
+      if (selectedZoneId) setSelectedZoneId('')
+      return
+    }
+    if (!zoneOptions.some((row) => row.zone_id === selectedZoneId)) setSelectedZoneId(zoneOptions[0].zone_id)
+  }, [zoneOptions, selectedZoneId])
+
+  useEffect(() => {
+    if (!selectedZoneId) return
+    const controller = new AbortController()
+    setLoadingVendors(true)
+    fetch(`/api/vendors?zone_id=${encodeURIComponent(selectedZoneId)}`, { signal: controller.signal })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { vendors?: VendorData[] } | null) => {
+        if (data?.vendors) setVendors(data.vendors)
+      })
+      .catch(() => {})
+      .finally(() => setLoadingVendors(false))
+    return () => controller.abort()
+  }, [selectedZoneId])
 
   const toggleFavorite = (vendorId: string) => {
     const willFav = !favorites.has(vendorId)
@@ -60,6 +132,69 @@ export function HomepageClient({ initialVendors, initialFavorites = [] }: { init
 
   return (
     <div className="space-y-4">
+      {locations.length > 0 && (
+        <div className="lx-surface p-4 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold text-white/85">Delivery area</h2>
+            <p className="mt-1 text-xs text-white/45">Choose where you are now. The vendor list follows the zone you pick.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="block">
+              <span className="mb-1.5 block text-xs text-white/45">State</span>
+              <select
+                value={selectedState}
+                onChange={(e) => {
+                  setSelectedState(e.target.value)
+                  setSelectedCityId('')
+                  setSelectedZoneId('')
+                }}
+                className="lx-field w-full px-3.5 py-3 text-sm outline-none"
+                style={{ colorScheme: 'dark' }}
+              >
+                <option value="">Choose a state</option>
+                {stateOptions.map((state) => <option key={state} value={state}>{state}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs text-white/45">City</span>
+              <select
+                value={selectedCityId}
+                onChange={(e) => {
+                  setSelectedCityId(e.target.value)
+                  setSelectedZoneId('')
+                }}
+                className="lx-field w-full px-3.5 py-3 text-sm outline-none"
+                style={{ colorScheme: 'dark' }}
+                disabled={cityOptions.length === 0}
+              >
+                <option value="">{selectedState ? 'Choose a city' : 'Choose a state first'}</option>
+                {cityOptions.map((city) => <option key={city.city_id} value={city.city_id}>{city.city_name}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs text-white/45">Area</span>
+              <select
+                value={selectedZoneId}
+                onChange={(e) => setSelectedZoneId(e.target.value)}
+                className="lx-field w-full px-3.5 py-3 text-sm outline-none"
+                style={{ colorScheme: 'dark' }}
+                disabled={zoneOptions.length === 0}
+              >
+                <option value="">{selectedCityId ? 'Choose an area' : 'Choose a city first'}</option>
+                {zoneOptions.map((zone) => <option key={zone.zone_id} value={zone.zone_id}>{zone.zone_name}</option>)}
+              </select>
+            </label>
+          </div>
+          {selectedZone && (
+            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/55">
+              <span className="font-medium text-white/80">{selectedZone.city_name}, {selectedZone.city_state}</span>
+              <span className="mx-2 text-white/25">•</span>
+              <span>{selectedZone.zone_name}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Search */}
       <div className="relative">
         <input
@@ -100,7 +235,11 @@ export function HomepageClient({ initialVendors, initialFavorites = [] }: { init
       </div>
 
       {/* Vendor list */}
-      {filtered.length === 0 ? (
+      {loadingVendors ? (
+        <div className="grid grid-cols-1 gap-4">
+          {[1, 2, 3].map((i) => <div key={i} className="lx-skeleton h-52" style={{ borderRadius: 20 }} />)}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-white/30 text-4xl mb-3">🍽️</p>
           <p className="text-white/50 text-sm">No vendors match your search.</p>

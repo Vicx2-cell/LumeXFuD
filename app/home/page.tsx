@@ -16,19 +16,65 @@ import { HomepageClient } from '../homepage-client'
 import { CountUp, SmoothScroll } from '@/components/fx'
 import { Suspense } from 'react'
 
+type HomeLocationRow = {
+  city_id: string
+  city_name: string
+  city_state: string
+  city_slug: string
+  zone_id: string
+  zone_name: string
+  uses_lodge_catalog: boolean
+}
+
 // Always render fresh — vendor open/closed status and the ranked list must never
 // be served stale from a cached page. (Realtime keeps it live after first paint.)
 export const dynamic = 'force-dynamic'
 
-async function getVendorsAndTrending() {
+async function getLocations() {
+  const db = createSupabaseAdmin()
+  const { data: cities } = await db
+    .from('cities')
+    .select('id, name, state, slug, status')
+    .eq('status', 'ACTIVE')
+    .order('state', { ascending: true })
+    .order('name', { ascending: true })
+
+  const cityRows = (cities ?? []) as Array<{ id: string; name: string; state: string; slug: string }>
+  if (cityRows.length === 0) return []
+
+  const cityIds = cityRows.map((city) => city.id)
+  const { data: zones } = await db
+    .from('delivery_zones')
+    .select('id, city_id, name, status, uses_lodge_catalog')
+    .eq('status', 'ACTIVE')
+    .in('city_id', cityIds)
+    .order('created_at', { ascending: true })
+
+  const cityById = new Map(cityRows.map((city) => [city.id, city]))
+  return ((zones ?? []) as Array<{ id: string; city_id: string; name: string; uses_lodge_catalog?: boolean | null }>).flatMap((zone) => {
+    const city = cityById.get(zone.city_id)
+    if (!city) return []
+    return [{
+      city_id: city.id,
+      city_name: city.name,
+      city_state: city.state,
+      city_slug: city.slug,
+      zone_id: zone.id,
+      zone_name: zone.name,
+      uses_lodge_catalog: zone.uses_lodge_catalog ?? (city.slug === 'uturu'),
+    }]
+  })
+}
+
+async function getVendorsAndTrending(zoneId?: string | null) {
   try {
     const db = createSupabaseAdmin()
-
-    const { data: vendors } = await db
+    let query = db
       .from('vendors')
       .select(`
         id, shop_name, logo_url, shop_photo_url, prep_time_minutes,
         status, paused_until, category, avg_rating, total_ratings, is_active,
+        city_id, zone_id,
         vendor_scores ( composite_score, visibility_tier )
       `)
       .eq('is_active', true)
@@ -38,6 +84,10 @@ async function getVendorsAndTrending() {
       // CLOSED or paused. The client sorts the unavailable ones to the bottom
       // and marks them clearly so customers don't waste time tapping them.
       .order('composite_score', { referencedTable: 'vendor_scores', ascending: false })
+
+    if (zoneId) query = query.eq('zone_id', zoneId)
+
+    const { data: vendors } = await query
 
     const { data: trending } = await db
       .from('trending_data')
@@ -60,10 +110,13 @@ async function getVendorsAndTrending() {
 }
 
 export default async function CustomerHomePage() {
-  const [{ vendors, trending }, studyOn, walletOn] = await Promise.all([
-    getVendorsAndTrending(),
+  const [locations, studyOn, walletOn] = await Promise.all([
+    getLocations(),
     getFeature('study'),
     getFeature('customer_wallet_enabled'),
+  ])
+  const [{ vendors, trending }] = await Promise.all([
+    getVendorsAndTrending(locations[0]?.zone_id ?? null),
   ])
 
   // The signed-in customer's favourite vendor ids — powers the heart state + the
@@ -183,7 +236,7 @@ export default async function CustomerHomePage() {
 
         <div id="vendors" className="scroll-mt-20">
           <Suspense fallback={<SkeletonGrid />}>
-            <HomepageClient initialVendors={vendors as VendorData[]} initialFavorites={favorites} />
+            <HomepageClient initialVendors={vendors as VendorData[]} initialFavorites={favorites} initialLocations={locations as HomeLocationRow[]} />
           </Suspense>
         </div>
       </div>
