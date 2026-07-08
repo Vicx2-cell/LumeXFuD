@@ -28,6 +28,8 @@ export const createOrderInput = z.object({
   // BIKE/DOOR the route still requires a real address.
   delivery_type: z.enum(['BIKE', 'DOOR', 'PICKUP']),
   delivery_address: z.string().min(5).max(500).optional(),
+  city_id: z.string().uuid().optional(),
+  zone_id: z.string().uuid().optional(),
   // Structured parts behind delivery_address (lodge → block → room). Stored
   // non-fatally after insert so an order never fails if migration 080 is pending;
   // the rider reads them back as scannable chips.

@@ -18,6 +18,9 @@ interface Props {
   suggestions: string[]
   lodges: MapLodge[]
   onCoords: (c: { lat: number; lng: number } | null) => void
+  placeLabel?: string
+  manualPlaceholder?: string
+  catalogHint?: string
 }
 
 function coordsFor(picked: string, lodges: MapLodge[]): { lat: number; lng: number } | null {
@@ -29,7 +32,17 @@ function coordsFor(picked: string, lodges: MapLodge[]): { lat: number; lng: numb
   return null
 }
 
-export function DeliveryAddress({ deliveryType, value, onChange, suggestions, lodges, onCoords }: Props) {
+export function DeliveryAddress({
+  deliveryType,
+  value,
+  onChange,
+  suggestions,
+  lodges,
+  onCoords,
+  placeLabel,
+  manualPlaceholder,
+  catalogHint,
+}: Props) {
   const isDoor = deliveryType === 'DOOR'
   const [showMap, setShowMap] = useState(false)
   const [customLodge, setCustomLodge] = useState(false)
@@ -89,9 +102,9 @@ export function DeliveryAddress({ deliveryType, value, onChange, suggestions, lo
               }}
               className="lx-field w-full appearance-none px-3.5 py-3 pr-9 text-sm outline-none"
               style={{ colorScheme: 'dark' }}
-              aria-label="Choose your lodge or hostel"
+              aria-label={`Choose your ${placeLabel ?? 'lodge or hostel'}`}
             >
-              <option value="">Choose your lodge or hostel</option>
+              <option value="">{`Choose your ${placeLabel ?? 'lodge or hostel'}`}</option>
               {lodgeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
               <option value="__OTHER__">My lodge is not listed</option>
             </select>
@@ -104,16 +117,16 @@ export function DeliveryAddress({ deliveryType, value, onChange, suggestions, lo
             type="text"
             value={value.lodge}
             onChange={(e) => { set({ lodge: e.target.value, block: '' }); onCoords(null) }}
-            placeholder={isDoor ? 'Type your lodge or hostel' : 'Type your lodge / area'}
+            placeholder={manualPlaceholder ?? (isDoor ? 'Type your lodge or hostel' : 'Type your lodge / area')}
             autoComplete="off"
             enterKeyHint={isDoor ? 'next' : 'done'}
             className="lx-field w-full px-4 py-3 text-sm outline-none"
-            aria-label="Lodge or hostel"
+            aria-label={placeLabel ?? 'Lodge or hostel'}
           />
         )}
 
         {lodgeOptions.length > 0 && (
-          <p className="text-xs text-white/35">Choose your lodge from the list. If it is missing, switch to manual entry and type it yourself.</p>
+          <p className="text-xs text-white/35">{catalogHint ?? 'Choose your lodge from the list. If it is missing, switch to manual entry and type it yourself.'}</p>
         )}
       </div>
 

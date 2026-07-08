@@ -24,6 +24,7 @@ type LocationRow = {
   zone_id: string
   zone_name: string
   zone_status: Status
+  uses_lodge_catalog: boolean
   city_id: string
   city_name: string
   city_state: string
@@ -42,12 +43,7 @@ function requireSuperAdmin(role: string) {
 
 async function loadLocations(db: ReturnType<typeof createSupabaseAdmin>): Promise<LocationRow[]> {
   try {
-    const { data: zones } = await db
-      .from('delivery_zones')
-      .select('id, city_id, name, status, base_bike_fee, base_door_fee, platform_markup, rider_split')
-      .order('created_at', { ascending: true })
-
-    const zoneRows = (zones ?? []) as Array<{
+    let zoneRows: Array<{
       id: string
       city_id: string
       name: string
@@ -56,7 +52,22 @@ async function loadLocations(db: ReturnType<typeof createSupabaseAdmin>): Promis
       base_door_fee: number
       platform_markup: number
       rider_split: { BIKE?: number; DOOR?: number } | null
-    }>
+      uses_lodge_catalog?: boolean | null
+    }> = []
+
+    const richZones = await db
+      .from('delivery_zones')
+      .select('id, city_id, name, status, base_bike_fee, base_door_fee, platform_markup, rider_split, uses_lodge_catalog')
+      .order('created_at', { ascending: true })
+    if (!richZones.error) {
+      zoneRows = (richZones.data ?? []) as typeof zoneRows
+    } else {
+      const baseZones = await db
+        .from('delivery_zones')
+        .select('id, city_id, name, status, base_bike_fee, base_door_fee, platform_markup, rider_split')
+        .order('created_at', { ascending: true })
+      zoneRows = (baseZones.data ?? []) as typeof zoneRows
+    }
     if (zoneRows.length === 0) return []
 
     const cityIds = Array.from(new Set(zoneRows.map((z) => z.city_id)))
@@ -73,6 +84,7 @@ async function loadLocations(db: ReturnType<typeof createSupabaseAdmin>): Promis
         zone_id: zone.id,
         zone_name: zone.name,
         zone_status: zone.status,
+        uses_lodge_catalog: zone.uses_lodge_catalog ?? (city.slug === 'uturu'),
         city_id: city.id,
         city_name: city.name,
         city_state: city.state,
@@ -84,7 +96,11 @@ async function loadLocations(db: ReturnType<typeof createSupabaseAdmin>): Promis
         rider_cut_bike_kobo: Number(zone.rider_split?.BIKE ?? 0),
         rider_cut_door_kobo: Number(zone.rider_split?.DOOR ?? 0),
       }]
-    })
+    }).sort((a, b) =>
+      a.city_state.localeCompare(b.city_state) ||
+      a.city_name.localeCompare(b.city_name) ||
+      a.zone_name.localeCompare(b.zone_name),
+    )
   } catch {
     return []
   }
@@ -130,6 +146,22 @@ const zonePatchInput = z.object({
   city_status: statusField,
   zone_name: z.string().trim().min(1).max(120),
   zone_status: statusField,
+  uses_lodge_catalog: z.boolean(),
+  base_bike_fee_kobo: kobo,
+  base_door_fee_kobo: kobo,
+  platform_markup_kobo: kobo,
+  rider_cut_bike_kobo: kobo,
+  rider_cut_door_kobo: kobo,
+})
+
+const zoneCreateInput = z.object({
+  city_name: z.string().trim().min(1).max(120),
+  city_state: z.string().trim().min(1).max(120),
+  city_slug: z.string().trim().min(1).max(120),
+  city_status: statusField.default('ACTIVE'),
+  zone_name: z.string().trim().min(1).max(120),
+  zone_status: statusField.default('ACTIVE'),
+  uses_lodge_catalog: z.boolean().default(false),
   base_bike_fee_kobo: kobo,
   base_door_fee_kobo: kobo,
   platform_markup_kobo: kobo,
@@ -170,7 +202,7 @@ export async function PATCH(req: NextRequest) {
 
     const { data: oldZone } = await db
       .from('delivery_zones')
-      .select('id, city_id, name, status, base_bike_fee, base_door_fee, platform_markup, rider_split, platform_split')
+      .select('id, city_id, name, status, base_bike_fee, base_door_fee, platform_markup, rider_split, platform_split, uses_lodge_catalog')
       .eq('id', p.zone_id)
       .maybeSingle()
     const { data: oldCity } = await db
@@ -191,6 +223,7 @@ export async function PATCH(req: NextRequest) {
     const { error: zoneError } = await db.from('delivery_zones').update({
       name: p.zone_name,
       status: p.zone_status,
+      uses_lodge_catalog: p.uses_lodge_catalog,
       base_bike_fee: p.base_bike_fee_kobo,
       base_door_fee: p.base_door_fee_kobo,
       platform_markup: p.platform_markup_kobo,
@@ -265,4 +298,99 @@ export async function PATCH(req: NextRequest) {
   })
 
   return NextResponse.json({ success: true })
+}
+
+export async function POST(req: NextRequest) {
+  const session = await getCurrentUser()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!requireSuperAdmin(session.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const rl = await rateLimitGeneric(`super-pricing:${session.userId ?? session.phone}`, 20, 60)
+  if (!rl.success) return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 })
+
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+
+  const parsed = zoneCreateInput.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid location details.' }, { status: 400 })
+  }
+
+  const p = parsed.data
+  if (p.rider_cut_bike_kobo > p.base_bike_fee_kobo) {
+    return NextResponse.json({ error: "Bike rider pay can't exceed the bike delivery fee." }, { status: 400 })
+  }
+  if (p.rider_cut_door_kobo > p.base_door_fee_kobo) {
+    return NextResponse.json({ error: "Door rider pay can't exceed the door delivery fee." }, { status: 400 })
+  }
+
+  const db = createSupabaseAdmin()
+  const now = new Date().toISOString()
+
+  let cityId: string
+  const { data: existingCity } = await db
+    .from('cities')
+    .select('id, name, state, slug, status')
+    .eq('slug', p.city_slug)
+    .maybeSingle()
+
+  if (existingCity) {
+    cityId = (existingCity as { id: string }).id
+    const { error: cityUpdateError } = await db.from('cities').update({
+      name: p.city_name,
+      state: p.city_state,
+      status: p.city_status,
+      updated_at: now,
+    }).eq('id', cityId)
+    if (cityUpdateError) return NextResponse.json({ error: 'Failed to update city details.' }, { status: 500 })
+  } else {
+    const { data: insertedCity, error: cityInsertError } = await db.from('cities').insert({
+      name: p.city_name,
+      state: p.city_state,
+      slug: p.city_slug,
+      status: p.city_status,
+      updated_at: now,
+    }).select('id').single()
+    if (cityInsertError || !insertedCity) return NextResponse.json({ error: 'Failed to create city.' }, { status: 500 })
+    cityId = (insertedCity as { id: string }).id
+  }
+
+  const { data: zone, error: zoneError } = await db.from('delivery_zones').insert({
+    city_id: cityId,
+    name: p.zone_name,
+    status: p.zone_status,
+    uses_lodge_catalog: p.uses_lodge_catalog,
+    base_bike_fee: p.base_bike_fee_kobo,
+    base_door_fee: p.base_door_fee_kobo,
+    platform_markup: p.platform_markup_kobo,
+    rider_split: { BIKE: p.rider_cut_bike_kobo, DOOR: p.rider_cut_door_kobo },
+    platform_split: {
+      BIKE: p.base_bike_fee_kobo - p.rider_cut_bike_kobo,
+      DOOR: p.base_door_fee_kobo - p.rider_cut_door_kobo,
+    },
+    updated_at: now,
+  }).select('id').single()
+
+  if (zoneError || !zone) {
+    if (zoneError?.code === '23505') {
+      return NextResponse.json({ error: 'That delivery zone already exists for this city.' }, { status: 409 })
+    }
+    return NextResponse.json({ error: 'Failed to create delivery zone.' }, { status: 500 })
+  }
+
+  await superAudit({
+    actor_id: session.phone,
+    actor_role: session.role,
+    action: 'delivery_zone_create',
+    target_table: 'delivery_zones',
+    target_id: (zone as { id: string }).id,
+    new_value: { city_id: cityId, ...p },
+    ip_address: req.headers.get('x-forwarded-for') ?? undefined,
+  })
+
+  return NextResponse.json({ success: true, city_id: cityId, zone_id: (zone as { id: string }).id })
 }

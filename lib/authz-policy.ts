@@ -130,7 +130,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   'whatsapp': { kind: 'webhook' },
 
   // ── public read (unauthenticated) ──
-  ...map(['announcement', 'applications', 'features', 'vendors', 'vendors/[id]', 'lodges', 'settings/fees'],
+  ...map(['announcement', 'applications', 'delivery-locations', 'features', 'vendors', 'vendors/[id]', 'lodges', 'settings/fees'],
     { kind: 'public' }),
 }
 

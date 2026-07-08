@@ -17,6 +17,7 @@ type LocationRow = {
   zone_id: string
   zone_name: string
   zone_status: 'ACTIVE' | 'PAUSED' | 'INACTIVE'
+  uses_lodge_catalog: boolean
   city_id: string
   city_name: string
   city_state: string
@@ -28,6 +29,8 @@ type LocationRow = {
   rider_cut_bike_kobo: number
   rider_cut_door_kobo: number
 }
+
+type NewLocationForm = Omit<LocationRow, 'zone_id' | 'city_id'>
 
 const STATUSES: Array<LocationRow['zone_status']> = ['ACTIVE', 'PAUSED', 'INACTIVE']
 
@@ -91,6 +94,7 @@ export default function SuperAdminPricing() {
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
+  const [newLocation, setNewLocation] = useState<NewLocationForm | null>(null)
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2800) }
 
@@ -102,6 +106,20 @@ export default function SuperAdminPricing() {
       for (const key of Object.keys(d.pricing) as Array<keyof Pricing>) next[key] = toNaira(d.pricing[key])
       setNaira(next)
       setLocations(d.locations ?? [])
+      setNewLocation({
+        zone_name: '',
+        zone_status: 'ACTIVE',
+        uses_lodge_catalog: true,
+        city_name: '',
+        city_state: '',
+        city_slug: '',
+        city_status: 'ACTIVE',
+        base_bike_fee_kobo: d.pricing.delivery_fee_bike_kobo,
+        base_door_fee_kobo: d.pricing.delivery_fee_door_kobo,
+        platform_markup_kobo: d.pricing.platform_markup_kobo,
+        rider_cut_bike_kobo: d.pricing.rider_cut_bike_kobo,
+        rider_cut_door_kobo: d.pricing.rider_cut_door_kobo,
+      })
     }
     setLoading(false)
   }
@@ -115,6 +133,11 @@ export default function SuperAdminPricing() {
 
   function updateLocation(zoneId: string, patch: Partial<LocationRow>) {
     setLocations((prev) => prev.map((row) => row.zone_id === zoneId ? { ...row, ...patch } : row))
+    setError('')
+  }
+
+  function updateNewLocation(patch: Partial<NewLocationForm>) {
+    setNewLocation((prev) => prev ? { ...prev, ...patch } : prev)
     setError('')
   }
 
@@ -160,6 +183,7 @@ export default function SuperAdminPricing() {
         city_status: row.city_status,
         zone_name: row.zone_name,
         zone_status: row.zone_status,
+        uses_lodge_catalog: row.uses_lodge_catalog,
         base_bike_fee_kobo: row.base_bike_fee_kobo,
         base_door_fee_kobo: row.base_door_fee_kobo,
         platform_markup_kobo: row.platform_markup_kobo,
@@ -170,6 +194,38 @@ export default function SuperAdminPricing() {
     const d = await res.json() as { error?: string }
     if (res.ok) showToast(`${row.city_name} / ${row.zone_name} updated`)
     else setError(d.error ?? 'Could not save location details')
+    setBusyKey(null)
+  }
+
+  async function createLocation() {
+    if (!newLocation) return
+    if (!newLocation.city_name.trim() || !newLocation.city_state.trim() || !newLocation.city_slug.trim() || !newLocation.zone_name.trim()) {
+      setError('Add the state, city, slug and zone name before saving.')
+      return
+    }
+    if (newLocation.rider_cut_bike_kobo > newLocation.base_bike_fee_kobo) {
+      setError("Bike rider pay can't exceed the bike delivery fee.")
+      return
+    }
+    if (newLocation.rider_cut_door_kobo > newLocation.base_door_fee_kobo) {
+      setError("Door rider pay can't exceed the door delivery fee.")
+      return
+    }
+
+    setBusyKey('new-location')
+    setError('')
+    const res = await fetch('/api/super-admin/pricing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newLocation),
+    })
+    const d = await res.json() as { error?: string }
+    if (res.ok) {
+      showToast(`${newLocation.city_name} / ${newLocation.zone_name} added`)
+      await load()
+    } else {
+      setError(d.error ?? 'Could not create location')
+    }
     setBusyKey(null)
   }
 
@@ -223,6 +279,57 @@ export default function SuperAdminPricing() {
                 <p className="mt-1 text-xs text-white/40">Edit each city and delivery zone record directly here. These are the rows vendors, riders and orders now point to.</p>
               </div>
 
+              {newLocation && (
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+                  <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-white/85">Add state / city / zone</h3>
+                    <p className="mt-1 text-xs text-white/45">Only `ACTIVE` locations show in customer checkout. You control the prices for each zone here.</p>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <TextInput label="State" value={newLocation.city_state} onChange={(v) => updateNewLocation({ city_state: v })} />
+                    <TextInput label="City name" value={newLocation.city_name} onChange={(v) => updateNewLocation({ city_name: v })} />
+                    <TextInput label="City slug" value={newLocation.city_slug} onChange={(v) => updateNewLocation({ city_slug: v.trim().toLowerCase().replace(/\s+/g, '-') })} hint="Example: uturu" />
+                    <StatusInput label="City status" value={newLocation.city_status} onChange={(v) => updateNewLocation({ city_status: v })} />
+                    <TextInput label="Zone name" value={newLocation.zone_name} onChange={(v) => updateNewLocation({ zone_name: v })} hint="Example: ABSU campus, Gregory University, Greater Uturu" />
+                    <StatusInput label="Zone status" value={newLocation.zone_status} onChange={(v) => updateNewLocation({ zone_status: v })} />
+                  </div>
+
+                  <label className="mt-4 flex items-start gap-2.5 rounded-2xl border border-white/10 bg-[#111113] p-3">
+                    <input
+                      type="checkbox"
+                      checked={newLocation.uses_lodge_catalog}
+                      onChange={(e) => updateNewLocation({ uses_lodge_catalog: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500"
+                    />
+                    <span className="text-xs leading-relaxed text-white/60">
+                      Use the lodge dropdown and campus map in checkout for this zone. Turn this off for wider city areas where customers should just type their address manually.
+                    </span>
+                  </label>
+
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-3 rounded-2xl border border-white/10 bg-[#111113] p-4">
+                      <h4 className="text-sm font-semibold text-white/80">Bike delivery</h4>
+                      <NairaInput label="Customer fee" value={toNaira(newLocation.base_bike_fee_kobo)} onChange={(n) => updateNewLocation({ base_bike_fee_kobo: n * 100 })} />
+                      <NairaInput label="Rider pay" value={toNaira(newLocation.rider_cut_bike_kobo)} onChange={(n) => updateNewLocation({ rider_cut_bike_kobo: n * 100 })} />
+                    </div>
+                    <div className="space-y-3 rounded-2xl border border-white/10 bg-[#111113] p-4">
+                      <h4 className="text-sm font-semibold text-white/80">Door delivery</h4>
+                      <NairaInput label="Customer fee" value={toNaira(newLocation.base_door_fee_kobo)} onChange={(n) => updateNewLocation({ base_door_fee_kobo: n * 100 })} />
+                      <NairaInput label="Rider pay" value={toNaira(newLocation.rider_cut_door_kobo)} onChange={(n) => updateNewLocation({ rider_cut_door_kobo: n * 100 })} />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <NairaInput label="Platform markup" value={toNaira(newLocation.platform_markup_kobo)} onChange={(n) => updateNewLocation({ platform_markup_kobo: n * 100 })} />
+                  </div>
+
+                  <button onClick={() => void createLocation()} disabled={busyKey === 'new-location'} className="lx-btn-amber mt-4 w-full py-3.5">
+                    {busyKey === 'new-location' ? 'Saving…' : 'Add location'}
+                  </button>
+                </div>
+              )}
+
               {locations.length === 0 ? (
                 <p className="text-sm text-white/45">No city or delivery-zone records are available yet. Apply the multi-city database migrations first.</p>
               ) : (
@@ -240,6 +347,18 @@ export default function SuperAdminPricing() {
                           <TextInput label="Zone name" value={row.zone_name} onChange={(v) => updateLocation(row.zone_id, { zone_name: v })} />
                           <StatusInput label="Zone status" value={row.zone_status} onChange={(v) => updateLocation(row.zone_id, { zone_status: v })} />
                         </div>
+
+                        <label className="mt-4 flex items-start gap-2.5 rounded-2xl border border-white/10 bg-[#111113] p-3">
+                          <input
+                            type="checkbox"
+                            checked={row.uses_lodge_catalog}
+                            onChange={(e) => updateLocation(row.zone_id, { uses_lodge_catalog: e.target.checked })}
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500"
+                          />
+                          <span className="text-xs leading-relaxed text-white/60">
+                            Use the lodge dropdown and campus map in checkout for this zone.
+                          </span>
+                        </label>
 
                         <div className="mt-4 grid gap-4 sm:grid-cols-2">
                           <div className="space-y-3 rounded-2xl border border-white/10 bg-[#111113] p-4">

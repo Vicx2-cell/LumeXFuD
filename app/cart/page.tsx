@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/components/cart-context'
 import { BottomNav } from '@/components/nav-bottom'
@@ -16,6 +16,21 @@ import { composeDeliveryAddress, lodgeBlocksFor, type DeliveryAddressParts } fro
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
 
 type PaymentMethod = 'PAYSTACK' | 'WALLET' | 'SPLIT'
+
+type DeliveryLocationRow = {
+  city_id: string
+  city_name: string
+  city_state: string
+  city_slug: string
+  zone_id: string
+  zone_name: string
+  base_bike_fee_kobo: number
+  base_door_fee_kobo: number
+  platform_markup_kobo: number
+  rider_cut_bike_kobo: number
+  rider_cut_door_kobo: number
+  uses_lodge_catalog: boolean
+}
 
 function CartSection({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
@@ -34,6 +49,10 @@ export default function CartPage() {
   const { cart, setQuantity, clearCart, subtotal, totalItems } = useCart()
   const features = useFeatures()
   const [groupBusy, setGroupBusy] = useState(false)
+  const [locations,     setLocations]     = useState<DeliveryLocationRow[]>([])
+  const [selectedState, setSelectedState] = useState('')
+  const [selectedCityId, setSelectedCityId] = useState('')
+  const [selectedZoneId, setSelectedZoneId] = useState('')
 
   const [deliveryType,  setDeliveryType]  = useState<'BIKE' | 'DOOR' | 'PICKUP'>('BIKE')
   // Structured delivery address — composed into one rider-clear string at checkout.
@@ -107,14 +126,23 @@ export default function CartPage() {
     Promise.all([
       fetch('/api/customer/addresses').then((r) => r.ok ? r.json() : null).catch(() => null),
       fetch('/api/lodges').then((r) => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([addrRes, lodgeRes]: [{ addresses?: string[] } | null, { lodges?: MapLodge[] } | null]) => {
+      fetch('/api/delivery-locations').then((r) => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([addrRes, lodgeRes, locationRes]: [{ addresses?: string[] } | null, { lodges?: MapLodge[] } | null, { locations?: DeliveryLocationRow[] } | null]) => {
       const personal = addrRes?.addresses ?? []
       const lodges = lodgeRes?.lodges ?? []
+      const nextLocations = locationRes?.locations ?? []
       const catalog = lodges.map((l) => l.area ? `${l.name} (${l.area})` : l.name)
       const merged: string[] = [...personal]
       for (const l of catalog) if (!merged.includes(l)) merged.push(l)
       setSavedAddresses(merged)
       setCatalogLodges(lodges)
+      setLocations(nextLocations)
+      if (nextLocations.length > 0) {
+        const first = nextLocations[0]
+        setSelectedState((cur) => cur || first.city_state)
+        setSelectedCityId((cur) => cur || first.city_id)
+        setSelectedZoneId((cur) => cur || first.zone_id)
+      }
       // A "Saved places → Order here" tap pre-fills the chosen place (takes
       // priority over the learned default); otherwise fall back to most-used.
       let prefill: string | null = null
@@ -134,11 +162,36 @@ export default function CartPage() {
   }, [])
 
   const isPickup        = deliveryType === 'PICKUP'
+  const stateOptions = useMemo(() => Array.from(new Set(locations.map((row) => row.city_state))), [locations])
+  const cityOptions = useMemo(
+    () => locations.filter((row) => row.city_state === selectedState)
+      .filter((row, index, all) => all.findIndex((candidate) => candidate.city_id === row.city_id) === index),
+    [locations, selectedState],
+  )
+  const zoneOptions = useMemo(
+    () => locations.filter((row) => row.city_id === selectedCityId),
+    [locations, selectedCityId],
+  )
+  const selectedZone = useMemo(
+    () => zoneOptions.find((row) => row.zone_id === selectedZoneId) ?? null,
+    [zoneOptions, selectedZoneId],
+  )
+  const selectedCity = useMemo(
+    () => cityOptions.find((row) => row.city_id === selectedCityId) ?? null,
+    [cityOptions, selectedCityId],
+  )
+  const showLodgeCatalog = selectedZone?.uses_lodge_catalog === true
+  const addressSuggestions = showLodgeCatalog ? savedAddresses : []
+  const locationLodges = showLodgeCatalog ? catalogLodges : []
   // Fold the structured parts into one rider-clear line ("Lodge · Block B · Room 12 · landmark").
   const composedAddress = isPickup ? '' : composeDeliveryAddress(deliveryType as 'BIKE' | 'DOOR', addr)
-  const deliveryFees    = fees ? { BIKE: fees.bike, DOOR: fees.door } : { BIKE: 0, DOOR: 0 }
+  const deliveryFees = selectedZone
+    ? { BIKE: selectedZone.base_bike_fee_kobo, DOOR: selectedZone.base_door_fee_kobo }
+    : fees
+      ? { BIKE: fees.bike, DOOR: fees.door }
+      : { BIKE: 0, DOOR: 0 }
   // Pickup charges the SAME platform fee as delivery — just ₦0 delivery, no tip.
-  const platformMarkup  = fees?.markup ?? 0
+  const platformMarkup  = selectedZone?.platform_markup_kobo ?? fees?.markup ?? 0
   const deliveryFee     = isPickup ? 0 : deliveryFees[deliveryType as 'BIKE' | 'DOOR']
   const tipApplied      = isPickup ? 0 : tip
   const total           = subtotal + platformMarkup + deliveryFee + tipApplied
@@ -170,6 +223,30 @@ export default function CartPage() {
   }
   const scheduleMin = toLocalInput(new Date(Date.now() + 25 * 60_000))
   const scheduleMax = toLocalInput(new Date(Date.now() + 7 * 86_400_000))
+
+  useEffect(() => {
+    if (!selectedState && stateOptions.length > 0) setSelectedState(stateOptions[0])
+  }, [selectedState, stateOptions])
+
+  useEffect(() => {
+    if (cityOptions.length === 0) {
+      if (selectedCityId) setSelectedCityId('')
+      return
+    }
+    if (!cityOptions.some((row) => row.city_id === selectedCityId)) {
+      setSelectedCityId(cityOptions[0].city_id)
+    }
+  }, [cityOptions, selectedCityId])
+
+  useEffect(() => {
+    if (zoneOptions.length === 0) {
+      if (selectedZoneId) setSelectedZoneId('')
+      return
+    }
+    if (!zoneOptions.some((row) => row.zone_id === selectedZoneId)) {
+      setSelectedZoneId(zoneOptions[0].zone_id)
+    }
+  }, [zoneOptions, selectedZoneId])
 
   if (totalItems === 0) {
     return (
@@ -217,10 +294,14 @@ export default function CartPage() {
   async function handleCheckout() {
     if (loading) return // guard against double-submit before the disabled state paints
     if (!isPickup) {
-      if (!addr.lodge.trim()) { setError('Please tell us your lodge or hostel'); return }
+      if (!selectedState || !selectedCityId || !selectedZoneId) { setError('Choose the delivery state, city and area first'); return }
+      if (!addr.lodge.trim()) {
+        setError(showLodgeCatalog ? 'Please tell us your lodge or hostel' : 'Please enter the delivery address or nearest landmark')
+        return
+      }
       if (deliveryType === 'DOOR') {
         // If the chosen lodge has defined blocks, the customer must pick one.
-        const blocks = lodgeBlocksFor(catalogLodges, addr.lodge)
+        const blocks = lodgeBlocksFor(locationLodges, addr.lodge)
         if (blocks.length > 0 && !addr.block?.trim()) { setError('Please choose your block'); return }
         if (!addr.room?.trim()) { setError('Add your room number so the rider reaches your door'); return }
       }
@@ -247,6 +328,8 @@ export default function CartPage() {
           // Pickup has no address/tip/schedule/coords/group — the server synthesizes
           // "Pickup at <shop>" and rejects those extras.
           delivery_address:      isPickup ? undefined : composedAddress,
+          city_id:               isPickup ? undefined : selectedCityId,
+          zone_id:               isPickup ? undefined : selectedZoneId,
           // Structured parts stored alongside the string (rider sees them as chips).
           delivery_lodge:        isPickup ? undefined : addr.lodge.trim() || undefined,
           delivery_block:        isPickup ? undefined : addr.block?.trim() || undefined,
@@ -495,14 +578,85 @@ export default function CartPage() {
         )}
 
         {!isPickup && (
-          <CartSection title="Drop-off details" subtitle="Pick the lodge from the list, or type it if it is missing.">
+          <CartSection title="Delivery area" subtitle="Pick the active state, city and exact area you want us to deliver to.">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="block">
+                <span className="mb-1.5 block text-xs text-white/45">State</span>
+                <select
+                  value={selectedState}
+                  onChange={(e) => {
+                    setSelectedState(e.target.value)
+                    setSelectedCityId('')
+                    setSelectedZoneId('')
+                    setAddr({ lodge: '', block: '', room: '', landmark: '' })
+                    setCoords(null)
+                  }}
+                  className="lx-field w-full px-3.5 py-3 text-sm outline-none"
+                  style={{ colorScheme: 'dark' }}
+                >
+                  <option value="">Choose a state</option>
+                  {stateOptions.map((state) => <option key={state} value={state}>{state}</option>)}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs text-white/45">City</span>
+                <select
+                  value={selectedCityId}
+                  onChange={(e) => {
+                    setSelectedCityId(e.target.value)
+                    setSelectedZoneId('')
+                    setAddr({ lodge: '', block: '', room: '', landmark: '' })
+                    setCoords(null)
+                  }}
+                  className="lx-field w-full px-3.5 py-3 text-sm outline-none"
+                  style={{ colorScheme: 'dark' }}
+                  disabled={cityOptions.length === 0}
+                >
+                  <option value="">{selectedState ? 'Choose a city' : 'Choose a state first'}</option>
+                  {cityOptions.map((city) => <option key={city.city_id} value={city.city_id}>{city.city_name}</option>)}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs text-white/45">Area</span>
+                <select
+                  value={selectedZoneId}
+                  onChange={(e) => {
+                    setSelectedZoneId(e.target.value)
+                    setAddr({ lodge: '', block: '', room: '', landmark: '' })
+                    setCoords(null)
+                  }}
+                  className="lx-field w-full px-3.5 py-3 text-sm outline-none"
+                  style={{ colorScheme: 'dark' }}
+                  disabled={zoneOptions.length === 0}
+                >
+                  <option value="">{selectedCity ? 'Choose an area' : 'Choose a city first'}</option>
+                  {zoneOptions.map((zone) => <option key={zone.zone_id} value={zone.zone_id}>{zone.zone_name}</option>)}
+                </select>
+              </label>
+            </div>
+            {selectedZone && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-white/60">
+                <p className="font-medium text-white/85">{selectedCity?.city_name}, {selectedState} · {selectedZone.zone_name}</p>
+                <p className="mt-1">Bike: {formatPrice(selectedZone.base_bike_fee_kobo)} · Door: {formatPrice(selectedZone.base_door_fee_kobo)} · Platform fee: {formatPrice(selectedZone.platform_markup_kobo)}</p>
+              </div>
+            )}
+          </CartSection>
+        )}
+
+        {!isPickup && (
+          <CartSection title="Drop-off details" subtitle={showLodgeCatalog ? 'Pick the lodge from the list, or type it if it is missing.' : 'Type the exact place, street, gate or landmark where the rider should bring it.'}>
             <DeliveryAddress
               deliveryType={deliveryType as 'BIKE' | 'DOOR'}
               value={addr}
               onChange={setAddr}
-              suggestions={savedAddresses}
-              lodges={catalogLodges}
+              suggestions={addressSuggestions}
+              lodges={locationLodges}
               onCoords={setCoords}
+              placeLabel={showLodgeCatalog ? 'lodge or hostel' : 'street, estate, school gate or landmark'}
+              manualPlaceholder={showLodgeCatalog ? undefined : 'Type the street, estate, school gate or closest landmark'}
+              catalogHint={showLodgeCatalog ? 'Choose your lodge from the list. If it is missing, switch to manual entry and type it yourself.' : undefined}
             />
 
             <div>

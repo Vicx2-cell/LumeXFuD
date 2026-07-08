@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid order data', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { vendor_id, items, delivery_type, delivery_address, delivery_lodge, delivery_block, delivery_room, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate, apply_reward } = parsed.data
+  const { vendor_id, items, delivery_type, delivery_address, city_id, zone_id, delivery_lodge, delivery_block, delivery_room, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate, apply_reward } = parsed.data
   const isScheduled = !!scheduled_for
   const isPickup = delivery_type === 'PICKUP'
   const hasCoords = typeof delivery_latitude === 'number' && typeof delivery_longitude === 'number'
@@ -88,6 +88,8 @@ export async function POST(req: NextRequest) {
   } else if (!delivery_address || delivery_address.trim().length < 5) {
     // Delivery orders still need a real address (pickup synthesizes its own).
     return NextResponse.json({ error: 'A delivery address is required.' }, { status: 400 })
+  } else if (!zone_id) {
+    return NextResponse.json({ error: 'Choose the delivery area for this order.' }, { status: 400 })
   }
 
   // Validate vendor
@@ -210,9 +212,18 @@ export async function POST(req: NextRequest) {
   // Delivery/platform fees now come from the vendor's delivery zone. During
   // rollout, the helper can fall back to existing settings rows if the migration
   // is not present yet; there are no hardcoded fee fallbacks in this route.
-  const zonePricing = await getDeliveryZonePricing({ db, vendorId: vendor_id, zoneId: (vendor as { zone_id?: string | null }).zone_id ?? null })
+  const pricingZoneId = isPickup ? ((vendor as { zone_id?: string | null }).zone_id ?? null) : zone_id
+  const zonePricing = await getDeliveryZonePricing({ db, zoneId: pricingZoneId })
   if (!zonePricing) {
     return NextResponse.json({ error: 'Delivery pricing is not configured' }, { status: 503 })
+  }
+  if (!isPickup) {
+    if (zonePricing.zoneId !== zone_id) {
+      return NextResponse.json({ error: 'That delivery area is not available right now.' }, { status: 400 })
+    }
+    if (city_id && zonePricing.cityId && city_id !== zonePricing.cityId) {
+      return NextResponse.json({ error: 'That city does not match the chosen delivery area.' }, { status: 400 })
+    }
   }
 
   // PICKUP charges the SAME platform fee as delivery (platform_markup); delivery
