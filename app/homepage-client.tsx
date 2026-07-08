@@ -35,8 +35,6 @@ export function HomepageClient({
   // (revalidate 30), so the list still works without it.
   const [vendors, setVendors] = useState<VendorData[]>(initialVendors)
   const [locations] = useState<LocationRow[]>(initialLocations)
-  const [selectedState, setSelectedState] = useState(initialLocations[0]?.city_state ?? '')
-  const [selectedCityId, setSelectedCityId] = useState(initialLocations[0]?.city_id ?? '')
   const [selectedZoneId, setSelectedZoneId] = useState(initialLocations[0]?.zone_id ?? '')
   const [loadingVendors, setLoadingVendors] = useState(false)
   const [search, setSearch] = useState('')
@@ -44,32 +42,11 @@ export function HomepageClient({
   const [favorites, setFavorites] = useState<Set<string>>(() => new Set(initialFavorites))
   const [favOnly, setFavOnly] = useState(false)
 
-  const stateOptions = useMemo(() => Array.from(new Set(locations.map((row) => row.city_state))), [locations])
-  const cityOptions = useMemo(
-    () => locations.filter((row) => row.city_state === selectedState)
-      .filter((row, index, all) => all.findIndex((candidate) => candidate.city_id === row.city_id) === index),
-    [locations, selectedState],
-  )
-  const zoneOptions = useMemo(
-    () => locations.filter((row) => row.city_id === selectedCityId),
-    [locations, selectedCityId],
-  )
+  const zoneOptions = useMemo(() => locations, [locations])
   const selectedZone = useMemo(
     () => zoneOptions.find((row) => row.zone_id === selectedZoneId) ?? null,
     [zoneOptions, selectedZoneId],
   )
-
-  useEffect(() => {
-    if (!selectedState && stateOptions.length > 0) setSelectedState(stateOptions[0])
-  }, [selectedState, stateOptions])
-
-  useEffect(() => {
-    if (cityOptions.length === 0) {
-      if (selectedCityId) setSelectedCityId('')
-      return
-    }
-    if (!cityOptions.some((row) => row.city_id === selectedCityId)) setSelectedCityId(cityOptions[0].city_id)
-  }, [cityOptions, selectedCityId])
 
   useEffect(() => {
     if (zoneOptions.length === 0) {
@@ -133,46 +110,14 @@ export function HomepageClient({
   return (
     <div className="space-y-4">
       {locations.length > 0 && (
-        <div className="lx-surface p-4 space-y-3">
-          <div>
-            <h2 className="text-sm font-semibold text-white/85">Delivery area</h2>
-            <p className="mt-1 text-xs text-white/45">Choose where you are now. The vendor list follows the zone you pick.</p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="block">
-              <span className="mb-1.5 block text-xs text-white/45">State</span>
-              <select
-                value={selectedState}
-                onChange={(e) => {
-                  setSelectedState(e.target.value)
-                  setSelectedCityId('')
-                  setSelectedZoneId('')
-                }}
-                className="lx-field w-full px-3.5 py-3 text-sm outline-none"
-                style={{ colorScheme: 'dark' }}
-              >
-                <option value="">Choose a state</option>
-                {stateOptions.map((state) => <option key={state} value={state}>{state}</option>)}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-xs text-white/45">City</span>
-              <select
-                value={selectedCityId}
-                onChange={(e) => {
-                  setSelectedCityId(e.target.value)
-                  setSelectedZoneId('')
-                }}
-                className="lx-field w-full px-3.5 py-3 text-sm outline-none"
-                style={{ colorScheme: 'dark' }}
-                disabled={cityOptions.length === 0}
-              >
-                <option value="">{selectedState ? 'Choose a city' : 'Choose a state first'}</option>
-                {cityOptions.map((city) => <option key={city.city_id} value={city.city_id}>{city.city_name}</option>)}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-xs text-white/45">Area</span>
+        <div className="lx-surface px-4 py-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wide text-white/40">Delivery area</p>
+              <p className="mt-0.5 text-xs text-white/50">Pick the zone you are in right now.</p>
+            </div>
+            <label className="block w-full sm:w-[340px]">
+              <span className="sr-only">Select delivery zone</span>
               <select
                 value={selectedZoneId}
                 onChange={(e) => setSelectedZoneId(e.target.value)}
@@ -180,13 +125,17 @@ export function HomepageClient({
                 style={{ colorScheme: 'dark' }}
                 disabled={zoneOptions.length === 0}
               >
-                <option value="">{selectedCityId ? 'Choose an area' : 'Choose a city first'}</option>
-                {zoneOptions.map((zone) => <option key={zone.zone_id} value={zone.zone_id}>{zone.zone_name}</option>)}
+                <option value="">{zoneOptions.length > 0 ? 'Choose your area' : 'No delivery areas available'}</option>
+                {zoneOptions.map((zone) => (
+                  <option key={zone.zone_id} value={zone.zone_id}>
+                    {zone.city_state} • {zone.city_name} • {zone.zone_name}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
           {selectedZone && (
-            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/55">
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/55">
               <span className="font-medium text-white/80">{selectedZone.city_name}, {selectedZone.city_state}</span>
               <span className="mx-2 text-white/25">•</span>
               <span>{selectedZone.zone_name}</span>
