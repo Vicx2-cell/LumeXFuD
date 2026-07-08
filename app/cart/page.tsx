@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/components/cart-context'
 import { BottomNav } from '@/components/nav-bottom'
@@ -8,29 +8,13 @@ import { formatPrice } from '@/lib/money'
 import { useFeatures } from '@/lib/use-features'
 import { estimateOrderPrepMinutes, prepRangeLabel } from '@/lib/prep-time'
 import { formatHoursRange } from '@/lib/hours'
-import { type MapLodge } from '@/components/lodge-map'
 import { DeliveryAddress } from '@/components/delivery-address'
 import { CartRewardHint } from '@/components/cart-reward-hint'
-import { composeDeliveryAddress, lodgeBlocksFor, type DeliveryAddressParts } from '@/lib/delivery-address'
+import { composeDeliveryAddress, type DeliveryAddressParts } from '@/lib/delivery-address'
 
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
 
 type PaymentMethod = 'PAYSTACK' | 'WALLET' | 'SPLIT'
-
-type DeliveryLocationRow = {
-  city_id: string
-  city_name: string
-  city_state: string
-  city_slug: string
-  zone_id: string
-  zone_name: string
-  base_bike_fee_kobo: number
-  base_door_fee_kobo: number
-  platform_markup_kobo: number
-  rider_cut_bike_kobo: number
-  rider_cut_door_kobo: number
-  uses_lodge_catalog: boolean
-}
 
 function CartSection({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
@@ -49,10 +33,6 @@ export default function CartPage() {
   const { cart, setQuantity, clearCart, subtotal, totalItems } = useCart()
   const features = useFeatures()
   const [groupBusy, setGroupBusy] = useState(false)
-  const [locations,     setLocations]     = useState<DeliveryLocationRow[]>([])
-  const [selectedState, setSelectedState] = useState('')
-  const [selectedCityId, setSelectedCityId] = useState('')
-  const [selectedZoneId, setSelectedZoneId] = useState('')
 
   const [deliveryType,  setDeliveryType]  = useState<'BIKE' | 'DOOR' | 'PICKUP'>('BIKE')
   // Structured delivery address — composed into one rider-clear string at checkout.
@@ -75,17 +55,13 @@ export default function CartPage() {
   const [reorderNote,   setReorderNote]   = useState('') // "some items skipped" after Order again
   const [fees,          setFees]          = useState<{ bike: number; door: number; markup: number; bonus: number } | null>(null)
   const [hoursLabel,    setHoursLabel]    = useState('7am – 10pm') // live opening hours
+  const [now]           = useState(() => Date.now())
 
   // ── Wallet state ──────────────────────────────────────────────────────────
   const [walletBalance,    setWalletBalance]    = useState<number | null>(null)
   const [walletFrozen,     setWalletFrozen]     = useState(false)
-  const [walletLoading,    setWalletLoading]    = useState(true)
+  const [walletLoading,    setWalletLoading]    = useState(features.customer_wallet_enabled !== true)
   const [paymentMethod,    setPaymentMethod]    = useState<PaymentMethod>('PAYSTACK')
-  // Saved delivery addresses (learned over time from past orders).
-  const [savedAddresses,   setSavedAddresses]   = useState<string[]>([])
-  // Verified ABSU lodge catalog (names, coords, blocks) — feeds search, the map,
-  // and the per-lodge block dropdown.
-  const [catalogLodges,    setCatalogLodges]    = useState<MapLodge[]>([])
   // GPS for this delivery (from "use my location" or a map/lodge pin). Cleared
   // when the address is hand-edited so coords never mismatch the text.
   const [coords,           setCoords]           = useState<{ lat: number; lng: number } | null>(null)
@@ -119,82 +95,39 @@ export default function CartPage() {
         })
         .catch(() => {})
         .finally(() => setWalletLoading(false))
-    } else {
-      setWalletLoading(false)
     }
 
-    // Delivery suggestions = the customer's own learned lodges first, then the
-    // admin-verified ABSU lodge catalog. Pre-fill the customer's most-used.
-    Promise.all([
-      fetch('/api/customer/addresses').then((r) => r.ok ? r.json() : null).catch(() => null),
-      fetch('/api/lodges').then((r) => r.ok ? r.json() : null).catch(() => null),
-      fetch('/api/delivery-locations').then((r) => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([addrRes, lodgeRes, locationRes]: [{ addresses?: string[] } | null, { lodges?: MapLodge[] } | null, { locations?: DeliveryLocationRow[] } | null]) => {
-      const personal = addrRes?.addresses ?? []
-      const lodges = lodgeRes?.lodges ?? []
-      const nextLocations = locationRes?.locations ?? []
-      const catalog = lodges.map((l) => l.area ? `${l.name} (${l.area})` : l.name)
-      const merged: string[] = [...personal]
-      for (const l of catalog) if (!merged.includes(l)) merged.push(l)
-      setSavedAddresses(merged)
-      setCatalogLodges(lodges)
-      setLocations(nextLocations)
-      if (nextLocations.length > 0) {
-        const first = nextLocations[0]
-        setSelectedState((cur) => cur || first.city_state)
-        setSelectedCityId((cur) => cur || first.city_id)
-        setSelectedZoneId((cur) => cur || first.zone_id)
+    // A stored location can still pre-fill the location name in checkout.
+    try {
+      const prefill = sessionStorage.getItem('lx_prefill_address')
+      if (prefill) {
+        sessionStorage.removeItem('lx_prefill_address')
+        window.setTimeout(() => {
+          setAddr((cur) => cur.lodge ? cur : { ...cur, lodge: prefill })
+        }, 0)
       }
-      // A "Saved places → Order here" tap pre-fills the chosen place (takes
-      // priority over the learned default); otherwise fall back to most-used.
-      let prefill: string | null = null
-      try { prefill = sessionStorage.getItem('lx_prefill_address'); if (prefill) sessionStorage.removeItem('lx_prefill_address') } catch { /* ignore */ }
-      const seed = prefill || (personal.length > 0 ? personal[0] : '')
-      if (seed) setAddr((cur) => cur.lodge ? cur : { ...cur, lodge: seed })
-    }).catch(() => {})
+    } catch { /* ignore */ }
 
     // Surface any items "Order again" had to drop (no longer on the menu).
     try {
       const skipped = sessionStorage.getItem('reorder_skipped')
       if (skipped) {
-        setReorderNote(`Some items were unavailable and left out: ${skipped}`)
         sessionStorage.removeItem('reorder_skipped')
+        window.setTimeout(() => {
+          setReorderNote(`Some items were unavailable and left out: ${skipped}`)
+        }, 0)
       }
     } catch { /* ignore */ }
-  }, [])
+  }, [features.customer_wallet_enabled])
 
   const isPickup        = deliveryType === 'PICKUP'
-  const stateOptions = useMemo(() => Array.from(new Set(locations.map((row) => row.city_state))), [locations])
-  const cityOptions = useMemo(
-    () => locations.filter((row) => row.city_state === selectedState)
-      .filter((row, index, all) => all.findIndex((candidate) => candidate.city_id === row.city_id) === index),
-    [locations, selectedState],
-  )
-  const zoneOptions = useMemo(
-    () => locations.filter((row) => row.city_id === selectedCityId),
-    [locations, selectedCityId],
-  )
-  const selectedZone = useMemo(
-    () => zoneOptions.find((row) => row.zone_id === selectedZoneId) ?? null,
-    [zoneOptions, selectedZoneId],
-  )
-  const selectedCity = useMemo(
-    () => cityOptions.find((row) => row.city_id === selectedCityId) ?? null,
-    [cityOptions, selectedCityId],
-  )
-  const showLodgeCatalog = selectedZone?.uses_lodge_catalog === true
-  const addressSuggestions = showLodgeCatalog ? savedAddresses : []
-  const locationLodges = showLodgeCatalog ? catalogLodges : []
   // Fold the structured parts into one rider-clear line ("Lodge · Block B · Room 12 · landmark").
   const composedAddress = isPickup ? '' : composeDeliveryAddress(deliveryType as 'BIKE' | 'DOOR', addr)
-  const deliveryFees = selectedZone
-    ? { BIKE: selectedZone.base_bike_fee_kobo, DOOR: selectedZone.base_door_fee_kobo }
-    : fees
-      ? { BIKE: fees.bike, DOOR: fees.door }
-      : { BIKE: 0, DOOR: 0 }
   // Pickup charges the SAME platform fee as delivery — just ₦0 delivery, no tip.
-  const platformMarkup  = selectedZone?.platform_markup_kobo ?? fees?.markup ?? 0
-  const deliveryFee     = isPickup ? 0 : deliveryFees[deliveryType as 'BIKE' | 'DOOR']
+  const deliveryFee     = isPickup ? 0 : deliveryType === 'BIKE'
+    ? fees?.bike ?? 0
+    : fees?.door ?? 0
+  const platformMarkup  = fees?.markup ?? 0
   const tipApplied      = isPickup ? 0 : tip
   const total           = subtotal + platformMarkup + deliveryFee + tipApplied
 
@@ -223,10 +156,10 @@ export default function CartPage() {
     const p = (n: number) => String(n).padStart(2, '0')
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
   }
-  const scheduleMin = toLocalInput(new Date(Date.now() + 25 * 60_000))
-  const scheduleMax = toLocalInput(new Date(Date.now() + 7 * 86_400_000))
+  const scheduleMin = toLocalInput(new Date(now + 25 * 60_000))
+  const scheduleMax = toLocalInput(new Date(now + 7 * 86_400_000))
 
-  async function captureCurrentLocation(savePin = false) {
+  async function captureCurrentLocation() {
     if (!('geolocation' in navigator)) {
       setGpsMessage('Location is not supported on this device')
       return
@@ -237,75 +170,12 @@ export default function CartPage() {
       const next = { lat: pos.coords.latitude, lng: pos.coords.longitude }
       setCoords(next)
       setGpsMessage(`Captured ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`)
-      if (savePin) {
-        try {
-          const primary = await fetch('/api/customer/locations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              label: 'Current GPS pin',
-              delivery_note: 'Saved from cart',
-              latitude: next.lat,
-              longitude: next.lng,
-              is_active: true,
-            }),
-          })
-          if (primary.ok) {
-            setGpsMessage('Captured and saved to your locations')
-          } else {
-            const fallback = await fetch('/api/customer/places', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                label: 'Current GPS pin',
-                landmark: 'Saved from cart',
-                latitude: next.lat,
-                longitude: next.lng,
-                is_default: true,
-              }),
-            })
-            if (fallback.ok) {
-              setGpsMessage('Captured and saved to your places')
-            } else {
-              const data = await primary.json().catch(() => ({})) as { error?: string }
-              const fallbackData = await fallback.json().catch(() => ({})) as { error?: string }
-              setGpsMessage(data.error ?? fallbackData.error ?? 'Captured location but could not save the pin')
-            }
-          }
-        } catch {
-          setGpsMessage('Captured location but could not save the pin')
-        }
-      }
       setGpsBusy(false)
     }, () => {
       setGpsBusy(false)
       setGpsMessage('Could not get your location')
     }, { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 })
   }
-
-  useEffect(() => {
-    if (!selectedState && stateOptions.length > 0) setSelectedState(stateOptions[0])
-  }, [selectedState, stateOptions])
-
-  useEffect(() => {
-    if (cityOptions.length === 0) {
-      if (selectedCityId) setSelectedCityId('')
-      return
-    }
-    if (!cityOptions.some((row) => row.city_id === selectedCityId)) {
-      setSelectedCityId(cityOptions[0].city_id)
-    }
-  }, [cityOptions, selectedCityId])
-
-  useEffect(() => {
-    if (zoneOptions.length === 0) {
-      if (selectedZoneId) setSelectedZoneId('')
-      return
-    }
-    if (!zoneOptions.some((row) => row.zone_id === selectedZoneId)) {
-      setSelectedZoneId(zoneOptions[0].zone_id)
-    }
-  }, [zoneOptions, selectedZoneId])
 
   if (totalItems === 0) {
     return (
@@ -353,18 +223,12 @@ export default function CartPage() {
   async function handleCheckout() {
     if (loading) return // guard against double-submit before the disabled state paints
     if (!isPickup) {
-      if (!selectedState || !selectedCityId || !selectedZoneId) { setError('Choose the delivery state, city and area first'); return }
       if (!addr.lodge.trim()) {
-        setError(showLodgeCatalog ? 'Please tell us your lodge or hostel' : 'Please enter the delivery address or nearest landmark')
+        setError('Please type the location name')
         return
       }
-      if (deliveryType === 'DOOR') {
-        // If the chosen lodge has defined blocks, the customer must pick one.
-        const blocks = lodgeBlocksFor(locationLodges, addr.lodge)
-        if (blocks.length > 0 && !addr.block?.trim()) { setError('Please choose your block'); return }
-        if (!addr.room?.trim()) { setError('Add your room number so the rider reaches your door'); return }
-      }
-      if (composedAddress.trim().length < 5) { setError('Please give a clearer delivery address'); return }
+      if (composedAddress.trim().length < 5) { setError('Please give a clearer delivery location'); return }
+      if (!coords) { setError('Pin your current location before placing a delivery order'); return }
     }
     if (!isPickup && scheduleOn && !scheduleAt) { setError('Pick a date and time for your scheduled order'); return }
     if (isPickup && !pickupAgree) { setError('Please accept the pickup collection terms to continue'); return }
@@ -387,12 +251,8 @@ export default function CartPage() {
           // Pickup has no address/tip/schedule/coords/group — the server synthesizes
           // "Pickup at <shop>" and rejects those extras.
           delivery_address:      isPickup ? undefined : composedAddress,
-          city_id:               isPickup ? undefined : selectedCityId,
-          zone_id:               isPickup ? undefined : selectedZoneId,
           // Structured parts stored alongside the string (rider sees them as chips).
           delivery_lodge:        isPickup ? undefined : addr.lodge.trim() || undefined,
-          delivery_block:        isPickup ? undefined : addr.block?.trim() || undefined,
-          delivery_room:         isPickup ? undefined : addr.room?.trim() || undefined,
           delivery_instructions: instructions || undefined,
           tip_amount:            isPickup ? 0 : tip,
           payment_method:        effectivePaymentMethod,
@@ -488,25 +348,15 @@ export default function CartPage() {
         )}
 
         {!isPickup && (
-          <CartSection title="GPS" subtitle="Use your current location for this order, or save it as a pin for later.">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => void captureCurrentLocation(false)}
-                disabled={gpsBusy}
-                className="lx-btn-amber py-3 text-sm disabled:opacity-50"
-              >
-                {gpsBusy ? 'Getting location…' : 'Use current location'}
-              </button>
-              <button
-                type="button"
-                onClick={() => void captureCurrentLocation(true)}
-                disabled={gpsBusy}
-                className="rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-white/75 disabled:opacity-50"
-              >
-                Save as pin
-              </button>
-            </div>
+          <CartSection title="GPS" subtitle="Pin your current location before you type the place name.">
+            <button
+              type="button"
+              onClick={() => void captureCurrentLocation()}
+              disabled={gpsBusy}
+              className="lx-btn-amber w-full py-3 text-sm disabled:opacity-50"
+            >
+              {gpsBusy ? 'Getting location…' : 'Use current location'}
+            </button>
             {coords && (
               <p className="text-xs text-white/40">
                 Active GPS: {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
@@ -565,7 +415,7 @@ export default function CartPage() {
                     : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 4h3a2 2 0 0 1 2 2v14"/><path d="M2 20h3"/><path d="M13 20h9"/><path d="M10 12v.01"/><path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z"/></svg>}
                 </div>
                 <p className="text-sm font-semibold">{type === 'BIKE' ? 'Bike' : 'Door'}</p>
-                <p className="text-xs text-white/55 mt-0.5 tabular-nums">{formatPrice(deliveryFees[type])}</p>
+                <p className="text-xs text-white/55 mt-0.5 tabular-nums">{formatPrice(type === 'BIKE' ? (fees?.bike ?? 0) : (fees?.door ?? 0))}</p>
               </button>
               )
             })}
@@ -666,85 +516,13 @@ export default function CartPage() {
         )}
 
         {!isPickup && (
-          <CartSection title="Delivery area" subtitle="Pick the active state, city and exact area you want us to deliver to.">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="block">
-                <span className="mb-1.5 block text-xs text-white/45">State</span>
-                <select
-                  value={selectedState}
-                  onChange={(e) => {
-                    setSelectedState(e.target.value)
-                    setSelectedCityId('')
-                    setSelectedZoneId('')
-                    setAddr({ lodge: '', block: '', room: '', landmark: '' })
-                    setCoords(null)
-                  }}
-                  className="lx-field w-full px-3.5 py-3 text-sm outline-none"
-                  style={{ colorScheme: 'dark' }}
-                >
-                  <option value="">Choose a state</option>
-                  {stateOptions.map((state) => <option key={state} value={state}>{state}</option>)}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs text-white/45">City</span>
-                <select
-                  value={selectedCityId}
-                  onChange={(e) => {
-                    setSelectedCityId(e.target.value)
-                    setSelectedZoneId('')
-                    setAddr({ lodge: '', block: '', room: '', landmark: '' })
-                    setCoords(null)
-                  }}
-                  className="lx-field w-full px-3.5 py-3 text-sm outline-none"
-                  style={{ colorScheme: 'dark' }}
-                  disabled={cityOptions.length === 0}
-                >
-                  <option value="">{selectedState ? 'Choose a city' : 'Choose a state first'}</option>
-                  {cityOptions.map((city) => <option key={city.city_id} value={city.city_id}>{city.city_name}</option>)}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs text-white/45">Area</span>
-                <select
-                  value={selectedZoneId}
-                  onChange={(e) => {
-                    setSelectedZoneId(e.target.value)
-                    setAddr({ lodge: '', block: '', room: '', landmark: '' })
-                    setCoords(null)
-                  }}
-                  className="lx-field w-full px-3.5 py-3 text-sm outline-none"
-                  style={{ colorScheme: 'dark' }}
-                  disabled={zoneOptions.length === 0}
-                >
-                  <option value="">{selectedCity ? 'Choose an area' : 'Choose a city first'}</option>
-                  {zoneOptions.map((zone) => <option key={zone.zone_id} value={zone.zone_id}>{zone.zone_name}</option>)}
-                </select>
-              </label>
-            </div>
-            {selectedZone && (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-white/60">
-                <p className="font-medium text-white/85">{selectedCity?.city_name}, {selectedState} · {selectedZone.zone_name}</p>
-                <p className="mt-1">Bike: {formatPrice(selectedZone.base_bike_fee_kobo)} · Door: {formatPrice(selectedZone.base_door_fee_kobo)} · Platform fee: {formatPrice(selectedZone.platform_markup_kobo)}</p>
-              </div>
-            )}
-          </CartSection>
-        )}
-
-        {!isPickup && (
-          <CartSection title="Drop-off details" subtitle={showLodgeCatalog ? 'Pick the lodge from the list, or type it if it is missing.' : 'Type the exact place, street, gate or landmark where the rider should bring it.'}>
+          <CartSection title="Drop-off details" subtitle="Pin your current location, then type the exact place name and any rider note.">
             <DeliveryAddress
               deliveryType={deliveryType as 'BIKE' | 'DOOR'}
               value={addr}
               onChange={setAddr}
-              suggestions={addressSuggestions}
-              lodges={locationLodges}
-              onCoords={setCoords}
-              placeLabel={showLodgeCatalog ? 'lodge or hostel' : 'street, estate, school gate or landmark'}
-              manualPlaceholder={showLodgeCatalog ? undefined : 'Type the street, estate, school gate or closest landmark'}
-              catalogHint={showLodgeCatalog ? 'Choose your lodge from the list. If it is missing, switch to manual entry and type it yourself.' : undefined}
+              placeLabel="Location name"
+              manualPlaceholder="Type the location name"
             />
 
             <div>

@@ -89,8 +89,6 @@ export async function POST(req: NextRequest) {
   } else if (!delivery_address || delivery_address.trim().length < 5) {
     // Delivery orders still need a real address (pickup synthesizes its own).
     return NextResponse.json({ error: 'A delivery address is required.' }, { status: 400 })
-  } else if (!zone_id) {
-    return NextResponse.json({ error: 'Choose the delivery area for this order.' }, { status: 400 })
   } else if (!hasCoords && !isPickup) {
     return NextResponse.json({ error: 'Share your current location before placing a delivery order.' }, { status: 400 })
   }
@@ -215,13 +213,15 @@ export async function POST(req: NextRequest) {
   // Delivery/platform fees now come from the vendor's delivery zone. During
   // rollout, the helper can fall back to existing settings rows if the migration
   // is not present yet; there are no hardcoded fee fallbacks in this route.
-  const pricingZoneId = isPickup ? ((vendor as { zone_id?: string | null }).zone_id ?? null) : zone_id
+  const pricingZoneId = isPickup
+    ? ((vendor as { zone_id?: string | null }).zone_id ?? null)
+    : zone_id ?? ((vendor as { zone_id?: string | null }).zone_id ?? null)
   const zonePricing = await getDeliveryZonePricing({ db, zoneId: pricingZoneId })
   if (!zonePricing) {
     return NextResponse.json({ error: 'Delivery pricing is not configured' }, { status: 503 })
   }
   if (!isPickup) {
-    if (zonePricing.zoneId !== zone_id) {
+    if (zone_id && zonePricing.zoneId !== zone_id) {
       return NextResponse.json({ error: 'That delivery area is not available right now.' }, { status: 400 })
     }
     if (city_id && zonePricing.cityId && city_id !== zonePricing.cityId) {
