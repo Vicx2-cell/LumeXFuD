@@ -53,6 +53,24 @@ const NAV_ACTIONS = [
   { href: '/admin/audit', label: 'Audit Log', icon: ICONS.log, desc: 'All admin actions' },
 ]
 
+const NAV_GROUPS = [
+  {
+    title: 'Live operations',
+    description: 'The places to check first when the day is moving fast.',
+    hrefs: ['/admin/live', '/admin/orders', '/admin/disputes', '/admin/verify-receipt'],
+  },
+  {
+    title: 'People and onboarding',
+    description: 'Review operators, KYC, and new account setup.',
+    hrefs: ['/admin/vendors', '/admin/riders', '/admin/kyc', '/admin/vendors/new', '/admin/riders/new'],
+  },
+  {
+    title: 'Platform support',
+    description: 'Supporting data, moderation, and audit trails.',
+    hrefs: ['/admin/accounts', '/admin/wallets', '/admin/lodges', '/admin/reviews', '/admin/audit'],
+  },
+] as const
+
 export default function AdminDashboard() {
   const router = useRouter()
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
@@ -194,24 +212,38 @@ export default function AdminDashboard() {
           </button>
         )}
 
-        {/* Navigation */}
-        <p className="lx-mono mb-4">Manage</p>
-        <div className="grid gap-3 sm:grid-cols-2 lx-stagger">
-          {NAV_ACTIONS.map((a) => (
-            <button
-              key={a.href}
-              onClick={() => router.push(a.href)}
-              className="lx-surface lx-focusable text-left p-4 transition-colors hover:border-white/15 group"
-            >
-              <div className="flex items-center gap-2.5 mb-1">
-                <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white/55" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--lx-border)' }}>
-                  {a.icon}
-                </span>
-                <p className="font-semibold text-white">{a.label}</p>
-              </div>
-              <p className="text-sm text-white/45">{a.desc}</p>
-            </button>
-          ))}
+        <div className="space-y-7">
+          {NAV_GROUPS.map((group) => {
+            const hrefs = new Set<string>(group.hrefs)
+            const actions = NAV_ACTIONS.filter((action) => hrefs.has(action.href))
+            return (
+              <section key={group.title}>
+                <div className="mb-4 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="lx-mono">{group.title}</p>
+                    <p className="mt-1 text-sm text-white/40">{group.description}</p>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lx-stagger">
+                  {actions.map((a) => (
+                    <button
+                      key={a.href}
+                      onClick={() => router.push(a.href)}
+                      className="lx-surface lx-focusable text-left p-4 transition-colors hover:border-white/15 group"
+                    >
+                      <div className="flex items-center gap-2.5 mb-1">
+                        <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white/55" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--lx-border)' }}>
+                          {a.icon}
+                        </span>
+                        <p className="font-semibold text-white">{a.label}</p>
+                      </div>
+                      <p className="text-sm text-white/45">{a.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )
+          })}
         </div>
       </div>
     </div>

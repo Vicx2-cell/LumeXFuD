@@ -57,6 +57,7 @@ export default async function LandingPage() {
   // Founder spotlight is super-admin gated: when off it is not rendered at all
   // (server-side, so it fully disappears — no client flash).
   const founderOn = await getFeature('founder')
+  const partnerApplicationsOn = await getFeature('partner_applications')
   return (
     <div className="lx-page lx-landing flex flex-col text-white overflow-hidden">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -279,6 +280,24 @@ export default async function LandingPage() {
                 Get started — it&apos;s free
               </Link>
             </Magnetic>
+            {partnerApplicationsOn && (
+              <div className="grid gap-3 pt-2 text-left sm:grid-cols-2">
+                <Link
+                  href="/apply/vendor"
+                  className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 transition-colors hover:border-white/20"
+                >
+                  <p className="text-sm font-semibold text-white">Apply as a vendor</p>
+                  <p className="mt-1 text-sm text-white/50">Tell us about your shop while admin reviews your application.</p>
+                </Link>
+                <Link
+                  href="/apply/rider"
+                  className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 transition-colors hover:border-white/20"
+                >
+                  <p className="text-sm font-semibold text-white">Apply as a rider</p>
+                  <p className="mt-1 text-sm text-white/50">Share your details and delivery setup for admin approval.</p>
+                </Link>
+              </div>
+            )}
           </div>
         </Reveal>
       </section>

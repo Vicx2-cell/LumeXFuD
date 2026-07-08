@@ -126,6 +126,29 @@ const actions = [
   },
 ]
 
+const GROUPS = [
+  {
+    title: 'Platform health',
+    description: 'Watch the system, jobs, incidents, and human support handoffs.',
+    hrefs: ['/super-admin/sentinel', '/super-admin/cron', '/super-admin/security', '/super-admin/whatsapp'],
+  },
+  {
+    title: 'Controls and growth',
+    description: 'The switches and knobs that shape the live product.',
+    hrefs: ['/super-admin/controls', '/super-admin/features', '/super-admin/settings', '/super-admin/usage', '/super-admin/announce'],
+  },
+  {
+    title: 'Revenue and market setup',
+    description: 'Pricing, rewards, financials, and launch readiness.',
+    hrefs: ['/super-admin/financials', '/super-admin/pricing', '/super-admin/rewards', '/super-admin/launch-counter'],
+  },
+  {
+    title: 'Access and oversight',
+    description: 'Admin access, audit review, and cross-check tools.',
+    hrefs: ['/super-admin/team/new', '/super-admin/audit', '/admin/verify-receipt', '/admin'],
+  },
+] as const
+
 export default function SuperAdminDashboard() {
   const router = useRouter()
 
@@ -140,30 +163,44 @@ export default function SuperAdminDashboard() {
           actions={<LogoutButton />}
         />
 
-        <div className="grid gap-3 sm:grid-cols-2 lx-stagger">
-          {actions.map((a) => (
-            <button
-              key={a.href}
-              onClick={() => router.push(a.href)}
-              className="lx-surface lx-focusable text-left p-5 transition-colors hover:border-white/15"
-              style={a.highlight ? { background: 'rgba(245,166,35,0.07)', borderColor: 'rgba(245,166,35,0.28)' } : undefined}
-            >
-              <div className="flex items-center gap-2.5 mb-1">
-                <span
-                  className="flex items-center justify-center w-9 h-9 rounded-xl"
-                  style={{
-                    background: a.highlight ? 'rgba(245,166,35,0.16)' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${a.highlight ? 'rgba(245,166,35,0.3)' : 'var(--lx-border)'}`,
-                    color: a.highlight ? '#F5A623' : 'rgba(255,255,255,0.6)',
-                  }}
-                >
-                  {a.icon}
-                </span>
-                <p className="font-semibold text-white">{a.label}</p>
-              </div>
-              <p className="text-sm text-white/45">{a.desc}</p>
-            </button>
-          ))}
+        <div className="space-y-7">
+          {GROUPS.map((group) => {
+            const hrefs = new Set<string>(group.hrefs)
+            const groupActions = actions.filter((action) => hrefs.has(action.href))
+            return (
+              <section key={group.title}>
+                <div className="mb-4">
+                  <p className="lx-mono">{group.title}</p>
+                  <p className="mt-1 text-sm text-white/40">{group.description}</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lx-stagger">
+                  {groupActions.map((a) => (
+                    <button
+                      key={a.href}
+                      onClick={() => router.push(a.href)}
+                      className="lx-surface lx-focusable text-left p-5 transition-colors hover:border-white/15"
+                      style={a.highlight ? { background: 'rgba(245,166,35,0.07)', borderColor: 'rgba(245,166,35,0.28)' } : undefined}
+                    >
+                      <div className="flex items-center gap-2.5 mb-1">
+                        <span
+                          className="flex items-center justify-center w-9 h-9 rounded-xl"
+                          style={{
+                            background: a.highlight ? 'rgba(245,166,35,0.16)' : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${a.highlight ? 'rgba(245,166,35,0.3)' : 'var(--lx-border)'}`,
+                            color: a.highlight ? '#F5A623' : 'rgba(255,255,255,0.6)',
+                          }}
+                        >
+                          {a.icon}
+                        </span>
+                        <p className="font-semibold text-white">{a.label}</p>
+                      </div>
+                      <p className="text-sm text-white/45">{a.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )
+          })}
         </div>
       </div>
     </div>
