@@ -89,6 +89,8 @@ export default function CartPage() {
   // GPS for this delivery (from "use my location" or a map/lodge pin). Cleared
   // when the address is hand-edited so coords never mismatch the text.
   const [coords,           setCoords]           = useState<{ lat: number; lng: number } | null>(null)
+  const [gpsBusy,          setGpsBusy]          = useState(false)
+  const [gpsMessage,       setGpsMessage]       = useState('')
 
   useEffect(() => {
     fetch('/api/settings/fees')
@@ -223,6 +225,63 @@ export default function CartPage() {
   }
   const scheduleMin = toLocalInput(new Date(Date.now() + 25 * 60_000))
   const scheduleMax = toLocalInput(new Date(Date.now() + 7 * 86_400_000))
+
+  async function captureCurrentLocation(savePin = false) {
+    if (!('geolocation' in navigator)) {
+      setGpsMessage('Location is not supported on this device')
+      return
+    }
+    setGpsBusy(true)
+    setGpsMessage('')
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const next = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+      setCoords(next)
+      setGpsMessage(`Captured ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`)
+      if (savePin) {
+        try {
+          const primary = await fetch('/api/customer/locations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              label: 'Current GPS pin',
+              delivery_note: 'Saved from cart',
+              latitude: next.lat,
+              longitude: next.lng,
+              is_active: true,
+            }),
+          })
+          if (primary.ok) {
+            setGpsMessage('Captured and saved to your locations')
+          } else {
+            const fallback = await fetch('/api/customer/places', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                label: 'Current GPS pin',
+                landmark: 'Saved from cart',
+                latitude: next.lat,
+                longitude: next.lng,
+                is_default: true,
+              }),
+            })
+            if (fallback.ok) {
+              setGpsMessage('Captured and saved to your places')
+            } else {
+              const data = await primary.json().catch(() => ({})) as { error?: string }
+              const fallbackData = await fallback.json().catch(() => ({})) as { error?: string }
+              setGpsMessage(data.error ?? fallbackData.error ?? 'Captured location but could not save the pin')
+            }
+          }
+        } catch {
+          setGpsMessage('Captured location but could not save the pin')
+        }
+      }
+      setGpsBusy(false)
+    }, () => {
+      setGpsBusy(false)
+      setGpsMessage('Could not get your location')
+    }, { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 })
+  }
 
   useEffect(() => {
     if (!selectedState && stateOptions.length > 0) setSelectedState(stateOptions[0])
@@ -426,6 +485,35 @@ export default function CartPage() {
             <span aria-hidden="true">👥</span>
             {groupBusy ? 'Starting…' : 'Order with friends (split one delivery)'}
           </button>
+        )}
+
+        {!isPickup && (
+          <CartSection title="GPS" subtitle="Use your current location for this order, or save it as a pin for later.">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => void captureCurrentLocation(false)}
+                disabled={gpsBusy}
+                className="lx-btn-amber py-3 text-sm disabled:opacity-50"
+              >
+                {gpsBusy ? 'Getting location…' : 'Use current location'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void captureCurrentLocation(true)}
+                disabled={gpsBusy}
+                className="rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-white/75 disabled:opacity-50"
+              >
+                Save as pin
+              </button>
+            </div>
+            {coords && (
+              <p className="text-xs text-white/40">
+                Active GPS: {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+              </p>
+            )}
+            {gpsMessage && <p className="text-xs text-white/45">{gpsMessage}</p>}
+          </CartSection>
         )}
 
         <CartSection title="Your items" subtitle={`${totalItems} item${totalItems === 1 ? '' : 's'} from ${cart.vendor_name}`}>

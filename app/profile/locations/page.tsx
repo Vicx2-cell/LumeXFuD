@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/back-button'
 
+type LocationSource = 'customer_locations' | 'saved_places'
+
 interface CustomerLocation {
   id: string
   label: string
@@ -15,6 +17,7 @@ interface CustomerLocation {
   is_active: boolean
   created_at: string
   updated_at: string
+  source: LocationSource
 }
 
 export default function ProfileLocationsPage() {
@@ -34,15 +37,46 @@ export default function ProfileLocationsPage() {
   }
 
   async function load() {
-    const res = await fetch('/api/customer/locations')
-    if (res.status === 401 || res.status === 403) {
+    const [locationsRes, placesRes] = await Promise.all([
+      fetch('/api/customer/locations'),
+      fetch('/api/customer/places'),
+    ])
+    if (locationsRes.status === 401 || locationsRes.status === 403 || placesRes.status === 401 || placesRes.status === 403) {
       router.push('/auth')
       return
     }
-    if (res.ok) {
-      const data = await res.json() as { locations: CustomerLocation[] }
-      setLocations(data.locations ?? [])
-    }
+    const locationData = locationsRes.ok ? await locationsRes.json() as { locations: CustomerLocation[] } : { locations: [] }
+    const placesData = placesRes.ok ? await placesRes.json() as {
+      places: Array<{
+        id: string
+        label: string
+        landmark: string | null
+        latitude: number | null
+        longitude: number | null
+        is_default: boolean
+        last_used_at: string | null
+        created_at: string
+      }>
+    } : { places: [] }
+    const merged: CustomerLocation[] = [
+      ...(locationData.locations ?? []).map((row) => ({ ...row, source: 'customer_locations' as const })),
+      ...(placesData.places ?? [])
+        .filter((row) => row.latitude != null && row.longitude != null)
+        .map((row) => ({
+          id: row.id,
+          label: row.label,
+          latitude: row.latitude as number,
+          longitude: row.longitude as number,
+          delivery_note: row.landmark,
+          city_id: null,
+          zone_id: null,
+          is_active: row.is_default,
+          created_at: row.created_at,
+          updated_at: row.last_used_at ?? row.created_at,
+          source: 'saved_places' as const,
+        })),
+    ]
+    setLocations(merged)
     setLoading(false)
   }
 
@@ -58,27 +92,45 @@ export default function ProfileLocationsPage() {
     navigator.geolocation.getCurrentPosition(async (pos) => {
       setLat(pos.coords.latitude.toFixed(6))
       setLng(pos.coords.longitude.toFixed(6))
-      const body: Record<string, unknown> = {
-        label: label.trim() || 'Current pin',
-        delivery_note: note.trim() || null,
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-        is_active: true,
-      }
       try {
-        const res = await fetch('/api/customer/locations', {
+        const primary = await fetch('/api/customer/locations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
+          body: JSON.stringify({
+            label: label.trim() || 'Current pin',
+            delivery_note: note.trim() || null,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            is_active: true,
+          }),
         })
-        const data = await res.json().catch(() => ({})) as { error?: string }
-        if (res.ok) {
+        if (primary.ok) {
           showToast('GPS pin saved')
           setLabel('Current pin')
           setNote('')
           await load()
         } else {
-          showToast(data.error ?? 'Could not save location')
+          const fallback = await fetch('/api/customer/places', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              label: label.trim() || 'Current GPS pin',
+              landmark: note.trim() || null,
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              is_default: true,
+            }),
+          })
+          if (fallback.ok) {
+            showToast('GPS pin saved')
+            setLabel('Current pin')
+            setNote('')
+            await load()
+          } else {
+            const data = await primary.json().catch(() => ({})) as { error?: string }
+            const fallbackData = await fallback.json().catch(() => ({})) as { error?: string }
+            showToast(data.error ?? fallbackData.error ?? 'Could not save location')
+          }
         }
       } catch {
         showToast('Network error')
@@ -92,10 +144,11 @@ export default function ProfileLocationsPage() {
   }
 
   async function activate(id: string) {
-    const res = await fetch(`/api/customer/locations/${id}`, {
+    const item = locations.find((row) => row.id === id)
+    const res = await fetch(item?.source === 'saved_places' ? `/api/customer/places/${id}` : `/api/customer/locations/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: true }),
+      body: JSON.stringify(item?.source === 'saved_places' ? { is_default: true } : { is_active: true }),
     })
     if (res.ok) {
       showToast('Location set as active')
@@ -106,7 +159,8 @@ export default function ProfileLocationsPage() {
   }
 
   async function remove(id: string) {
-    const res = await fetch(`/api/customer/locations/${id}`, { method: 'DELETE' })
+    const item = locations.find((row) => row.id === id)
+    const res = await fetch(item?.source === 'saved_places' ? `/api/customer/places/${id}` : `/api/customer/locations/${id}`, { method: 'DELETE' })
     if (res.ok) {
       showToast('Location removed')
       await load()
