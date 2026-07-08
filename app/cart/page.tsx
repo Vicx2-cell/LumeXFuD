@@ -648,6 +648,8 @@ export default function CartPage() {
                 </button>
               </div>
             </div>
+          </CartSection>
+        )}
 
         {/* Order summary */}
         <div className="glass-thin rounded-2xl p-4 space-y-2">
@@ -731,21 +733,20 @@ export default function CartPage() {
         {/* Saved rewards — customer chooses whether to spend them now or later. */}
         <CartRewardHint checked={applyReward} onChange={setApplyReward} />
 
-        {/* Delivery acceptance — explicit agreement to Terms + Refund policy, gates Pay */}
         {!isPickup && (
-          <label className="flex items-start gap-2.5 cursor-pointer px-1">
-            <input
-              type="checkbox"
-              checked={orderAgree}
-              onChange={(e) => { setOrderAgree(e.target.checked); if (e.target.checked) setError('') }}
-              className="mt-0.5 w-4 h-4 shrink-0 accent-amber-400"
-            />
-            <span className="text-xs text-white/60 leading-relaxed">
-              I agree to the <a href="/terms" target="_blank" className="text-[#F5A623]">Terms</a> and{' '}
-              <a href="/refunds" target="_blank" className="text-[#F5A623]">Refund &amp; Cancellation Policy</a>. I can cancel for a full refund before the vendor accepts; once accepted it can’t be cancelled. I can report a problem within 24 hours of delivery.
-            </span>
-          </label>
-        )}
+          <CartSection title="Consent" subtitle="You need to accept the policy before checkout can continue.">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={orderAgree}
+                onChange={(e) => { setOrderAgree(e.target.checked); if (e.target.checked) setError('') }}
+                className="mt-0.5 w-4 h-4 shrink-0 accent-amber-400"
+              />
+              <span className="text-xs text-white/60 leading-relaxed">
+                I agree to the <a href="/terms" target="_blank" className="text-[#F5A623]">Terms</a> and {' '}
+                <a href="/refunds" target="_blank" className="text-[#F5A623]">Refund &amp; Cancellation Policy</a>. I can cancel for a full refund before the vendor accepts; once accepted it can’t be cancelled. I can report a problem within 24 hours of delivery.
+              </span>
+            </label>
           </CartSection>
         )}
 
