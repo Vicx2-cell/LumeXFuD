@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/components/cart-context'
 import { BottomNav } from '@/components/nav-bottom'
@@ -16,6 +16,18 @@ import { composeDeliveryAddress, lodgeBlocksFor, type DeliveryAddressParts } fro
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
 
 type PaymentMethod = 'PAYSTACK' | 'WALLET' | 'SPLIT'
+
+function CartSection({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
+  return (
+    <section className="lx-surface p-4 space-y-4">
+      <div>
+        <h2 className="text-sm font-semibold text-white/85">{title}</h2>
+        {subtitle && <p className="mt-1 text-xs text-white/45">{subtitle}</p>}
+      </div>
+      {children}
+    </section>
+  )
+}
 
 export default function CartPage() {
   const router = useRouter()
@@ -333,8 +345,8 @@ export default function CartPage() {
           </button>
         )}
 
-        {/* Items */}
-        <div className="glass-thin overflow-hidden">
+        <CartSection title="Your items" subtitle={`${totalItems} item${totalItems === 1 ? '' : 's'} from ${cart.vendor_name}`}>
+        <div className="glass-thin overflow-hidden rounded-2xl">
           {cart.items.map((item, idx) => {
             const addonsKobo = item.addons.reduce((s, a) => s + a.price_kobo, 0)
             const eachKobo = item.price_kobo + addonsKobo
@@ -361,10 +373,10 @@ export default function CartPage() {
             )
           })}
         </div>
+        </CartSection>
 
         {/* Delivery type */}
-        <div>
-          <h3 className="text-sm font-medium text-white/70 mb-3">How do you want it?</h3>
+        <CartSection title="Delivery" subtitle="Choose how the order gets to you before you set the drop-off details.">
           <div className="grid grid-cols-2 gap-3">
             {(['BIKE', 'DOOR'] as const).map((type) => {
               const selected = deliveryType === type
@@ -409,7 +421,7 @@ export default function CartPage() {
               </div>
             </button>
           )}
-        </div>
+        </CartSection>
 
         {/* Pickup info — replaces address/schedule when collecting in person */}
         {isPickup && (
@@ -482,56 +494,56 @@ export default function CartPage() {
         </div>
         )}
 
-        {/* Address — delivery only. Structured composer adapts to bike vs door. */}
         {!isPickup && (
-          <DeliveryAddress
-            deliveryType={deliveryType as 'BIKE' | 'DOOR'}
-            value={addr}
-            onChange={setAddr}
-            suggestions={savedAddresses}
-            lodges={catalogLodges}
-            onCoords={setCoords}
-          />
+          <CartSection title="Drop-off details" subtitle="Pick the lodge from the list, or type it if it is missing.">
+            <DeliveryAddress
+              deliveryType={deliveryType as 'BIKE' | 'DOOR'}
+              value={addr}
+              onChange={setAddr}
+              suggestions={savedAddresses}
+              lodges={catalogLodges}
+              onCoords={setCoords}
+            />
+
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">
+                Special instructions <span className="text-white/30">(optional)</span>
+              </label>
+              <textarea value={instructions} onChange={(e) => setInstructions(e.target.value.slice(0, 200))}
+                placeholder="Any special requests for the vendor..." rows={2}
+                className="lx-field w-full px-4 py-3 text-sm outline-none resize-none" />
+              <p className="text-xs text-white/30 mt-1 text-right">{instructions.length}/200</p>
+            </div>
+          </CartSection>
         )}
 
-        {/* Instructions */}
-        <div>
-          <label className="block text-sm font-medium text-white/70 mb-2">
-            Special instructions <span className="text-white/30">(optional)</span>
-          </label>
-          <textarea value={instructions} onChange={(e) => setInstructions(e.target.value.slice(0, 200))}
-            placeholder="Any special requests for the vendor..." rows={2}
-            className="lx-field w-full px-4 py-3 text-sm outline-none resize-none" />
-          <p className="text-xs text-white/30 mt-1 text-right">{instructions.length}/200</p>
-        </div>
-
-        {/* Tip — delivery only (no rider on pickup) */}
         {!isPickup && (
-        <div>
-          <h3 className="text-sm font-medium text-white/70 mb-3">Add a tip (optional)</h3>
-          <div className="flex gap-2">
-            {TIP_OPTIONS.map((t) => (
-              <button key={t} onClick={() => setTip(t)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium"
-                style={{
-                  background: tip === t ? '#F5A623' : '#111113',
-                  color: tip === t ? '#000' : 'rgba(255,255,255,0.7)',
-                  border: `1px solid ${tip === t ? '#F5A623' : 'rgba(255,255,255,0.07)'}`,
-                }}>
-                {t === 0 ? '₦0' : formatPrice(t)}
-              </button>
-            ))}
-          </div>
-        </div>
+          <CartSection title="Delivery extras" subtitle="Optional touches for the rider and delivery timing.">
+            <div>
+              <h3 className="text-sm font-medium text-white/70 mb-3">Add a tip</h3>
+              <div className="flex gap-2">
+                {TIP_OPTIONS.map((t) => (
+                  <button key={t} onClick={() => setTip(t)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-medium"
+                    style={{
+                      background: tip === t ? '#F5A623' : '#111113',
+                      color: tip === t ? '#000' : 'rgba(255,255,255,0.7)',
+                      border: `1px solid ${tip === t ? '#F5A623' : 'rgba(255,255,255,0.07)'}`,
+                    }}>
+                    {t === 0 ? '₦0' : formatPrice(t)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </CartSection>
         )}
 
         {/* ── Payment method: Wallet vs Paystack (always a clear choice) ── */}
         {/* The whole selector shows regardless of the wallet flag; only the WALLET
             row is gated on it, so Paystack is never hidden (card must always work). */}
         {!walletLoading && (
-          <div>
-            <h3 className="text-sm font-medium text-white/70 mb-3">Pay with</h3>
-            <div className="glass-thin overflow-hidden">
+          <CartSection title="Checkout" subtitle="Pick how you want to pay and confirm the final breakdown.">
+            <div className="glass-thin overflow-hidden rounded-2xl">
               {/* Wallet choice — only when the customer wallet feature is enabled */}
               {features.customer_wallet_enabled === true && (
               <>
@@ -616,11 +628,9 @@ export default function CartPage() {
                 </button>
               </div>
             </div>
-          </div>
-        )}
 
         {/* Order summary */}
-        <div className="glass-thin p-4 space-y-2">
+        <div className="glass-thin rounded-2xl p-4 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-white/60">Subtotal</span>
             <span>{formatPrice(subtotal)}</span>
@@ -715,6 +725,8 @@ export default function CartPage() {
               <a href="/refunds" target="_blank" className="text-[#F5A623]">Refund &amp; Cancellation Policy</a>. I can cancel for a full refund before the vendor accepts; once accepted it can’t be cancelled. I can report a problem within 24 hours of delivery.
             </span>
           </label>
+        )}
+          </CartSection>
         )}
 
         {reorderNote && (

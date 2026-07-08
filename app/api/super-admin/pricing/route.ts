@@ -8,9 +8,6 @@ import { getDeliveryZonePricing, getMinimumOrderKobo } from '@/lib/delivery-zone
 
 export const runtime = 'nodejs'
 
-// Pricing lives in the settings table as { amount_kobo: N } rows. This endpoint
-// gives a friendly, *validated* way to edit it (the raw settings editor can't
-// enforce "rider cut ≤ delivery fee", which protects per-order profitability).
 const KEYS = {
   platform_markup_kobo:   'platform_markup',
   delivery_fee_bike_kobo: 'delivery_fee_bike',
@@ -20,8 +17,77 @@ const KEYS = {
   min_order_kobo:         'min_order_amount',
 } as const
 
+type Pricing = Record<keyof typeof KEYS, number>
+type Status = 'ACTIVE' | 'PAUSED' | 'INACTIVE'
+
+type LocationRow = {
+  zone_id: string
+  zone_name: string
+  zone_status: Status
+  city_id: string
+  city_name: string
+  city_state: string
+  city_slug: string
+  city_status: Status
+  base_bike_fee_kobo: number
+  base_door_fee_kobo: number
+  platform_markup_kobo: number
+  rider_cut_bike_kobo: number
+  rider_cut_door_kobo: number
+}
+
 function requireSuperAdmin(role: string) {
   return role === 'super_admin'
+}
+
+async function loadLocations(db: ReturnType<typeof createSupabaseAdmin>): Promise<LocationRow[]> {
+  try {
+    const { data: zones } = await db
+      .from('delivery_zones')
+      .select('id, city_id, name, status, base_bike_fee, base_door_fee, platform_markup, rider_split')
+      .order('created_at', { ascending: true })
+
+    const zoneRows = (zones ?? []) as Array<{
+      id: string
+      city_id: string
+      name: string
+      status: Status
+      base_bike_fee: number
+      base_door_fee: number
+      platform_markup: number
+      rider_split: { BIKE?: number; DOOR?: number } | null
+    }>
+    if (zoneRows.length === 0) return []
+
+    const cityIds = Array.from(new Set(zoneRows.map((z) => z.city_id)))
+    const { data: cities } = await db.from('cities').select('id, name, state, slug, status').in('id', cityIds)
+    const cityById = new Map(
+      ((cities ?? []) as Array<{ id: string; name: string; state: string; slug: string; status: Status }>)
+        .map((city) => [city.id, city]),
+    )
+
+    return zoneRows.flatMap((zone) => {
+      const city = cityById.get(zone.city_id)
+      if (!city) return []
+      return [{
+        zone_id: zone.id,
+        zone_name: zone.name,
+        zone_status: zone.status,
+        city_id: city.id,
+        city_name: city.name,
+        city_state: city.state,
+        city_slug: city.slug,
+        city_status: city.status,
+        base_bike_fee_kobo: Number(zone.base_bike_fee ?? 0),
+        base_door_fee_kobo: Number(zone.base_door_fee ?? 0),
+        platform_markup_kobo: Number(zone.platform_markup ?? 0),
+        rider_cut_bike_kobo: Number(zone.rider_split?.BIKE ?? 0),
+        rider_cut_door_kobo: Number(zone.rider_split?.DOOR ?? 0),
+      }]
+    })
+  } catch {
+    return []
+  }
 }
 
 export async function GET() {
@@ -32,7 +98,7 @@ export async function GET() {
   const db = createSupabaseAdmin()
   const zone = await getDeliveryZonePricing({ db })
   const minOrder = await getMinimumOrderKobo(db)
-  const pricing: Record<keyof typeof KEYS, number> = {
+  const pricing: Pricing = {
     platform_markup_kobo: zone?.platformMarkup ?? 0,
     delivery_fee_bike_kobo: zone?.bikeFee ?? 0,
     rider_cut_bike_kobo: zone?.riderCutBike ?? 0,
@@ -40,10 +106,10 @@ export async function GET() {
     rider_cut_door_kobo: zone?.riderCutDoor ?? 0,
     min_order_kobo: minOrder ?? 0,
   }
-  return NextResponse.json({ pricing })
+  const locations = await loadLocations(db)
+  return NextResponse.json({ pricing, locations })
 }
 
-// All amounts in kobo, whole numbers, capped to a sane ceiling (₦100,000).
 const kobo = z.number().int().min(0).max(10_000_000)
 const patchInput = z.object({
   platform_markup_kobo:   kobo,
@@ -52,6 +118,23 @@ const patchInput = z.object({
   delivery_fee_door_kobo: kobo,
   rider_cut_door_kobo:    kobo,
   min_order_kobo:         kobo,
+})
+
+const statusField = z.enum(['ACTIVE', 'PAUSED', 'INACTIVE'])
+const zonePatchInput = z.object({
+  zone_id: z.string().uuid(),
+  city_id: z.string().uuid(),
+  city_name: z.string().trim().min(1).max(120),
+  city_state: z.string().trim().min(1).max(120),
+  city_slug: z.string().trim().min(1).max(120),
+  city_status: statusField,
+  zone_name: z.string().trim().min(1).max(120),
+  zone_status: statusField,
+  base_bike_fee_kobo: kobo,
+  base_door_fee_kobo: kobo,
+  platform_markup_kobo: kobo,
+  rider_cut_bike_kobo: kobo,
+  rider_cut_door_kobo: kobo,
 })
 
 export async function PATCH(req: NextRequest) {
@@ -63,14 +146,81 @@ export async function PATCH(req: NextRequest) {
   if (!rl.success) return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 })
 
   let body: unknown
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid body' }, { status: 400 }) }
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+
+  const db = createSupabaseAdmin()
+  const now = new Date().toISOString()
+
+  if (body && typeof body === 'object' && 'zone_id' in (body as Record<string, unknown>)) {
+    const parsed = zonePatchInput.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid location details.' }, { status: 400 })
+    }
+    const p = parsed.data
+    if (p.rider_cut_bike_kobo > p.base_bike_fee_kobo) {
+      return NextResponse.json({ error: "Bike rider pay can't exceed the bike delivery fee." }, { status: 400 })
+    }
+    if (p.rider_cut_door_kobo > p.base_door_fee_kobo) {
+      return NextResponse.json({ error: "Door rider pay can't exceed the door delivery fee." }, { status: 400 })
+    }
+
+    const { data: oldZone } = await db
+      .from('delivery_zones')
+      .select('id, city_id, name, status, base_bike_fee, base_door_fee, platform_markup, rider_split, platform_split')
+      .eq('id', p.zone_id)
+      .maybeSingle()
+    const { data: oldCity } = await db
+      .from('cities')
+      .select('id, name, state, slug, status')
+      .eq('id', p.city_id)
+      .maybeSingle()
+
+    const { error: cityError } = await db.from('cities').update({
+      name: p.city_name,
+      state: p.city_state,
+      slug: p.city_slug,
+      status: p.city_status,
+      updated_at: now,
+    }).eq('id', p.city_id)
+    if (cityError) return NextResponse.json({ error: 'Failed to save city details.' }, { status: 500 })
+
+    const { error: zoneError } = await db.from('delivery_zones').update({
+      name: p.zone_name,
+      status: p.zone_status,
+      base_bike_fee: p.base_bike_fee_kobo,
+      base_door_fee: p.base_door_fee_kobo,
+      platform_markup: p.platform_markup_kobo,
+      rider_split: { BIKE: p.rider_cut_bike_kobo, DOOR: p.rider_cut_door_kobo },
+      platform_split: {
+        BIKE: p.base_bike_fee_kobo - p.rider_cut_bike_kobo,
+        DOOR: p.base_door_fee_kobo - p.rider_cut_door_kobo,
+      },
+      updated_at: now,
+    }).eq('id', p.zone_id)
+    if (zoneError) return NextResponse.json({ error: 'Failed to save delivery-zone details.' }, { status: 500 })
+
+    await superAudit({
+      actor_id: session.phone,
+      actor_role: session.role,
+      action: 'delivery_zone_update',
+      target_table: 'delivery_zones',
+      target_id: p.zone_id,
+      old_value: { city: oldCity ?? null, zone: oldZone ?? null },
+      new_value: p,
+      ip_address: req.headers.get('x-forwarded-for') ?? undefined,
+    })
+
+    return NextResponse.json({ success: true })
+  }
 
   const parsed = patchInput.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: 'All prices must be whole amounts in kobo (0–₦100,000).' }, { status: 400 })
+  if (!parsed.success) return NextResponse.json({ error: 'All prices must be whole amounts in kobo (0-₦100,000).' }, { status: 400 })
   const p = parsed.data
 
-  // Profitability guard: the platform must never pay a rider more than the
-  // delivery fee collected.
   if (p.rider_cut_bike_kobo > p.delivery_fee_bike_kobo) {
     return NextResponse.json({ error: "Bike rider pay can't exceed the bike delivery fee." }, { status: 400 })
   }
@@ -78,8 +228,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Door rider pay can't exceed the door delivery fee." }, { status: 400 })
   }
 
-  const db = createSupabaseAdmin()
-  const now = new Date().toISOString()
   const { data: existingRows } = await db.from('settings').select('id, value').in('id', Object.values(KEYS))
   const oldById = new Map((existingRows ?? []).map((r) => [r.id as string, r.value]))
   const oldZone = await getDeliveryZonePricing({ db })
@@ -87,7 +235,6 @@ export async function PATCH(req: NextRequest) {
   const rows = (Object.entries(KEYS) as [keyof typeof KEYS, string][]).map(([outKey, id]) => ({
     id, value: { amount_kobo: p[outKey] }, updated_by: session.phone, updated_at: now,
   }))
-
   const { error } = await db.from('settings').upsert(rows, { onConflict: 'id' })
   if (error) return NextResponse.json({ error: 'Failed to save pricing' }, { status: 500 })
 

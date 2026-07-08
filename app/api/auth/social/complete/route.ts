@@ -14,6 +14,7 @@ import { isPhoneBlocked } from '@/lib/blocklist'
 const schema = z.object({
   name: z.string().trim().min(1, 'Enter your name').max(80),
   phone: z.string().min(7).max(20),
+  default_delivery_address: z.string().trim().min(5, 'Enter your usual delivery location').max(200),
 })
 
 // GET /api/auth/social/complete
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { name, phone } = schema.parse(body)
+    const { name, phone, default_delivery_address } = schema.parse(body)
 
     let normalizedPhone: string
     try {
@@ -166,6 +167,7 @@ export async function POST(req: NextRequest) {
       .insert({
         phone: normalizedPhone,
         name,
+        default_delivery_address,
         phone_verified: verificationEnforced,
         email: emailToStore,
         email_verified: emailToStore ? pending.emailVerified : false,

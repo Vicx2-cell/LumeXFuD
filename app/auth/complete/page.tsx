@@ -13,6 +13,7 @@ export default function CompleteSignupPage() {
   const [ready, setReady] = useState(false)         // pending session confirmed?
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('+234')
+  const [defaultDeliveryAddress, setDefaultDeliveryAddress] = useState('')
   // Read the deep-link destination once, at first render (client-only) — keeps
   // it out of the effect so we don't setState synchronously in an effect body.
   const [nextPath] = useState(() => {
@@ -105,7 +106,7 @@ export default function CompleteSignupPage() {
       const res = await fetch('/api/auth/social/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone }),
+        body: JSON.stringify({ name, phone, default_delivery_address: defaultDeliveryAddress }),
       })
       const data = await res.json().catch(() => ({})) as {
         error?: string; redirect_path?: string; restart?: boolean; already_registered?: boolean
@@ -126,7 +127,7 @@ export default function CompleteSignupPage() {
   }
 
   const phoneOk = phone.length >= 13
-  const canFinish = name.trim().length > 0 && phoneOk && (!verificationRequired || phoneVerified)
+  const canFinish = name.trim().length > 0 && defaultDeliveryAddress.trim().length >= 5 && phoneOk && (!verificationRequired || phoneVerified)
 
   if (!ready) {
     return (
@@ -142,7 +143,7 @@ export default function CompleteSignupPage() {
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <h1 className="text-2xl font-semibold text-white">Almost there</h1>
           <p className="mt-2 text-sm text-white/60">
-            Add your phone number so your rider can reach you and we can send order updates.
+            Add your phone number and usual delivery location so riders can reach you without the usual back-and-forth later.
           </p>
         </div>
 
@@ -185,6 +186,17 @@ export default function CompleteSignupPage() {
                 </button>
               )}
             </div>
+          </label>
+
+          <label className="block text-sm text-white/70">
+            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Usual delivery location</span>
+            <textarea
+              value={defaultDeliveryAddress}
+              onChange={(e) => setDefaultDeliveryAddress(e.target.value)}
+              className="min-h-[96px] w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+              placeholder="Blessed Lodge, Block C, Room 12"
+              autoComplete="street-address"
+            />
           </label>
 
           {verificationRequired && codeSent && !phoneVerified && (

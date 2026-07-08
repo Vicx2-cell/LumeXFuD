@@ -13,6 +13,7 @@ import GoogleButton from '@/components/auth/GoogleButton'
 const initialForm = {
   name: '',
   phone: '+234',
+  default_delivery_address: '',
   pin: '',
   confirm_pin: '',
   question_1: '',
@@ -152,6 +153,10 @@ export default function RegisterPage() {
     }
     if (!callSame && callPhone.replace(/\D/g, '').length < 11) {
       setError('Enter a phone number for calls, or tick “Same as my WhatsApp number”.')
+      return
+    }
+    if (form.default_delivery_address.trim().length < 5) {
+      setError('Please enter your usual delivery location.')
       return
     }
     if (!agreed) {
@@ -297,6 +302,18 @@ export default function RegisterPage() {
 
           {/* Phone ownership verification — hidden when a super admin disables
               the phone_verification flag (OTP delivery down). */}
+          <label className="block text-sm text-white/70">
+            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Usual delivery location</span>
+            <span className="mb-2 block text-xs text-white/40">Required. Add the hostel, lodge, block and room you usually order to so riders can find you quickly later.</span>
+            <textarea
+              value={form.default_delivery_address}
+              onChange={(event) => handleChange('default_delivery_address', event.target.value)}
+              className="min-h-[96px] w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+              placeholder="Blessed Lodge, Block C, Room 12"
+              autoComplete="street-address"
+            />
+          </label>
+
           {verificationRequired && (phoneVerified ? (
             <div className="flex items-center gap-2 text-sm" style={{ color: '#34d399' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>

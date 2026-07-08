@@ -202,6 +202,7 @@ export const registerInput = z.object({
   name:         z.string().min(1).max(100).transform((s) => s.trim()),
   phone:        phoneField,                  // the WhatsApp / account number
   call_phone:   phoneField.optional(),       // optional separate call number
+  default_delivery_address: z.string().trim().min(5).max(200),
   pin:          pinField,
   confirm_pin:  pinField,
   question_1:   z.string().min(5).max(300),

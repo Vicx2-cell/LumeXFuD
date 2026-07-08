@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
     const insertData = {
       phone: normalizedPhone,
       name: data.name,
+      default_delivery_address: data.default_delivery_address,
       // Stamp whether the phone was actually proven. FALSE means the account was
       // created while phone_verification was off (OTP down) — flag it for
       // re-verification once OTP returns. (migration 029)

@@ -342,10 +342,45 @@ export default function VendorDashboard() {
 
         {/* Orders — FIRST on mobile, left column on desktop */}
         <div className="space-y-4 order-1 lg:order-none lg:col-start-1 lg:row-start-1">
-          {/* Shop status */}
           <p className="lx-mono px-1">Live</p>
-          <div className="lx-surface p-4 space-y-3">
-            <p className="text-sm font-semibold text-white/80">Shop status</p>
+          <div className="lx-surface p-4 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-white/85">Shift overview</p>
+                <p className="mt-1 text-xs text-white/45">Stay on top of your queue, prep load and pause state from one place.</p>
+              </div>
+              <Badge
+                color={vendor?.status === 'OPEN' ? 'var(--lx-green)' : vendor?.status === 'BUSY' ? 'var(--color-amber)' : 'rgba(255,255,255,0.45)'}
+              >
+                {vendor?.status === 'OPEN' ? '● Open' : vendor?.status === 'BUSY' ? '● Busy' : '● Closed'}
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'New', value: pendingCount, tint: 'rgba(245,166,35,0.16)', color: '#F5A623' },
+                { label: 'Preparing', value: prepCount, tint: 'rgba(96,165,250,0.14)', color: '#60a5fa' },
+                { label: 'Ready', value: readyCount, tint: 'rgba(74,222,128,0.14)', color: '#4ade80' },
+              ].map((stat) => (
+                <div key={stat.label} className="rounded-2xl border border-white/8 p-3" style={{ background: stat.tint }}>
+                  <p className="text-[11px] uppercase tracking-wide text-white/45">{stat.label}</p>
+                  <p className="mt-1 text-lg font-semibold lx-nums" style={{ color: stat.color }}>{stat.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs uppercase tracking-wide text-white/40">Order pipeline</p>
+                <span className="text-xs text-white/45 lx-nums">{pendingCount + prepCount + readyCount} active</span>
+              </div>
+              <div className="lx-pipe">
+                {pendingCount > 0 && <span style={{ flexGrow: pendingCount, background: 'var(--color-amber)' }} />}
+                {prepCount > 0 && <span style={{ flexGrow: prepCount, background: 'var(--lx-blue)' }} />}
+                {readyCount > 0 && <span style={{ flexGrow: readyCount, background: 'var(--lx-green)' }} />}
+              </div>
+            </div>
+
             {(() => {
               const opts = ['OPEN', 'BUSY', 'CLOSED'] as const
               const idx = Math.max(0, opts.indexOf((vendor?.status ?? 'OPEN') as (typeof opts)[number]))
@@ -361,21 +396,22 @@ export default function VendorDashboard() {
                 </div>
               )
             })()}
+
             <div className="relative">
               <button
                 onClick={() => setPauseMenuOpen((v) => !v)}
-                className="w-full py-2.5 rounded-xl text-sm text-white/50 border border-white/8"
+                className="w-full rounded-xl border border-white/8 py-2.5 text-sm text-white/50"
                 style={{ background: 'rgba(255,255,255,0.03)' }}
               >
                 Pause orders for…
               </button>
               {pauseMenuOpen && (
-                <div className="absolute bottom-full mb-1 left-0 right-0 rounded-2xl border border-white/10 overflow-hidden z-10" style={{ background: '#111113' }}>
+                <div className="absolute bottom-full left-0 right-0 z-10 mb-1 overflow-hidden rounded-2xl border border-white/10" style={{ background: '#111113' }}>
                   {(['15', '30', '60'] as const).map((m) => (
                     <button
                       key={m}
                       onClick={() => pause(m)}
-                      className="w-full px-4 py-3 text-sm text-left text-white/80 hover:bg-white/8"
+                      className="w-full px-4 py-3 text-left text-sm text-white/80 hover:bg-white/8"
                     >
                       {m} minutes
                     </button>
@@ -383,29 +419,12 @@ export default function VendorDashboard() {
                 </div>
               )}
             </div>
+
             {vendor?.paused_until && new Date(vendor.paused_until) > new Date() && (
-              <p className="text-xs text-amber-400 text-center">
+              <p className="text-center text-xs text-amber-400">
                 Paused until {new Date(vendor.paused_until).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}
               </p>
             )}
-          </div>
-
-          {/* Order pipeline — shape, not just counts */}
-          <div className="lx-surface p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="lx-mono">Order pipeline</p>
-              <span className="text-xs text-white/45 lx-nums">{pendingCount + prepCount + readyCount} active</span>
-            </div>
-            <div className="lx-pipe">
-              {pendingCount > 0 && <span style={{ flexGrow: pendingCount, background: 'var(--color-amber)' }} />}
-              {prepCount > 0 && <span style={{ flexGrow: prepCount, background: 'var(--lx-blue)' }} />}
-              {readyCount > 0 && <span style={{ flexGrow: readyCount, background: 'var(--lx-green)' }} />}
-            </div>
-            <div className="flex items-center gap-3.5 mt-2.5 text-[11px] text-white/50 lx-nums">
-              <span><b className="text-white/85">{pendingCount}</b> New</span>
-              <span><b className="text-white/85">{prepCount}</b> Preparing</span>
-              <span><b className="text-white/85">{readyCount}</b> Ready</span>
-            </div>
           </div>
 
         {/* Active Orders */}
