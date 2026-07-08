@@ -89,7 +89,7 @@ export async function POST(
   const now = new Date().toISOString()
   const { data: claimed } = await db
     .from('orders')
-    .update({ status: 'CANCELLED', cancelled_at: now, updated_at: now })
+    .update({ status: 'CANCELLED', order_state: 'cancelled', cancelled_at: now, updated_at: now })
     .eq('id', id)
     .eq('status', order.status)
     .select('id')

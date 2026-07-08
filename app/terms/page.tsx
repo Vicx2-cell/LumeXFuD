@@ -3,6 +3,7 @@ import { formatHoursRange } from '@/lib/hours'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { formatPrice } from '@/lib/money'
 import { SiteFooter, SUPPORT_EMAIL } from '@/components/site-footer'
+import { getMinimumOrderKobo } from '@/lib/delivery-zones'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,9 +12,7 @@ export default async function TermsPage() {
   const hoursLabel = formatHoursRange(controls.hours_open, controls.hours_close)
   // Minimum order — live from settings ({"amount_kobo": N}); never hardcoded.
   const db = createSupabaseAdmin()
-  const { data: minRow } = await db.from('settings').select('value').eq('id', 'min_order_amount').maybeSingle()
-  const minKobo = Number((minRow as { value?: { amount_kobo?: number } } | null)?.value?.amount_kobo)
-  const minOrder = Number.isFinite(minKobo) && minKobo > 0 ? minKobo : 50000
+  const minOrder = (await getMinimumOrderKobo(db)) ?? 0
   return (
     <main style={{ background: '#0A0A0B' }}>
       <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 3rem)' }}>

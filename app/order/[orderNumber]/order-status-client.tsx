@@ -215,7 +215,8 @@ export function OrderStatusClient({
     if (!order.vendors) return null
     if (['PENDING', 'VENDOR_ACCEPTED', 'PREPARING', 'READY', 'RIDER_ASSIGNED'].includes(order.status)) {
       const base = order.vendor_accepted_at ? new Date(order.vendor_accepted_at) : new Date()
-      const eta = new Date(base.getTime() + (order.vendors.prep_time_minutes + 10) * 60_000)
+      const prepMinutes = order.prep_time_minutes ?? order.vendors.prep_time_minutes
+      const eta = new Date(base.getTime() + (prepMinutes + 10) * 60_000)
       return eta.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
     }
     if (order.status === 'PICKED_UP' && order.picked_up_at) {

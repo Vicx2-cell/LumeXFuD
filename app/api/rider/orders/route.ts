@@ -14,10 +14,24 @@ export async function GET() {
 
   const { data: rider, error: re } = await db
     .from('riders')
-    .select('id, full_name, status, active_order_id, avg_rating, total_deliveries, avatar_url')
+    .select('id, full_name, status, active_order_id, avg_rating, total_deliveries, avatar_url, is_active, approval_state')
     .eq('id', session.userId!)
     .single()
   if (re || !rider) return NextResponse.json({ error: 'Rider not found' }, { status: 404 })
+  if (!rider.is_active || rider.approval_state !== 'approved') {
+    return NextResponse.json({
+      rider: {
+        id: rider.id,
+        full_name: rider.full_name,
+        status: rider.status,
+        avg_rating: rider.avg_rating,
+        total_deliveries: rider.total_deliveries,
+        avatar_url: rider.avatar_url,
+      },
+      available: [],
+      current: null,
+    })
+  }
 
   const [availableResult, currentResult] = await Promise.all([
     db.from('orders')

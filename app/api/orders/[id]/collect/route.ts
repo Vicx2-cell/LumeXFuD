@@ -10,6 +10,7 @@ import { audit } from '@/lib/audit'
 import { getFeature } from '@/lib/features'
 import { verifyHandoverCode, recordWrongHandoverAttempt, HANDOVER_ATTEMPT_LIMIT } from '@/lib/handover-code'
 import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
+import { recordSecurityEvent } from '@/lib/security-events'
 
 // POST /api/orders/[id]/collect
 // The vendor hands a pickup (order ahead) order to the customer by entering the
@@ -99,7 +100,7 @@ export async function POST(
   const now = new Date().toISOString()
   const { data: claimed } = await db
     .from('orders')
-    .update({ status: 'COMPLETED', completed_at: now, collected_at: now, handover_method: 'CODE', handover_code_hash: null, updated_at: now })
+    .update({ status: 'COMPLETED', order_state: 'delivered', completed_at: now, collected_at: now, handover_method: 'CODE', handover_code_hash: null, updated_at: now })
     .eq('id', id)
     .eq('status', 'READY')
     .select('id')
@@ -145,6 +146,28 @@ export async function POST(
     action: 'pickup_collected', target_table: 'orders', target_id: id,
     new_value: { status: 'COMPLETED', via: 'handover_code' },
     ip_address: req.headers.get('x-forwarded-for') ?? undefined,
+  })
+
+  void recordSecurityEvent({
+    eventType: 'order_handover_completed',
+    severity: 'info',
+    surface: 'orders.collect',
+    actorId: session.userId ?? null,
+    actorRole: session.role,
+    sessionId: session.sessionId,
+    ip: req.headers.get('x-forwarded-for'),
+    userAgent: req.headers.get('user-agent'),
+    detail: {
+      order_id: id,
+      order_number: order.order_number,
+      vendor_id: order.vendor_id,
+      rider_id: null,
+      from_status: 'READY',
+      to_status: 'COMPLETED',
+      status_changed_at: now,
+      delivery_type: order.delivery_type,
+      handover_method: 'CODE',
+    },
   })
 
   return NextResponse.json({ success: true, status: 'COMPLETED' })

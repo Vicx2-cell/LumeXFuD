@@ -14,7 +14,8 @@ export async function GET() {
     .from('vendors')
     .select(`
       id, shop_name, owner_name, phone, category, subscription_tier,
-      subscription_paid_until, status, is_active, avg_rating,
+      subscription_paid_until, status, is_active, approval_state,
+      id_verified, site_inspected, avg_rating,
       total_ratings, created_at, paused_until
     `)
     .is('deleted_at', null)

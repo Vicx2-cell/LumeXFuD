@@ -216,7 +216,7 @@ export default function RiderDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: next }),
       })
-      const d = await res.json().catch(() => ({})) as { error?: string }
+      const d = await res.json().catch(() => ({})) as { error?: string; code?: string }
       if (res.ok) {
         setRider((r) => r ? { ...r, status: next } : r)
         showToast(`You are now ${next.toLowerCase()}`)
@@ -261,13 +261,16 @@ export default function RiderDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       })
-      const d = await res.json().catch(() => ({})) as { error?: string }
+      const d = await res.json().catch(() => ({})) as { error?: string; code?: string }
       if (res.ok) {
         showToast(
           status === 'PICKED_UP' ? 'Marked as picked up'
           : status === 'COMPLETED' ? 'Delivery completed — you can take a new order'
           : 'Marked as delivered'
         )
+        await fetchData()
+      } else if (d.code === 'ORDER_AUTO_CANCELLED') {
+        showToast(d.error ?? 'This order was auto-cancelled before pickup.')
         await fetchData()
       } else {
         showToast(d.error ?? 'Failed to update order')

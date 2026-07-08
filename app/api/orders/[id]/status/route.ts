@@ -12,6 +12,17 @@ import { completeOrderPayout } from '@/lib/order-payout'
 import { getPickupConfig } from '@/lib/pickup'
 import { getFeature } from '@/lib/features'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { recordSecurityEvent } from '@/lib/security-events'
+import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
+import {
+  MAX_READY_EXTENSION_COUNT,
+  ORDER_AUTO_CANCELLED_CODE,
+  ORDER_AUTO_CANCELLED_MESSAGE,
+  extendPromisedReadyAt,
+  orderStateForStatus,
+  paidLiveAt,
+  promisedReadyAt,
+} from '@/lib/order-state'
 import type { OrderStatus } from '@/types'
 
 // Whitelist: [from, to, allowed roles]
@@ -74,7 +85,7 @@ export async function PATCH(
 
   const { data: order, error } = await db
     .from('orders')
-    .select('id, order_number, status, delivery_type, vendor_id, customer_id, rider_id, guest_phone, total_amount, subtotal, rider_delivery_cut, tip_amount, platform_markup, platform_delivery_cut')
+    .select('id, order_number, status, delivery_type, vendor_id, customer_id, rider_id, guest_phone, total_amount, subtotal, rider_delivery_cut, tip_amount, platform_markup, platform_delivery_cut, placed_at, pending_since, prep_time_minutes, promised_ready_at, promised_ready_extension_count')
     .eq('id', id)
     .single()
 
@@ -98,8 +109,82 @@ export async function PATCH(
   }
 
   const currentStatus = order.status as OrderStatus
+  const extensionMinutes = parsed.data.extend_ready_minutes
+
+  if (extensionMinutes !== undefined) {
+    if (!['vendor', 'admin', 'super_admin'].includes(session.role)) {
+      return NextResponse.json({ error: 'Only the vendor or staff can extend prep time' }, { status: 403 })
+    }
+    if (!['VENDOR_ACCEPTED', 'PREPARING'].includes(currentStatus)) {
+      return NextResponse.json({ error: 'Prep time can only be extended before the order is ready' }, { status: 400 })
+    }
+    const currentPromisedRaw = order.promised_ready_at as string | null
+    if (!currentPromisedRaw) {
+      return NextResponse.json({ error: 'This order does not have a promised ready time yet' }, { status: 400 })
+    }
+    const extensionCount = Number(order.promised_ready_extension_count ?? 0)
+    if (extensionCount >= MAX_READY_EXTENSION_COUNT) {
+      return NextResponse.json({ error: 'Prep time has already been extended for this order' }, { status: 409 })
+    }
+    const currentPromised = new Date(currentPromisedRaw)
+    if (Number.isNaN(currentPromised.getTime())) {
+      return NextResponse.json({ error: 'Promised ready time is invalid' }, { status: 500 })
+    }
+    const nextPromised = extendPromisedReadyAt(
+      currentPromised,
+      extensionMinutes,
+      paidLiveAt(order as { placed_at?: string | null; pending_since?: string | null }),
+    ).toISOString()
+    const now = new Date().toISOString()
+    const { data: extended } = await db
+      .from('orders')
+      .update({
+        promised_ready_at: nextPromised,
+        promised_ready_extended_at: now,
+        promised_ready_extension_count: extensionCount + 1,
+        updated_at: now,
+      })
+      .eq('id', id)
+      .eq('status', currentStatus)
+      .eq('promised_ready_extension_count', extensionCount)
+      .select('id')
+
+    if (!extended || extended.length === 0) {
+      return NextResponse.json({ error: 'Order was already updated. Refresh and try again.' }, { status: 409 })
+    }
+
+    void recordSecurityEvent({
+      eventType: 'order_status_transition',
+      severity: 'info',
+      surface: 'orders.status',
+      actorId: session.userId ?? null,
+      actorRole: session.role,
+      sessionId: session.sessionId,
+      ip: req.headers.get('x-forwarded-for'),
+      userAgent: req.headers.get('user-agent'),
+      detail: {
+        order_id: id,
+        order_number: order.order_number,
+        vendor_id: order.vendor_id,
+        rider_id: order.rider_id,
+        action: 'promised_ready_extended',
+        from_promised_ready_at: currentPromisedRaw,
+        to_promised_ready_at: nextPromised,
+        extension_minutes: extensionMinutes,
+        extension_count: extensionCount + 1,
+      },
+    })
+
+    return NextResponse.json({ success: true, promised_ready_at: nextPromised, extension_count: extensionCount + 1 })
+  }
 
   if (!isTransitionAllowed(currentStatus, newStatus, session.role)) {
+    if (session.role === 'rider' && newStatus === 'PICKED_UP' && currentStatus === 'CANCELLED') {
+      return NextResponse.json(
+        { error: ORDER_AUTO_CANCELLED_MESSAGE, code: ORDER_AUTO_CANCELLED_CODE },
+        { status: 409 },
+      )
+    }
     return NextResponse.json(
       { error: `Transition from ${currentStatus} to ${newStatus} is not allowed for role ${session.role}` },
       { status: 400 }
@@ -125,7 +210,16 @@ export async function PATCH(
     status: newStatus,
     updated_at: now,
   }
+  const orderState = orderStateForStatus(newStatus)
+  if (orderState) updateData.order_state = orderState
   if (timestampField) updateData[timestampField] = now
+  if (newStatus === 'VENDOR_ACCEPTED') {
+    updateData.promised_ready_at = promisedReadyAt(
+      new Date(now),
+      order.prep_time_minutes as number | null,
+      paidLiveAt(order as { placed_at?: string | null; pending_since?: string | null }),
+    ).toISOString()
+  }
 
   // When DELIVERED: set 15-min auto-complete window
   if (newStatus === 'DELIVERED') {
@@ -142,7 +236,23 @@ export async function PATCH(
     updateData.rider_payment_status = 'HELD'
   }
 
-  await db.from('orders').update(updateData).eq('id', id)
+  const { data: updatedRows } = await db
+    .from('orders')
+    .update(updateData)
+    .eq('id', id)
+    .eq('status', currentStatus)
+    .select('id')
+
+  if (!updatedRows || updatedRows.length === 0) {
+    const { data: latest } = await db.from('orders').select('status').eq('id', id).maybeSingle()
+    if (session.role === 'rider' && newStatus === 'PICKED_UP' && latest?.status === 'CANCELLED') {
+      return NextResponse.json(
+        { error: ORDER_AUTO_CANCELLED_MESSAGE, code: ORDER_AUTO_CANCELLED_CODE },
+        { status: 409 },
+      )
+    }
+    return NextResponse.json({ error: 'Order was already updated. Refresh and try again.' }, { status: 409 })
+  }
 
   // On completion: record platform earnings, credit the vendor + rider wallets,
   // and free the rider for their next order. This used to be done only by the
@@ -179,6 +289,33 @@ export async function PATCH(
     new_value: { status: newStatus },
     ip_address: req.headers.get('x-forwarded-for') ?? undefined,
   })
+
+  void recordSecurityEvent({
+    eventType: 'order_status_transition',
+    severity: 'info',
+    surface: 'orders.status',
+    actorId: session.userId ?? null,
+    actorRole: session.role,
+    sessionId: session.sessionId,
+    ip: req.headers.get('x-forwarded-for'),
+    userAgent: req.headers.get('user-agent'),
+    detail: {
+      order_id: id,
+      order_number: order.order_number,
+      vendor_id: order.vendor_id,
+      rider_id: order.rider_id,
+      from_status: currentStatus,
+      to_status: newStatus,
+      status_changed_at: now,
+      delivery_type: order.delivery_type,
+    },
+  })
+
+  if (newStatus === 'DELIVERED' || newStatus === 'COMPLETED') {
+    void maybeApplyLateDeliveryCredit(id).catch((err) => {
+      console.error('[orders.status] late delivery credit failed:', err)
+    })
+  }
 
   return NextResponse.json({ success: true, status: newStatus })
 }

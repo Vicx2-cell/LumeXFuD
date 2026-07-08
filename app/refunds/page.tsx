@@ -1,6 +1,7 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { formatPrice } from '@/lib/money'
 import { SiteFooter, SUPPORT_EMAIL } from '@/components/site-footer'
+import { getDeliveryZonePricing, getMinimumOrderKobo } from '@/lib/delivery-zones'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,23 +11,11 @@ export const dynamic = 'force-dynamic'
 // and shows the live fees so pricing is transparent without logging in.
 export default async function RefundsPage() {
   const db = createSupabaseAdmin()
-  // Live fees from the settings table — id-keyed JSONB shaped {"amount_kobo": N},
-  // the SAME source the cart + the authoritative checkout calc use. A super-admin
-  // price change here is reflected on this page immediately (no hardcoded prices).
-  const { data } = await db.from('settings').select('id, value')
-    .in('id', ['platform_markup', 'delivery_fee_bike', 'delivery_fee_door', 'min_order_amount'])
-  const priceMap = new Map<string, number>()
-  for (const row of (data ?? []) as Array<{ id: string; value: { amount_kobo?: number } }>) {
-    priceMap.set(row.id, Number(row.value?.amount_kobo))
-  }
-  const kobo = (id: string, fallback: number) => {
-    const n = priceMap.get(id)
-    return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : fallback
-  }
-  const platform = kobo('platform_markup', 25000)
-  const bike = kobo('delivery_fee_bike', 50000)
-  const door = kobo('delivery_fee_door', 100000)
-  const minOrder = kobo('min_order_amount', 50000)
+  const pricing = await getDeliveryZonePricing({ db })
+  const minOrder = (await getMinimumOrderKobo(db)) ?? 0
+  const platform = pricing?.platformMarkup ?? 0
+  const bike = pricing?.bikeFee ?? 0
+  const door = pricing?.doorFee ?? 0
 
   return (
     <main style={{ background: '#0A0A0B' }}>

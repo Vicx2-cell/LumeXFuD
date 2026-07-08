@@ -6,7 +6,7 @@ import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 
 const updateInput = z.object({
-  action: z.enum(['approve', 'suspend', 'unsuspend']),
+  action: z.enum(['approve', 'reject', 'suspend', 'unsuspend']),
   reason: z.string().max(500).optional(),
 })
 
@@ -33,7 +33,7 @@ export async function PATCH(
   const db = createSupabaseAdmin()
   const { data: vendor } = await db
     .from('vendors')
-    .select('id, shop_name, is_active')
+    .select('id, shop_name, is_active, approval_state')
     .eq('id', id)
     .single()
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
@@ -43,12 +43,22 @@ export async function PATCH(
 
   if (parsed.data.action === 'approve') {
     updates.is_active = true
+    updates.approval_state = 'approved'
+    updates.id_verified = true
+    updates.site_inspected = true
     updates.approved_at = now
     updates.approved_by = session.phone
+  } else if (parsed.data.action === 'reject') {
+    updates.is_active = false
+    updates.status = 'CLOSED'
+    updates.approval_state = 'rejected'
   } else if (parsed.data.action === 'suspend') {
     updates.is_active = false
     updates.status = 'CLOSED'
   } else {
+    if (vendor.approval_state !== 'approved') {
+      return NextResponse.json({ error: 'Approve this vendor before unsuspending.' }, { status: 409 })
+    }
     updates.is_active = true
     updates.status = 'OPEN'
   }

@@ -46,6 +46,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'super-admin/revoke-sessions', 'super-admin/rewards', 'super-admin/security-health',
     'super-admin/sentinel', 'super-admin/settings', 'super-admin/super-audit',
     'super-admin/team/create', 'super-admin/users/[id]/force-reset-pin', 'super-admin/withdraw',
+    'admin/whatsapp',
   ], role(SUPER)),
 
   // ── admin + super_admin ──
@@ -84,7 +85,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   // ── vendor + admin + super ──
   ...map([
     'vendor/orders', 'vendors/[id]/status', 'vendors/[id]/pause', 'vendors/[id]/hours',
-    'vendors/[id]/pickup-settings', 'orders/[id]/collect',
+    'vendors/[id]/pickup-settings', 'vendors/[id]/location', 'orders/[id]/collect',
   ], role(VAS)),
 
   // ── rider + admin + super ──
@@ -101,7 +102,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'group-order/create', 'group-order/mine',
     'orders', 'orders/[id]/cancel', 'orders/[id]/reorder', 'orders/[id]/handover-code',
     'orders/[id]/status', 'rewards', 'rewards/surprise/[id]/open', 'streak/nudge',
-    'lumi/badge', 'lumi/memory', 'chow-ai', 'push/subscribe', 'notifications',
+    'lumi', 'lumi/confirm', 'lumi/badge', 'lumi/memory', 'chow-ai', 'push/subscribe', 'notifications',
     'study/ingest', 'sponsor-wallet/topup', 'sponsor-wallet/receipt', 'launch-counter',
   ], { kind: 'self' }),
 
@@ -126,6 +127,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
 
   // ── webhook (HMAC) ──
   'paystack/webhook': { kind: 'webhook' },
+  'whatsapp': { kind: 'webhook' },
 
   // ── public read (unauthenticated) ──
   ...map(['announcement', 'features', 'vendors', 'vendors/[id]', 'lodges', 'settings/fees'],

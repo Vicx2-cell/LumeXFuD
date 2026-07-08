@@ -124,9 +124,9 @@ export default function CartPage() {
   const isPickup        = deliveryType === 'PICKUP'
   // Fold the structured parts into one rider-clear line ("Lodge · Block B · Room 12 · landmark").
   const composedAddress = isPickup ? '' : composeDeliveryAddress(deliveryType as 'BIKE' | 'DOOR', addr)
-  const deliveryFees    = fees ? { BIKE: fees.bike, DOOR: fees.door } : { BIKE: 50000, DOOR: 100000 }
+  const deliveryFees    = fees ? { BIKE: fees.bike, DOOR: fees.door } : { BIKE: 0, DOOR: 0 }
   // Pickup charges the SAME platform fee as delivery — just ₦0 delivery, no tip.
-  const platformMarkup  = fees?.markup ?? 25000
+  const platformMarkup  = fees?.markup ?? 0
   const deliveryFee     = isPickup ? 0 : deliveryFees[deliveryType as 'BIKE' | 'DOOR']
   const tipApplied      = isPickup ? 0 : tip
   const total           = subtotal + platformMarkup + deliveryFee + tipApplied

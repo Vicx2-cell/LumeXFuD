@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
         // Claim then refund (optimistic lock keeps refund at-most-once).
         const { data: claimed } = await db
           .from('orders')
-          .update({ status: 'CANCELLED', cancelled_at: nowIso, updated_at: nowIso })
+          .update({ status: 'CANCELLED', order_state: 'cancelled', cancelled_at: nowIso, updated_at: nowIso })
           .eq('id', order.id)
           .eq('status', 'SCHEDULED')
           .select('id')
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       // Hand to the vendor: SCHEDULED → PENDING, start the accept clock.
       const { data: promoted } = await db
         .from('orders')
-        .update({ status: 'PENDING', pending_since: nowIso, updated_at: nowIso })
+        .update({ status: 'PENDING', pending_since: nowIso, placed_at: nowIso, order_state: 'placed', updated_at: nowIso })
         .eq('id', order.id)
         .eq('status', 'SCHEDULED')
         .select('id')

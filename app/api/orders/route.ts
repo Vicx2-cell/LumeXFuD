@@ -17,12 +17,9 @@ import { getControls, withinHours } from '@/lib/controls'
 import { computePickupEta, countActivePickups } from '@/lib/pickup'
 import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
 import { anyRewardFeatureOn } from '@/lib/rewards'
-
-// Allowed delivery types from settings
-const DELIVERY_FEES: Record<string, number> = {
-  BIKE: 50000, // ₦500 in kobo — overridden from settings table
-  DOOR: 100000, // ₦1,000 in kobo
-}
+import { getDeliveryZonePricing, getMinimumOrderKobo } from '@/lib/delivery-zones'
+import { estimateOrderPrepMinutes } from '@/lib/prep-time'
+import { getBusyModeThrottle } from '@/lib/busy-mode'
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
@@ -96,7 +93,7 @@ export async function POST(req: NextRequest) {
   // Validate vendor
   const { data: vendor, error: vendorError } = await db
     .from('vendors')
-    .select('id, shop_name, status, is_active, subscription_paid_until, prep_time_minutes, pickup_enabled, pickup_max_concurrent')
+    .select('id, shop_name, status, is_active, approval_state, subscription_paid_until, prep_time_minutes, pickup_enabled, pickup_max_concurrent, city_id, zone_id')
     .eq('id', vendor_id)
     .is('deleted_at', null)
     .single()
@@ -106,6 +103,9 @@ export async function POST(req: NextRequest) {
   }
   if (!vendor.is_active) {
     return NextResponse.json({ error: 'Vendor is not active' }, { status: 400 })
+  }
+  if (vendor.approval_state !== 'approved') {
+    return NextResponse.json({ error: 'Vendor is pending review' }, { status: 400 })
   }
   // A currently-CLOSED vendor can still take a SCHEDULED order for later.
   if (vendor.status === 'CLOSED' && !isScheduled) {
@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
   const itemIds = items.map((i) => i.menu_item_id)
   const { data: menuItems, error: menuError } = await db
     .from('menu_items')
-    .select('id, name, price_kobo, is_available, daily_limit, sold_today')
+    .select('id, name, price_kobo, is_available, daily_limit, sold_today, prep_time_minutes')
     .in('id', itemIds)
     .eq('vendor_id', vendor_id)
     .is('deleted_at', null)
@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'One or more items are invalid or do not belong to this vendor' }, { status: 400 })
   }
 
-  const itemMap = new Map(menuItems.map((m: { id: string; name: string; price_kobo: number; is_available: boolean; daily_limit: number | null; sold_today: number }) => [m.id, m]))
+  const itemMap = new Map(menuItems.map((m: { id: string; name: string; price_kobo: number; is_available: boolean; daily_limit: number | null; sold_today: number; prep_time_minutes: number | null }) => [m.id, m]))
   for (const item of items) {
     const menuItem = itemMap.get(item.menu_item_id)
     if (!menuItem) return NextResponse.json({ error: `Item ${item.menu_item_id} not found` }, { status: 400 })
@@ -207,41 +207,27 @@ export async function POST(req: NextRequest) {
   }
 
   // SERVER-SIDE price calculation — never trust client (rule #4 + #17).
-  // Pricing lives in the settings table as id-keyed JSONB rows seeded in 010,
-  // each money row shaped {"amount_kobo": N}. The hardcoded numbers below are
-  // defensive fallbacks only — the DB rows are the source of truth.
-  const PRICING_IDS = [
-    'platform_markup', 'delivery_fee_bike', 'delivery_fee_door',
-    'rider_delivery_cut_bike', 'rider_delivery_cut_door', 'min_order_amount',
-    'reward_min_profit_kobo',
-  ]
-  const { data: settingsRows } = await db
-    .from('settings')
-    .select('id, value')
-    .in('id', PRICING_IDS)
-
-  const priceMap = new Map<string, number>()
-  for (const row of (settingsRows ?? []) as Array<{ id: string; value: { amount_kobo?: number } }>) {
-    priceMap.set(row.id, Number(row.value?.amount_kobo))
-  }
-  const kobo = (id: string, fallback: number): number => {
-    const v = priceMap.get(id)
-    return v !== undefined && Number.isFinite(v) ? v : fallback
+  // Delivery/platform fees now come from the vendor's delivery zone. During
+  // rollout, the helper can fall back to existing settings rows if the migration
+  // is not present yet; there are no hardcoded fee fallbacks in this route.
+  const zonePricing = await getDeliveryZonePricing({ db, vendorId: vendor_id, zoneId: (vendor as { zone_id?: string | null }).zone_id ?? null })
+  if (!zonePricing) {
+    return NextResponse.json({ error: 'Delivery pricing is not configured' }, { status: 503 })
   }
 
   // PICKUP charges the SAME platform fee as delivery (platform_markup); delivery
   // is ₦0 and there's no rider/tip. Keeping it in platform_markup means the
   // existing earnings + payout code (platform_markup → platform, subtotal →
   // vendor) works unchanged.
-  const platformMarkup: number = kobo('platform_markup', 25000) // ₦250 in kobo
-  const bikeFee: number = kobo('delivery_fee_bike', DELIVERY_FEES.BIKE)
-  const doorFee: number = kobo('delivery_fee_door', DELIVERY_FEES.DOOR)
+  const platformMarkup: number = zonePricing.platformMarkup
+  const bikeFee: number = zonePricing.bikeFee
+  const doorFee: number = zonePricing.doorFee
   const deliveryFee: number = isPickup ? 0 : delivery_type === 'BIKE' ? bikeFee : doorFee
   const riderCut: number = isPickup
     ? 0
     : delivery_type === 'BIKE'
-      ? kobo('rider_delivery_cut_bike', 40000)
-      : kobo('rider_delivery_cut_door', 80000)
+      ? zonePricing.riderCutBike
+      : zonePricing.riderCutDoor
   const platformDeliveryCut: number = deliveryFee - riderCut
   const tipKobo: number = isPickup ? 0 : Math.max(0, Math.min(tip_amount ?? 0, 50000))
 
@@ -252,7 +238,10 @@ export async function POST(req: NextRequest) {
     subtotal += (menuItem.price_kobo + addonKobo) * item.quantity
   })
 
-  const minimumOrder = kobo('min_order_amount', 50000) // ₦500
+  const minimumOrder = await getMinimumOrderKobo(db)
+  if (minimumOrder === null) {
+    return NextResponse.json({ error: 'Minimum order is not configured' }, { status: 503 })
+  }
   if (subtotal < minimumOrder) {
     return NextResponse.json(
       { error: `Minimum order is ₦${minimumOrder / 100}` },
@@ -261,6 +250,13 @@ export async function POST(req: NextRequest) {
   }
 
   const totalAmount = subtotal + platformMarkup + deliveryFee + tipKobo
+
+  const basePrepMinutes = estimateOrderPrepMinutes(
+    items.map((item) => ({ prepTimeMinutes: itemMap.get(item.menu_item_id)?.prep_time_minutes ?? null })),
+    (vendor.prep_time_minutes as number) ?? 25,
+  )
+  const busyThrottle = await getBusyModeThrottle(db, vendor_id)
+  const prepMinutes = basePrepMinutes + busyThrottle.appliedBufferMinutes
 
   // ── Pickup specifics: synthetic address, pacing-aware ETA ───────────────────
   // The handover code is NOT created here. It is a HASHED, owner-pull secret
@@ -272,7 +268,7 @@ export async function POST(req: NextRequest) {
     const activeCount = await countActivePickups(db, vendor_id)
     const eta = computePickupEta(
       new Date(),
-      (vendor.prep_time_minutes as number) ?? 20,
+      prepMinutes,
       activeCount,
       (vendor.pickup_max_concurrent as number) ?? 0,
     )
@@ -351,7 +347,10 @@ export async function POST(req: NextRequest) {
     order_number: orderNumber,
     customer_id: customerId,
     vendor_id,
+    city_id: zonePricing.cityId ?? (vendor as { city_id?: string | null }).city_id ?? null,
+    zone_id: zonePricing.zoneId ?? (vendor as { zone_id?: string | null }).zone_id ?? null,
     status: 'PENDING_PAYMENT',
+    order_state: null,
     delivery_type,
     delivery_address: resolvedAddress,
     delivery_instructions: delivery_instructions ?? null,
@@ -370,6 +369,8 @@ export async function POST(req: NextRequest) {
     idempotency_key: idempotencyKey,
     payment_status: 'PENDING',
     rider_payment_status: 'PENDING',
+    prep_time_minutes: prepMinutes,
+    busy_prep_buffer_minutes: busyThrottle.appliedBufferMinutes,
     scheduled_for: scheduledForIso,
     scheduled_release_at: scheduledReleaseIso,
   }
@@ -458,7 +459,9 @@ export async function POST(req: NextRequest) {
     // Our margin = our markup + OUR share of the delivery fee (the rider's cut is
     // never touched). A bigger credit just spreads across future orders — each one
     // still keeps ≥ the floor. Floor is live-tunable via reward_min_profit_kobo.
-    const minProfit = kobo('reward_min_profit_kobo', 25000) // ₦250 floor
+    const { data: minProfitRow } = await db.from('settings').select('value').eq('id', 'reward_min_profit_kobo').maybeSingle()
+    const minProfitValue = Number((minProfitRow as { value?: { amount_kobo?: number } } | null)?.value?.amount_kobo)
+    const minProfit = Number.isFinite(minProfitValue) && minProfitValue >= 0 ? minProfitValue : platformMarkup
     const platformMargin = platformMarkup + platformDeliveryCut
     const cap = Math.max(0, platformMargin - minProfit)
     try {
@@ -650,7 +653,7 @@ export async function POST(req: NextRequest) {
       wallet_amount_kobo: totalAmount,
       payment_status: 'PAID',
       status: isScheduled ? 'SCHEDULED' : 'PENDING',
-      ...(isScheduled ? {} : { pending_since: now }),
+      ...(isScheduled ? {} : { pending_since: now, placed_at: now, order_state: 'placed' }),
       updated_at: now,
     }).eq('id', order.id).eq('payment_status', 'PENDING')
 
@@ -698,7 +701,7 @@ export async function POST(req: NextRequest) {
       .update(
         isScheduled
           ? { payment_status: 'PAID', status: 'SCHEDULED', updated_at: now }
-          : { payment_status: 'PAID', status: 'PENDING', pending_since: now, updated_at: now },
+          : { payment_status: 'PAID', status: 'PENDING', pending_since: now, placed_at: now, order_state: 'placed', updated_at: now },
       )
       .eq('id', order.id)
       .eq('payment_status', 'PENDING')

@@ -11,6 +11,7 @@ const VALID_TYPES = [
   'RIDER_BONUS_COST',
   'TOPUP_BONUS_COST',
   'REFUND_COST',
+  'LATE_DELIVERY_CREDIT_COST',
 ] as const
 
 const querySchema = z.object({

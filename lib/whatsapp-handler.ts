@@ -8,6 +8,7 @@ import { askLlama, isLlamaConfigured } from './llm'
 import { kbSystemPrompt, isEscalation } from './whatsapp-kb'
 import { composeDeliveryAddress } from './delivery-address'
 import { sendText, sendButtons, sendList, type WARow } from './whatsapp'
+import { getDeliveryZonePricing, getMinimumOrderKobo } from './delivery-zones'
 
 // ─── The WhatsApp bot "brain" ────────────────────────────────────────────────
 // Per inbound message:
@@ -172,28 +173,25 @@ async function outList(db: DB, to: string, body: string, label: string, rows: WA
 }
 
 // ─── Pricing (from settings, with locked-default fallbacks) ───────────────────
-async function loadPricing(db: DB) {
-  const ids = ['platform_markup', 'delivery_fee_bike', 'delivery_fee_door', 'rider_delivery_cut_bike', 'rider_delivery_cut_door', 'min_order_amount']
-  const { data } = await db.from('settings').select('id, value').in('id', ids)
-  const map = new Map<string, number>()
-  for (const r of (data ?? []) as Array<{ id: string; value: { amount_kobo?: number } }>) {
-    const n = Number(r.value?.amount_kobo)
-    if (Number.isFinite(n)) map.set(r.id, n)
-  }
-  const kobo = (id: string, fb: number) => map.get(id) ?? fb
+async function loadPricing(vendorId?: string | null) {
+  const [zone, minOrder] = await Promise.all([
+    getDeliveryZonePricing({ vendorId: vendorId ?? null }),
+    getMinimumOrderKobo(),
+  ])
+  if (!zone || minOrder === null) return null
   return {
-    platformMarkup: kobo('platform_markup', 25000),
-    bikeFee: kobo('delivery_fee_bike', 50000),
-    doorFee: kobo('delivery_fee_door', 100000),
-    riderCutBike: kobo('rider_delivery_cut_bike', 40000),
-    riderCutDoor: kobo('rider_delivery_cut_door', 80000),
-    minOrder: kobo('min_order_amount', 50000),
+    platformMarkup: zone.platformMarkup,
+    bikeFee: zone.bikeFee,
+    doorFee: zone.doorFee,
+    riderCutBike: zone.riderCutBike,
+    riderCutDoor: zone.riderCutDoor,
+    minOrder,
   }
 }
 
 const naira = (kobo: number) => `₦${(kobo / 100).toLocaleString('en-NG')}`
 
-function feesText(p: Awaited<ReturnType<typeof loadPricing>>): string {
+function feesText(p: NonNullable<Awaited<ReturnType<typeof loadPricing>>>): string {
   return [
     `- Platform service fee: ${naira(p.platformMarkup)} per order`,
     `- Bike delivery: ${naira(p.bikeFee)}`,
@@ -303,7 +301,8 @@ async function resetToMenu(db: DB, phone: string, role: Role): Promise<void> {
 // ─── Grounded AI: staff FAQ + customer Q&A ───────────────────────────────────
 async function answerWithAI(db: DB, phone: string, audience: Role, input: string): Promise<'answered' | 'escalate'> {
   if (!isLlamaConfigured() || audience === 'unknown' || !input) return 'escalate'
-  const p = await loadPricing(db)
+  const p = await loadPricing()
+  if (!p) return 'escalate'
   try {
     const answer = await askLlama([
       { role: 'system', content: kbSystemPrompt(audience, feesText(p)) },
@@ -674,7 +673,11 @@ async function askDeliveryType(db: DB, phone: string, conv: Conversation): Promi
     await outText(db, phone, 'Your cart is empty. Add an item first.')
     return showMenu(db, phone, conv)
   }
-  const p = await loadPricing(db)
+  const p = await loadPricing(conv.cart.vendor_id ?? null)
+  if (!p) {
+    await outText(db, phone, 'Delivery pricing is not configured for this vendor yet. Please try another vendor or talk to a human.')
+    return
+  }
   await patchConversation(db, phone, { state: 'CHOOSE_DELIVERY' })
   await outButtons(db, phone, 'How should we deliver your order?', [
     { id: 'dt:BIKE', title: `🏍️ Bike ${naira(p.bikeFee)}` },
@@ -694,7 +697,11 @@ async function reviewOrder(db: DB, phone: string, conv: Conversation): Promise<v
     await outText(db, phone, 'I didn’t catch your address. Let’s set it again.')
     return startAddressCapture(db, phone, cart, 'order')
   }
-  const p = await loadPricing(db)
+  const p = await loadPricing(cart.vendor_id ?? null)
+  if (!p) {
+    await outText(db, phone, 'Delivery pricing is not configured for this vendor yet. Please try another vendor or talk to a human.')
+    return showMenu(db, phone, conv)
+  }
   const subtotal = cart.items.reduce((s, i) => s + i.price_kobo * i.qty, 0)
   if (subtotal < p.minOrder) {
     await outText(db, phone, `Minimum order is ${naira(p.minOrder)}. Please add a bit more.`)
@@ -809,7 +816,11 @@ async function placeOrder(db: DB, phone: string, conv: Conversation, waMessageId
     }
   }
 
-  const p = await loadPricing(db)
+  const p = await loadPricing(cart.vendor_id ?? null)
+  if (!p) {
+    await outText(db, phone, 'Delivery pricing is not configured for this vendor yet. Please try another vendor or talk to a human.')
+    return resetToMenu(db, phone, 'customer')
+  }
   const subtotal = cart.items.reduce((s, i) => s + menuMap.get(i.menu_item_id)!.price_kobo * i.qty, 0)
   if (subtotal < p.minOrder) {
     await outText(db, phone, `Minimum order is ${naira(p.minOrder)}. Please add more.`)

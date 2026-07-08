@@ -24,7 +24,7 @@ export async function POST(
   const db = createSupabaseAdmin()
   const { data: rider } = await db
     .from('riders')
-    .select('id, active_order_id')
+    .select('id, active_order_id, is_active, approval_state')
     .eq('id', id)
     .is('deleted_at', null)
     .single()
@@ -48,6 +48,9 @@ export async function POST(
   // Mandatory verified bank before a rider can go ONLINE (admins/super-admins exempt).
   if (parsed.data.status === 'ONLINE' && session.role === 'rider' && !(await isBankVerified(id, 'RIDER'))) {
     return NextResponse.json({ error: BANK_GATE_MESSAGE, code: 'BANK_REQUIRED' }, { status: 403 })
+  }
+  if (parsed.data.status === 'ONLINE' && (!rider.is_active || rider.approval_state !== 'approved')) {
+    return NextResponse.json({ error: 'Rider account is not approved for live orders' }, { status: 403 })
   }
 
   await db.from('riders').update({

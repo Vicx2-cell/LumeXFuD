@@ -5,6 +5,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 import { isBankVerified, BANK_GATE_MESSAGE } from '@/lib/wallet'
+import { recordSecurityEvent } from '@/lib/security-events'
 
 const acceptInput = z.object({ order_id: z.string().uuid() })
 
@@ -25,7 +26,7 @@ export async function POST(
   const db = createSupabaseAdmin()
   const { data: rider } = await db
     .from('riders')
-    .select('id, status, active_order_id, is_active')
+    .select('id, status, active_order_id, is_active, approval_state')
     .eq('id', id)
     .is('deleted_at', null)
     .single()
@@ -35,6 +36,7 @@ export async function POST(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
   if (!rider.is_active) return NextResponse.json({ error: 'Rider account is inactive' }, { status: 403 })
+  if (rider.approval_state !== 'approved') return NextResponse.json({ error: 'Rider account is pending review' }, { status: 403 })
   // Mandatory verified bank before a rider can earn (admins/super-admins exempt).
   if (session.role === 'rider' && !(await isBankVerified(id, 'RIDER'))) {
     return NextResponse.json({ error: BANK_GATE_MESSAGE, code: 'BANK_REQUIRED' }, { status: 403 })
@@ -60,13 +62,14 @@ export async function POST(
     .update({
       rider_id: id,
       status: 'RIDER_ASSIGNED',
+      order_state: 'ready_for_pickup',
       rider_assigned_at: now,
       updated_at: now,
     })
     .eq('id', parsed.data.order_id)
     .eq('status', 'READY')
     .is('rider_id', null)
-    .select('id, order_number')
+    .select('id, order_number, vendor_id')
     .single()
 
   if (error || !updated) {
@@ -86,6 +89,26 @@ export async function POST(
     target_table: 'orders',
     target_id: parsed.data.order_id,
     new_value: { rider_id: id, status: 'RIDER_ASSIGNED' },
+  })
+
+  void recordSecurityEvent({
+    eventType: 'rider_order_accepted',
+    severity: 'info',
+    surface: 'riders.accept',
+    actorId: session.userId ?? null,
+    actorRole: session.role,
+    sessionId: session.sessionId,
+    ip: req.headers.get('x-forwarded-for'),
+    userAgent: req.headers.get('user-agent'),
+    detail: {
+      order_id: parsed.data.order_id,
+      order_number: updated.order_number,
+      vendor_id: updated.vendor_id,
+      rider_id: id,
+      from_status: 'READY',
+      to_status: 'RIDER_ASSIGNED',
+      status_changed_at: now,
+    },
   })
 
   return NextResponse.json({ success: true, order_number: updated.order_number })

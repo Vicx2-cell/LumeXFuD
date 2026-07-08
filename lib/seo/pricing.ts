@@ -1,4 +1,5 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { getDeliveryZonePricing, getMinimumOrderKobo } from '@/lib/delivery-zones'
 
 // Platform fees for "honest, all-in" pricing on the public pages. Read LIVE from
 // the settings table — NEVER hardcoded (CLAUDE.md rule 17). Falls back to the
@@ -12,38 +13,20 @@ export interface PlatformFees {
   minOrderKobo: number
 }
 
-// Seeded defaults (kobo) — mirror migration 010_seed_settings.sql.
-const FALLBACK: PlatformFees = {
-  platformMarkupKobo: 25000,  // ₦250
-  bikeFeeKobo: 50000,         // ₦500
-  doorFeeKobo: 100000,        // ₦1,000
-  minOrderKobo: 50000,        // ₦500
-}
-
-function amount(value: unknown, fallback: number): number {
-  if (value && typeof value === 'object' && 'amount_kobo' in value) {
-    const n = Number((value as { amount_kobo: unknown }).amount_kobo)
-    if (Number.isFinite(n) && n >= 0) return n
-  }
-  return fallback
-}
-
 export async function getPlatformFees(): Promise<PlatformFees> {
   try {
     const db = createSupabaseAdmin()
-    const { data } = await db
-      .from('settings')
-      .select('id, value')
-      .in('id', ['platform_markup', 'delivery_fee_bike', 'delivery_fee_door', 'min_order_amount'])
-    const map = new Map<string, unknown>((data ?? []).map((r) => [r.id as string, r.value]))
+    const pricing = await getDeliveryZonePricing({ db })
+    const minOrder = await getMinimumOrderKobo(db)
+    if (!pricing || minOrder === null) throw new Error('Pricing unavailable')
     return {
-      platformMarkupKobo: amount(map.get('platform_markup'), FALLBACK.platformMarkupKobo),
-      bikeFeeKobo: amount(map.get('delivery_fee_bike'), FALLBACK.bikeFeeKobo),
-      doorFeeKobo: amount(map.get('delivery_fee_door'), FALLBACK.doorFeeKobo),
-      minOrderKobo: amount(map.get('min_order_amount'), FALLBACK.minOrderKobo),
+      platformMarkupKobo: pricing.platformMarkup,
+      bikeFeeKobo: pricing.bikeFee,
+      doorFeeKobo: pricing.doorFee,
+      minOrderKobo: minOrder,
     }
   } catch {
-    return { ...FALLBACK }
+    return { platformMarkupKobo: 0, bikeFeeKobo: 0, doorFeeKobo: 0, minOrderKobo: 0 }
   }
 }
 

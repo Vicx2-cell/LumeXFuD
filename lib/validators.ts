@@ -68,6 +68,7 @@ export const orderStatusInput = z.object({
     'VENDOR_ACCEPTED', 'PREPARING', 'READY', 'RIDER_ASSIGNED',
     'PICKED_UP', 'DELIVERED', 'COMPLETED', 'CANCELLED',
   ]),
+  extend_ready_minutes: z.number().int().min(1).max(120).optional(),
 })
 
 export const disputeInput = z.object({
@@ -299,6 +300,7 @@ export const vendorLocationInput = z.object({
 // ─── Vendor menu ────────────────────────────────────────────────────────────────
 
 export const MENU_CATEGORIES = ['RICE', 'PROTEIN', 'DRINKS', 'SNACKS', 'OTHER'] as const
+export const MERCHANT_CATEGORIES = ['restaurant', 'supermarket', 'pharmacy'] as const
 
 // Add-on prices are entered in naira by the vendor; converted to kobo server-side.
 export const menuAddonInput = z.object({
@@ -315,6 +317,8 @@ export const createMenuItemInput = z.object({
   is_available: z.boolean().optional().default(true),
   // Per-dish prep time (minutes). Omit/null = use the vendor's base prep time.
   prep_time_minutes: z.number().int().min(1).max(180).nullable().optional(),
+  // Pharmacy-specific; harmless/default false for restaurants and supermarkets.
+  prescription_required: z.boolean().optional().default(false),
   addons:       z.array(menuAddonInput).max(20).optional().default([]),
 })
 
@@ -329,6 +333,7 @@ export const updateMenuItemInput = z.object({
   // restore time is computed server-side (never trust the client clock).
   sold_out_today: z.boolean().optional(),
   prep_time_minutes: z.number().int().min(1).max(180).nullable().optional(),
+  prescription_required: z.boolean().optional(),
   // When present, replaces the item's whole add-on list.
   addons:       z.array(menuAddonInput).max(20).optional(),
 })

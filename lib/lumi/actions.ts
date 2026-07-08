@@ -57,7 +57,13 @@ export async function handleCancelOrder(userId: string, entities: Entities): Pro
   if (!orderNumber) return { text: 'Which order would you like to cancel?', quickReplies: ['Cancel my last order'] }
   const db = createSupabaseAdmin()
   // Reuse existing cancellation API where possible (orders table update + business rules)
-  const { error } = await db.rpc('cancel_order_by_number', { _order_number: orderNumber, _requester_id: userId }).catch(() => ({ error: { message: 'failed' } }))
+  let error: { message?: string } | null = null
+  try {
+    const result = await db.rpc('cancel_order_by_number', { _order_number: orderNumber, _requester_id: userId })
+    error = result.error
+  } catch {
+    error = { message: 'failed' }
+  }
   if (error) return templates.cancelOrder(false)
   return templates.cancelOrder(true)
 }

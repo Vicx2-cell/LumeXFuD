@@ -66,6 +66,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (parsed.is_available === true) updates.sold_out_until = null
   }
   if (parsed.prep_time_minutes !== undefined) updates.prep_time_minutes = parsed.prep_time_minutes
+  if (parsed.prescription_required !== undefined) updates.prescription_required = parsed.prescription_required
   if (parsed.price_naira !== undefined) {
     const kobo = toKobo(parsed.price_naira)
     updates.price_kobo = kobo

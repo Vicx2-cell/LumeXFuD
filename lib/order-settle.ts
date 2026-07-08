@@ -43,7 +43,7 @@ export async function settleOrderIfDue(order: SettleableOrder): Promise<string |
   // refund below runs exactly once even if this races the cron or another tab.
   const { data: claimed } = await db
     .from('orders')
-    .update({ status: 'CANCELLED', cancelled_at: now, updated_at: now })
+    .update({ status: 'CANCELLED', order_state: 'cancelled', auto_cancel_reason: 'vendor_no_accept', cancelled_at: now, updated_at: now })
     .eq('id', order.id)
     .eq('status', 'PENDING')
     .select('id')

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { getDeliveryZonePricing, getMinimumOrderKobo } from '@/lib/delivery-zones'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { trackFeature } from '@/lib/usage'
 import { toKobo } from '@/lib/money'
@@ -218,29 +219,16 @@ interface OrderDraft {
   total_kobo: number
 }
 
-// Reads the same id-keyed settings rows that POST /api/orders uses (shape
-// {"amount_kobo": N}), with identical defensive fallbacks. The DB rows are the
-// source of truth; the numbers here are only a fallback when a row is missing.
 async function readFees(
   db: ReturnType<typeof createSupabaseAdmin>
 ): Promise<{ markup: number; bike: number; door: number; min: number }> {
-  const { data } = await db
-    .from('settings')
-    .select('id, value')
-    .in('id', ['platform_markup', 'delivery_fee_bike', 'delivery_fee_door', 'min_order_amount'])
-  const byId = new Map<string, number>()
-  for (const row of (data ?? []) as Array<{ id: string; value: { amount_kobo?: number } }>) {
-    byId.set(row.id, Number(row.value?.amount_kobo))
-  }
-  const kobo = (id: string, fallback: number): number => {
-    const v = byId.get(id)
-    return v !== undefined && Number.isFinite(v) ? v : fallback
-  }
+  const pricing = await getDeliveryZonePricing({ db })
+  const min = await getMinimumOrderKobo(db)
   return {
-    markup: kobo('platform_markup', 25000),
-    bike: kobo('delivery_fee_bike', 50000),
-    door: kobo('delivery_fee_door', 100000),
-    min: kobo('min_order_amount', 50000),
+    markup: pricing?.platformMarkup ?? 0,
+    bike: pricing?.bikeFee ?? 0,
+    door: pricing?.doorFee ?? 0,
+    min: min ?? 0,
   }
 }
 

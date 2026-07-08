@@ -19,6 +19,7 @@ export type PlatformEarningType =
   | 'RIDER_BONUS_COST'    // −bonus amount when milestone bonus awarded to rider
   | 'TOPUP_BONUS_COST'    // −bonus amount when wallet top-up bonus issued to customer
   | 'REFUND_COST'         // −refund amount when order refunded
+  | 'LATE_DELIVERY_CREDIT_COST' // customer wallet credit for late delivery
 
 export interface RecordEarningParams {
   type:        PlatformEarningType

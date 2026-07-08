@@ -40,6 +40,7 @@ interface EarningsBreakdown {
   RIDER_BONUS_COST?:    number
   TOPUP_BONUS_COST?:    number
   REFUND_COST?:         number
+  LATE_DELIVERY_CREDIT_COST?: number
 }
 
 interface EarningsPeriod {
@@ -113,6 +114,7 @@ const TYPE_LABEL: Record<string, string> = {
   RIDER_BONUS_COST:     'Rider bonus',
   TOPUP_BONUS_COST:     'Top-up bonus',
   REFUND_COST:          'Refund',
+  LATE_DELIVERY_CREDIT_COST: 'Late delivery credit',
 }
 
 const TYPE_ICON: Record<string, string> = {
@@ -123,6 +125,7 @@ const TYPE_ICON: Record<string, string> = {
   RIDER_BONUS_COST:     '🏆',
   TOPUP_BONUS_COST:     '🎁',
   REFUND_COST:          '↩️',
+  LATE_DELIVERY_CREDIT_COST: '⏱️',
 }
 
 // ─── Withdraw modal ───────────────────────────────────────────────────────────
@@ -332,6 +335,7 @@ function FounderEarnings() {
     { label: 'Rider bonuses paid',   icon: '🏆', amount: bd.RIDER_BONUS_COST    ?? 0 },
     { label: 'Top-up bonuses issued',icon: '🎁', amount: bd.TOPUP_BONUS_COST    ?? 0 },
     { label: 'Refunds issued',       icon: '↩️', amount: bd.REFUND_COST         ?? 0 },
+    { label: 'Late delivery credits', icon: '⏱️', amount: bd.LATE_DELIVERY_CREDIT_COST ?? 0 },
   ].filter((item) => item.amount !== 0)
 
   return (

@@ -165,7 +165,7 @@ export async function settleDuePickups(vendorId?: string): Promise<number> {
         // ── Forfeit: claim READY → NO_SHOW so only one caller settles it ──────────
         const { data: claimed } = await db
           .from('orders')
-          .update({ status: 'NO_SHOW', no_show_at: nowIso, handover_code_hash: null, updated_at: nowIso })
+          .update({ status: 'NO_SHOW', order_state: 'cancelled', no_show_at: nowIso, handover_code_hash: null, updated_at: nowIso })
           .eq('id', o.id)
           .eq('status', 'READY')
           .select('id')
@@ -208,7 +208,7 @@ export async function settleDuePickups(vendorId?: string): Promise<number> {
         // ── Vendor-side fail: claim <status> → CANCELLED, then full refund ────────
         const { data: claimed } = await db
           .from('orders')
-          .update({ status: 'CANCELLED', cancelled_at: nowIso, handover_code_hash: null, payment_status: 'REFUNDED', updated_at: nowIso })
+          .update({ status: 'CANCELLED', order_state: 'cancelled', auto_cancel_reason: 'pickup_fairness', cancelled_at: nowIso, handover_code_hash: null, payment_status: 'REFUNDED', updated_at: nowIso })
           .eq('id', o.id)
           .eq('status', o.status)
           .select('id')

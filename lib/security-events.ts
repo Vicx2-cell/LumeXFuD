@@ -12,6 +12,8 @@ export type SecurityEventType =
   | 'auth_fail' | 'authz_deny' | 'ratelimit_hit' | 'webhook_reject'
   | 'stepup_fail' | 'ledger_anomaly' | 'handover_bruteforce' | 'ai_injection'
   | 'session_revoked' | 'rls_coverage_gap' | 'chain_tamper'
+  | 'order_status_transition' | 'order_handover_completed' | 'rider_order_accepted'
+  | 'late_delivery_credit_issued'
 
 export interface SecurityEventInput {
   eventType: SecurityEventType

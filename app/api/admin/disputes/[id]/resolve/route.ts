@@ -85,6 +85,7 @@ export async function POST(
 
   await db.from('orders').update({
     status:         newStatus,
+    order_state:    parsed.data.resolution === 'REFUND' ? 'cancelled' : 'delivered',
     payment_status: parsed.data.resolution === 'REFUND' ? 'REFUNDED' : undefined,
     updated_at:     now,
   }).eq('id', id)

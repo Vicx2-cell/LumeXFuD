@@ -5,6 +5,7 @@ import { completeOrderPayout } from '@/lib/order-payout'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { renderTemplate } from '@/lib/notify-templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
 
 export async function POST(
   _req: NextRequest,
@@ -46,6 +47,7 @@ export async function POST(
     .from('orders')
     .update({
       status: 'COMPLETED',
+      order_state: 'delivered',
       completed_at: now,
       rider_payment_status: 'HELD',
       rider_auto_release_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -68,6 +70,10 @@ export async function POST(
     subtotal:           (order.subtotal as number) ?? 0,
     rider_delivery_cut: (order.rider_delivery_cut as number) ?? 0,
     tip_amount:         (order.tip_amount as number) ?? 0,
+  })
+
+  void maybeApplyLateDeliveryCredit(id).catch((err) => {
+    console.error('[orders.confirm] late delivery credit failed:', err)
   })
 
   // Notify rider

@@ -10,6 +10,8 @@ import { verifyHandoverCode, recordWrongHandoverAttempt, HANDOVER_ATTEMPT_LIMIT,
 import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
 import { recordOrderCompletedEarnings } from '@/lib/platform-earnings'
 import { completeOrderPayout } from '@/lib/order-payout'
+import { recordSecurityEvent } from '@/lib/security-events'
+import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
 
 // POST /api/orders/[id]/deliver
 // Delivery handover (delivery_handover_v1). The DEFAULT path: the ASSIGNED rider
@@ -107,6 +109,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .from('orders')
     .update({
       status: 'COMPLETED', delivered_at: now, completed_at: now,
+      order_state: 'delivered',
       rider_payment_status: 'HELD', handover_method: method,
       handover_code_hash: null, updated_at: now,
     })
@@ -143,6 +146,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     tip_amount: (order.tip_amount as number) ?? 0,
   })
 
+  void maybeApplyLateDeliveryCredit(id).catch((err) => {
+    console.error('[orders.deliver] late delivery credit failed:', err)
+  })
+
   await audit({
     actor_id: session.phone, actor_role: session.role,
     action: 'delivery_confirmed', target_table: 'orders', target_id: id,
@@ -163,6 +170,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       message: renderTemplate('DELIVERED', { confirm_url: `${appUrl}/order/${order.order_number}` }),
     }).catch(() => {})
   }
+
+  void recordSecurityEvent({
+    eventType: 'order_handover_completed',
+    severity: 'info',
+    surface: 'orders.deliver',
+    actorId: session.userId ?? null,
+    actorRole: session.role,
+    sessionId: session.sessionId,
+    ip: req.headers.get('x-forwarded-for'),
+    userAgent: req.headers.get('user-agent'),
+    detail: {
+      order_id: id,
+      order_number: order.order_number,
+      vendor_id: order.vendor_id,
+      rider_id: order.rider_id,
+      from_status: 'PICKED_UP',
+      to_status: 'COMPLETED',
+      status_changed_at: now,
+      delivery_type: order.delivery_type,
+      handover_method: method,
+    },
+  })
 
   return NextResponse.json({ success: true, status: 'COMPLETED', method })
 }

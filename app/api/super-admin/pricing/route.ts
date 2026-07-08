@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { superAudit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { getDeliveryZonePricing, getMinimumOrderKobo } from '@/lib/delivery-zones'
 
 export const runtime = 'nodejs'
 
@@ -19,15 +20,6 @@ const KEYS = {
   min_order_kobo:         'min_order_amount',
 } as const
 
-const DEFAULTS: Record<keyof typeof KEYS, number> = {
-  platform_markup_kobo:   25000,
-  delivery_fee_bike_kobo: 50000,
-  rider_cut_bike_kobo:    40000,
-  delivery_fee_door_kobo: 100000,
-  rider_cut_door_kobo:    80000,
-  min_order_kobo:         50000,
-}
-
 function requireSuperAdmin(role: string) {
   return role === 'super_admin'
 }
@@ -38,14 +30,15 @@ export async function GET() {
   if (!requireSuperAdmin(session.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const db = createSupabaseAdmin()
-  const { data } = await db.from('settings').select('id, value').in('id', Object.values(KEYS))
-  const byId = new Map<string, { amount_kobo?: number }>()
-  for (const row of (data ?? []) as Array<{ id: string; value: { amount_kobo?: number } }>) byId.set(row.id, row.value)
-
-  const pricing = {} as Record<keyof typeof KEYS, number>
-  for (const [outKey, id] of Object.entries(KEYS) as [keyof typeof KEYS, string][]) {
-    const v = byId.get(id)?.amount_kobo
-    pricing[outKey] = typeof v === 'number' ? v : DEFAULTS[outKey]
+  const zone = await getDeliveryZonePricing({ db })
+  const minOrder = await getMinimumOrderKobo(db)
+  const pricing: Record<keyof typeof KEYS, number> = {
+    platform_markup_kobo: zone?.platformMarkup ?? 0,
+    delivery_fee_bike_kobo: zone?.bikeFee ?? 0,
+    rider_cut_bike_kobo: zone?.riderCutBike ?? 0,
+    delivery_fee_door_kobo: zone?.doorFee ?? 0,
+    rider_cut_door_kobo: zone?.riderCutDoor ?? 0,
+    min_order_kobo: minOrder ?? 0,
   }
   return NextResponse.json({ pricing })
 }
@@ -89,6 +82,7 @@ export async function PATCH(req: NextRequest) {
   const now = new Date().toISOString()
   const { data: existingRows } = await db.from('settings').select('id, value').in('id', Object.values(KEYS))
   const oldById = new Map((existingRows ?? []).map((r) => [r.id as string, r.value]))
+  const oldZone = await getDeliveryZonePricing({ db })
 
   const rows = (Object.entries(KEYS) as [keyof typeof KEYS, string][]).map(([outKey, id]) => ({
     id, value: { amount_kobo: p[outKey] }, updated_by: session.phone, updated_at: now,
@@ -96,6 +90,21 @@ export async function PATCH(req: NextRequest) {
 
   const { error } = await db.from('settings').upsert(rows, { onConflict: 'id' })
   if (error) return NextResponse.json({ error: 'Failed to save pricing' }, { status: 500 })
+
+  if (oldZone?.zoneId) {
+    const { error: zoneError } = await db.from('delivery_zones').update({
+      base_bike_fee: p.delivery_fee_bike_kobo,
+      base_door_fee: p.delivery_fee_door_kobo,
+      platform_markup: p.platform_markup_kobo,
+      rider_split: { BIKE: p.rider_cut_bike_kobo, DOOR: p.rider_cut_door_kobo },
+      platform_split: {
+        BIKE: p.delivery_fee_bike_kobo - p.rider_cut_bike_kobo,
+        DOOR: p.delivery_fee_door_kobo - p.rider_cut_door_kobo,
+      },
+      updated_at: now,
+    }).eq('id', oldZone.zoneId)
+    if (zoneError) return NextResponse.json({ error: 'Failed to save delivery-zone pricing' }, { status: 500 })
+  }
 
   await superAudit({
     actor_id: session.phone,

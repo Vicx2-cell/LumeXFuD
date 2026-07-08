@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
 
   // Full refund → flip the order workflow status too (parity with prior behaviour).
   if (row.fully_refunded) {
-    await db.from('orders').update({ status: 'REFUNDED', updated_at: new Date().toISOString() }).eq('id', order.id)
+    await db.from('orders').update({ status: 'REFUNDED', order_state: 'cancelled', updated_at: new Date().toISOString() }).eq('id', order.id)
   }
 
   // Record as platform cost (fire-and-forget)

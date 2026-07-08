@@ -20,6 +20,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNum
     .select(`
       id, order_number, status, payment_status, delivery_type, delivery_address,
       subtotal, platform_markup, delivery_fee, tip_amount, total_amount,
+      prep_time_minutes, busy_prep_buffer_minutes,
       vendor_accepted_at, preparing_at, ready_at, rider_assigned_at,
       picked_up_at, delivered_at, completed_at, cancelled_at, created_at,
       pickup_eta_at, collected_at, no_show_at, delivery_photo_url,
@@ -148,6 +149,8 @@ export interface OrderDetail {
   delivery_fee: number
   tip_amount: number
   total_amount: number
+  prep_time_minutes: number | null
+  busy_prep_buffer_minutes: number | null
   vendor_accepted_at: string | null
   preparing_at: string | null
   ready_at: string | null

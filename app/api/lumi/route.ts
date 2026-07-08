@@ -60,7 +60,11 @@ export async function POST(req: Request) {
       default:
         // log unmatched message
         const db = createSupabaseAdmin()
-        await db.from('lumi_unmatched_messages').insert({ user_id: userId, message }).catch(() => null)
+        try {
+          await db.from('lumi_unmatched_messages').insert({ user_id: userId, message })
+        } catch {
+          // Unmatched-message logging must not block a user-facing fallback reply.
+        }
         reply = { text: "Sorry, I didn't understand that. Try 'View vendors' or 'Check balance'.", quickReplies: ['View vendors', 'Check balance', 'Help'] }
         await clearState(userId)
         break

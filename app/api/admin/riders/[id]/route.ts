@@ -6,7 +6,7 @@ import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 
 const updateInput = z.object({
-  action: z.enum(['approve', 'suspend', 'unsuspend']),
+  action: z.enum(['approve', 'reject', 'suspend', 'unsuspend']),
 })
 
 export async function PATCH(
@@ -32,7 +32,7 @@ export async function PATCH(
   const db = createSupabaseAdmin()
   const { data: rider } = await db
     .from('riders')
-    .select('id, is_active')
+    .select('id, is_active, approval_state')
     .eq('id', id)
     .single()
   if (!rider) return NextResponse.json({ error: 'Rider not found' }, { status: 404 })
@@ -42,12 +42,22 @@ export async function PATCH(
 
   if (parsed.data.action === 'approve') {
     updates.is_active = true
+    updates.approval_state = 'approved'
+    updates.id_verified = true
+    updates.vehicle_inspected = true
     updates.approved_at = now
     updates.approved_by = session.phone
+  } else if (parsed.data.action === 'reject') {
+    updates.is_active = false
+    updates.status = 'OFFLINE'
+    updates.approval_state = 'rejected'
   } else if (parsed.data.action === 'suspend') {
     updates.is_active = false
     updates.status = 'OFFLINE'
   } else {
+    if (rider.approval_state !== 'approved') {
+      return NextResponse.json({ error: 'Approve this rider before unsuspending.' }, { status: 409 })
+    }
     updates.is_active = true
   }
 

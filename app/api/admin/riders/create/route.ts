@@ -11,9 +11,11 @@ import { isPhoneBlocked } from '@/lib/blocklist'
 import { z } from 'zod'
 
 const createRiderInput = z.object({
-  full_name:  z.string().min(1).max(100).transform((s) => s.trim()),
-  phone:      z.string().min(7).max(20),
-  call_phone: z.string().min(7).max(20).optional(),
+  full_name:         z.string().min(1).max(100).transform((s) => s.trim()),
+  phone:             z.string().min(7).max(20),
+  call_phone:        z.string().min(7).max(20).optional(),
+  id_verified:       z.boolean().optional(),
+  vehicle_inspected: z.boolean().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: 'Missing or invalid required fields' }, { status: 400 })
     }
-    const { full_name, phone, call_phone } = parsed.data
+    const { full_name, phone, call_phone, id_verified, vehicle_inspected } = parsed.data
 
     let normalized: string
     try {
@@ -68,6 +70,7 @@ export async function POST(req: NextRequest) {
 
     const tempPin = generateTempPin()
     const pinHash = await hashSecret(tempPin)
+    const now = new Date().toISOString()
 
     const insert = {
       full_name,
@@ -77,6 +80,11 @@ export async function POST(req: NextRequest) {
       login_pin_hash: pinHash,
       pin_reset_pending: true,
       is_active: true,
+      approval_state: 'approved',
+      id_verified: id_verified ?? true,
+      vehicle_inspected: vehicle_inspected ?? true,
+      approved_at: now,
+      approved_by: user.phone,
       added_by: user.userId ?? null,
     }
 

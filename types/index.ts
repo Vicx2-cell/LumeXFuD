@@ -41,6 +41,7 @@ export interface OtpAttempt {
 export type VendorStatus = 'OPEN' | 'BUSY' | 'CLOSED'
 export type SubscriptionTier = 'FOUNDING' | 'EARLY' | 'STANDARD'
 export type TrustTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND'
+export type MerchantCategory = 'restaurant' | 'supermarket' | 'pharmacy'
 
 export interface Vendor {
   id: string
@@ -54,6 +55,7 @@ export interface Vendor {
   busy_until: string | null
   paused_until: string | null
   category: string
+  merchant_category: MerchantCategory
   description: string | null
   paystack_subaccount_code: string | null
   bank_code: string | null
@@ -63,6 +65,8 @@ export interface Vendor {
   subscription_paid_until: string | null
   avg_rating: number
   total_ratings: number
+  reliability_score: number
+  reliability_score_updated_at: string | null
   // Public store location (migration 090) — shown to customers + riders so they
   // can find and navigate to the shop. All optional; a pin is lat+lng together.
   address_text: string | null
@@ -77,6 +81,8 @@ export interface Vendor {
   deleted_at: string | null
 }
 
+export type Merchant = Vendor
+
 export interface MenuItem {
   id: string
   vendor_id: string
@@ -85,6 +91,8 @@ export interface MenuItem {
   price_kobo: number
   image_url: string | null
   category: 'RICE' | 'PROTEIN' | 'DRINKS' | 'SNACKS' | 'OTHER'
+  product_category: string | null
+  prescription_required: boolean
   is_available: boolean
   daily_limit: number | null
   sold_today: number
@@ -112,6 +120,8 @@ export interface Rider {
   total_ratings: number
   total_deliveries: number
   acceptance_rate: number
+  reliability_score: number
+  reliability_score_updated_at: string | null
   is_active: boolean
   approved_at: string | null
   approved_by: string | null
@@ -137,6 +147,17 @@ export type OrderStatus =
   | 'REFUNDED'
   | 'NO_SHOW'
 
+export type OrderState =
+  | 'placed'
+  | 'vendor_ack'
+  | 'preparing'
+  | 'ready_for_pickup'
+  | 'picked_up'
+  | 'in_transit'
+  | 'delivered'
+  | 'late_delivered'
+  | 'cancelled'
+
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
 export type DeliveryType = 'BIKE' | 'DOOR' | 'PICKUP'
 
@@ -148,6 +169,7 @@ export interface Order {
   rider_id: string | null
   guest_phone: string | null
   status: OrderStatus
+  order_state: OrderState | null
   delivery_type: DeliveryType
   delivery_address: string
   delivery_instructions: string | null
@@ -163,6 +185,15 @@ export interface Order {
   payment_status: PaymentStatus
   rider_payment_status: 'PENDING' | 'HELD' | 'RELEASED'
   rider_auto_release_at: string | null
+  placed_at: string | null
+  promised_ready_at: string | null
+  promised_ready_extended_at: string | null
+  promised_ready_extension_count: number
+  auto_cancel_reason: string | null
+  late_delivery_credit_applied_at: string | null
+  late_delivery_credit_kobo: number
+  late_delivery_credit_stage: 'vendor_prep' | 'pickup_wait' | 'transit' | null
+  late_delivery_credit_reference: string | null
   rider_payment_released_at: string | null
   delivery_photo_url: string | null
   vendor_accepted_at: string | null

@@ -13,7 +13,8 @@ export async function GET() {
   const { data: riders } = await db
     .from('riders')
     .select(`
-      id, full_name, phone, status, is_active,
+      id, full_name, phone, status, is_active, approval_state,
+      id_verified, vehicle_inspected,
       avg_rating, total_ratings, total_deliveries, created_at
     `)
     .is('deleted_at', null)

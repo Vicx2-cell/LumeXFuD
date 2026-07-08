@@ -158,7 +158,7 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
           }
           await db
             .from('orders')
-            .update({ status: 'CANCELLED', payment_status: 'FAILED', updated_at: new Date().toISOString() })
+            .update({ status: 'CANCELLED', order_state: 'cancelled', payment_status: 'FAILED', updated_at: new Date().toISOString() })
             .eq('id', pending.id)
             .eq('payment_status', 'PENDING')
           // Idempotency: don't insert a second refund row if this split-failure
@@ -210,7 +210,7 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
         .update(
           releaseInFuture
             ? { payment_status: 'PAID', status: 'SCHEDULED', updated_at: nowIso }
-            : { payment_status: 'PAID', status: 'PENDING', pending_since: nowIso, updated_at: nowIso },
+            : { payment_status: 'PAID', status: 'PENDING', pending_since: nowIso, placed_at: nowIso, order_state: 'placed', updated_at: nowIso },
         )
         .eq('paystack_reference', reference)
         .eq('payment_status', 'PENDING')
@@ -285,7 +285,7 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
       // top-up/subscription charge has no matching order row, so it no-ops here.
       const { data: order } = await db
         .from('orders')
-        .update({ payment_status: 'FAILED', status: 'CANCELLED', updated_at: new Date().toISOString() })
+        .update({ payment_status: 'FAILED', status: 'CANCELLED', order_state: 'cancelled', updated_at: new Date().toISOString() })
         .eq('paystack_reference', reference)
         .eq('payment_status', 'PENDING')
         .in('status', ['PENDING_PAYMENT', 'PENDING'])
