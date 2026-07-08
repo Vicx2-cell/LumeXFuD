@@ -20,6 +20,7 @@ import { anyRewardFeatureOn } from '@/lib/rewards'
 import { getDeliveryZonePricing, getMinimumOrderKobo } from '@/lib/delivery-zones'
 import { estimateOrderPrepMinutes } from '@/lib/prep-time'
 import { getBusyModeThrottle } from '@/lib/busy-mode'
+import { captureCustomerLocation } from '@/lib/location-intelligence'
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
@@ -90,6 +91,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'A delivery address is required.' }, { status: 400 })
   } else if (!zone_id) {
     return NextResponse.json({ error: 'Choose the delivery area for this order.' }, { status: 400 })
+  } else if (!hasCoords && !isPickup) {
+    return NextResponse.json({ error: 'Share your current location before placing a delivery order.' }, { status: 400 })
   }
 
   // Validate vendor
@@ -559,6 +562,18 @@ export async function POST(req: NextRequest) {
       p_address: (delivery_lodge && delivery_lodge.trim()) || delivery_address,
       ...(hasCoords ? { p_lat: delivery_latitude, p_lng: delivery_longitude } : {}),
     }).then(() => {}, () => {})
+
+    if (hasCoords) {
+      void captureCustomerLocation(db, {
+        customerId,
+        label: (delivery_lodge && delivery_lodge.trim()) || delivery_address,
+        deliveryNote: delivery_instructions?.trim() || null,
+        latitude: delivery_latitude as number,
+        longitude: delivery_longitude as number,
+        cityId: zonePricing.cityId ?? (vendor as { city_id?: string | null }).city_id ?? null,
+        zoneId: zonePricing.zoneId ?? (vendor as { zone_id?: string | null }).zone_id ?? null,
+      }).catch(() => {})
+    }
   }
 
   // Stamp the structured address parts for rider-side display (block/room chips).

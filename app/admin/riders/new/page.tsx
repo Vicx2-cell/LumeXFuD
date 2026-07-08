@@ -83,11 +83,14 @@ export default function NewRiderPage() {
         <GlassSheen />
         <div className="relative z-10 w-full max-w-md space-y-4">
           <div className="rounded-3xl border border-green-500/30 bg-green-500/10 p-6">
-            <p className="text-lg font-semibold text-white">Rider account created</p>
+            <p className="text-lg font-semibold text-white">Rider record created</p>
             <div className="mt-3 space-y-1 text-sm text-white/60">
               <p>Name: <span className="text-white">{success.full_name}</span></p>
               <p>Phone: <span className="text-white">{success.phone}</span></p>
             </div>
+            <p className="mt-3 text-sm text-white/60">
+              This account is pending review and will not receive orders until approval is complete.
+            </p>
             <div className="mt-4">
               <p className="lx-mono mb-1">Temporary PIN</p>
               <p className="text-4xl font-bold tracking-[0.3em] text-amber-400 lx-nums">{success.temp_pin}</p>
@@ -134,7 +137,7 @@ export default function NewRiderPage() {
       <div className="relative z-10 mx-auto max-w-md">
         <PageHeader
           title="Add Rider"
-          subtitle="A temporary PIN will be generated and shown after creation."
+          subtitle="A temporary PIN will be generated and the rider will stay pending until approval."
           badge="Admin"
         />
 

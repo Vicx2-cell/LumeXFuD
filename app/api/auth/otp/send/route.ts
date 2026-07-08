@@ -18,7 +18,7 @@ export const maxDuration = 30
 // admin (no existence gate; the target account doesn't exist yet).
 const schema = z.object({
   phone: z.string().min(7).max(20),
-  purpose: z.enum(['signup', 'reset', 'admin_create']).default('signup'),
+  purpose: z.enum(['signup', 'reset', 'admin_create', 'application']).default('signup'),
 })
 
 const COOLDOWN_SECONDS = 60
@@ -28,7 +28,7 @@ const REF_TTL_SECONDS = 600
 // purpose at confirm time than it requested here.
 interface StoredRef {
   reference: string
-  purpose: 'signup' | 'reset' | 'admin_create'
+  purpose: 'signup' | 'reset' | 'admin_create' | 'application'
 }
 
 function getRedis(): Redis {
@@ -82,9 +82,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'This number is not permitted.', blocked: true }, { status: 403 })
   }
 
-  // Existence gate, keyed on purpose. admin_create skips it: the new account
-  // doesn't exist yet, and the create route does its own per-table uniqueness check.
-  if (purpose !== 'admin_create') {
+  // Existence gate, keyed on purpose. admin_create/application skip it: the
+  // applicant may already have another customer account on the same number.
+  if (purpose === 'signup' || purpose === 'reset') {
     const existing = await findAuthUserByPhone(phone)
     if (purpose === 'signup' && existing) {
       return NextResponse.json(

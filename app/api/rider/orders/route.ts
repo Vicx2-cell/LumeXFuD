@@ -48,7 +48,7 @@ export async function GET() {
     rider.active_order_id
       ? db.from('orders')
           .select(`
-            id, order_number, status, delivery_type, delivery_address, vendor_id, customer_id,
+            id, order_number, status, delivery_type, delivery_address, delivery_latitude, delivery_longitude, vendor_id, customer_id,
             rider_delivery_cut, picked_up_at, created_at, delivery_photo_url,
             vendors ( shop_name, phone, address_text, landmark, latitude, longitude, location_photo_url ),
             customers ( phone, name, avatar_url ),
@@ -64,6 +64,7 @@ export async function GET() {
   // been applied yet. tel: calls the call number (fallback: the WhatsApp number).
   const current = currentResult.data as ({
     id: string; vendor_id?: string | null; customer_id?: string | null; leave_at_gate?: boolean
+    delivery_latitude?: number | null; delivery_longitude?: number | null
     vendors?: { phone: string; call_phone?: string | null } | null
     customers?: { phone: string; call_phone?: string | null } | null
   } | null)

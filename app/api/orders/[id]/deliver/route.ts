@@ -12,6 +12,7 @@ import { recordOrderCompletedEarnings } from '@/lib/platform-earnings'
 import { completeOrderPayout } from '@/lib/order-payout'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
+import { recordOrderStatusEvent, promoteVerifiedPlaceFromOrder } from '@/lib/location-intelligence'
 
 // POST /api/orders/[id]/deliver
 // Delivery handover (delivery_handover_v1). The DEFAULT path: the ASSIGNED rider
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const rl = await rateLimitGeneric(`handover-deliver:${id}`, 6, 60)
   if (!rl.success) return NextResponse.json({ error: 'Too many tries. Wait a moment and try again.' }, { status: 429 })
 
-  let body: { code?: unknown; leave_at_gate?: unknown }
+  let body: { code?: unknown; leave_at_gate?: unknown; latitude?: unknown; longitude?: unknown; gps_accuracy?: unknown }
   try { body = (await req.json()) as typeof body } catch { body = {} }
   const wantsGate = body.leave_at_gate === true
   const rawCode = typeof body.code === 'string' ? body.code : ''
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const db = createSupabaseAdmin()
   const { data: order, error } = await db
     .from('orders')
-    .select('id, order_number, status, delivery_type, vendor_id, rider_id, customer_id, guest_phone, handover_code_hash, handover_code_locked, payment_status, leave_at_gate, subtotal, rider_delivery_cut, tip_amount, platform_markup, platform_delivery_cut')
+    .select('id, order_number, status, delivery_type, vendor_id, rider_id, customer_id, guest_phone, handover_code_hash, handover_code_locked, payment_status, leave_at_gate, subtotal, rider_delivery_cut, tip_amount, platform_markup, platform_delivery_cut, city_id, delivery_address, delivery_lodge, delivery_block, delivery_room, delivery_latitude, delivery_longitude')
     .eq('id', id)
     .single()
   if (error || !order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -192,6 +193,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       handover_method: method,
     },
   })
+
+  void recordOrderStatusEvent(db, {
+    orderId: id,
+    actorType: session.role,
+    actorId: session.userId ?? session.phone,
+    status: 'COMPLETED',
+    latitude: typeof body.latitude === 'number' ? body.latitude : null,
+    longitude: typeof body.longitude === 'number' ? body.longitude : null,
+    gpsAccuracy: typeof body.gps_accuracy === 'number' ? body.gps_accuracy : null,
+    validationStatus: typeof body.latitude === 'number' && typeof body.longitude === 'number' ? 'captured' : 'not_validated',
+  }).catch(() => {})
+
+  void promoteVerifiedPlaceFromOrder(db, {
+    orderId: id,
+    orderNumber: order.order_number as string,
+    deliveryAddress: order.delivery_address as string | null,
+    deliveryLodge: order.delivery_lodge as string | null,
+    deliveryBlock: order.delivery_block as string | null,
+    deliveryRoom: order.delivery_room as string | null,
+    latitude: typeof body.latitude === 'number' ? body.latitude : (order.delivery_latitude as number | null),
+    longitude: typeof body.longitude === 'number' ? body.longitude : (order.delivery_longitude as number | null),
+    cityId: order.city_id as string | null,
+  }).catch(() => {})
 
   return NextResponse.json({ success: true, status: 'COMPLETED', method })
 }

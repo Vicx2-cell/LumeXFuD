@@ -4,9 +4,11 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { nextRiderReviewState, riderReadyForApproval } from '@/lib/onboarding'
 
 const updateInput = z.object({
-  action: z.enum(['approve', 'reject', 'suspend', 'unsuspend']),
+  action: z.enum(['review', 'verification_failed', 'approve', 'reject', 'suspend', 'unsuspend']),
+  reason: z.string().max(500).optional(),
 })
 
 export async function PATCH(
@@ -32,15 +34,26 @@ export async function PATCH(
   const db = createSupabaseAdmin()
   const { data: rider } = await db
     .from('riders')
-    .select('id, is_active, approval_state')
+    .select('id, is_active, approval_state, nin, id_photo_url, live_selfie_url, guarantor_name, guarantor_phone, vehicle_type')
     .eq('id', id)
     .single()
   if (!rider) return NextResponse.json({ error: 'Rider not found' }, { status: 404 })
 
   const now = new Date().toISOString()
-  const updates: Record<string, unknown> = {}
+  const updates: Record<string, unknown> = { updated_at: now, approval_state: nextRiderReviewState(rider.approval_state, parsed.data.action) }
 
-  if (parsed.data.action === 'approve') {
+  if (parsed.data.action === 'review') {
+    updates.is_active = false
+  } else if (parsed.data.action === 'verification_failed') {
+    updates.is_active = false
+    updates.approval_state = 'verification_failed'
+  } else if (parsed.data.action === 'approve') {
+    if (!riderReadyForApproval(rider)) {
+      return NextResponse.json(
+        { error: 'Complete rider identity, selfie, guarantor, and vehicle checks before approval.' },
+        { status: 409 },
+      )
+    }
     updates.is_active = true
     updates.approval_state = 'approved'
     updates.id_verified = true
@@ -51,14 +64,18 @@ export async function PATCH(
     updates.is_active = false
     updates.status = 'OFFLINE'
     updates.approval_state = 'rejected'
+    updates.rejection_reason = parsed.data.reason ?? null
   } else if (parsed.data.action === 'suspend') {
     updates.is_active = false
     updates.status = 'OFFLINE'
+    updates.approval_state = 'suspended'
   } else {
     if (rider.approval_state !== 'approved') {
       return NextResponse.json({ error: 'Approve this rider before unsuspending.' }, { status: 409 })
     }
     updates.is_active = true
+    updates.status = 'ONLINE'
+    updates.approval_state = 'approved'
   }
 
   await db.from('riders').update(updates).eq('id', id)

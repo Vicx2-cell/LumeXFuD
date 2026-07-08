@@ -13,6 +13,7 @@ interface VendorRow {
   owner_name: string
   category: string
   status: string
+  approval_state: string
   subscription_tier: string
   subscription_paid_until: string | null
   is_active: boolean
@@ -26,6 +27,18 @@ const TIER_COLORS: Record<string, string> = {
   FOUNDING: '#F5A623',
   EARLY: '#22C55E',
   STANDARD: '#60A5FA',
+}
+
+const STATE_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  application_submitted: 'Application submitted',
+  under_review: 'Under review',
+  inspection_scheduled: 'Inspection scheduled',
+  shop_inspected: 'Shop inspected',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  suspended: 'Suspended',
+  pending_review: 'Pending review',
 }
 
 export default function AdminVendors() {
@@ -51,9 +64,10 @@ export default function AdminVendors() {
     setLoading(false)
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchVendors() }, [])
 
-  async function doAction(vendorId: string, action: 'approve' | 'suspend' | 'unsuspend') {
+  async function doAction(vendorId: string, action: 'review' | 'schedule_inspection' | 'mark_inspected' | 'approve' | 'suspend' | 'unsuspend') {
     setActionLoading(vendorId + action)
     const res = await fetch(`/api/admin/vendors/${vendorId}`, {
       method: 'PATCH',
@@ -150,16 +164,9 @@ export default function AdminVendors() {
                         style={{ background: TIER_COLORS[v.subscription_tier] ?? '#666', color: '#000' }}>
                         {v.subscription_tier}
                       </span>
-                      {!v.approved_at && (
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}>
-                          Pending
-                        </span>
-                      )}
-                      {v.approved_at && !v.is_active && (
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}>
-                          Suspended
-                        </span>
-                      )}
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.07)', color: '#fff' }}>
+                        {STATE_LABELS[v.approval_state] ?? v.approval_state}
+                      </span>
                     </div>
                     <p className="text-sm text-white/40 mt-0.5">{v.owner_name} · {v.phone}</p>
                   </div>
@@ -177,7 +184,31 @@ export default function AdminVendors() {
                 </div>
 
                 <div className="flex gap-2 flex-wrap">
-                  {!v.approved_at && (
+                  {(v.approval_state === 'application_submitted' || v.approval_state === 'draft' || v.approval_state === 'pending_review') && (
+                    <button onClick={() => doAction(v.id, 'review')}
+                      disabled={actionLoading === v.id + 'review'}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+                      style={{ background: 'rgba(96,165,250,0.15)', color: '#60A5FA', border: '1px solid rgba(96,165,250,0.3)' }}>
+                      {actionLoading === v.id + 'review' ? '…' : 'Under review'}
+                    </button>
+                  )}
+                  {v.approval_state === 'under_review' && (
+                    <button onClick={() => doAction(v.id, 'schedule_inspection')}
+                      disabled={actionLoading === v.id + 'schedule_inspection'}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+                      style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.3)' }}>
+                      {actionLoading === v.id + 'schedule_inspection' ? '…' : 'Schedule inspection'}
+                    </button>
+                  )}
+                  {v.approval_state === 'inspection_scheduled' && (
+                    <button onClick={() => doAction(v.id, 'mark_inspected')}
+                      disabled={actionLoading === v.id + 'mark_inspected'}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+                      style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
+                      {actionLoading === v.id + 'mark_inspected' ? '…' : 'Mark inspected'}
+                    </button>
+                  )}
+                  {v.approval_state === 'shop_inspected' && (
                     <button onClick={() => doAction(v.id, 'approve')}
                       disabled={actionLoading === v.id + 'approve'}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
@@ -185,7 +216,7 @@ export default function AdminVendors() {
                       {actionLoading === v.id + 'approve' ? '…' : 'Approve'}
                     </button>
                   )}
-                  {v.approved_at && v.is_active && (
+                  {v.approval_state === 'approved' && v.is_active && (
                     <button onClick={() => doAction(v.id, 'suspend')}
                       disabled={actionLoading === v.id + 'suspend'}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
@@ -193,7 +224,7 @@ export default function AdminVendors() {
                       {actionLoading === v.id + 'suspend' ? '…' : 'Suspend'}
                     </button>
                   )}
-                  {v.approved_at && !v.is_active && (
+                  {v.approval_state === 'suspended' && !v.is_active && (
                     <button onClick={() => doAction(v.id, 'unsuspend')}
                       disabled={actionLoading === v.id + 'unsuspend'}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"

@@ -1,4 +1,5 @@
 'use client'
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
@@ -25,17 +26,19 @@ export function HomepageClient({
   initialVendors,
   initialFavorites = [],
   initialLocations = [],
+  initialSelectedZoneId = '',
 }: {
   initialVendors: VendorData[]
   initialFavorites?: string[]
   initialLocations?: LocationRow[]
+  initialSelectedZoneId?: string
 }) {
   // NOTE: realtime vendor-status subscription temporarily removed while isolating
   // the iOS "page couldn't load" crash on /home. Vendors are server-rendered
   // (revalidate 30), so the list still works without it.
   const [vendors, setVendors] = useState<VendorData[]>(initialVendors)
   const [locations] = useState<LocationRow[]>(initialLocations)
-  const [selectedZoneId, setSelectedZoneId] = useState(initialLocations[0]?.zone_id ?? '')
+  const [selectedZoneId, setSelectedZoneId] = useState(initialSelectedZoneId || (initialLocations[0]?.zone_id ?? ''))
   const [loadingVendors, setLoadingVendors] = useState(false)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
@@ -53,7 +56,9 @@ export function HomepageClient({
       if (selectedZoneId) setSelectedZoneId('')
       return
     }
-    if (!zoneOptions.some((row) => row.zone_id === selectedZoneId)) setSelectedZoneId(zoneOptions[0].zone_id)
+    if (!zoneOptions.some((row) => row.zone_id === selectedZoneId)) {
+      setSelectedZoneId(zoneOptions[0].zone_id)
+    }
   }, [zoneOptions, selectedZoneId])
 
   useEffect(() => {

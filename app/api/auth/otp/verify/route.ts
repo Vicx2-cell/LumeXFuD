@@ -16,7 +16,7 @@ const schema = z.object({
 
 interface StoredRef {
   reference: string
-  purpose: 'signup' | 'reset' | 'admin_create'
+  purpose: 'signup' | 'reset' | 'admin_create' | 'application'
 }
 
 function getRedis(): Redis {

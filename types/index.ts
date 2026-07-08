@@ -237,6 +237,56 @@ export interface OrderMessage {
   created_at: string
 }
 
+export interface CustomerLocation {
+  id: string
+  customer_id: string
+  label: string
+  latitude: number
+  longitude: number
+  delivery_note: string | null
+  city_id: string | null
+  zone_id: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface VerifiedPlace {
+  id: string
+  name: string
+  canonical_latitude: number
+  canonical_longitude: number
+  city: string
+  status: 'candidate' | 'verified' | 'rejected'
+  confidence_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface VerifiedPlaceVote {
+  id: string
+  verified_place_id: string
+  order_id: string
+  customer_location_label: string | null
+  latitude: number
+  longitude: number
+  delivered_at: string
+}
+
+export interface OrderStatusEvent {
+  id: string
+  order_id: string
+  actor_type: string
+  actor_id: string
+  status: string
+  latitude: number | null
+  longitude: number | null
+  gps_accuracy: number | null
+  distance_from_expected_meters: number | null
+  validation_status: string
+  created_at: string
+}
+
 // ─── Payments ─────────────────────────────────────────────────────────────────
 
 export interface Payment {

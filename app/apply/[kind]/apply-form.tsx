@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
+import PhoneVerifyInline from '@/components/auth/PhoneVerifyInline'
 
 type ApplicationKind = 'vendor' | 'rider'
 type MerchantCategory = 'restaurant' | 'supermarket' | 'pharmacy'
@@ -36,9 +37,18 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
   const [merchantCategory, setMerchantCategory] = useState<MerchantCategory | ''>('')
   const [vehicleType, setVehicleType] = useState<VehicleType | ''>('')
   const [notes, setNotes] = useState('')
+  const [guarantorName, setGuarantorName] = useState('')
+  const [guarantorPhone, setGuarantorPhone] = useState('+234')
+  const [nin, setNin] = useState('')
+  const [idPhotoUrl, setIdPhotoUrl] = useState('')
+  const [selfieUrl, setSelfieUrl] = useState('')
+  const [vehiclePhotoUrl, setVehiclePhotoUrl] = useState('')
+  const [plateNumber, setPlateNumber] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [phoneVerified, setPhoneVerified] = useState(false)
 
   const title = isVendor ? 'Apply as a vendor' : 'Apply as a rider'
   const subtitle = isVendor
@@ -53,6 +63,10 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
 
   async function handleSubmit() {
     setError('')
+    if (!phoneVerified) {
+      setError('Verify your WhatsApp number first.')
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch('/api/applications', {
@@ -61,12 +75,25 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
         body: JSON.stringify({
           kind,
           name,
+          owner_name: isVendor ? name : undefined,
+          full_name: !isVendor ? name : undefined,
           phone,
           area,
           business_name: isVendor ? businessName : undefined,
           merchant_category: isVendor ? merchantCategory || undefined : undefined,
+          what_they_sell: isVendor ? notes.trim() || undefined : undefined,
+          rough_location_description: isVendor ? area || undefined : undefined,
+          operating_hours: isVendor ? notes.trim() || undefined : undefined,
+          notes: !isVendor ? notes.trim() || undefined : undefined,
           vehicle_type: !isVendor ? vehicleType || undefined : undefined,
-          notes: notes.trim() || undefined,
+          guarantor_name: !isVendor ? guarantorName || undefined : undefined,
+          guarantor_phone: !isVendor ? guarantorPhone || undefined : undefined,
+          nin: !isVendor ? nin || undefined : undefined,
+          id_photo_url: !isVendor ? idPhotoUrl || undefined : undefined,
+          live_selfie_url: !isVendor ? selfieUrl || undefined : undefined,
+          vehicle_photo_url: !isVendor ? vehiclePhotoUrl || undefined : undefined,
+          plate_number: !isVendor ? plateNumber || undefined : undefined,
+          date_of_birth: !isVendor ? dateOfBirth || undefined : undefined,
         }),
       })
       const data = await res.json() as { error?: string }
@@ -129,6 +156,16 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
             <p className="text-xs uppercase tracking-[0.18em] text-amber-300/70">{isVendor ? 'Merchant onboarding' : 'Rider onboarding'}</p>
             <h1 className="mt-3 text-3xl font-semibold">{title}</h1>
             <p className="mt-3 text-sm leading-6 text-white/65">{subtitle}</p>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+            <p className="text-sm font-medium text-white">Verify your WhatsApp number</p>
+            <p className="mt-2 text-sm leading-6 text-white/60">
+              We use OTP before your application can be submitted. The verified number is how the team reaches you.
+            </p>
+            <div className="mt-4">
+              <PhoneVerifyInline phone={phone} verified={phoneVerified} onVerified={() => setPhoneVerified(true)} purpose="application" />
+            </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
@@ -240,6 +277,116 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
               </div>
             )}
 
+            {!isVendor && (
+              <>
+                <label className="block text-sm text-white/75">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Guarantor name</span>
+                  <input
+                    value={guarantorName}
+                    onChange={(event) => { setGuarantorName(event.target.value); setError('') }}
+                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+                    placeholder="A trusted person who can confirm your identity"
+                  />
+                </label>
+
+                <label className="block text-sm text-white/75">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Guarantor phone</span>
+                  <input
+                    value={guarantorPhone}
+                    onChange={(event) => { setGuarantorPhone(normalizePhoneInput(event.target.value)); setError('') }}
+                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+                    placeholder="+2348012345678"
+                    type="tel"
+                    inputMode="tel"
+                  />
+                </label>
+
+                <label className="block text-sm text-white/75">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Vehicle type</span>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {vehicleOptions.map((option) => {
+                      const active = vehicleType === option.value
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => { setVehicleType(option.value); setError('') }}
+                          className="rounded-2xl border px-4 py-4 text-left transition-colors"
+                          style={{
+                            background: active ? 'rgba(245,166,35,0.14)' : 'rgba(255,255,255,0.03)',
+                            borderColor: active ? 'rgba(245,166,35,0.42)' : 'rgba(255,255,255,0.08)',
+                          }}
+                        >
+                          <p className="text-sm font-medium text-white">{option.label}</p>
+                          <p className="mt-1 text-xs text-white/45">{option.hint}</p>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </label>
+
+                <label className="block text-sm text-white/75">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">NIN</span>
+                  <input
+                    value={nin}
+                    onChange={(event) => { setNin(event.target.value); setError('') }}
+                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+                    placeholder="Enter your NIN"
+                  />
+                </label>
+
+                <label className="block text-sm text-white/75">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">ID photo URL</span>
+                  <input
+                    value={idPhotoUrl}
+                    onChange={(event) => { setIdPhotoUrl(event.target.value); setError('') }}
+                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+                    placeholder="Link to a captured ID photo"
+                  />
+                </label>
+
+                <label className="block text-sm text-white/75">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Live selfie URL</span>
+                  <input
+                    value={selfieUrl}
+                    onChange={(event) => { setSelfieUrl(event.target.value); setError('') }}
+                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+                    placeholder="Link to a live selfie"
+                  />
+                </label>
+
+                <label className="block text-sm text-white/75">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Vehicle photo URL</span>
+                  <input
+                    value={vehiclePhotoUrl}
+                    onChange={(event) => { setVehiclePhotoUrl(event.target.value); setError('') }}
+                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+                    placeholder="Link to a vehicle photo"
+                  />
+                </label>
+
+                <label className="block text-sm text-white/75">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Plate / registration</span>
+                  <input
+                    value={plateNumber}
+                    onChange={(event) => { setPlateNumber(event.target.value); setError('') }}
+                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+                    placeholder="Optional plate number"
+                  />
+                </label>
+
+                <label className="block text-sm text-white/75">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Date of birth</span>
+                  <input
+                    value={dateOfBirth}
+                    onChange={(event) => { setDateOfBirth(event.target.value); setError('') }}
+                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+                    placeholder="YYYY-MM-DD"
+                  />
+                </label>
+              </>
+            )}
+
             <label className="block text-sm text-white/75">
               <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">
                 {isVendor ? 'Business location or delivery area' : 'Usual area or base'}
@@ -267,10 +414,10 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={loading}
+              disabled={loading || !phoneVerified}
               className="rounded-2xl bg-amber-500 px-5 py-4 text-sm font-semibold text-black disabled:opacity-50"
             >
-              {loading ? 'Submitting application...' : 'Submit application'}
+              {loading ? 'Submitting application...' : !phoneVerified ? 'Verify your phone to continue' : 'Submit application'}
             </button>
           </div>
         </section>

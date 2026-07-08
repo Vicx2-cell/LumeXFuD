@@ -1,4 +1,5 @@
 'use client'
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Image from 'next/image'
@@ -15,7 +16,7 @@ import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { useFeatures } from '@/lib/use-features'
 import { waLink } from '@/lib/contact'
 import { formatAddressForRider } from '@/lib/delivery-address'
-import { directionsUrl } from '@/lib/maps'
+import { directionsUrl, hasPin } from '@/lib/maps'
 
 type RiderStatus = 'ONLINE' | 'OFFLINE' | 'BUSY'
 
@@ -25,6 +26,8 @@ interface AvailableOrder {
   status: string
   delivery_type: 'BIKE' | 'DOOR'
   delivery_address: string
+  delivery_latitude?: number | null
+  delivery_longitude?: number | null
   rider_delivery_cut: number
   created_at: string
   vendors: { shop_name: string } | null
@@ -36,6 +39,8 @@ interface CurrentOrder {
   status: string
   delivery_type: 'BIKE' | 'DOOR'
   delivery_address: string
+  delivery_latitude?: number | null
+  delivery_longitude?: number | null
   rider_delivery_cut: number
   picked_up_at: string | null
   leave_at_gate: boolean | null
@@ -139,6 +144,23 @@ export default function RiderDashboard() {
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(''), 3000)
+  }
+
+  async function captureGps(): Promise<{ latitude?: number; longitude?: number; gps_accuracy?: number } | null> {
+    if (!('geolocation' in navigator)) return null
+    return await new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          resolve({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            gps_accuracy: pos.coords.accuracy ?? undefined,
+          })
+        },
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+      )
+    })
   }
 
   const fetchData = useCallback(async () => {
@@ -256,10 +278,11 @@ export default function RiderDashboard() {
   async function updateOrderStatus(orderId: string, status: string) {
     setUpdatingStatus(true)
     try {
+      const gps = await captureGps()
       const res = await fetch(`/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...gps }),
       })
       const d = await res.json().catch(() => ({})) as { error?: string; code?: string }
       if (res.ok) {
@@ -288,9 +311,10 @@ export default function RiderDashboard() {
   async function confirmDelivery(orderId: string, payload: { code?: string; leave_at_gate?: boolean }): Promise<string | null> {
     setUpdatingStatus(true)
     try {
+      const gps = await captureGps()
       const res = await fetch(`/api/orders/${orderId}/deliver`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, ...gps }),
       })
       const d = await res.json().catch(() => ({})) as { error?: string }
       if (res.ok) { showToast('Delivery confirmed'); await fetchData(); return null }
@@ -471,6 +495,18 @@ export default function RiderDashboard() {
               <p className="text-[10px] text-white/30 uppercase tracking-wide pl-[23px] -mt-0.5">
                 {current.delivery_type === 'DOOR' ? 'Door — bring it to the room' : 'Bike — meet at the lodge'}
               </p>
+              {hasPin(current.delivery_latitude, current.delivery_longitude) && (
+                <a
+                  href={directionsUrl(current.delivery_latitude, current.delivery_longitude)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 inline-flex items-center justify-center gap-2 rounded-lg text-xs font-semibold active:scale-[0.98] transition-transform px-3 py-2"
+                  style={{ background: 'rgba(34,197,94,0.14)', color: '#22C55E', minHeight: 40 }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                  Navigate to drop-off
+                </a>
+              )}
               {current.customers && (
                 <div className="flex items-center gap-2 text-sm text-white/65">
                   <span className="text-[10px] uppercase tracking-wide text-white/35 shrink-0 w-14">Customer</span>

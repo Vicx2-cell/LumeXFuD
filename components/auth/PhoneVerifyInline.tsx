@@ -11,10 +11,12 @@ export default function PhoneVerifyInline({
   phone,
   verified,
   onVerified,
+  purpose = 'admin_create',
 }: {
   phone: string
   verified: boolean
   onVerified: () => void
+  purpose?: 'admin_create' | 'application'
 }) {
   const [code, setCode] = useState('')
   const [codeSent, setCodeSent] = useState(false)
@@ -31,7 +33,7 @@ export default function PhoneVerifyInline({
       const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, purpose: 'admin_create' }),
+        body: JSON.stringify({ phone, purpose }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Could not send the code.'); return }

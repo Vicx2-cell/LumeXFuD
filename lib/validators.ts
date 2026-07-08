@@ -71,6 +71,9 @@ export const orderStatusInput = z.object({
     'PICKED_UP', 'DELIVERED', 'COMPLETED', 'CANCELLED',
   ]),
   extend_ready_minutes: z.number().int().min(1).max(120).optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+  gps_accuracy: z.number().min(0).max(100000).optional(),
 })
 
 export const disputeInput = z.object({
@@ -288,6 +291,29 @@ export const updateSavedPlaceInput = z.object({
   landmark: z.string().max(120).nullable().optional(),
   is_default: z.boolean().optional(),
   ...placeCoordsShape,
+}).strict()
+
+// Customer GPS pins are active, delivery-ready locations captured from the app
+// or the order flow. They can optionally carry the delivery zone that was chosen
+// when the pin was recorded, so the home screen can default to that area.
+export const customerLocationInput = z.object({
+  label: z.string().min(1).max(80).optional(),
+  delivery_note: z.string().max(300).nullable().optional(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  city_id: z.string().uuid().nullable().optional(),
+  zone_id: z.string().uuid().nullable().optional(),
+  is_active: z.boolean().optional().default(true),
+}).strict()
+
+export const updateCustomerLocationInput = z.object({
+  label: z.string().min(1).max(80).optional(),
+  delivery_note: z.string().max(300).nullable().optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+  city_id: z.string().uuid().nullable().optional(),
+  zone_id: z.string().uuid().nullable().optional(),
+  is_active: z.boolean().optional(),
 }).strict()
 
 // ─── Vendor store location (address + map pinpoint) ──────────────────────────

@@ -4,9 +4,10 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { nextVendorReviewState, vendorReadyForApproval } from '@/lib/onboarding'
 
 const updateInput = z.object({
-  action: z.enum(['approve', 'reject', 'suspend', 'unsuspend']),
+  action: z.enum(['review', 'schedule_inspection', 'mark_inspected', 'approve', 'reject', 'suspend', 'unsuspend']),
   reason: z.string().max(500).optional(),
 })
 
@@ -33,34 +34,51 @@ export async function PATCH(
   const db = createSupabaseAdmin()
   const { data: vendor } = await db
     .from('vendors')
-    .select('id, shop_name, is_active, approval_state')
+    .select('id, shop_name, is_active, approval_state, official_latitude, official_longitude, storefront_photo_url, site_inspected, business_verified')
     .eq('id', id)
     .single()
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
 
   const now = new Date().toISOString()
-  const updates: Record<string, unknown> = { updated_at: now }
+  const updates: Record<string, unknown> = { updated_at: now, approval_state: nextVendorReviewState(vendor.approval_state, parsed.data.action) }
 
-  if (parsed.data.action === 'approve') {
+  if (parsed.data.action === 'review') {
+    updates.is_active = false
+  } else if (parsed.data.action === 'schedule_inspection') {
+    updates.is_active = false
+  } else if (parsed.data.action === 'mark_inspected') {
+    updates.site_inspected = true
+    updates.is_active = false
+  } else if (parsed.data.action === 'approve') {
+    if (!vendorReadyForApproval(vendor)) {
+      return NextResponse.json(
+        { error: 'Capture the official GPS pin and storefront photo before approval.' },
+        { status: 409 },
+      )
+    }
     updates.is_active = true
     updates.approval_state = 'approved'
     updates.id_verified = true
     updates.site_inspected = true
+    updates.business_verified = !!vendor.business_verified
     updates.approved_at = now
     updates.approved_by = session.phone
   } else if (parsed.data.action === 'reject') {
     updates.is_active = false
     updates.status = 'CLOSED'
     updates.approval_state = 'rejected'
+    updates.rejection_reason = parsed.data.reason ?? null
   } else if (parsed.data.action === 'suspend') {
     updates.is_active = false
     updates.status = 'CLOSED'
+    updates.approval_state = 'suspended'
   } else {
     if (vendor.approval_state !== 'approved') {
       return NextResponse.json({ error: 'Approve this vendor before unsuspending.' }, { status: 409 })
     }
     updates.is_active = true
     updates.status = 'OPEN'
+    updates.approval_state = 'approved'
   }
 
   await db.from('vendors').update(updates).eq('id', id)

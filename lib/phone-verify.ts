@@ -82,7 +82,7 @@ export async function checkCode(phone: string, code: string): Promise<VerifyResu
 // account via /register; "reset" → set a new login PIN via /api/auth/pin/reset;
 // "admin_create" → an admin/super-admin provisioning a vendor/rider/admin account
 // (the new owner reads the WhatsApp code back during onboarding).
-export type VerifyPurpose = 'signup' | 'reset' | 'admin_create'
+export type VerifyPurpose = 'signup' | 'reset' | 'admin_create' | 'application'
 
 /**
  * Issue a signed token proving THIS phone was verified moments ago, scoped to a

@@ -14,6 +14,7 @@ import { getFeature } from '@/lib/features'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
+import { recordOrderStatusEvent, promoteVerifiedPlaceFromOrder } from '@/lib/location-intelligence'
 import {
   MAX_READY_EXTENSION_COUNT,
   ORDER_AUTO_CANCELLED_CODE,
@@ -85,7 +86,7 @@ export async function PATCH(
 
   const { data: order, error } = await db
     .from('orders')
-    .select('id, order_number, status, delivery_type, vendor_id, customer_id, rider_id, guest_phone, total_amount, subtotal, rider_delivery_cut, tip_amount, platform_markup, platform_delivery_cut, placed_at, pending_since, prep_time_minutes, promised_ready_at, promised_ready_extension_count')
+    .select('id, order_number, status, delivery_type, vendor_id, customer_id, rider_id, guest_phone, total_amount, subtotal, rider_delivery_cut, tip_amount, platform_markup, platform_delivery_cut, placed_at, pending_since, prep_time_minutes, promised_ready_at, promised_ready_extension_count, city_id, delivery_address, delivery_lodge, delivery_block, delivery_room, delivery_latitude, delivery_longitude')
     .eq('id', id)
     .single()
 
@@ -310,6 +311,31 @@ export async function PATCH(
       delivery_type: order.delivery_type,
     },
   })
+
+  void recordOrderStatusEvent(db, {
+    orderId: id,
+    actorType: session.role,
+    actorId: session.userId ?? session.phone,
+    status: newStatus,
+    latitude: parsed.data.latitude ?? null,
+    longitude: parsed.data.longitude ?? null,
+    gpsAccuracy: parsed.data.gps_accuracy ?? null,
+    validationStatus: parsed.data.latitude != null && parsed.data.longitude != null ? 'captured' : 'not_validated',
+  }).catch(() => {})
+
+  if (newStatus === 'COMPLETED' && order.delivery_type !== 'PICKUP') {
+    void promoteVerifiedPlaceFromOrder(db, {
+      orderId: id,
+      orderNumber: order.order_number as string,
+      deliveryAddress: order.delivery_address as string | null,
+      deliveryLodge: order.delivery_lodge as string | null,
+      deliveryBlock: order.delivery_block as string | null,
+      deliveryRoom: order.delivery_room as string | null,
+      latitude: parsed.data.latitude ?? (order.delivery_latitude as number | null),
+      longitude: parsed.data.longitude ?? (order.delivery_longitude as number | null),
+      cityId: order.city_id as string | null,
+    }).catch(() => {})
+  }
 
   if (newStatus === 'DELIVERED' || newStatus === 'COMPLETED') {
     void maybeApplyLateDeliveryCredit(id).catch((err) => {

@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
 
     const insert = {
       owner_name,
+      business_name: shop_name,
       shop_name,
       // The live DB (from 000_sync) carries legacy NOT NULL columns the current
       // schema dropped: `name` and `owner_phone`. Populate them from the new
@@ -91,12 +92,15 @@ export async function POST(req: NextRequest) {
       subscription_tier: subscription_tier ?? 'STANDARD',
       login_pin_hash: pinHash,
       pin_reset_pending: true,
-      is_active: true,
-      approval_state: 'approved',
-      id_verified: id_verified ?? true,
-      site_inspected: site_inspected ?? true,
-      approved_at: now,
-      approved_by: user.phone,
+      whatsapp_verified: true,
+      created_by_admin: true,
+      business_verified: false,
+      is_active: false,
+      approval_state: 'pending_review',
+      id_verified: id_verified ?? false,
+      site_inspected: site_inspected ?? false,
+      approved_at: null,
+      approved_by: null,
       created_by: user.userId ?? null,
     }
 

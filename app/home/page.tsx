@@ -66,6 +66,26 @@ async function getLocations() {
   })
 }
 
+async function getPreferredZoneId(): Promise<string | null> {
+  const session = await getCurrentUser()
+  if (!session || session.role !== 'customer') return null
+  const db = createSupabaseAdmin()
+  let customerId = session.userId ?? null
+  if (!customerId) {
+    const { data } = await db.from('customers').select('id').eq('phone', session.phone).maybeSingle()
+    customerId = (data as { id: string } | null)?.id ?? null
+  }
+  if (!customerId) return null
+  const { data } = await db
+    .from('customer_locations')
+    .select('zone_id')
+    .eq('customer_id', customerId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .maybeSingle()
+  return (data as { zone_id?: string | null } | null)?.zone_id ?? null
+}
+
 async function getVendorsAndTrending(zoneId?: string | null) {
   try {
     const db = createSupabaseAdmin()
@@ -115,8 +135,9 @@ export default async function CustomerHomePage() {
     getFeature('study'),
     getFeature('customer_wallet_enabled'),
   ])
+  const preferredZoneId = await getPreferredZoneId()
   const [{ vendors, trending }] = await Promise.all([
-    getVendorsAndTrending(locations[0]?.zone_id ?? null),
+    getVendorsAndTrending(preferredZoneId ?? locations[0]?.zone_id ?? null),
   ])
 
   // The signed-in customer's favourite vendor ids — powers the heart state + the
@@ -236,7 +257,12 @@ export default async function CustomerHomePage() {
 
         <div id="vendors" className="scroll-mt-20">
           <Suspense fallback={<SkeletonGrid />}>
-            <HomepageClient initialVendors={vendors as VendorData[]} initialFavorites={favorites} initialLocations={locations as HomeLocationRow[]} />
+            <HomepageClient
+              initialVendors={vendors as VendorData[]}
+              initialFavorites={favorites}
+              initialLocations={locations as HomeLocationRow[]}
+              initialSelectedZoneId={preferredZoneId ?? locations[0]?.zone_id ?? ''}
+            />
           </Suspense>
         </div>
       </div>

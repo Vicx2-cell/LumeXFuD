@@ -11,12 +11,27 @@ interface RiderRow {
   phone: string
   full_name: string
   status: string
+  approval_state: string
   is_active: boolean
   approved_at: string | null
   avg_rating: number
   total_deliveries: number
   trust_tier: string
   created_at: string
+}
+
+const STATE_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  application_submitted: 'Application submitted',
+  under_review: 'Under review',
+  verification_failed: 'Verification failed',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  suspended: 'Suspended',
+  offline: 'Offline',
+  online: 'Online',
+  on_delivery: 'On delivery',
+  pending_review: 'Pending review',
 }
 
 const TRUST_COLORS: Record<string, string> = {
@@ -49,9 +64,10 @@ export default function AdminRiders() {
     setLoading(false)
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchRiders() }, [])
 
-  async function doAction(riderId: string, action: 'approve' | 'suspend' | 'unsuspend') {
+  async function doAction(riderId: string, action: 'review' | 'verification_failed' | 'approve' | 'suspend' | 'unsuspend') {
     setActionLoading(riderId + action)
     const res = await fetch(`/api/admin/riders/${riderId}`, {
       method: 'PATCH',
@@ -150,16 +166,9 @@ export default function AdminRiders() {
                           {r.trust_tier}
                         </span>
                       )}
-                      {!r.approved_at && (
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}>
-                          Pending
-                        </span>
-                      )}
-                      {r.approved_at && !r.is_active && (
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}>
-                          Suspended
-                        </span>
-                      )}
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.07)', color: '#fff' }}>
+                        {STATE_LABELS[r.approval_state] ?? r.approval_state}
+                      </span>
                     </div>
                     <p className="text-sm text-white/40 mt-0.5">{r.phone}</p>
                   </div>
@@ -175,15 +184,31 @@ export default function AdminRiders() {
                 </div>
 
                 <div className="flex gap-2 flex-wrap">
-                  {!r.approved_at && (
-                    <button onClick={() => doAction(r.id, 'approve')}
-                      disabled={actionLoading === r.id + 'approve'}
+                  {(r.approval_state === 'application_submitted' || r.approval_state === 'pending_review' || r.approval_state === 'draft') && (
+                    <button onClick={() => doAction(r.id, 'review')}
+                      disabled={actionLoading === r.id + 'review'}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
-                      style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
-                      {actionLoading === r.id + 'approve' ? '…' : 'Approve'}
+                      style={{ background: 'rgba(96,165,250,0.15)', color: '#60A5FA', border: '1px solid rgba(96,165,250,0.3)' }}>
+                      {actionLoading === r.id + 'review' ? '…' : 'Under review'}
                     </button>
                   )}
-                  {r.approved_at && r.is_active && (
+                  {r.approval_state === 'under_review' && (
+                    <>
+                      <button onClick={() => doAction(r.id, 'approve')}
+                        disabled={actionLoading === r.id + 'approve'}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+                        style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
+                        {actionLoading === r.id + 'approve' ? '…' : 'Approve'}
+                      </button>
+                      <button onClick={() => doAction(r.id, 'verification_failed')}
+                        disabled={actionLoading === r.id + 'verification_failed'}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+                        style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.3)' }}>
+                        {actionLoading === r.id + 'verification_failed' ? '…' : 'Verification failed'}
+                      </button>
+                    </>
+                  )}
+                  {r.approval_state === 'approved' && r.is_active && (
                     <button onClick={() => doAction(r.id, 'suspend')}
                       disabled={actionLoading === r.id + 'suspend'}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
@@ -191,7 +216,7 @@ export default function AdminRiders() {
                       {actionLoading === r.id + 'suspend' ? '…' : 'Suspend'}
                     </button>
                   )}
-                  {r.approved_at && !r.is_active && (
+                  {r.approval_state === 'suspended' && !r.is_active && (
                     <button onClick={() => doAction(r.id, 'unsuspend')}
                       disabled={actionLoading === r.id + 'unsuspend'}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"

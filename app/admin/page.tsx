@@ -32,6 +32,7 @@ const ICONS = {
   star:   svg(<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>),
   shield: svg(<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M9 12h6"/></>),
   pin:    svg(<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>),
+  gps:    svg(<><path d="M12 2v3"/><path d="M12 19v3"/><path d="M2 12h3"/><path d="M19 12h3"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>),
   receipt: svg(<><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="m9 12 2 2 4-4"/></>),
   radar:  svg(<><path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"/><path d="M4 6h.01"/><path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"/><path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"/><path d="M12 18h.01"/><path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"/><circle cx="12" cy="12" r="2"/><path d="m13.41 10.59 5.66-5.66"/></>),
 } as const
@@ -45,6 +46,8 @@ const NAV_ACTIONS = [
   { href: '/admin/reviews', label: 'Reviews', icon: ICONS.star, desc: 'Screen & remove vendor reviews' },
   { href: '/admin/accounts', label: 'Accounts', icon: ICONS.shield, desc: 'Suspend accounts · adjust wallets' },
   { href: '/admin/lodges', label: 'Lodges', icon: ICONS.pin, desc: 'Add & verify ABSU lodge locations' },
+  { href: '/admin/customer-locations', label: 'Customer Pins', icon: ICONS.gps, desc: 'Review active customer GPS pins' },
+  { href: '/admin/verified-places', label: 'Verified Places', icon: ICONS.gps, desc: 'Promote delivery spots into verified places' },
   { href: '/admin/verify-receipt', label: 'Verify Receipt', icon: ICONS.receipt, desc: 'Check a wallet receipt is genuine' },
   { href: '/admin/kyc', label: 'KYC Review', icon: ICONS.shield, desc: 'Approve vendor & rider documents' },
   { href: '/admin/vendors/new', label: 'Add Vendor', icon: ICONS.plus, desc: 'Create vendor with temp PIN' },
@@ -67,7 +70,7 @@ const NAV_GROUPS = [
   {
     title: 'Platform support',
     description: 'Supporting data, moderation, and audit trails.',
-    hrefs: ['/admin/accounts', '/admin/wallets', '/admin/lodges', '/admin/reviews', '/admin/audit'],
+    hrefs: ['/admin/accounts', '/admin/wallets', '/admin/lodges', '/admin/customer-locations', '/admin/verified-places', '/admin/reviews', '/admin/audit'],
   },
 ] as const
 

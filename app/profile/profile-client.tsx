@@ -329,6 +329,20 @@ export function ProfileClient({
           </svg>
         </Link>
 
+        <Link
+          href="/profile/locations"
+          className="lx-tap flex items-center gap-3 rounded-2xl p-4 glass-thin"
+        >
+          <span className="text-2xl">🛰️</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-white">GPS pins</p>
+            <p className="text-xs text-white/50">Capture your current location and manage the active pin</p>
+          </div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </Link>
+
         {/* Appearance — light / dark / auto (customer-facing only) */}
         <div className="glass-thin rounded-2xl p-4 space-y-3">
           <h3 className="text-sm font-semibold text-white/70">Appearance</h3>
