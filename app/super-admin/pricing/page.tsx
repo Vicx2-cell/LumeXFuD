@@ -13,6 +13,21 @@ type Pricing = {
   min_order_kobo: number
 }
 
+type PricingRuleRow = {
+  id?: string
+  name: string
+  start_time: string | null
+  end_time: string | null
+  days_of_week: number[]
+  weather_trigger: string | null
+  customer_adjustment_kind: 'FIXED' | 'MULTIPLIER'
+  customer_adjustment_value: number
+  rider_bonus_kind: 'FIXED' | 'MULTIPLIER'
+  rider_bonus_value: number
+  priority: number
+  enabled: boolean
+}
+
 type LocationRow = {
   zone_id: string
   zone_name: string
@@ -28,11 +43,44 @@ type LocationRow = {
   platform_markup_kobo: number
   rider_cut_bike_kobo: number
   rider_cut_door_kobo: number
+  pricing_mode: 'FLAT' | 'DISTANCE'
+  base_distance_meters: number
+  distance_increment_meters: number
+  bike_increment_fee_kobo: number
+  door_increment_fee_kobo: number
+  bike_increment_rider_fee_kobo: number
+  door_increment_rider_fee_kobo: number
+  max_delivery_distance_meters: number
+  vendor_delivery_radius_meters: number
+  rules: PricingRuleRow[]
 }
 
 type NewLocationForm = Omit<LocationRow, 'zone_id' | 'city_id'>
 
 const STATUSES: Array<LocationRow['zone_status']> = ['ACTIVE', 'PAUSED', 'INACTIVE']
+const DAYS = [
+  { key: 0, label: 'Sun' },
+  { key: 1, label: 'Mon' },
+  { key: 2, label: 'Tue' },
+  { key: 3, label: 'Wed' },
+  { key: 4, label: 'Thu' },
+  { key: 5, label: 'Fri' },
+  { key: 6, label: 'Sat' },
+] as const
+
+const newRule = (): PricingRuleRow => ({
+  name: '',
+  start_time: null,
+  end_time: null,
+  days_of_week: [],
+  weather_trigger: null,
+  customer_adjustment_kind: 'FIXED',
+  customer_adjustment_value: 0,
+  rider_bonus_kind: 'FIXED',
+  rider_bonus_value: 0,
+  priority: 100,
+  enabled: true,
+})
 
 const toNaira = (kobo: number) => Math.round(kobo / 100)
 const fmt = (kobo: number) => `₦${toNaira(kobo).toLocaleString('en-NG')}`
@@ -51,6 +99,26 @@ function NairaInput({ label, value, onChange, hint }: { label: string; value: nu
           onChange={(e) => onChange(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
           className="flex-1 bg-transparent py-3 pr-3 text-base tabular-nums text-white outline-none"
         />
+      </div>
+      {hint && <span className="mt-1 block text-xs text-white/35">{hint}</span>}
+    </label>
+  )
+}
+
+function MeterInput({ label, value, onChange, hint }: { label: string; value: number; onChange: (n: number) => void; hint?: string }) {
+  return (
+    <label className="block">
+      <span className="text-xs text-white/55">{label}</span>
+      <div className="mt-1 flex items-center overflow-hidden rounded-xl border border-white/10 bg-white/5">
+        <input
+          type="number"
+          min={0}
+          inputMode="numeric"
+          value={Number.isFinite(value) ? value : 0}
+          onChange={(e) => onChange(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+          className="flex-1 bg-transparent px-3 py-3 text-base tabular-nums text-white outline-none"
+        />
+        <span className="px-3 text-sm text-white/40">m</span>
       </div>
       {hint && <span className="mt-1 block text-xs text-white/35">{hint}</span>}
     </label>
@@ -119,11 +187,22 @@ export default function SuperAdminPricing() {
         platform_markup_kobo: d.pricing.platform_markup_kobo,
         rider_cut_bike_kobo: d.pricing.rider_cut_bike_kobo,
         rider_cut_door_kobo: d.pricing.rider_cut_door_kobo,
+        pricing_mode: 'DISTANCE',
+        base_distance_meters: 2000,
+        distance_increment_meters: 2000,
+        bike_increment_fee_kobo: 0,
+        door_increment_fee_kobo: 0,
+        bike_increment_rider_fee_kobo: 0,
+        door_increment_rider_fee_kobo: 0,
+        max_delivery_distance_meters: 10000,
+        vendor_delivery_radius_meters: 10000,
+        rules: [],
       })
     }
     setLoading(false)
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load() }, [])
 
   function setPricing(key: keyof Pricing, n: number) {
@@ -138,6 +217,22 @@ export default function SuperAdminPricing() {
 
   function updateNewLocation(patch: Partial<NewLocationForm>) {
     setNewLocation((prev) => prev ? { ...prev, ...patch } : prev)
+    setError('')
+  }
+
+  function updateLocationRule(zoneId: string, index: number, patch: Partial<PricingRuleRow>) {
+    setLocations((prev) => prev.map((row) => row.zone_id !== zoneId ? row : {
+      ...row,
+      rules: row.rules.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, ...patch } : rule),
+    }))
+    setError('')
+  }
+
+  function updateNewLocationRule(index: number, patch: Partial<PricingRuleRow>) {
+    setNewLocation((prev) => prev ? {
+      ...prev,
+      rules: prev.rules.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, ...patch } : rule),
+    } : prev)
     setError('')
   }
 
@@ -168,6 +263,14 @@ export default function SuperAdminPricing() {
       setError("Door rider pay can't exceed the door delivery fee.")
       return
     }
+    if (row.bike_increment_rider_fee_kobo > row.bike_increment_fee_kobo) {
+      setError("Bike rider distance pay can't exceed the bike distance add-on.")
+      return
+    }
+    if (row.door_increment_rider_fee_kobo > row.door_increment_fee_kobo) {
+      setError("Door rider distance pay can't exceed the door distance add-on.")
+      return
+    }
 
     setBusyKey(row.zone_id)
     setError('')
@@ -189,6 +292,16 @@ export default function SuperAdminPricing() {
         platform_markup_kobo: row.platform_markup_kobo,
         rider_cut_bike_kobo: row.rider_cut_bike_kobo,
         rider_cut_door_kobo: row.rider_cut_door_kobo,
+        pricing_mode: row.pricing_mode,
+        base_distance_meters: row.base_distance_meters,
+        distance_increment_meters: row.distance_increment_meters,
+        bike_increment_fee_kobo: row.bike_increment_fee_kobo,
+        door_increment_fee_kobo: row.door_increment_fee_kobo,
+        bike_increment_rider_fee_kobo: row.bike_increment_rider_fee_kobo,
+        door_increment_rider_fee_kobo: row.door_increment_rider_fee_kobo,
+        max_delivery_distance_meters: row.max_delivery_distance_meters,
+        vendor_delivery_radius_meters: row.vendor_delivery_radius_meters,
+        rules: row.rules,
       }),
     })
     const d = await res.json() as { error?: string }
@@ -209,6 +322,14 @@ export default function SuperAdminPricing() {
     }
     if (newLocation.rider_cut_door_kobo > newLocation.base_door_fee_kobo) {
       setError("Door rider pay can't exceed the door delivery fee.")
+      return
+    }
+    if (newLocation.bike_increment_rider_fee_kobo > newLocation.bike_increment_fee_kobo) {
+      setError("Bike rider distance pay can't exceed the bike distance add-on.")
+      return
+    }
+    if (newLocation.door_increment_rider_fee_kobo > newLocation.door_increment_fee_kobo) {
+      setError("Door rider distance pay can't exceed the door distance add-on.")
       return
     }
 
@@ -324,6 +445,63 @@ export default function SuperAdminPricing() {
                     <NairaInput label="Platform markup" value={toNaira(newLocation.platform_markup_kobo)} onChange={(n) => updateNewLocation({ platform_markup_kobo: n * 100 })} />
                   </div>
 
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <MeterInput label="Base distance" value={newLocation.base_distance_meters} onChange={(n) => updateNewLocation({ base_distance_meters: n })} />
+                    <MeterInput label="Distance increment" value={newLocation.distance_increment_meters} onChange={(n) => updateNewLocation({ distance_increment_meters: n })} />
+                    <MeterInput label="Max delivery distance" value={newLocation.max_delivery_distance_meters} onChange={(n) => updateNewLocation({ max_delivery_distance_meters: n })} />
+                    <MeterInput label="Vendor radius" value={newLocation.vendor_delivery_radius_meters} onChange={(n) => updateNewLocation({ vendor_delivery_radius_meters: n })} />
+                    <NairaInput label="Bike add-on per step" value={toNaira(newLocation.bike_increment_fee_kobo)} onChange={(n) => updateNewLocation({ bike_increment_fee_kobo: n * 100 })} />
+                    <NairaInput label="Bike rider bonus per step" value={toNaira(newLocation.bike_increment_rider_fee_kobo)} onChange={(n) => updateNewLocation({ bike_increment_rider_fee_kobo: n * 100 })} />
+                    <NairaInput label="Door add-on per step" value={toNaira(newLocation.door_increment_fee_kobo)} onChange={(n) => updateNewLocation({ door_increment_fee_kobo: n * 100 })} />
+                    <NairaInput label="Door rider bonus per step" value={toNaira(newLocation.door_increment_rider_fee_kobo)} onChange={(n) => updateNewLocation({ door_increment_rider_fee_kobo: n * 100 })} />
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-white/10 bg-[#111113] p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-semibold text-white/80">Dynamic pricing rules</h4>
+                        <p className="mt-1 text-xs text-white/45">Optional surcharges like rain or peak hours. Each one must also pay riders more.</p>
+                      </div>
+                      <button type="button" onClick={() => updateNewLocation({ rules: [...newLocation.rules, newRule()] })} className="rounded-xl border border-amber-500/30 px-3 py-2 text-xs font-semibold text-amber-300">Add rule</button>
+                    </div>
+                    {newLocation.rules.map((rule, index) => (
+                      <div key={`new-rule-${index}`} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <TextInput label="Rule name" value={rule.name} onChange={(v) => updateNewLocationRule(index, { name: v })} />
+                          <TextInput label="Weather trigger" value={rule.weather_trigger ?? ''} onChange={(v) => updateNewLocationRule(index, { weather_trigger: v || null })} hint="Optional. Example: rain" />
+                          <TextInput label="Start time" value={rule.start_time ?? ''} onChange={(v) => updateNewLocationRule(index, { start_time: v || null })} hint="HH:MM" />
+                          <TextInput label="End time" value={rule.end_time ?? ''} onChange={(v) => updateNewLocationRule(index, { end_time: v || null })} hint="HH:MM" />
+                          <NairaInput label="Customer surcharge" value={toNaira(rule.customer_adjustment_value)} onChange={(n) => updateNewLocationRule(index, { customer_adjustment_kind: 'FIXED', customer_adjustment_value: n * 100 })} />
+                          <NairaInput label="Rider bonus" value={toNaira(rule.rider_bonus_value)} onChange={(n) => updateNewLocationRule(index, { rider_bonus_kind: 'FIXED', rider_bonus_value: n * 100 })} />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {DAYS.map((day) => {
+                            const active = rule.days_of_week.includes(day.key)
+                            return (
+                              <button
+                                key={`new-rule-day-${index}-${day.key}`}
+                                type="button"
+                                onClick={() => updateNewLocationRule(index, { days_of_week: active ? rule.days_of_week.filter((value) => value !== day.key) : [...rule.days_of_week, day.key].sort() })}
+                                className="rounded-full px-3 py-1.5 text-xs font-medium"
+                                style={{ background: active ? '#F5A623' : 'rgba(255,255,255,0.08)', color: active ? '#000' : 'rgba(255,255,255,0.7)' }}
+                              >
+                                {day.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <MeterInput label="Priority" value={rule.priority} onChange={(n) => updateNewLocationRule(index, { priority: n })} />
+                          <label className="mt-6 flex items-center gap-2 text-xs text-white/60">
+                            <input type="checkbox" checked={rule.enabled} onChange={(e) => updateNewLocationRule(index, { enabled: e.target.checked })} className="h-4 w-4 accent-amber-500" />
+                            Enabled
+                          </label>
+                          <button type="button" onClick={() => updateNewLocation({ rules: newLocation.rules.filter((_, ruleIndex) => ruleIndex !== index) })} className="mt-6 rounded-xl border border-red-500/25 px-3 py-2 text-xs font-semibold text-red-300">Remove</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
                   <button onClick={() => void createLocation()} disabled={busyKey === 'new-location'} className="lx-btn-amber mt-4 w-full py-3.5">
                     {busyKey === 'new-location' ? 'Saving…' : 'Add location'}
                   </button>
@@ -377,6 +555,63 @@ export default function SuperAdminPricing() {
 
                         <div className="mt-4 grid gap-3 sm:grid-cols-2">
                           <NairaInput label="Platform markup" value={toNaira(row.platform_markup_kobo)} onChange={(n) => updateLocation(row.zone_id, { platform_markup_kobo: n * 100 })} />
+                        </div>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          <MeterInput label="Base distance" value={row.base_distance_meters} onChange={(n) => updateLocation(row.zone_id, { base_distance_meters: n })} />
+                          <MeterInput label="Distance increment" value={row.distance_increment_meters} onChange={(n) => updateLocation(row.zone_id, { distance_increment_meters: n })} />
+                          <MeterInput label="Max delivery distance" value={row.max_delivery_distance_meters} onChange={(n) => updateLocation(row.zone_id, { max_delivery_distance_meters: n })} />
+                          <MeterInput label="Vendor radius" value={row.vendor_delivery_radius_meters} onChange={(n) => updateLocation(row.zone_id, { vendor_delivery_radius_meters: n })} />
+                          <NairaInput label="Bike add-on per step" value={toNaira(row.bike_increment_fee_kobo)} onChange={(n) => updateLocation(row.zone_id, { bike_increment_fee_kobo: n * 100 })} />
+                          <NairaInput label="Bike rider bonus per step" value={toNaira(row.bike_increment_rider_fee_kobo)} onChange={(n) => updateLocation(row.zone_id, { bike_increment_rider_fee_kobo: n * 100 })} />
+                          <NairaInput label="Door add-on per step" value={toNaira(row.door_increment_fee_kobo)} onChange={(n) => updateLocation(row.zone_id, { door_increment_fee_kobo: n * 100 })} />
+                          <NairaInput label="Door rider bonus per step" value={toNaira(row.door_increment_rider_fee_kobo)} onChange={(n) => updateLocation(row.zone_id, { door_increment_rider_fee_kobo: n * 100 })} />
+                        </div>
+
+                        <div className="mt-4 rounded-2xl border border-white/10 bg-[#111113] p-4 space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <h4 className="text-sm font-semibold text-white/80">Dynamic pricing rules</h4>
+                              <p className="mt-1 text-xs text-white/45">Examples: rain, lunch rush, dinner rush, holiday, event.</p>
+                            </div>
+                            <button type="button" onClick={() => updateLocation(row.zone_id, { rules: [...row.rules, newRule()] })} className="rounded-xl border border-amber-500/30 px-3 py-2 text-xs font-semibold text-amber-300">Add rule</button>
+                          </div>
+                          {row.rules.map((rule, index) => (
+                            <div key={`${row.zone_id}-rule-${index}`} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <TextInput label="Rule name" value={rule.name} onChange={(v) => updateLocationRule(row.zone_id, index, { name: v })} />
+                                <TextInput label="Weather trigger" value={rule.weather_trigger ?? ''} onChange={(v) => updateLocationRule(row.zone_id, index, { weather_trigger: v || null })} hint="Optional. Example: rain" />
+                                <TextInput label="Start time" value={rule.start_time ?? ''} onChange={(v) => updateLocationRule(row.zone_id, index, { start_time: v || null })} hint="HH:MM" />
+                                <TextInput label="End time" value={rule.end_time ?? ''} onChange={(v) => updateLocationRule(row.zone_id, index, { end_time: v || null })} hint="HH:MM" />
+                                <NairaInput label="Customer surcharge" value={toNaira(rule.customer_adjustment_value)} onChange={(n) => updateLocationRule(row.zone_id, index, { customer_adjustment_kind: 'FIXED', customer_adjustment_value: n * 100 })} />
+                                <NairaInput label="Rider bonus" value={toNaira(rule.rider_bonus_value)} onChange={(n) => updateLocationRule(row.zone_id, index, { rider_bonus_kind: 'FIXED', rider_bonus_value: n * 100 })} />
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {DAYS.map((day) => {
+                                  const active = rule.days_of_week.includes(day.key)
+                                  return (
+                                    <button
+                                      key={`${row.zone_id}-rule-${index}-day-${day.key}`}
+                                      type="button"
+                                      onClick={() => updateLocationRule(row.zone_id, index, { days_of_week: active ? rule.days_of_week.filter((value) => value !== day.key) : [...rule.days_of_week, day.key].sort() })}
+                                      className="rounded-full px-3 py-1.5 text-xs font-medium"
+                                      style={{ background: active ? '#F5A623' : 'rgba(255,255,255,0.08)', color: active ? '#000' : 'rgba(255,255,255,0.7)' }}
+                                    >
+                                      {day.label}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                              <div className="flex items-center justify-between gap-3">
+                                <MeterInput label="Priority" value={rule.priority} onChange={(n) => updateLocationRule(row.zone_id, index, { priority: n })} />
+                                <label className="mt-6 flex items-center gap-2 text-xs text-white/60">
+                                  <input type="checkbox" checked={rule.enabled} onChange={(e) => updateLocationRule(row.zone_id, index, { enabled: e.target.checked })} className="h-4 w-4 accent-amber-500" />
+                                  Enabled
+                                </label>
+                                <button type="button" onClick={() => updateLocation(row.zone_id, { rules: row.rules.filter((_, ruleIndex) => ruleIndex !== index) })} className="mt-6 rounded-xl border border-red-500/25 px-3 py-2 text-xs font-semibold text-red-300">Remove</button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
 
                         <button onClick={() => void saveLocation(row)} disabled={busyKey === row.zone_id} className="lx-btn-amber mt-4 w-full py-3.5">

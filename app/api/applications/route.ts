@@ -9,6 +9,8 @@ import { audit } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 
+const businessRegistrationStatus = z.enum(['cac_registered', 'cac_in_progress', 'not_registered'])
+
 const applicationInput = z.object({
   kind: z.enum(['vendor', 'rider']),
   phone: z.string().trim().min(7).max(20),
@@ -16,6 +18,9 @@ const applicationInput = z.object({
   owner_name: z.string().trim().min(2).max(100).optional(),
   full_name: z.string().trim().min(2).max(100).optional(),
   business_name: z.string().trim().min(2).max(120).optional(),
+  business_registration_status: businessRegistrationStatus.optional(),
+  cac_number: z.string().trim().min(4).max(50).optional(),
+  cac_document_url: z.string().trim().max(500).optional(),
   category: z.string().trim().min(2).max(50).optional(),
   merchant_category: z.enum(['restaurant', 'supermarket', 'pharmacy']).optional(),
   what_they_sell: z.string().trim().min(2).max(400).optional(),
@@ -39,6 +44,12 @@ const applicationInput = z.object({
     }
     if (!value.business_name) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['business_name'], message: 'Enter the business or shop name.' })
+    }
+    if (!value.business_registration_status) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['business_registration_status'], message: 'Tell us the CAC or business registration status.' })
+    }
+    if (value.business_registration_status === 'cac_registered' && !value.cac_number) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['cac_number'], message: 'Enter the CAC registration number.' })
     }
     if (!value.category && !value.merchant_category) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['category'], message: 'Choose a business category.' })
@@ -69,6 +80,34 @@ const applicationInput = z.object({
 
 function applicationVerifiedCookie(req: NextRequest): string | undefined {
   return req.cookies.get(PHONE_VERIFIED_COOKIE)?.value
+}
+
+function collectVendorReviewFlags(input: {
+  owner_name: string
+  business_name: string
+  area: string | null
+  what_they_sell: string
+  business_registration_status: z.infer<typeof businessRegistrationStatus>
+  cac_number?: string
+}) {
+  const flags: string[] = []
+  const searchable = `${input.owner_name} ${input.business_name} ${input.area ?? ''} ${input.what_they_sell}`.toLowerCase()
+  const suspiciousPhrases = ['bitcoin', 'forex', 'loan', 'investment', 'betting', 'casino', 'airdrop', 'adult', 'sex']
+
+  if (suspiciousPhrases.some((phrase) => searchable.includes(phrase))) {
+    flags.push('Contains keywords that need manual suitability review.')
+  }
+  if (searchable.includes('http://') || searchable.includes('https://') || searchable.includes('www.')) {
+    flags.push('Contains promotional links that should be checked by admin.')
+  }
+  if (input.business_registration_status === 'cac_registered' && !input.cac_number) {
+    flags.push('Marked CAC registered without a CAC number.')
+  }
+  if ((input.area ?? '').trim().length < 8) {
+    flags.push('Location description is too short for a confident review.')
+  }
+
+  return flags
 }
 
 export async function POST(req: NextRequest) {
@@ -123,6 +162,17 @@ export async function POST(req: NextRequest) {
     const category = parsed.data.category ?? parsed.data.merchant_category ?? 'restaurant'
     const rough_location_description = parsed.data.rough_location_description ?? parsed.data.area ?? null
     const what_they_sell = parsed.data.what_they_sell ?? parsed.data.notes ?? 'Not provided'
+    const business_registration_status = parsed.data.business_registration_status ?? 'not_registered'
+    const cac_number = parsed.data.cac_number?.trim() || null
+    const cac_document_url = parsed.data.cac_document_url?.trim() || null
+    const reviewFlags = collectVendorReviewFlags({
+      owner_name,
+      business_name,
+      area: rough_location_description,
+      what_they_sell,
+      business_registration_status,
+      cac_number: cac_number ?? undefined,
+    })
 
     const { data: application, error: appError } = await db
       .from('vendor_applications')
@@ -135,6 +185,15 @@ export async function POST(req: NextRequest) {
         what_they_sell,
         rough_location_description,
         operating_hours: parsed.data.operating_hours ?? null,
+        business_registration_status,
+        cac_number,
+        cac_document_url,
+        verification_context: business_registration_status === 'cac_registered'
+          ? 'Vendor says CAC is complete.'
+          : business_registration_status === 'cac_in_progress'
+            ? 'Vendor says CAC is in progress.'
+            : 'Vendor says CAC is not yet registered.',
+        review_notes: reviewFlags.length > 0 ? reviewFlags.join(' ') : null,
         status: 'application_submitted',
       })
       .select('id')
@@ -154,6 +213,9 @@ export async function POST(req: NextRequest) {
         category,
         rough_location_description,
         whatsapp_verified: verificationRequired,
+        business_registration_status,
+        cac_number,
+        cac_document_url,
         approval_state: 'application_submitted',
         is_active: false,
         status: 'CLOSED',
@@ -271,4 +333,3 @@ export async function POST(req: NextRequest) {
   res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
   return res
 }
-

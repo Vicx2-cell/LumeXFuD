@@ -7,6 +7,7 @@ import PhoneVerifyInline from '@/components/auth/PhoneVerifyInline'
 type ApplicationKind = 'vendor' | 'rider'
 type MerchantCategory = 'restaurant' | 'supermarket' | 'pharmacy'
 type VehicleType = 'bike' | 'bicycle' | 'foot'
+type BusinessRegistrationStatus = 'cac_registered' | 'cac_in_progress' | 'not_registered'
 
 const merchantOptions: Array<{ value: MerchantCategory; label: string; hint: string }> = [
   { value: 'restaurant', label: 'Restaurant', hint: 'Cooked meals and drinks' },
@@ -18,6 +19,12 @@ const vehicleOptions: Array<{ value: VehicleType; label: string; hint: string }>
   { value: 'bike', label: 'Bike', hint: 'Fastest for campus runs' },
   { value: 'bicycle', label: 'Bicycle', hint: 'Light delivery coverage' },
   { value: 'foot', label: 'On foot', hint: 'Nearby deliveries only' },
+]
+
+const businessRegistrationOptions: Array<{ value: BusinessRegistrationStatus; label: string; hint: string }> = [
+  { value: 'cac_registered', label: 'CAC registered', hint: 'Business is already registered' },
+  { value: 'cac_in_progress', label: 'CAC in progress', hint: 'Registration has started but is not complete' },
+  { value: 'not_registered', label: 'Not registered yet', hint: 'You are still operating without CAC documents' },
 ]
 
 function normalizePhoneInput(value: string) {
@@ -35,6 +42,9 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
   const [area, setArea] = useState('')
   const [businessName, setBusinessName] = useState('')
   const [merchantCategory, setMerchantCategory] = useState<MerchantCategory | ''>('')
+  const [businessRegistrationStatus, setBusinessRegistrationStatus] = useState<BusinessRegistrationStatus | ''>('')
+  const [cacNumber, setCacNumber] = useState('')
+  const [cacDocumentUrl, setCacDocumentUrl] = useState('')
   const [vehicleType, setVehicleType] = useState<VehicleType | ''>('')
   const [notes, setNotes] = useState('')
   const [guarantorName, setGuarantorName] = useState('')
@@ -56,7 +66,7 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
     : 'Tell us how you deliver. We will review your details before your rider account goes live.'
   const checklist = useMemo(
     () => isVendor
-      ? ['Your business details', 'Where you operate from', 'A number we can reach', 'Anything admin should know before review']
+      ? ['Your business details', 'Your CAC or registration status', 'Where you operate from', 'A number we can reach']
       : ['Your contact details', 'How you deliver', 'Where you are usually available', 'Anything admin should know before review'],
     [isVendor],
   )
@@ -80,6 +90,9 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
           phone,
           area,
           business_name: isVendor ? businessName : undefined,
+          business_registration_status: isVendor ? businessRegistrationStatus || undefined : undefined,
+          cac_number: isVendor ? cacNumber.trim() || undefined : undefined,
+          cac_document_url: isVendor ? cacDocumentUrl.trim() || undefined : undefined,
           merchant_category: isVendor ? merchantCategory || undefined : undefined,
           what_they_sell: isVendor ? notes.trim() || undefined : undefined,
           rough_location_description: isVendor ? area || undefined : undefined,
@@ -249,6 +262,54 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
                       )
                     })}
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="block text-xs uppercase tracking-[0.18em] text-white/40">CAC or business registration</span>
+                  <div className="grid gap-3">
+                    {businessRegistrationOptions.map((option) => {
+                      const active = businessRegistrationStatus === option.value
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => { setBusinessRegistrationStatus(option.value); setError('') }}
+                          className="rounded-2xl border px-4 py-4 text-left transition-colors"
+                          style={{
+                            background: active ? 'rgba(245,166,35,0.14)' : 'rgba(255,255,255,0.03)',
+                            borderColor: active ? 'rgba(245,166,35,0.42)' : 'rgba(255,255,255,0.08)',
+                          }}
+                        >
+                          <p className="text-sm font-medium text-white">{option.label}</p>
+                          <p className="mt-1 text-xs text-white/45">{option.hint}</p>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <label className="block text-sm text-white/75">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">CAC number</span>
+                  <input
+                    value={cacNumber}
+                    onChange={(event) => { setCacNumber(event.target.value); setError('') }}
+                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+                    placeholder="RC1234567"
+                  />
+                </label>
+
+                <label className="block text-sm text-white/75">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">CAC document URL</span>
+                  <input
+                    value={cacDocumentUrl}
+                    onChange={(event) => { setCacDocumentUrl(event.target.value); setError('') }}
+                    className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+                    placeholder="Optional link to CAC certificate or business proof"
+                  />
+                </label>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/60">
+                  We collect verification details for review, but your application can still move forward while admin confirms the documents.
                 </div>
               </>
             ) : (

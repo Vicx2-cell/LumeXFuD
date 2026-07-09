@@ -15,6 +15,12 @@ import { composeDeliveryAddress, type DeliveryAddressParts } from '@/lib/deliver
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
 
 type PaymentMethod = 'PAYSTACK' | 'WALLET' | 'SPLIT'
+type DeliveryEstimate = {
+  distanceKm: number
+  serviceFeeKobo: number
+  deliveryFeeKobo: number
+  activeSurchargeTotalKobo: number
+}
 
 function CartSection({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
@@ -54,6 +60,8 @@ export default function CartPage() {
   const [scheduleAt,    setScheduleAt]    = useState('') // datetime-local string
   const [reorderNote,   setReorderNote]   = useState('') // "some items skipped" after Order again
   const [fees,          setFees]          = useState<{ bike: number; door: number; markup: number; bonus: number } | null>(null)
+  const [estimate,      setEstimate]      = useState<DeliveryEstimate | null>(null)
+  const [estimateError, setEstimateError] = useState('')
   const [hoursLabel,    setHoursLabel]    = useState('7am – 10pm') // live opening hours
   const [now]           = useState(() => Date.now())
 
@@ -120,14 +128,53 @@ export default function CartPage() {
     } catch { /* ignore */ }
   }, [features.customer_wallet_enabled])
 
+  useEffect(() => {
+    if (deliveryType === 'PICKUP' || !coords || !cart.vendor_id) {
+      setEstimate(null)
+      setEstimateError('')
+      return
+    }
+
+    let cancelled = false
+    fetch('/api/orders/estimate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vendor_id: cart.vendor_id,
+        delivery_type: deliveryType,
+        delivery_latitude: coords.lat,
+        delivery_longitude: coords.lng,
+      }),
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => null) as { error?: string; estimate?: { distanceKm: number; serviceFeeKobo: number; deliveryFeeKobo: number; activeSurchargeTotalKobo: number } } | null
+        if (cancelled) return
+        if (!response.ok || !data?.estimate) {
+          setEstimate(null)
+          setEstimateError(data?.error ?? 'Could not estimate delivery right now.')
+          return
+        }
+        setEstimate(data.estimate)
+        setEstimateError('')
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEstimate(null)
+          setEstimateError('Could not estimate delivery right now.')
+        }
+      })
+
+    return () => { cancelled = true }
+  }, [cart.vendor_id, coords, deliveryType])
+
   const isPickup        = deliveryType === 'PICKUP'
   // Fold the structured parts into one rider-clear line ("Lodge · Block B · Room 12 · landmark").
   const composedAddress = isPickup ? '' : composeDeliveryAddress(deliveryType as 'BIKE' | 'DOOR', addr)
   // Pickup charges the SAME platform fee as delivery — just ₦0 delivery, no tip.
-  const deliveryFee     = isPickup ? 0 : deliveryType === 'BIKE'
+  const deliveryFee     = isPickup ? 0 : estimate?.deliveryFeeKobo ?? (deliveryType === 'BIKE'
     ? fees?.bike ?? 0
-    : fees?.door ?? 0
-  const platformMarkup  = fees?.markup ?? 0
+    : fees?.door ?? 0)
+  const platformMarkup  = isPickup ? (fees?.markup ?? 0) : estimate?.serviceFeeKobo ?? fees?.markup ?? 0
   const tipApplied      = isPickup ? 0 : tip
   const total           = subtotal + platformMarkup + deliveryFee + tipApplied
 
@@ -229,6 +276,7 @@ export default function CartPage() {
       }
       if (composedAddress.trim().length < 5) { setError('Please give a clearer delivery location'); return }
       if (!coords) { setError('Pin your current location before placing a delivery order'); return }
+      if (estimateError) { setError(estimateError); return }
     }
     if (!isPickup && scheduleOn && !scheduleAt) { setError('Pick a date and time for your scheduled order'); return }
     if (isPickup && !pickupAgree) { setError('Please accept the pickup collection terms to continue'); return }
@@ -363,6 +411,7 @@ export default function CartPage() {
               </p>
             )}
             {gpsMessage && <p className="text-xs text-white/45">{gpsMessage}</p>}
+            {estimateError && <p className="text-xs text-red-400">{estimateError}</p>}
           </CartSection>
         )}
 
@@ -703,6 +752,20 @@ export default function CartPage() {
               </p>
             )}
           </div>
+          {!isPickup && estimate && (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-white/60">Delivery distance</span>
+                <span>{estimate.distanceKm.toFixed(2)} km</span>
+              </div>
+              {estimate.activeSurchargeTotalKobo > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-white/60">Active surcharge</span>
+                  <span>{formatPrice(estimate.activeSurchargeTotalKobo)}</span>
+                </div>
+              )}
+            </>
+          )}
           {!isPickup && tip > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-white/60">Tip</span>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useFeatures } from '@/lib/use-features'
+import { readJsonResponse } from '@/lib/http'
 
 // Final step of "Continue with Google": a verified Google identity adds and
 // verifies a phone number, so the account we create holds the exact same data
@@ -66,7 +67,7 @@ export default function CompleteSignupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, purpose: 'signup' }),
       })
-      const data = await res.json().catch(() => ({})) as { error?: string; already_registered?: boolean }
+      const data = await readJsonResponse<{ error?: string; already_registered?: boolean }>(res) ?? {}
       if (!res.ok) {
         setError(data.error ?? 'Could not send the code.')
         setAlreadyRegistered(Boolean(data.already_registered))
@@ -89,7 +90,7 @@ export default function CompleteSignupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, code }),
       })
-      const data = await res.json().catch(() => ({})) as { error?: string; verified?: boolean }
+      const data = await readJsonResponse<{ error?: string; verified?: boolean }>(res) ?? {}
       if (!res.ok) { setError(data.error ?? 'Incorrect code.'); return }
       setPhoneVerified(true)
       setNote('Phone verified ✓')

@@ -17,10 +17,11 @@ import { getControls, withinHours } from '@/lib/controls'
 import { computePickupEta, countActivePickups } from '@/lib/pickup'
 import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
 import { anyRewardFeatureOn } from '@/lib/rewards'
-import { getDeliveryZonePricing, getMinimumOrderKobo } from '@/lib/delivery-zones'
+import { getMinimumOrderKobo } from '@/lib/delivery-zones'
 import { estimateOrderPrepMinutes } from '@/lib/prep-time'
 import { getBusyModeThrottle } from '@/lib/busy-mode'
 import { captureCustomerLocation } from '@/lib/location-intelligence'
+import { computeDeliveryPriceEstimate, getDeliveryPricingConfig, haversineDistanceMeters } from '@/lib/delivery-pricing'
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
   // Validate vendor
   const { data: vendor, error: vendorError } = await db
     .from('vendors')
-    .select('id, shop_name, status, is_active, approval_state, subscription_paid_until, prep_time_minutes, pickup_enabled, pickup_max_concurrent, city_id, zone_id')
+    .select('id, shop_name, status, is_active, approval_state, subscription_paid_until, prep_time_minutes, pickup_enabled, pickup_max_concurrent, city_id, zone_id, official_latitude, official_longitude, latitude, longitude')
     .eq('id', vendor_id)
     .is('deleted_at', null)
     .single()
@@ -216,15 +217,15 @@ export async function POST(req: NextRequest) {
   const pricingZoneId = isPickup
     ? ((vendor as { zone_id?: string | null }).zone_id ?? null)
     : zone_id ?? ((vendor as { zone_id?: string | null }).zone_id ?? null)
-  const zonePricing = await getDeliveryZonePricing({ db, zoneId: pricingZoneId })
-  if (!zonePricing) {
+  const pricingConfig = await getDeliveryPricingConfig({ db, zoneId: pricingZoneId, vendorId: vendor_id })
+  if (!pricingConfig) {
     return NextResponse.json({ error: 'Delivery pricing is not configured' }, { status: 503 })
   }
   if (!isPickup) {
-    if (zone_id && zonePricing.zoneId !== zone_id) {
+    if (zone_id && pricingConfig.zoneId !== zone_id) {
       return NextResponse.json({ error: 'That delivery area is not available right now.' }, { status: 400 })
     }
-    if (city_id && zonePricing.cityId && city_id !== zonePricing.cityId) {
+    if (city_id && pricingConfig.cityId && city_id !== pricingConfig.cityId) {
       return NextResponse.json({ error: 'That city does not match the chosen delivery area.' }, { status: 400 })
     }
   }
@@ -233,16 +234,56 @@ export async function POST(req: NextRequest) {
   // is ₦0 and there's no rider/tip. Keeping it in platform_markup means the
   // existing earnings + payout code (platform_markup → platform, subtotal →
   // vendor) works unchanged.
-  const platformMarkup: number = zonePricing.platformMarkup
-  const bikeFee: number = zonePricing.bikeFee
-  const doorFee: number = zonePricing.doorFee
-  const deliveryFee: number = isPickup ? 0 : delivery_type === 'BIKE' ? bikeFee : doorFee
-  const riderCut: number = isPickup
-    ? 0
-    : delivery_type === 'BIKE'
-      ? zonePricing.riderCutBike
-      : zonePricing.riderCutDoor
-  const platformDeliveryCut: number = deliveryFee - riderCut
+  const platformMarkup: number = pricingConfig.platformMarkup
+  let deliveryFee = 0
+  let riderCut = 0
+  let platformDeliveryCut = 0
+  let deliveryDistanceMeters: number | null = null
+  let activeSurchargeTotalKobo = 0
+  let riderBonusTotalKobo = 0
+  let deliveryPricingBreakdown: Record<string, unknown> | null = null
+  if (!isPickup) {
+    const vendorLat = Number((vendor as { official_latitude?: number | null; latitude?: number | null }).official_latitude ?? (vendor as { latitude?: number | null }).latitude)
+    const vendorLng = Number((vendor as { official_longitude?: number | null; longitude?: number | null }).official_longitude ?? (vendor as { longitude?: number | null }).longitude)
+    if (!Number.isFinite(vendorLat) || !Number.isFinite(vendorLng)) {
+      return NextResponse.json({ error: 'Vendor location is not configured yet.' }, { status: 409 })
+    }
+
+    deliveryDistanceMeters = haversineDistanceMeters(
+      { lat: vendorLat, lng: vendorLng },
+      { lat: delivery_latitude as number, lng: delivery_longitude as number },
+    )
+    const estimate = computeDeliveryPriceEstimate({
+      pricing: pricingConfig,
+      deliveryType: delivery_type as 'BIKE' | 'DOOR',
+      distanceMeters: deliveryDistanceMeters,
+    })
+    if (estimate.distanceMeters > estimate.maxDeliveryDistanceMeters) {
+      return NextResponse.json({ error: 'Delivery distance is outside the configured service area.' }, { status: 400 })
+    }
+    if (estimate.distanceMeters > estimate.vendorDeliveryRadiusMeters) {
+      return NextResponse.json({ error: 'This vendor does not deliver that far yet.' }, { status: 400 })
+    }
+
+    deliveryFee = estimate.deliveryFeeKobo
+    riderCut = estimate.riderTotalCutKobo
+    platformDeliveryCut = estimate.platformDeliveryCutKobo
+    activeSurchargeTotalKobo = estimate.activeSurchargeTotalKobo
+    riderBonusTotalKobo = estimate.riderDistanceBonusKobo + estimate.riderRuleBonusKobo
+    deliveryPricingBreakdown = {
+      distance_meters: estimate.distanceMeters,
+      distance_km: estimate.distanceKm,
+      segment_count: estimate.segmentCount,
+      base_delivery_fee_kobo: estimate.baseDeliveryFeeKobo,
+      distance_surcharge_kobo: estimate.distanceSurchargeKobo,
+      active_surcharge_total_kobo: estimate.activeSurchargeTotalKobo,
+      service_fee_kobo: estimate.serviceFeeKobo,
+      rider_base_cut_kobo: estimate.riderBaseCutKobo,
+      rider_distance_bonus_kobo: estimate.riderDistanceBonusKobo,
+      rider_rule_bonus_kobo: estimate.riderRuleBonusKobo,
+      active_adjustments: estimate.activeAdjustments,
+    }
+  }
   const tipKobo: number = isPickup ? 0 : Math.max(0, Math.min(tip_amount ?? 0, 50000))
 
   let subtotal = 0
@@ -361,8 +402,8 @@ export async function POST(req: NextRequest) {
     order_number: orderNumber,
     customer_id: customerId,
     vendor_id,
-    city_id: zonePricing.cityId ?? (vendor as { city_id?: string | null }).city_id ?? null,
-    zone_id: zonePricing.zoneId ?? (vendor as { zone_id?: string | null }).zone_id ?? null,
+    city_id: pricingConfig.cityId ?? (vendor as { city_id?: string | null }).city_id ?? null,
+    zone_id: pricingConfig.zoneId ?? (vendor as { zone_id?: string | null }).zone_id ?? null,
     status: 'PENDING_PAYMENT',
     order_state: null,
     delivery_type,
@@ -373,6 +414,10 @@ export async function POST(req: NextRequest) {
     delivery_fee: deliveryFee,
     platform_delivery_cut: platformDeliveryCut,
     rider_delivery_cut: riderCut,
+    delivery_distance_meters: deliveryDistanceMeters,
+    active_surcharge_total_kobo: activeSurchargeTotalKobo,
+    rider_bonus_total_kobo: riderBonusTotalKobo,
+    delivery_pricing_breakdown: deliveryPricingBreakdown,
     tip_amount: tipKobo,
     total_amount: totalAmount,
     // Placeholders — the real method/wallet split and any reward discount are
@@ -570,8 +615,8 @@ export async function POST(req: NextRequest) {
         deliveryNote: delivery_instructions?.trim() || null,
         latitude: delivery_latitude as number,
         longitude: delivery_longitude as number,
-        cityId: zonePricing.cityId ?? (vendor as { city_id?: string | null }).city_id ?? null,
-        zoneId: zonePricing.zoneId ?? (vendor as { zone_id?: string | null }).zone_id ?? null,
+        cityId: pricingConfig.cityId ?? (vendor as { city_id?: string | null }).city_id ?? null,
+        zoneId: pricingConfig.zoneId ?? (vendor as { zone_id?: string | null }).zone_id ?? null,
       }).catch(() => {})
     }
   }

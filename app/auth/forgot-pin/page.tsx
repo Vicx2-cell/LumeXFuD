@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import RecoveryCodeDisplay from '@/components/auth/RecoveryCodeDisplay'
 import { useFeatures } from '@/lib/use-features'
+import { readJsonResponse } from '@/lib/http'
 
 type Mode = 'phone' | 'choose' | 'questions' | 'recovery' | 'contact' | 'new-code' | 'otp'
 
@@ -132,7 +133,7 @@ export default function ForgotPinPage() {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ phone, purpose: 'reset' }),
       })
-      const data = await res.json().catch(() => ({})) as { error?: string }
+      const data = await readJsonResponse<{ error?: string }>(res) ?? {}
       if (!res.ok) {
         setError(data.error ?? 'Could not send the code.')
         // Surface OTP being off, but keep the user on the choose screen.
@@ -161,7 +162,7 @@ export default function ForgotPinPage() {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ phone, code: otpCode }),
       })
-      const data = await res.json().catch(() => ({})) as { error?: string; verified?: boolean }
+      const data = await readJsonResponse<{ error?: string; verified?: boolean }>(res) ?? {}
       if (!res.ok) { setError(data.error ?? 'Incorrect or expired code.'); return }
       setOtpStep('pin')
       setOtpNote('Phone verified ✓ Set your new PIN.')

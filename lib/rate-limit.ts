@@ -22,7 +22,7 @@ export type RateLimitResult = { success: boolean; remaining: number; reset: numb
 // failClosed: when the limiter itself errors (Redis outage / bad token), should
 // the request be allowed (open) or blocked (closed)? Default OPEN — a Redis blip
 // must never 500 a login or payment. Pass `true` only where an unmetered request
-// has a real external cost (e.g. a Sendchamp SMS), so a blip can't drain credits.
+// has a real external cost (e.g. an OTP or paid SMS), so a blip can't drain credits.
 async function check(limiter: Ratelimit | null, key: string, failClosed = false): Promise<RateLimitResult> {
   if (!limiter) {
     // Limiter unconfigured (no Upstash env). Same open/closed decision applies.
@@ -41,12 +41,16 @@ async function check(limiter: Ratelimit | null, key: string, failClosed = false)
   }
 }
 
-// 3 OTP sends per phone per hour. Fails CLOSED: each send costs a Sendchamp SMS, so
+// 5 OTP sends per phone per hour. Fails CLOSED: each send has a real external cost, so
 // if Redis is unavailable we'd rather block (user retries) than leave the
 // endpoint unmetered and burn credits.
-const _otpSendLimiter = makeRatelimit(3, 3600)
+//
+// NOTE: the `v2` key suffix intentionally resets the old quota state so users
+// already blocked by the previous 3/hour policy can try again immediately after
+// this deploy.
+const _otpSendLimiter = makeRatelimit(5, 3600)
 export async function rateLimitOtpSend(phone: string): Promise<RateLimitResult> {
-  return check(_otpSendLimiter, `otp:send:${phone}`, true)
+  return check(_otpSendLimiter, `otp:send:v2:${phone}`, true)
 }
 
 // 5 OTP verify attempts per phone per 15 minutes

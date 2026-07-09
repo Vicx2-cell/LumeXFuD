@@ -8,7 +8,7 @@
     { "path": "/api/cron/reset-daily-limits", "schedule": "0 23 * * *" },
     { "path": "/api/cron/wallet-reconciliation", "schedule": "0 5 * * *" },
     { "path": "/api/cron/subscription-check", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/recalculate-vendor-scores", "schedule": "0 23 * * 6" },
+    { "path": "/api/cron/recalculate-vendor-scores", "schedule": "0 */3 * * *" },
     { "path": "/api/cron/reset-weekly-leaderboard", "schedule": "0 23 * * 0" },
     { "path": "/api/cron/sentinel", "schedule": "*/5 * * * *" }
   ]

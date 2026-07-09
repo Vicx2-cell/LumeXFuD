@@ -9,6 +9,7 @@ import { pinStrengthError } from '@/lib/pin-weak'
 import { BackButton } from '@/components/back-button'
 import { useFeatures } from '@/lib/use-features'
 import GoogleButton from '@/components/auth/GoogleButton'
+import { readJsonResponse } from '@/lib/http'
 
 const initialForm = {
   name: '',
@@ -96,8 +97,8 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: form.phone, purpose: 'signup' }),
       })
-      const data = await res.json()
-      if (!res.ok) { setVError(data.error ?? 'Could not send the code.'); return }
+      const data = await readJsonResponse<{ error?: string }>(res)
+      if (!res.ok) { setVError(data?.error ?? 'Could not send the code.'); return }
       setCodeSent(true)
       setVNote('Code sent — check your WhatsApp.')
     } catch {
@@ -118,8 +119,8 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: form.phone, code }),
       })
-      const data = await res.json()
-      if (!res.ok) { setVError(data.error ?? 'Verification failed.'); return }
+      const data = await readJsonResponse<{ error?: string }>(res)
+      if (!res.ok) { setVError(data?.error ?? 'Verification failed.'); return }
       setPhoneVerified(true)
     } catch {
       setVError('Network error. Please try again.')

@@ -45,7 +45,7 @@ function scheduleLabel(expr: string): string {
     case '0 23 * * *': return 'daily 23:00'
     case '0 5 * * *': return 'daily 05:00'
     case '0 8 * * *': return 'daily 08:00'
-    case '0 23 * * 6': return 'weekly · Sat 23:00'
+    case '0 */3 * * *': return 'every 3 hours'
     case '0 23 * * 0': return 'weekly · Sun 23:00'
     default: return expr
   }
@@ -75,9 +75,12 @@ export default function CronHealthPage() {
   }, [])
 
   useEffect(() => {
-    load()
+    const boot = window.setTimeout(() => { void load() }, 0)
     const t = setInterval(load, 30_000)
-    return () => clearInterval(t)
+    return () => {
+      window.clearTimeout(boot)
+      clearInterval(t)
+    }
   }, [load])
 
   const runNow = async (key: string) => {

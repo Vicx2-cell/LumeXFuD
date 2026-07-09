@@ -78,7 +78,10 @@ export async function PATCH(
 
   const parsed = orderStatusInput.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid status', details: parsed.error.flatten() }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid status update', code: 'INVALID_STATUS', details: parsed.error.flatten() },
+      { status: 400 },
+    )
   }
 
   const newStatus = parsed.data.status as OrderStatus
@@ -186,8 +189,23 @@ export async function PATCH(
         { status: 409 },
       )
     }
+    if (session.role === 'rider' && newStatus === 'PICKED_UP') {
+      const riderPickupReason =
+        currentStatus === 'READY'
+          ? 'This order is ready, but it has not been assigned to you yet. Accept it first.'
+          : currentStatus === 'RIDER_ASSIGNED'
+            ? 'This order cannot be marked as picked up yet.'
+            : `This order is currently ${currentStatus}. Pickup is only allowed after assignment.`
+      return NextResponse.json(
+        { error: riderPickupReason, code: 'PICKUP_BLOCKED' },
+        { status: 400 },
+      )
+    }
     return NextResponse.json(
-      { error: `Transition from ${currentStatus} to ${newStatus} is not allowed for role ${session.role}` },
+      {
+        error: `Transition from ${currentStatus} to ${newStatus} is not allowed for role ${session.role}`,
+        code: 'STATUS_TRANSITION_BLOCKED',
+      },
       { status: 400 }
     )
   }

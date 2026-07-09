@@ -62,7 +62,7 @@ export default function PrivacyPage() {
           <p>We share data only with:</p>
           <ul className="list-disc pl-5 space-y-1 mt-1">
             <li><strong className="text-white">Paystack</strong> — payment processing and bank payouts</li>
-            <li><strong className="text-white">Sendchamp</strong> — SMS / WhatsApp / OTP notifications</li>
+            <li><strong className="text-white">Sendchamp</strong> — WhatsApp OTP notifications</li>
             <li><strong className="text-white">Supabase</strong> — database hosting</li>
             <li><strong className="text-white">Vercel</strong> — application hosting</li>
             <li><strong className="text-white">Anthropic / Google (Gemini)</strong> — power our in-app AI features; only the context needed for your request is sent, and it is not used to train their models</li>

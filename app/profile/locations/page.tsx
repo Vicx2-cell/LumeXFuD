@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/back-button'
+import { AlertBanner } from '@/components/ui/alert-banner'
 
 type LocationSource = 'customer_locations' | 'saved_places'
 
@@ -30,11 +31,15 @@ export default function ProfileLocationsPage() {
   const [lat, setLat] = useState('')
   const [lng, setLng] = useState('')
   const [toast, setToast] = useState('')
+  const [errorBanner, setErrorBanner] = useState<{ title: string; message: string } | null>(null)
 
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(''), 3000)
   }
+
+  const showError = (title: string, message: string) => setErrorBanner({ title, message })
+  const clearError = () => setErrorBanner(null)
 
   async function load() {
     const [locationsRes, placesRes] = await Promise.all([
@@ -85,6 +90,7 @@ export default function ProfileLocationsPage() {
 
   async function captureCurrent() {
     if (!('geolocation' in navigator)) {
+      showError('Could not capture location', 'Location is not supported on this device')
       showToast('Location is not supported on this device')
       return
     }
@@ -129,16 +135,20 @@ export default function ProfileLocationsPage() {
           } else {
             const data = await primary.json().catch(() => ({})) as { error?: string }
             const fallbackData = await fallback.json().catch(() => ({})) as { error?: string }
-            showToast(data.error ?? fallbackData.error ?? 'Could not save location')
+            const message = data.error ?? fallbackData.error ?? 'Could not save location'
+            showError('Could not save location', message)
+            showToast(message)
           }
         }
       } catch {
+        showError('Could not save location', 'Network error')
         showToast('Network error')
       } finally {
         setSaving(false)
       }
     }, () => {
       setSaving(false)
+      showError('Could not get location', 'Could not get your location')
       showToast('Could not get your location')
     }, { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 })
   }
@@ -154,6 +164,7 @@ export default function ProfileLocationsPage() {
       showToast('Location set as active')
       await load()
     } else {
+      showError('Could not update location', 'Could not update location')
       showToast('Could not update location')
     }
   }
@@ -165,12 +176,14 @@ export default function ProfileLocationsPage() {
       showToast('Location removed')
       await load()
     } else {
+      showError('Could not remove location', 'Could not remove location')
       showToast('Could not remove location')
     }
   }
 
   return (
     <div className="lx-page px-4 py-8">
+      <AlertBanner open={!!errorBanner} title={errorBanner?.title ?? ''} message={errorBanner?.message ?? ''} onDismiss={clearError} />
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg" style={{ background: '#F5A623', color: '#000' }}>{toast}</div>}
       <div className="mx-auto max-w-lg">
         <div className="mb-6 flex items-center gap-3">

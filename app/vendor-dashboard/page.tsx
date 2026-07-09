@@ -11,6 +11,8 @@ import { DemandBanner } from '@/components/demand-banner'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
 import { Badge } from '@/components/ui/badge'
+import { AlertBanner } from '@/components/ui/alert-banner'
+import { RoleTutorial } from '@/components/role-tutorial'
 import { GlassSheen } from '@/components/fx'
 import { hasUsableLocation } from '@/lib/vendor-location'
 import { UtensilsCrossed, Wallet, Star, Settings2, ChevronRight, MapPin } from 'lucide-react'
@@ -82,6 +84,7 @@ export default function VendorDashboard() {
   const [pauseMenuOpen, setPauseMenuOpen] = useState(false)
   const [recentOpen, setRecentOpen] = useState(false)
   const [toast, setToast] = useState('')
+  const [errorBanner, setErrorBanner] = useState<{ title: string; message: string } | null>(null)
   const audioCtx = useRef<AudioContext | null>(null)
   const knownIds = useRef<Set<string>>(new Set())
 
@@ -91,6 +94,9 @@ export default function VendorDashboard() {
     setToast(msg)
     setTimeout(() => setToast(''), 3500)
   }
+
+  const showError = (title: string, message: string) => setErrorBanner({ title, message })
+  const clearError = () => setErrorBanner(null)
 
   const alert = useCallback(() => {
     try {
@@ -203,8 +209,13 @@ export default function VendorDashboard() {
       })
       if (res.ok) { setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: newStatus } : o)); return }
       const d = await res.json().catch(() => ({})) as { error?: string }
-      showToast(d.error ?? 'Could not update the order. Refresh and try again.')
-    } catch { showToast('Network error — check your connection and try again.') }
+      const message = d.error ?? 'Could not update the order. Refresh and try again.'
+      showError('Could not update order', message)
+      showToast(message)
+    } catch {
+      showError('Could not update order', 'Network error — check your connection and try again.')
+      showToast('Network error — check your connection and try again.')
+    }
   }
 
   const cancelOrder = async (orderId: string) => {
@@ -212,8 +223,13 @@ export default function VendorDashboard() {
       const res = await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' })
       if (res.ok) { setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'CANCELLED' } : o)); return }
       const d = await res.json().catch(() => ({})) as { error?: string }
-      showToast(d.error ?? 'Could not cancel the order. Refresh and try again.')
-    } catch { showToast('Network error — check your connection and try again.') }
+      const message = d.error ?? 'Could not cancel the order. Refresh and try again.'
+      showError('Could not cancel order', message)
+      showToast(message)
+    } catch {
+      showError('Could not cancel order', 'Network error — check your connection and try again.')
+      showToast('Network error — check your connection and try again.')
+    }
   }
 
   // Pickup handover: enter the customer's 6-character code to release the order.
@@ -250,6 +266,7 @@ export default function VendorDashboard() {
   return (
     <div className="lx-page lx-console pb-10 overflow-hidden">
       <GlassSheen />
+      <AlertBanner open={!!errorBanner} title={errorBanner?.title ?? ''} message={errorBanner?.message ?? ''} onDismiss={clearError} />
       {/* Action toast — failures are never silent */}
       {toast && (
         <div className="fixed left-1/2 -translate-x-1/2 z-[60] px-4 py-3 rounded-xl text-sm font-medium lx-enter max-w-[90vw] text-center"
@@ -274,6 +291,7 @@ export default function VendorDashboard() {
             >
               {vendor?.status === 'OPEN' ? '● Open' : vendor?.status === 'BUSY' ? '● Busy' : '● Closed'}
             </Badge>
+            <RoleTutorial role="vendor" variant="icon" />
             <NotificationBell />
             <LogoutButton />
           </div>

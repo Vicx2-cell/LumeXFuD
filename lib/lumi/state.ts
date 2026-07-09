@@ -1,35 +1,63 @@
 import { Redis } from '@upstash/redis'
+import {
+  LUMI_STATE_TTL_SECONDS,
+  type LumiConversationState,
+  type LumiConversationStateInput,
+  lumiConversationStateSchema,
+} from './types'
 
-const url = process.env.UPSTASH_REDIS_REST_URL
-const token = process.env.UPSTASH_REDIS_REST_TOKEN
-if (!url || !token) {
-  // In dev, it's acceptable to allow missing Redis but production should have it
-  // Throwing would break builds that import this file server-side; instead export a noop client.
+function getRedis(): Redis | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN
+  if (!url || !token) return null
+  return new Redis({ url, token })
 }
 
-const redis = url && token ? new Redis({ url, token }) : null
+const redis = getRedis()
 
-const TTL_SECONDS = 60 * 10 // 10 minutes
-
-export type LumiState = {
-  step?: string
-  partial?: Record<string, any>
-  updatedAt?: number
+function conversationKey(userId: string): string {
+  return `lumi:conversation:${userId}`
 }
 
-export async function getState(userId: string): Promise<LumiState | null> {
+export function createIdleState(): LumiConversationState {
+  return {
+    version: 1,
+    step: 'idle',
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+export function validateConversationState(
+  value: unknown,
+): LumiConversationState | null {
+  if (!value || typeof value !== 'object') return null
+  const parsed = lumiConversationStateSchema.safeParse(value)
+  return parsed.success ? parsed.data : null
+}
+
+export async function getState(userId: string): Promise<LumiConversationState | null> {
   if (!redis) return null
-  const v = await redis.get(`lumi:state:${userId}`)
-  return v ? JSON.parse(v as string) : null
+  try {
+    const raw = await redis.get(conversationKey(userId))
+    if (!raw) return null
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return validateConversationState(parsed)
+  } catch (error) {
+    console.error('[lumi/state] failed to load conversation state:', error)
+    return null
+  }
 }
 
-export async function setState(userId: string, state: LumiState) {
+export async function setState(userId: string, input: LumiConversationStateInput): Promise<void> {
   if (!redis) return
-  state.updatedAt = Date.now()
-  await redis.set(`lumi:state:${userId}`, JSON.stringify(state), { ex: TTL_SECONDS })
+  const state = lumiConversationStateSchema.parse({
+    ...input,
+    updatedAt: new Date().toISOString(),
+  })
+  await redis.set(conversationKey(userId), state, { ex: LUMI_STATE_TTL_SECONDS })
 }
 
-export async function clearState(userId: string) {
+export async function clearState(userId: string): Promise<void> {
   if (!redis) return
-  await redis.del(`lumi:state:${userId}`)
+  await redis.del(conversationKey(userId))
 }

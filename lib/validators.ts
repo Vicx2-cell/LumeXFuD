@@ -65,6 +65,15 @@ export const createOrderInput = z.object({
   apply_reward: z.boolean().optional().default(false),
 })
 
+export const orderEstimateInput = z.object({
+  vendor_id: z.string().uuid(),
+  delivery_type: z.enum(['BIKE', 'DOOR']),
+  city_id: z.string().uuid().optional(),
+  zone_id: z.string().uuid().optional(),
+  delivery_latitude: z.number().min(-90).max(90),
+  delivery_longitude: z.number().min(-180).max(180),
+}).strict()
+
 export const orderStatusInput = z.object({
   status: z.enum([
     'VENDOR_ACCEPTED', 'PREPARING', 'READY', 'RIDER_ASSIGNED',

@@ -27,7 +27,6 @@ export async function sendWhatsAppWithFallback(params: NotifyParams): Promise<vo
     // controls unreadable — fail open and still send.
   }
 
-  // Prefer WhatsApp (approved template) when configured; SMS otherwise / on failure.
   if (whatsAppTemplateConfigured()) {
     try {
       await sendWhatsAppTemplate(params.to, params.message)
@@ -36,10 +35,11 @@ export async function sendWhatsAppWithFallback(params: NotifyParams): Promise<vo
       console.error('[notify] WhatsApp template failed, falling back to SMS:', err instanceof Error ? err.message : err)
     }
   }
+
   await sendSms(params.to, params.message)
 }
 
 // Notification copy lives alongside the sender so callers can import both from
-// one module (mirrors the old lib/termii templates split).
+// one module.
 export { renderTemplate, TEMPLATES } from './notify-templates'
 export type { TemplateName } from './notify-templates'

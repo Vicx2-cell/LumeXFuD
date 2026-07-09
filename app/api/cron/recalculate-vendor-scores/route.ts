@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { withCronHealth, verifyCronSecret } from '@/lib/cron-health'
+import { computeVendorRanking } from '@/lib/vendor-ranking'
 
 // Called weekly, Sunday midnight, by Vercel cron (vercel.json: "0 0 * * 0").
 // Recomputes the simplified MVP vendor ranking and upserts vendor_scores.
@@ -22,6 +23,12 @@ interface Agg {
   prepSamples: number
 }
 
+interface VendorMetaRow {
+  id: string
+  avg_rating: number | null
+  total_ratings: number | null
+}
+
 // Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
 export async function GET(req: NextRequest) {
   return withCronHealth('recalculate-vendor-scores', () => POST(req))
@@ -38,13 +45,14 @@ export async function POST(req: NextRequest) {
   // Active vendors.
   const { data: vendorsRaw, error: vErr } = await db
     .from('vendors')
-    .select('id')
+    .select('id, avg_rating, total_ratings')
     .is('deleted_at', null)
   if (vErr) {
     console.error('[cron/recalculate-vendor-scores] vendor query error:', vErr.message)
     return NextResponse.json({ error: 'DB query failed', detail: vErr.message }, { status: 500 })
   }
-  const vendorIds = (vendorsRaw ?? []).map((v) => (v as { id: string }).id)
+  const vendors = (vendorsRaw ?? []) as VendorMetaRow[]
+  const vendorIds = vendors.map((v) => v.id)
   if (vendorIds.length === 0) return NextResponse.json({ updated: 0 })
 
   // 30-day order window. Paginate: PostgREST caps a single response at 1000
@@ -90,25 +98,23 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date().toISOString()
-  const rows = vendorIds.map((id) => {
+  const rows = vendors.map((vendor) => {
+    const id = vendor.id
     const a = aggs.get(id) ?? { completed: 0, cancelled: 0, prepTotalMin: 0, prepSamples: 0 }
-    const total = a.completed + a.cancelled
-    const cancelRate = total > 0 ? a.cancelled / total : 0
     const avgPrep = a.prepSamples > 0 ? a.prepTotalMin / a.prepSamples : null
 
-    // Volume minus cancellations; small speed boost for sub-25-min prep.
-    let score = a.completed * 2 - a.cancelled
-    if (avgPrep !== null && avgPrep <= 25) score += 1
-
-    let tier: 'TOP' | 'STANDARD' | 'LOW'
-    if (a.completed >= 20 && cancelRate < 0.1) tier = 'TOP'
-    else if (a.completed === 0 || cancelRate > 0.3) tier = 'LOW'
-    else tier = 'STANDARD'
+    const ranking = computeVendorRanking({
+      completedOrders30d: a.completed,
+      cancelledOrders30d: a.cancelled,
+      averageRating: vendor.avg_rating,
+      totalRatings: vendor.total_ratings ?? 0,
+      averagePrepMinutes: avgPrep,
+    })
 
     return {
       vendor_id:            id,
-      composite_score:      score,
-      visibility_tier:      tier,
+      composite_score:      ranking.compositeScore,
+      visibility_tier:      ranking.visibilityTier,
       completed_orders_30d: a.completed,
       cancelled_orders_30d: a.cancelled,
       avg_prep_minutes:     avgPrep !== null ? Math.round(avgPrep * 100) / 100 : null,

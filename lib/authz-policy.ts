@@ -57,7 +57,8 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'admin/pin-resets', 'admin/reviews', 'admin/reviews/[id]', 'admin/riders',
     'admin/riders/[id]', 'admin/riders/create', 'admin/suspend',
     'admin/users/[id]/reset-pin', 'admin/vendors', 'admin/vendors/[id]',
-    'admin/vendors/create', 'admin/verify-receipt', 'admin/wallets',
+    'admin/vendors/create', 'admin/vendors/[id]/inspection', 'admin/verify-receipt', 'admin/wallets',
+    'admin/customer-locations', 'admin/verified-places', 'admin/verified-places/[id]',
     'wallet/freeze', 'wallet/unfreeze', 'paystack/refund',
   ], role(A_S)),
 
@@ -97,7 +98,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   // ── authenticated, self-scoped (ownership / multi-role enforced in-handler) ──
   ...map([
     'customer/addresses', 'customer/favorites', 'customer/places', 'customer/places/[id]',
-    'customer/places/[id]/use', 'customer/places/photo', 'profile/image',
+    'customer/places/[id]/use', 'customer/places/photo', 'profile/image', 'customer/locations', 'customer/locations/[id]',
     'group-order/[code]', 'group-order/[code]/cancel', 'group-order/[code]/items',
     'group-order/create', 'group-order/mine',
     'orders', 'orders/[id]/cancel', 'orders/[id]/reorder', 'orders/[id]/handover-code',
@@ -130,7 +131,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   'whatsapp': { kind: 'webhook' },
 
   // ── public read (unauthenticated) ──
-  ...map(['announcement', 'applications', 'delivery-locations', 'features', 'vendors', 'vendors/[id]', 'lodges', 'settings/fees'],
+  ...map(['announcement', 'applications', 'delivery-locations', 'features', 'vendors', 'vendors/[id]', 'lodges', 'settings/fees', 'orders/estimate'],
     { kind: 'public' }),
 }
 

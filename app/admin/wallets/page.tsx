@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Pill } from '@/components/ui/pill'
 import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
+import { AlertBanner } from '@/components/ui/alert-banner'
 import { GlassSheen } from '@/components/fx'
 
 interface FloatStats {
@@ -69,8 +70,11 @@ export default function AdminWalletsPage() {
   const [unfreezeReason, setUnfreezeReason] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
   const [toast, setToast] = useState('')
+  const [errorBanner, setErrorBanner] = useState<{ title: string; message: string } | null>(null)
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3500) }
+  const showError = (title: string, message: string) => setErrorBanner({ title, message })
+  const clearError = () => setErrorBanner(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -88,7 +92,8 @@ export default function AdminWalletsPage() {
     setLoading(false)
   }, [router, typeFilter, frozenFilter, search])
 
-  useEffect(() => { load() }, [load])
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
+  useEffect(() => { load() }, [])
 
   async function freezeWallet(row: WalletRow) {
     if (!freezeReason.trim()) return
@@ -100,7 +105,12 @@ export default function AdminWalletsPage() {
     })
     setActionLoading(false)
     if (res.ok) { showToast(`Wallet frozen for ${row.name}`); setSelected(null); setFreezeReason(''); load() }
-    else { const d = await res.json() as { error?: string }; showToast(d.error ?? 'Failed') }
+    else {
+      const d = await res.json() as { error?: string }
+      const message = d.error ?? 'Failed'
+      showError('Could not freeze wallet', message)
+      showToast(message)
+    }
   }
 
   async function unfreezeWallet(row: WalletRow) {
@@ -113,7 +123,12 @@ export default function AdminWalletsPage() {
     })
     setActionLoading(false)
     if (res.ok) { showToast(`Wallet unfrozen for ${row.name}`); setSelected(null); setUnfreezeReason(''); load() }
-    else { const d = await res.json() as { error?: string }; showToast(d.error ?? 'Failed') }
+    else {
+      const d = await res.json() as { error?: string }
+      const message = d.error ?? 'Failed'
+      showError('Could not unfreeze wallet', message)
+      showToast(message)
+    }
   }
 
   const badgeColor = (type: string) => {
@@ -126,6 +141,7 @@ export default function AdminWalletsPage() {
   return (
     <div className="lx-page lx-console px-4 py-8 overflow-hidden">
       <GlassSheen />
+      <AlertBanner open={!!errorBanner} title={errorBanner?.title ?? ''} message={errorBanner?.message ?? ''} onDismiss={clearError} />
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg"
           style={{ background: '#F5A623', color: '#000' }}>{toast}</div>

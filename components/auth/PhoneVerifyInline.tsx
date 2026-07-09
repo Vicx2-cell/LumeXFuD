@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { readJsonResponse } from '@/lib/http'
 
 // Inline OTP step for the admin/super-admin "create account" forms. The admin
 // sends a WhatsApp code to the new vendor/rider/admin's number and enters it back
@@ -35,8 +36,8 @@ export default function PhoneVerifyInline({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, purpose }),
       })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Could not send the code.'); return }
+      const data = await readJsonResponse<{ error?: string }>(res)
+      if (!res.ok) { setError(data?.error ?? 'Could not send the code.'); return }
       setCodeSent(true)
       setNote('Code sent to their WhatsApp.')
     } catch {
@@ -57,8 +58,8 @@ export default function PhoneVerifyInline({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, code }),
       })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Verification failed.'); return }
+      const data = await readJsonResponse<{ error?: string }>(res)
+      if (!res.ok) { setError(data?.error ?? 'Verification failed.'); return }
       onVerified()
     } catch {
       setError('Network error. Please try again.')

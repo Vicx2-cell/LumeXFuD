@@ -13,6 +13,8 @@ import { RiderHotspots } from '@/components/rider-hotspots'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
+import { AlertBanner } from '@/components/ui/alert-banner'
+import { RoleTutorial } from '@/components/role-tutorial'
 import { useFeatures } from '@/lib/use-features'
 import { waLink } from '@/lib/contact'
 import { formatAddressForRider } from '@/lib/delivery-address'
@@ -139,11 +141,33 @@ export default function RiderDashboard() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [toast, setToast] = useState('')
+  const [errorPopout, setErrorPopout] = useState<{ title: string; message: string } | null>(null)
   const prevAvailableIds = useRef<Set<string>>(new Set())
 
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(''), 3000)
+  }
+
+  const showErrorPopout = (title: string, message: string) => { setErrorPopout({ title, message }) }
+  const clearErrorPopout = () => { setErrorPopout(null) }
+
+  function explainActionFailure(
+    fallback: string,
+    payload: { error?: string; code?: string; details?: { formErrors?: string[]; fieldErrors?: Record<string, string[] | undefined> } } = {},
+  ) {
+    const parts: string[] = []
+    if (payload.error) parts.push(payload.error)
+
+    const fieldErrors = payload.details?.fieldErrors
+    const formErrors = payload.details?.formErrors ?? []
+    const statusError = fieldErrors?.status?.[0]
+    const generalError = formErrors[0]
+
+    if (payload.code === 'INVALID_STATUS' && statusError) parts.push(statusError)
+    if (payload.code === 'INVALID_STATUS' && generalError) parts.push(generalError)
+    if (parts.length === 0) parts.push(fallback)
+    return parts.join(' ')
   }
 
   async function captureGps(): Promise<{ latitude?: number; longitude?: number; gps_accuracy?: number } | null> {
@@ -240,13 +264,17 @@ export default function RiderDashboard() {
       })
       const d = await res.json().catch(() => ({})) as { error?: string; code?: string }
       if (res.ok) {
+        clearErrorPopout()
         setRider((r) => r ? { ...r, status: next } : r)
         showToast(`You are now ${next.toLowerCase()}`)
       } else {
-        showToast(d.error ?? 'Failed to update status')
+        const message = d.error ?? 'Failed to update status'
+        showErrorPopout('Could not change rider status', message)
+        showToast(message)
       }
     } catch (err) {
       console.error('[rider] toggleStatus failed:', err)
+      showErrorPopout('Could not change rider status', 'Network error. Please try again.')
       showToast('Network error. Please try again.')
     } finally {
       setStatusLoading(false)
@@ -263,9 +291,17 @@ export default function RiderDashboard() {
         body: JSON.stringify({ order_id: orderId }),
       })
       const d = await res.json().catch(() => ({})) as { error?: string; order_number?: string }
-      showToast(res.ok ? `Order ${d.order_number} accepted!` : (d.error ?? 'Order no longer available'))
+      if (res.ok) {
+        clearErrorPopout()
+        showToast(`Order ${d.order_number} accepted!`)
+      } else {
+        const message = d.error ?? 'Order no longer available'
+        showErrorPopout('Could not accept order', message)
+        showToast(message)
+      }
     } catch (err) {
       console.error('[rider] acceptOrder failed:', err)
+      showErrorPopout('Could not accept order', 'Network error. Please try again.')
       showToast('Network error. Please try again.')
     } finally {
       // Always refresh and clear the spinner, even if the request errored after
@@ -284,8 +320,9 @@ export default function RiderDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, ...gps }),
       })
-      const d = await res.json().catch(() => ({})) as { error?: string; code?: string }
+      const d = await res.json().catch(() => ({})) as { error?: string; code?: string; details?: { formErrors?: string[]; fieldErrors?: Record<string, string[] | undefined> } }
       if (res.ok) {
+        clearErrorPopout()
         showToast(
           status === 'PICKED_UP' ? 'Marked as picked up'
           : status === 'COMPLETED' ? 'Delivery completed — you can take a new order'
@@ -293,13 +330,29 @@ export default function RiderDashboard() {
         )
         await fetchData()
       } else if (d.code === 'ORDER_AUTO_CANCELLED') {
-        showToast(d.error ?? 'This order was auto-cancelled before pickup.')
+        const message = d.error ?? 'This order was auto-cancelled before pickup.'
+        showErrorPopout('Pickup could not be completed', message)
+        showToast(message)
         await fetchData()
       } else {
-        showToast(d.error ?? 'Failed to update order')
+        const message = explainActionFailure('Failed to update order', d)
+        showErrorPopout(
+          status === 'PICKED_UP' ? 'Could not mark pickup'
+          : status === 'COMPLETED' ? 'Could not complete delivery'
+          : 'Could not update order',
+          message,
+        )
+        showToast(message)
+        await fetchData()
       }
     } catch (err) {
       console.error('[rider] updateOrderStatus failed:', err)
+      showErrorPopout(
+        status === 'PICKED_UP' ? 'Could not mark pickup'
+        : status === 'COMPLETED' ? 'Could not complete delivery'
+        : 'Could not update order',
+        'Network error. Please try again.',
+      )
       showToast('Network error. Please try again.')
     } finally {
       setUpdatingStatus(false)
@@ -317,9 +370,14 @@ export default function RiderDashboard() {
         body: JSON.stringify({ ...payload, ...gps }),
       })
       const d = await res.json().catch(() => ({})) as { error?: string }
-      if (res.ok) { showToast('Delivery confirmed'); await fetchData(); return null }
-      return d.error ?? 'Could not confirm delivery.'
-    } catch { return 'Network error. Please try again.' }
+      if (res.ok) { clearErrorPopout(); showToast('Delivery confirmed'); await fetchData(); return null }
+      const message = d.error ?? 'Could not confirm delivery.'
+      showErrorPopout('Could not confirm delivery', message)
+      return message
+    } catch {
+      showErrorPopout('Could not confirm delivery', 'Network error. Please try again.')
+      return 'Network error. Please try again.'
+    }
     finally { setUpdatingStatus(false) }
   }
 
@@ -328,8 +386,10 @@ export default function RiderDashboard() {
     const form = new FormData(); form.append('file', file)
     const res = await fetch(`/api/orders/${orderId}/delivery-photo`, { method: 'POST', body: form })
     const d = await res.json().catch(() => ({})) as { error?: string }
-    if (res.ok) { showToast('Proof photo added'); await fetchData(); return null }
-    return d.error ?? 'Could not upload photo.'
+    if (res.ok) { clearErrorPopout(); showToast('Proof photo added'); await fetchData(); return null }
+    const message = d.error ?? 'Could not upload photo.'
+    showErrorPopout('Could not upload photo', message)
+    return message
   }
 
   if (loading) {
@@ -370,6 +430,12 @@ export default function RiderDashboard() {
           {toast}
         </div>
       )}
+      <AlertBanner
+        open={!!errorPopout}
+        title={errorPopout?.title ?? ''}
+        message={errorPopout?.message ?? ''}
+        onDismiss={clearErrorPopout}
+      />
 
       {/* Header */}
       <div className="px-4 pt-10 pb-4">
@@ -395,6 +461,7 @@ export default function RiderDashboard() {
           </div>
           <div className="flex flex-col items-end gap-2">
           {/* Online/Offline toggle — status conveyed by icon + text (not colour alone). */}
+            <RoleTutorial role="rider" variant="icon" />
           <button
             onClick={toggleStatus}
             disabled={statusLoading || rider.status === 'BUSY'}

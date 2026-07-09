@@ -91,7 +91,9 @@ export function OrderStatusClient({
   const isActive = !['COMPLETED', 'CANCELLED', 'REFUNDED', 'DISPUTED', 'NO_SHOW'].includes(order.status)
 
   // Keep local state in sync with refreshed server data (see polling below).
-  useEffect(() => { setOrder(initialOrder) }, [initialOrder])
+  useEffect(() => {
+    queueMicrotask(() => setOrder(initialOrder))
+  }, [initialOrder])
 
   // Live updates via polling. The anon Supabase browser client has no session
   // (this app uses a custom JWT in an httpOnly cookie), so Realtime delivers
@@ -483,12 +485,12 @@ export function OrderStatusClient({
           rated ? (
             <div className="rounded-2xl p-4 text-center lx-scale-in" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
               <p className="text-sm font-semibold text-green-300">Thanks for your review</p>
-              <p className="text-xs text-white/50 mt-1">It helps other students choose where to order.</p>
+              <p className="text-xs text-white/50 mt-1">Every honest review lifts the standard for everyone and helps the best food rise to the top.</p>
             </div>
           ) : (
             <div className="glass-thin p-5 lx-scale-in">
               <h3 className="font-semibold text-center">How was {order.vendors?.shop_name ?? 'your order'}?</h3>
-              <p className="text-xs text-white/45 text-center mt-1">Your review is public and helps other students.</p>
+              <p className="text-xs text-white/45 text-center mt-1">Share a quick review. Your voice helps good vendors grow and helps other students order with confidence.</p>
 
               {/* Stars */}
               <div className="flex justify-center gap-2 mt-4" onMouseLeave={() => setHoverStars(0)}>
@@ -721,8 +723,8 @@ function HandoverCodeCard({
   useEffect(() => {
     let stored: string | null = null
     try { stored = localStorage.getItem(storeKey) } catch { /* private mode */ }
-    if (stored) setCode(stored)
-    else void issueCode()
+    if (stored) queueMicrotask(() => setCode(stored))
+    else queueMicrotask(() => { void issueCode() })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
 

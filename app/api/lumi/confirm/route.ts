@@ -1,17 +1,25 @@
 import { NextResponse } from 'next/server'
-import { getState, clearState } from '@/lib/lumi/state'
+import { getCurrentUser } from '@/lib/session'
+import { buildConfirmationPayload, createLumiContext } from '@/lib/lumi/actions'
+import { clearState, getState } from '@/lib/lumi/state'
 
-export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({}))
-  const { userId } = body as { userId?: string }
-  if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
-  const state = await getState(userId)
-  if (!state || state.step !== 'awaiting_order_confirmation' || !state.partial) {
-    return NextResponse.json({ error: 'No pending order to confirm' }, { status: 404 })
+export async function POST() {
+  const session = await getCurrentUser()
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  // Return the draft to the client so it can POST to /api/orders with the user's session
-  const draft = state.partial
-  // Optionally clear state to avoid double-submits; client UI should handle retry semantics
-  await clearState(userId)
-  return NextResponse.json({ draft })
+
+  const ctx = await createLumiContext(session)
+  if (!ctx) {
+    return NextResponse.json({ error: 'Customer profile not found.' }, { status: 404 })
+  }
+
+  const state = await getState(ctx.customerId)
+  const payload = await buildConfirmationPayload(ctx, state)
+  if (!payload) {
+    return NextResponse.json({ error: 'No pending Lumi confirmation was found.' }, { status: 404 })
+  }
+
+  await clearState(ctx.customerId)
+  return NextResponse.json(payload)
 }

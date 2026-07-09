@@ -5,11 +5,12 @@ import { formatPrice } from '@/lib/money'
 import { BottomNav } from '@/components/nav-bottom'
 import { BackButton } from '@/components/back-button'
 import { BrandLogo } from '@/components/brand-logo'
-import { Lumi } from '@/components/chow-ai'
+import LumiChat from '@/components/LumiChat'
 import { NotificationBell } from '@/components/notification-bell'
 import { StreakNudge } from '@/components/streak-nudge'
 import { LaunchCounter } from '@/components/launch-counter'
 import ActiveGroupBanner from '@/components/active-group-banner'
+import { RoleTutorial } from '@/components/role-tutorial'
 import { getFeature } from '@/lib/features'
 import { VendorCardSkeleton } from '@/components/ui/skeleton'
 import { HomepageClient } from '../homepage-client'
@@ -190,6 +191,7 @@ export default async function CustomerHomePage() {
               <span className="lx-amber text-xs font-semibold">Wallet</span>
             </a>
             )}
+            <RoleTutorial role="customer" variant="icon" />
             <NotificationBell />
             <a
               href="/profile"
@@ -267,7 +269,7 @@ export default async function CustomerHomePage() {
         </div>
       </div>
 
-      <Lumi />
+      <LumiChat />
       <BottomNav />
     </main>
   )

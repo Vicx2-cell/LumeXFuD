@@ -1,78 +1,90 @@
-import { NextResponse } from 'next/server'
-import { matchIntent } from '@/lib/lumi/intents'
-import * as actions from '@/lib/lumi/actions'
-import { getState, setState, clearState } from '@/lib/lumi/state'
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { getCurrentUser } from '@/lib/session'
+import { rateLimitGeneric } from '@/lib/rate-limit'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { createLumiContext, processLumiMessage } from '@/lib/lumi/actions'
+import { matchIntent } from '@/lib/lumi/intents'
+import { clearState, getState, setState } from '@/lib/lumi/state'
+import { LUMI_MAX_MESSAGE_LENGTH } from '@/lib/lumi/types'
 
-export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({}))
-  const { userId, message } = body as { userId?: string; message?: string }
-  if (!userId || !message) return NextResponse.json({ error: 'userId and message required' }, { status: 400 })
+export const dynamic = 'force-dynamic'
 
-  // Check existing state
-  const state = (await getState(userId)) || null
+const requestSchema = z.object({
+  message: z.string().trim().min(1).max(LUMI_MAX_MESSAGE_LENGTH),
+})
 
-  // If there's an active conversation step, for now we just match intents fresh
-  const { intent, entities } = matchIntent(message)
+function sanitizeForLogging(message: string): string {
+  return message
+    .replace(/\b\d{12,19}\b/g, '[redacted-number]')
+    .slice(0, LUMI_MAX_MESSAGE_LENGTH)
+}
 
-  let reply
-  try {
-    switch (intent) {
-      case 'check_balance':
-        reply = await actions.handleCheckBalance(userId)
-        await clearState(userId)
-        break
-      case 'browse_vendors':
-        reply = await actions.handleBrowseVendors()
-        await clearState(userId)
-        break
-      case 'view_menu':
-        reply = await actions.handleViewMenu(entities)
-        await setState(userId, { step: 'view_menu', partial: { vendor: entities.vendor } })
-        break
-      case 'place_order':
-        // Validate and prepare an order draft; client will confirm & POST to /api/orders
-        reply = await actions.handlePlaceOrder(userId, entities)
-        // store partial draft so /api/lumi/confirm can return it
-        await setState(userId, { step: 'awaiting_order_confirmation', partial: { ...entities } })
-        break
-      case 'order_status':
-        reply = await actions.handleOrderStatus(entities)
-        await clearState(userId)
-        break
-      case 'fund_wallet':
-        reply = await actions.handleFundWallet(userId, entities)
-        await clearState(userId)
-        break
-      case 'withdraw':
-        reply = await actions.handleWithdraw()
-        await clearState(userId)
-        break
-      case 'cancel_order':
-        reply = await actions.handleCancelOrder(userId, entities)
-        await clearState(userId)
-        break
-      case 'help':
-        reply = await actions.handleHelp()
-        await clearState(userId)
-        break
-      case 'fallback':
-      default:
-        // log unmatched message
-        const db = createSupabaseAdmin()
-        try {
-          await db.from('lumi_unmatched_messages').insert({ user_id: userId, message })
-        } catch {
-          // Unmatched-message logging must not block a user-facing fallback reply.
-        }
-        reply = { text: "Sorry, I didn't understand that. Try 'View vendors' or 'Check balance'.", quickReplies: ['View vendors', 'Check balance', 'Help'] }
-        await clearState(userId)
-        break
-    }
-  } catch (err) {
-    reply = { text: 'Something went wrong. Try again later.', quickReplies: ['Help'] }
-    await clearState(userId)
+export async function POST(req: NextRequest) {
+  const session = await getCurrentUser()
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (session.role !== 'customer') {
+    return NextResponse.json({ error: 'Lumi is available for customer accounts only.' }, { status: 403 })
   }
 
-  return NextResponse.json(reply)
+  const limiterKey = `lumi:${session.userId ?? session.phone}`
+  const rl = await rateLimitGeneric(limiterKey, 20, 60)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Too many chat requests. Please wait a moment and try again.' }, { status: 429 })
+  }
+
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+
+  const parsed = requestSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Message is required and must be short.' }, { status: 400 })
+  }
+
+  const ctx = await createLumiContext(session)
+  if (!ctx) {
+    return NextResponse.json({ error: 'Customer profile not found.' }, { status: 404 })
+  }
+
+  const state = await getState(ctx.customerId)
+
+  try {
+    const result = await processLumiMessage(ctx, parsed.data.message, state)
+
+    if (result.clearState) {
+      await clearState(ctx.customerId)
+    } else if (result.nextState) {
+      await setState(ctx.customerId, result.nextState)
+    }
+
+    const intentResult = matchIntent(parsed.data.message)
+    if (intentResult.intent === 'fallback' && parsed.data.message.trim()) {
+      const db = createSupabaseAdmin()
+      db.from('lumi_unmatched_messages')
+        .insert({
+          user_id: ctx.customerId,
+          message: sanitizeForLogging(parsed.data.message),
+          normalized_message: sanitizeForLogging(intentResult.normalizedMessage),
+          active_step: state?.step ?? null,
+        })
+        .then(() => {}, (error) => {
+          console.error('[lumi] unmatched logging failed:', error)
+        })
+    }
+
+    return NextResponse.json(result.response)
+  } catch (error) {
+    console.error('[lumi] route error:', error)
+    await clearState(ctx.customerId)
+    return NextResponse.json({
+      reply: 'Something went wrong. Please try again.',
+      quickReplies: [{ id: 'help', label: 'Help', value: 'help' }],
+    }, { status: 500 })
+  }
 }

@@ -44,7 +44,7 @@ export const CRON_JOBS: CronJob[] = [
   { key: 'reset-daily-limits',        path: '/api/cron/reset-daily-limits',        schedule: '0 23 * * *',  label: 'Reset daily limits',      description: 'Resets per-day counters at midnight (Africa/Lagos).',                                          money: false, staleMs: 26 * HOUR },
   { key: 'wallet-reconciliation',     path: '/api/cron/wallet-reconciliation',     schedule: '0 5 * * *',   label: 'Wallet reconciliation',   description: 'Daily check that wallet float matches Paystack balance.',                                      money: true,  staleMs: 26 * HOUR },
   { key: 'subscription-check',        path: '/api/cron/subscription-check',        schedule: '0 8 * * *',   label: 'Subscription check',      description: 'Charges/flags overdue vendor subscriptions.',                                                  money: true,  staleMs: 26 * HOUR },
-  { key: 'recalculate-vendor-scores', path: '/api/cron/recalculate-vendor-scores', schedule: '0 23 * * 6',  label: 'Recalculate vendor scores', description: 'Weekly vendor performance/visibility re-score.',                                            money: false, staleMs: 8 * 24 * HOUR },
+  { key: 'recalculate-vendor-scores', path: '/api/cron/recalculate-vendor-scores', schedule: '0 */3 * * *', label: 'Recalculate vendor scores', description: 'Rebuilds vendor visibility from sales, reviews, reliability, and prep speed.',               money: false, staleMs: 10 * HOUR },
   { key: 'reset-weekly-leaderboard',  path: '/api/cron/reset-weekly-leaderboard',  schedule: '0 23 * * 0',  label: 'Reset weekly leaderboard', description: 'Weekly leaderboard reset.',                                                                   money: false, staleMs: 8 * 24 * HOUR },
 ]
 
