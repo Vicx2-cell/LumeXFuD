@@ -14,9 +14,8 @@ import { Badge } from '@/components/ui/badge'
 import { AlertBanner } from '@/components/ui/alert-banner'
 import { RoleTutorial } from '@/components/role-tutorial'
 import { GlassSheen } from '@/components/fx'
-import { FlyerCenter } from '@/components/vendor-marketing/FlyerCenter'
 import { hasUsableLocation } from '@/lib/vendor-location'
-import { UtensilsCrossed, Wallet, Star, Settings2, ChevronRight, MapPin, Radio } from 'lucide-react'
+import { UtensilsCrossed, Wallet, Star, Settings2, ChevronRight, MapPin } from 'lucide-react'
 
 interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
 interface VendorOrder {
@@ -87,7 +86,7 @@ export default function VendorDashboard() {
   const [statusBusy, setStatusBusy] = useState(false)
   const [pauseMenuOpen, setPauseMenuOpen] = useState(false)
   const [recentOpen, setRecentOpen] = useState(false)
-  const [activePanel, setActivePanel] = useState<'orders' | 'marketing' | 'manage'>('orders')
+  const [activePanel, setActivePanel] = useState<'orders' | 'manage'>('orders')
   const [toast, setToast] = useState('')
   const [errorBanner, setErrorBanner] = useState<{ title: string; message: string } | null>(null)
   const audioCtx = useRef<AudioContext | null>(null)
@@ -269,7 +268,6 @@ export default function VendorDashboard() {
   const readyCount = orders.filter((o) => o.status === 'READY').length
   const isPremium = !!vendor?.is_premium
   const quickActions = [
-    { href: '/feed', label: 'Feed', desc: 'Post updates', Icon: Radio },
     { href: '/vendor-dashboard/menu', label: 'Menu', desc: 'Edit prices', Icon: UtensilsCrossed },
     { href: '/vendor-dashboard/videos', label: 'Videos', desc: 'Archive flow', Icon: UtensilsCrossed },
     { href: '/vendor-dashboard/boosts', label: 'Boosts', desc: 'Sponsored push', Icon: Star },
@@ -326,7 +324,7 @@ export default function VendorDashboard() {
               <div>
                 <p className="text-xs uppercase tracking-[0.18em] text-white/40">Today</p>
                 <h2 className="text-2xl font-semibold text-white">Orders and store controls</h2>
-                <p className="mt-1 text-sm text-white/55">Accept orders, update your store, create flyers, and manage menu visibility.</p>
+                <p className="mt-1 text-sm text-white/55">Accept orders, update your store, and manage menu visibility.</p>
               </div>
               {isPremium && <Badge color="#F5A623">Premium store</Badge>}
             </div>
@@ -402,10 +400,9 @@ export default function VendorDashboard() {
           </div>
         </section>
 
-        <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-white/8 bg-black/20 p-1">
+        <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl border border-white/8 bg-black/20 p-1">
           {([
             { key: 'orders', label: 'Orders' },
-            { key: 'marketing', label: 'Marketing' },
             { key: 'manage', label: 'Manage' },
           ] as const).map((tab) => (
             <button
@@ -425,13 +422,7 @@ export default function VendorDashboard() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-4 lx-enter">
-        {activePanel === 'marketing' && (
-          <div className="max-w-3xl">
-            <FlyerCenter vendorName={vendor?.shop_name ?? 'Vendor'} isPremium={isPremium} />
-          </div>
-        )}
-
-        <div className={`${activePanel === 'marketing' ? 'hidden' : 'flex'} flex-col gap-5 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:items-start`}>
+        <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:items-start">
         {/* Controls — sidebar on desktop (right), BELOW the orders on mobile */}
         <div className={`${activePanel === 'manage' ? 'block' : 'hidden lg:block'} space-y-5 order-2 lg:order-none lg:col-start-2`}>
         {/* Location nudge — customers & riders can't find a store with no pin. */}
@@ -781,4 +772,3 @@ function OrderCard({
     </div>
   )
 }
-

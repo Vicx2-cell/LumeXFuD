@@ -142,56 +142,41 @@ async function getVendorsAndTrending(zoneId?: string | null) {
 }
 
 export default async function CustomerHomePage() {
-  const feedCampaignId = crypto.randomUUID()
-  const [locations, studyOn, walletOn] = await Promise.all([
+  const marketplaceCampaignId = crypto.randomUUID()
+  const [locations] = await Promise.all([
     getLocations(),
     getFeature('study'),
     getFeature('customer_wallet_enabled'),
   ])
   const preferredZoneId = await getPreferredZoneId()
-  const [{ vendors, trending }] = await Promise.all([
+  const [{ vendors }] = await Promise.all([
     getVendorsAndTrending(preferredZoneId ?? locations[0]?.zone_id ?? null),
   ])
 
   let favorites: string[] = []
-  let firstName = ''
   try {
     const session = await getCurrentUser()
     if (session?.userId && session.role === 'customer') {
       const db = createSupabaseAdmin()
-      const [{ data: favs }, { data: me }] = await Promise.all([
+      const [{ data: favs }] = await Promise.all([
         db.from('customer_favorites').select('vendor_id').eq('customer_id', session.userId),
-        db.from('customers').select('name').eq('id', session.userId).maybeSingle(),
       ])
       favorites = (favs ?? []).map((r) => r.vendor_id as string)
-      firstName = ((me?.name as string | null) ?? '').trim().split(' ')[0] ?? ''
     }
   } catch {
     // Non-critical - never block the home render.
   }
-
-  const lagosHour = Number(new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    hour12: false,
-    timeZone: 'Africa/Lagos',
-  }).format(new Date()))
-  const partOfDay = lagosHour < 12 ? 'morning' : lagosHour < 17 ? 'afternoon' : 'evening'
-  const greeting = `Good ${partOfDay}${firstName ? `, ${firstName}` : ''}`
 
   return (
     <main className="lx-page pb-24">
       <SmoothScroll />
       <Suspense fallback={<SkeletonGrid />}>
         <HomepageClient
-          greeting={greeting}
-          studyOn={studyOn}
-          walletOn={walletOn}
-          trending={trending}
           initialVendors={vendors as VendorData[]}
           initialFavorites={favorites}
           initialLocations={locations as HomeLocationRow[]}
           initialSelectedZoneId={preferredZoneId ?? locations[0]?.zone_id ?? ''}
-          campaignId={feedCampaignId}
+          campaignId={marketplaceCampaignId}
         />
       </Suspense>
       <LumiChat />
