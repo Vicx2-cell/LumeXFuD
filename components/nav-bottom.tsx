@@ -7,6 +7,7 @@ import { useFeatures } from '@/lib/use-features'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Home', icon: HomeIcon },
+  { href: '/feed', label: 'Feed', icon: FeedIcon, feature: 'feed_enabled' },
   { href: '/orders', label: 'Orders', icon: OrdersIcon },
   { href: '/cart', label: 'Cart', icon: CartIcon, showBadge: true },
   { href: '/leaderboard', label: 'Ranks', icon: TrophyIcon, feature: 'leaderboard' },
@@ -110,6 +111,16 @@ function HomeIcon({ active }: { active: boolean }) {
       stroke={active ? '#F5A623' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <polyline points="9,22 9,12 15,12 15,22" />
+    </svg>
+  )
+}
+
+function FeedIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+      stroke={active ? '#F5A623' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <path d="m10 9 5 3-5 3V9Z" fill={active ? '#F5A623' : 'none'} />
     </svg>
   )
 }

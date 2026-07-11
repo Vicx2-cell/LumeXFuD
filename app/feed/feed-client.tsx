@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { InfoCard } from '@/components/ui/info-card'
@@ -237,6 +238,7 @@ export function FeedClient({
     : sessionRole === 'rider'
       ? 'Rider pulse: spot busy areas, monitor orders, and watch what is moving.'
       : 'Customer feed: discover meals, creators, deals, and vendors in one place.'
+  const composerOpenByDefault = sessionRole === 'vendor'
 
   function patchFeedItem(id: string, updater: (item: RankedFeedCandidate) => RankedFeedCandidate) {
     setFeedItems((current) => current.map((item) => item.id === id ? updater(item) : item))
@@ -755,7 +757,19 @@ export function FeedClient({
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3">
+          <details open={composerOpenByDefault} className="group rounded-2xl border border-white/8 bg-black/20 p-4">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-white/45">Create</p>
+                <h2 className="text-base font-semibold text-white">
+                  {sessionRole === 'vendor' ? 'Post to the feed' : sessionRole === 'rider' ? 'Share a rider update' : 'Create a post'}
+                </h2>
+              </div>
+              <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/55 group-open:hidden">Open</span>
+              <span className="hidden rounded-full border border-white/10 px-3 py-1 text-xs text-white/55 group-open:inline">Close</span>
+            </summary>
+
+          <div className="mt-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-white/45">Composer</p>
               <h2 className="text-lg font-semibold text-white">
@@ -996,14 +1010,19 @@ export function FeedClient({
               Publish post
             </button>
           </div>
+          </details>
         </div>
       </InfoCard>
 
       {feedItems.length === 0 ? (
         <EmptyState
-          title="No feed items yet"
-          description="The feed foundation is live. Once posts arrive, likes, follows, reposts, reports, and saves will appear here."
-          action={<a href="/vendor-dashboard" className="lx-btn-amber">Go to vendor dashboard</a>}
+          title={sessionRole === 'vendor' ? 'No posts are live yet' : 'No feed posts yet'}
+          description={sessionRole === 'vendor'
+            ? 'Create your first menu update, deal or video post so customers can discover it here.'
+            : 'Vendor posts, deals and campus updates will appear here as soon as they are published.'}
+          action={sessionRole === 'vendor'
+            ? <button type="button" onClick={() => document.querySelector('details')?.setAttribute('open', 'true')} className="lx-btn-amber">Create post</button>
+            : <Link href="/" className="lx-btn-amber">Browse vendors</Link>}
         />
       ) : (
         <div className="space-y-4">

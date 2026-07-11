@@ -16,7 +16,7 @@ import { RoleTutorial } from '@/components/role-tutorial'
 import { GlassSheen } from '@/components/fx'
 import { FlyerCenter } from '@/components/vendor-marketing/FlyerCenter'
 import { hasUsableLocation } from '@/lib/vendor-location'
-import { UtensilsCrossed, Wallet, Star, Settings2, ChevronRight, MapPin } from 'lucide-react'
+import { UtensilsCrossed, Wallet, Star, Settings2, ChevronRight, MapPin, Radio } from 'lucide-react'
 
 interface OrderItem { id: string; name: string; quantity: number; price: number; notes: string | null; addons?: { name: string; price_kobo: number }[] }
 interface VendorOrder {
@@ -268,6 +268,7 @@ export default function VendorDashboard() {
   const readyCount = orders.filter((o) => o.status === 'READY').length
   const isPremium = !!vendor?.is_premium
   const quickActions = [
+    { href: '/feed', label: 'Feed', desc: 'Post updates', Icon: Radio },
     { href: '/vendor-dashboard/menu', label: 'Menu', desc: 'Edit prices', Icon: UtensilsCrossed },
     { href: '/vendor-dashboard/videos', label: 'Videos', desc: 'Archive flow', Icon: UtensilsCrossed },
     { href: '/vendor-dashboard/boosts', label: 'Boosts', desc: 'Sponsored push', Icon: Star },

@@ -517,6 +517,24 @@ export default function RiderDashboard() {
         </div>
       )}
 
+      <div className="mx-4 mb-5">
+        <a href="/feed" className="block lx-surface lx-tap p-4">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: 'rgba(34,197,94,0.12)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.22)' }}>
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="3" />
+                <path d="m10 9 5 3-5 3V9Z" />
+              </svg>
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white">Rider feed</p>
+              <p className="text-xs text-white/45">See busy vendors, campus posts and delivery demand signals.</p>
+            </div>
+            <ChevronRight size={16} strokeWidth={2} className="text-white/30 shrink-0" />
+          </div>
+        </a>
+      </div>
+
       {/* Current active order */}
       {current && (
         <div className="mx-4 mb-5">
