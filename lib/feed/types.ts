@@ -32,6 +32,12 @@ export interface FeedCandidate {
   authorProfileId: string
   authorHandle?: string | null
   authorDisplayName?: string | null
+  body?: string | null
+  contentWarning?: string | null
+  locationText?: string | null
+  hashtags?: string[]
+  media?: FeedMediaSummary[]
+  menuItems?: FeedMenuItemSummary[]
   vendorId?: string | null
   zoneId?: string | null
   campusId?: string | null
@@ -70,6 +76,26 @@ export interface FeedCandidate {
   viewerFollowsAuthor?: boolean
   viewerMutedAuthor?: boolean
   viewerBlockedAuthor?: boolean
+}
+
+export interface FeedMediaSummary {
+  id: string
+  kind: 'image' | 'video' | 'embed' | string
+  publicUrl: string | null
+  providerName?: string | null
+  providerUrl?: string | null
+  mimeType?: string | null
+  altText?: string | null
+  caption?: string | null
+}
+
+export interface FeedMenuItemSummary {
+  id: string
+  menuItemId: string | null
+  name: string
+  priceKobo: number
+  isAvailable: boolean
+  isPrimary: boolean
 }
 
 export interface FeedViewerContext {

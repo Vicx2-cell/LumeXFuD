@@ -87,6 +87,7 @@ export default function VendorDashboard() {
   const [statusBusy, setStatusBusy] = useState(false)
   const [pauseMenuOpen, setPauseMenuOpen] = useState(false)
   const [recentOpen, setRecentOpen] = useState(false)
+  const [activePanel, setActivePanel] = useState<'orders' | 'marketing' | 'manage'>('orders')
   const [toast, setToast] = useState('')
   const [errorBanner, setErrorBanner] = useState<{ title: string; message: string } | null>(null)
   const audioCtx = useRef<AudioContext | null>(null)
@@ -323,9 +324,9 @@ export default function VendorDashboard() {
           <div className="lx-surface p-4 space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-white/40">Dashboard board</p>
-                <h2 className="text-2xl font-semibold text-white">Clean view for today</h2>
-                <p className="mt-1 text-sm text-white/55">Orders on one side, controls on the other, with the most important actions at the top.</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-white/40">Today</p>
+                <h2 className="text-2xl font-semibold text-white">Orders and store controls</h2>
+                <p className="mt-1 text-sm text-white/55">Accept orders, update your store, create flyers, and manage menu visibility.</p>
               </div>
               {isPremium && <Badge color="#F5A623">Premium store</Badge>}
             </div>
@@ -400,11 +401,39 @@ export default function VendorDashboard() {
             </div>
           </div>
         </section>
+
+        <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-white/8 bg-black/20 p-1">
+          {([
+            { key: 'orders', label: 'Orders' },
+            { key: 'marketing', label: 'Marketing' },
+            { key: 'manage', label: 'Manage' },
+          ] as const).map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActivePanel(tab.key)}
+              className="min-h-11 rounded-xl text-sm font-bold transition"
+              style={{
+                background: activePanel === tab.key ? '#F5A623' : 'transparent',
+                color: activePanel === tab.key ? '#000' : 'rgba(255,255,255,0.62)',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col gap-5 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:items-start lx-enter">
+      <div className="max-w-6xl mx-auto px-4 py-4 lx-enter">
+        {activePanel === 'marketing' && (
+          <div className="max-w-3xl">
+            <FlyerCenter vendorName={vendor?.shop_name ?? 'Vendor'} isPremium={isPremium} />
+          </div>
+        )}
+
+        <div className={`${activePanel === 'marketing' ? 'hidden' : 'flex'} flex-col gap-5 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:items-start`}>
         {/* Controls — sidebar on desktop (right), BELOW the orders on mobile */}
-        <div className="space-y-5 order-2 lg:order-none lg:col-start-2">
+        <div className={`${activePanel === 'manage' ? 'block' : 'hidden lg:block'} space-y-5 order-2 lg:order-none lg:col-start-2`}>
         {/* Location nudge — customers & riders can't find a store with no pin. */}
         {vendor && !hasUsableLocation(vendor) && (
           <button
@@ -466,8 +495,7 @@ export default function VendorDashboard() {
         </div>
 
         {/* Orders — FIRST on mobile, left column on desktop */}
-        <div className="space-y-4 order-1 lg:order-none lg:col-start-1 lg:row-start-1">
-          <FlyerCenter vendorName={vendor?.shop_name ?? 'Vendor'} isPremium={isPremium} />
+        <div className={`${activePanel === 'orders' ? 'block' : 'hidden lg:block'} space-y-4 order-1 lg:order-none lg:col-start-1 lg:row-start-1`}>
           <p className="lx-mono px-1">Live</p>
           <div className="lx-surface p-4 space-y-4">
             <div className="flex items-start justify-between gap-3">
@@ -621,6 +649,7 @@ export default function VendorDashboard() {
         )}
 
         </div>
+      </div>
       </div>
     </div>
   )

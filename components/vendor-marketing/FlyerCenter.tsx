@@ -47,6 +47,8 @@ export function FlyerCenter({ vendorName, isPremium }: { vendorName: string; isP
   const [flyers, setFlyers] = useState<FlyerRow[]>([])
   const [popup, setPopup] = useState<FlyerRow | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [message, setMessage] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
   const openIdRef = useRef<string | null>(null)
 
@@ -138,24 +140,64 @@ export function FlyerCenter({ vendorName, isPremium }: { vendorName: string; isP
     setOpenId(flyer.id)
   }
 
+  const createFlyer = async () => {
+    setGenerating(true)
+    setMessage('')
+    try {
+      const res = await fetch('/api/vendor/marketing/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventType: 'scheduled.lunch_campaign',
+          sourceEntityId: `manual-${Date.now()}`,
+          payload: { source: 'vendor_dashboard' },
+          premium: isPremium,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string }
+        throw new Error(data.error ?? 'Could not create flyer')
+      }
+      setMessage('Flyer created. Pick one to download or share.')
+      await load()
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not create flyer')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   return (
-    <section className={`lx-surface rounded-3xl p-4 md:p-5 ${isPremium ? 'border border-amber-300/30 bg-gradient-to-br from-[#21170d] via-[#17120d] to-[#0c0a08]' : ''}`}>
+    <section className={`lx-surface rounded-2xl p-4 md:p-5 ${isPremium ? 'border border-amber-300/30 bg-gradient-to-br from-[#21170d] via-[#17120d] to-[#0c0a08]' : ''}`}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-white/40">Vendor Marketing</p>
-          <h2 className="text-lg font-semibold text-white">Generated flyers</h2>
+          <p className="text-[11px] uppercase tracking-[0.22em] text-white/40">Marketing</p>
+          <h2 className="text-lg font-semibold text-white">Flyers for WhatsApp and status</h2>
+          <p className="mt-1 text-xs text-white/45">Create a clean promo image, then download or share it.</p>
         </div>
-        {isPremium && (
-          <span className="rounded-full bg-[#F5A623] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-black">
-            Premium
-          </span>
-        )}
+        <button
+          type="button"
+          onClick={() => void createFlyer()}
+          disabled={generating}
+          className="shrink-0 rounded-full bg-[#F5A623] px-4 py-2 text-xs font-black text-black disabled:opacity-60"
+        >
+          {generating ? 'Creating...' : 'Create flyer'}
+        </button>
       </div>
+      {message && <p className="mb-3 rounded-xl border border-white/8 bg-white/[0.04] px-3 py-2 text-xs text-white/65">{message}</p>}
 
       {flyers.length === 0 ? (
         <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-8 text-center">
-          <p className="text-sm text-white/70">No automated flyers yet.</p>
-          <p className="mt-1 text-xs text-white/40">They will show up here when an event triggers one.</p>
+          <p className="text-sm font-semibold text-white/75">No flyers yet</p>
+          <p className="mt-1 text-xs text-white/40">Tap Create flyer to generate a lunch campaign from your menu and store details.</p>
+          <button
+            type="button"
+            onClick={() => void createFlyer()}
+            disabled={generating}
+            className="mt-4 rounded-full bg-[#F5A623] px-5 py-2 text-sm font-black text-black disabled:opacity-60"
+          >
+            {generating ? 'Creating...' : 'Create first flyer'}
+          </button>
         </div>
       ) : (
         <div className="grid gap-3">

@@ -120,9 +120,16 @@ async function loadFeedCandidates(tab: FeedTabKey): Promise<FeedCandidate[]> {
     .from('posts')
     .select(`
       id, author_profile_id, vendor_id, zone_id, campus_id, post_kind, status, visibility,
+      body, content_warning, location_text, hashtags_cached,
       published_at, created_at, view_count, like_count, reply_count, repost_count,
       bookmark_count, share_count, menu_click_count, cart_add_count, order_count,
-      revenue_kobo
+      revenue_kobo,
+      post_media (
+        id, media_kind, public_url, provider_name, provider_url, mime_type, alt_text, caption, sort_order, is_primary
+      ),
+      post_menu_items (
+        id, menu_item_id, menu_item_name_snapshot, menu_item_price_kobo_snapshot, is_available_snapshot, is_primary
+      )
     `)
     .eq('status', 'published')
     .is('deleted_at', null)
@@ -143,6 +150,10 @@ async function loadFeedCandidates(tab: FeedTabKey): Promise<FeedCandidate[]> {
     post_kind: FeedCandidate['postKind']
     status: FeedCandidate['status']
     visibility: FeedCandidate['visibility']
+    body?: string | null
+    content_warning?: string | null
+    location_text?: string | null
+    hashtags_cached?: string[] | null
     published_at: string | null
     created_at: string
     view_count?: number | null
@@ -155,11 +166,56 @@ async function loadFeedCandidates(tab: FeedTabKey): Promise<FeedCandidate[]> {
     cart_add_count?: number | null
     order_count?: number | null
     revenue_kobo?: number | null
+    post_media?: Array<{
+      id: string
+      media_kind: string
+      public_url: string | null
+      provider_name: string | null
+      provider_url: string | null
+      mime_type: string | null
+      alt_text: string | null
+      caption: string | null
+      sort_order: number | null
+      is_primary: boolean | null
+    }>
+    post_menu_items?: Array<{
+      id: string
+      menu_item_id: string | null
+      menu_item_name_snapshot: string | null
+      menu_item_price_kobo_snapshot: number | null
+      is_available_snapshot: boolean | null
+      is_primary: boolean | null
+    }>
   }>
 
   return rows.map((row) => ({
     id: row.id,
     authorProfileId: row.author_profile_id,
+    body: row.body ?? null,
+    contentWarning: row.content_warning ?? null,
+    locationText: row.location_text ?? null,
+    hashtags: row.hashtags_cached ?? [],
+    media: (row.post_media ?? [])
+      .slice()
+      .sort((a, b) => Number(Boolean(b.is_primary)) - Number(Boolean(a.is_primary)) || (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((media) => ({
+        id: media.id,
+        kind: media.media_kind,
+        publicUrl: media.public_url,
+        providerName: media.provider_name,
+        providerUrl: media.provider_url,
+        mimeType: media.mime_type,
+        altText: media.alt_text,
+        caption: media.caption,
+      })),
+    menuItems: (row.post_menu_items ?? []).map((item) => ({
+      id: item.id,
+      menuItemId: item.menu_item_id,
+      name: item.menu_item_name_snapshot ?? 'Menu item',
+      priceKobo: item.menu_item_price_kobo_snapshot ?? 0,
+      isAvailable: item.is_available_snapshot ?? true,
+      isPrimary: item.is_primary ?? false,
+    })),
     vendorId: row.vendor_id,
     zoneId: row.zone_id,
     campusId: row.campus_id,
