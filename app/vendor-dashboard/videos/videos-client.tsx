@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 
@@ -73,6 +74,8 @@ function fmtDate(value: string | null) {
 }
 
 export function VideosClient() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [tab, setTab] = useState<StateTab>('active')
   const [quota, setQuota] = useState<Quota | null>(null)
   const [items, setItems] = useState<Item[]>([])
@@ -94,12 +97,15 @@ export function VideosClient() {
         fetch('/api/feed/stale-suggestions'),
         fetch('/api/premium/status'),
       ])
+
       const quotaData = await quotaRes.json().catch(() => ({}))
       const listData = await listRes.json().catch(() => ({}))
       const staleData = await staleRes.json().catch(() => ({}))
       const premiumData = await premiumRes.json().catch(() => ({}))
+
       if (!quotaRes.ok) throw new Error(quotaData.error ?? 'Could not load quota')
       if (!listRes.ok) throw new Error(listData.error ?? 'Could not load videos')
+
       setQuota({ ...(quotaData.quota ?? {}), ...(listData.quota ?? {}) })
       setItems(listData.items ?? [])
       setSuggestions(staleData.suggestions ?? [])
@@ -127,6 +133,12 @@ export function VideosClient() {
     if (pct >= 0.8) return '80%'
     return null
   }, [quota])
+
+  const tiktokStatus = searchParams.get('connect') === 'tiktok'
+    ? searchParams.get('status')
+    : null
+
+  const tiktokItems = items.filter((item) => item.post_kind === 'TIKTOK' || item.post_media.some((media) => media.provider_type === 'TIKTOK'))
 
   async function mutate(url: string, method = 'POST', body?: unknown) {
     setBusy(true)
@@ -159,18 +171,15 @@ export function VideosClient() {
     await mutate(url, 'POST', action === 'delete' ? { post_ids: ids, confirm: true } : { post_ids: ids })
   }
 
-  const dismissSuggestion = (postId: string) => {
-    setSuggestions((prev) => prev.filter((item) => item.postId !== postId))
-  }
-
   return (
     <div className="lx-page lx-console pb-28 overflow-hidden">
       <div className="mx-auto max-w-5xl px-4 py-4 space-y-4">
-        <div className="lx-surface p-4">
+        <div className="lx-surface p-4 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-white/45">Video management</p>
               <h1 className="text-2xl font-semibold text-white">Videos and lifecycle</h1>
+              <p className="mt-1 text-sm text-white/55">Upload native videos in the feed composer, connect TikTok when enabled, and manage imported clips here.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge color="var(--lx-green)">Active videos: {quota ? `${quota.activeCount} / ${Number.isFinite(quota.limit) ? quota.limit : 'Unlimited'}` : '...'}</Badge>
@@ -178,8 +187,51 @@ export function VideosClient() {
               {quota?.premiumActive && <Badge color="var(--lx-green)">Premium active</Badge>}
             </div>
           </div>
-          {quotaWarning && <p className="mt-3 text-sm text-amber-300">Quota warning: {quotaWarning} used.</p>}
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+
+          {quotaWarning && <p className="text-sm text-amber-300">Quota warning: {quotaWarning} used.</p>}
+
+          {tiktokStatus && (
+            <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3 text-sm text-white/70">
+              {tiktokStatus === 'disabled' && 'TikTok connection is currently disabled by admin configuration.'}
+              {tiktokStatus === 'not_configured' && 'TikTok connect is not configured yet. The route exists, but credentials are not live.'}
+            </div>
+          )}
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => router.push('/feed')}
+              className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 text-left transition hover:border-white/15"
+            >
+              <p className="text-xs uppercase tracking-wide text-white/40">Native upload</p>
+              <p className="mt-1 text-sm font-semibold text-white">Open video composer</p>
+              <p className="mt-1 text-xs text-white/45">Create the post, upload the video, and publish from the feed composer.</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/api/auth/tiktok/start?next=/vendor-dashboard/videos')}
+              disabled={!premium?.benefits?.tiktok_connection}
+              className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 text-left transition hover:border-white/15 disabled:opacity-60"
+            >
+              <p className="text-xs uppercase tracking-wide text-white/40">TikTok connect</p>
+              <p className="mt-1 text-sm font-semibold text-white">Connect TikTok account</p>
+              <p className="mt-1 text-xs text-white/45">{premium?.benefits?.tiktok_connection ? 'Open the official connect flow.' : 'Locked until Premium entitlement is active.'}</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const target = document.getElementById('tiktok-library')
+                target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }}
+              className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 text-left transition hover:border-white/15"
+            >
+              <p className="text-xs uppercase tracking-wide text-white/40">Selection queue</p>
+              <p className="mt-1 text-sm font-semibold text-white">Review TikTok videos</p>
+              <p className="mt-1 text-xs text-white/45">{tiktokItems.length > 0 ? `${tiktokItems.length} imported video(s) ready for review.` : 'No imported TikTok videos yet.'}</p>
+            </button>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-2xl border border-white/8 p-3 bg-white/[0.03]">
               <p className="text-xs uppercase tracking-wide text-white/40">TikTok connection</p>
               <p className="mt-1 text-sm text-white">{premium?.benefits?.tiktok_connection ? 'Available' : 'Locked'}</p>
@@ -195,7 +247,8 @@ export function VideosClient() {
               </p>
             </div>
           </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-3">
+
+          <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-2xl border border-white/8 p-3 bg-white/[0.03]">
               <p className="text-xs uppercase tracking-wide text-white/40">Multiple menu tags</p>
               <p className="mt-1 text-sm text-white">{premium?.entitlements?.['premium.menu.multiple_tags'] ? 'Available' : 'Locked'}</p>
@@ -219,6 +272,7 @@ export function VideosClient() {
           {TABS.map((state) => (
             <button
               key={state}
+              type="button"
               className="lx-btn-secondary px-3 py-2 text-xs"
               onClick={() => setTab(state)}
               style={{ borderColor: tab === state ? 'rgba(245,166,35,0.45)' : undefined }}
@@ -247,6 +301,7 @@ export function VideosClient() {
                     </div>
                     <div className="flex gap-2">
                       <button
+                        type="button"
                         className="lx-btn-secondary px-3 py-2 text-xs"
                         disabled={busy}
                         onClick={() => void mutate(`/api/feed/posts/${suggestion.postId}/archive`, 'POST', { reason: 'Stale content suggestion' })}
@@ -254,8 +309,9 @@ export function VideosClient() {
                         Archive
                       </button>
                       <button
+                        type="button"
                         className="lx-btn-secondary px-3 py-2 text-xs"
-                        onClick={() => dismissSuggestion(suggestion.postId)}
+                        onClick={() => setSuggestions((prev) => prev.filter((item) => item.postId !== suggestion.postId))}
                       >
                         Dismiss
                       </button>
@@ -268,10 +324,10 @@ export function VideosClient() {
         )}
 
         <div className="flex flex-wrap gap-2">
-          <button className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy || selected.size === 0} onClick={() => void bulkAction('archive')}>Bulk archive</button>
-          <button className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy || selected.size === 0} onClick={() => void bulkAction('restore')}>Bulk restore</button>
-          <button className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy || selected.size === 0} onClick={() => void bulkAction('delete')}>Bulk delete</button>
-          <button className="lx-btn-secondary px-3 py-2 text-xs" onClick={() => void load(tab)}>Refresh</button>
+          <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy || selected.size === 0} onClick={() => void bulkAction('archive')}>Bulk archive</button>
+          <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy || selected.size === 0} onClick={() => void bulkAction('restore')}>Bulk restore</button>
+          <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy || selected.size === 0} onClick={() => void bulkAction('delete')}>Bulk delete</button>
+          <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" onClick={() => void load(tab)}>Refresh</button>
         </div>
 
         {error && <p className="text-sm text-red-400">{error}</p>}
@@ -284,8 +340,21 @@ export function VideosClient() {
           <EmptyState title={`No ${tab} videos`} description="Video lifecycle items will appear here." />
         ) : (
           <div className="space-y-3">
+            {tab === 'active' && tiktokItems.length > 0 && (
+              <section id="tiktok-library" className="lx-surface p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-white/40">TikTok library</p>
+                    <h2 className="text-lg font-semibold text-white">Select imported videos</h2>
+                  </div>
+                  <Badge color="var(--lx-amber)">{tiktokItems.length}</Badge>
+                </div>
+                <p className="text-sm text-white/55">These are the TikTok-linked clips currently visible in your library. When TikTok sync is configured, this is where you review them before attaching menu items or promotions.</p>
+              </section>
+            )}
             {items.map((item) => {
               const thumb = item.post_media[0]?.public_url ?? null
+              const providerLabel = item.post_media[0]?.provider_type ?? item.post_kind
               return (
                 <article key={item.id} className="lx-surface p-3 flex gap-3">
                   <input
@@ -314,7 +383,7 @@ export function VideosClient() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-medium text-white truncate">{item.caption ?? item.post_kind}</p>
-                        <p className="text-xs text-white/45">{item.post_kind} · {item.status} · {item.is_archived ? 'Archived' : 'Visible'}</p>
+                        <p className="text-xs text-white/45">{providerLabel} · {item.status} · {item.is_archived ? 'Archived' : 'Visible'}</p>
                       </div>
                       <Badge color="var(--lx-green)">{item.view_count} views</Badge>
                     </div>
@@ -322,15 +391,15 @@ export function VideosClient() {
                       Orders: {item.order_count} · Storage: {fmtBytes(item.storage_bytes ?? 0)} · Created: {fmtDate(item.created_at)}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <button className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy} onClick={() => void mutate(`/api/feed/posts/${item.id}/archive`, 'POST', { reason: 'Archive from manager' })}>Archive</button>
-                      <button className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy} onClick={() => void mutate(`/api/feed/posts/${item.id}/restore`, 'POST')}>Restore</button>
-                      <button className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy} onClick={() => { if (window.confirm('Delete this post?')) void mutate(`/api/feed/posts/${item.id}`, 'DELETE', { reason: 'Deleted from manager' }) }}>Delete</button>
+                      <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy} onClick={() => void mutate(`/api/feed/posts/${item.id}/archive`, 'POST', { reason: 'Archive from manager' })}>Archive</button>
+                      <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy} onClick={() => void mutate(`/api/feed/posts/${item.id}/restore`, 'POST')}>Restore</button>
+                      <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy} onClick={() => { if (window.confirm('Delete this post?')) void mutate(`/api/feed/posts/${item.id}`, 'DELETE', { reason: 'Deleted from manager' }) }}>Delete</button>
                       {item.status === 'failed' && (
-                        <button className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy} onClick={() => void mutate(`/api/feed/posts/${item.id}/retry-processing`, 'POST')}>
+                        <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy} onClick={() => void mutate(`/api/feed/posts/${item.id}/retry-processing`, 'POST')}>
                           Retry failed processing
                         </button>
                       )}
-                      <button className="lx-btn-secondary px-3 py-2 text-xs" onClick={() => setPerformanceItem(item)}>View performance</button>
+                      <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" onClick={() => setPerformanceItem(item)}>View performance</button>
                     </div>
                   </div>
                 </article>
@@ -354,7 +423,7 @@ export function VideosClient() {
                 <p className="text-xs uppercase tracking-[0.18em] text-white/45">Performance</p>
                 <h2 className="text-lg font-semibold text-white truncate">{performanceItem.caption ?? performanceItem.post_kind}</h2>
               </div>
-              <button className="lx-btn-secondary px-3 py-2 text-xs" onClick={() => setPerformanceItem(null)}>Close</button>
+              <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" onClick={() => setPerformanceItem(null)}>Close</button>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-2xl border border-white/8 p-3">

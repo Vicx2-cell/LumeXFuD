@@ -14,6 +14,20 @@ type Flyer = {
   status: string
 }
 
+async function downloadFlyer(flyer: Flyer) {
+  const res = await fetch(`/api/vendor/marketing/flyers/${flyer.id}/download`, { cache: 'no-store' })
+  if (!res.ok) throw new Error('Could not download flyer')
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = `${flyer.campaign_type}-${flyer.id}.png`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5000)
+}
+
 export default function VendorFlyerPage() {
   const params = useParams<{ id?: string }>()
   const router = useRouter()
@@ -64,8 +78,14 @@ export default function VendorFlyerPage() {
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={flyer.thumbnail_url || flyer.image_url} alt={flyer.headline} className="w-full rounded-[28px] object-cover shadow-2xl" />
+        <div className="mt-4 rounded-[24px] border border-white/8 bg-white/[0.04] p-4">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Copy package</p>
+          <p className="mt-2 text-sm font-semibold text-white">{flyer.headline}</p>
+          <p className="mt-1 text-sm text-white/65">{flyer.subheadline}</p>
+          <p className="mt-3 inline-flex rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs font-semibold text-white/80">{flyer.cta}</p>
+        </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button className="rounded-full bg-[#F5A623] px-4 py-2 text-sm font-bold text-black" onClick={() => window.open(flyer.image_url, '_blank', 'noopener,noreferrer')}>
+          <button className="rounded-full bg-[#F5A623] px-4 py-2 text-sm font-bold text-black" onClick={() => { void downloadFlyer(flyer) }}>
             Download
           </button>
           <button

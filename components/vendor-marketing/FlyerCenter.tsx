@@ -43,6 +43,25 @@ function timeAgo(iso: string): string {
   return `${d}d ago`
 }
 
+function buildFlyerWriteup(flyer: FlyerRow) {
+  const parts = [flyer.headline, flyer.subheadline, flyer.cta].filter(Boolean)
+  return parts.join('\n')
+}
+
+async function downloadFlyerFile(flyer: FlyerRow) {
+  const res = await fetch(`/api/vendor/marketing/flyers/${flyer.id}/download`, { cache: 'no-store' })
+  if (!res.ok) throw new Error('Could not download flyer')
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = `lumex-flyer-${flyer.event_type}-${flyer.variation + 1}.png`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5000)
+}
+
 export function FlyerCenter({ vendorName, isPremium }: { vendorName: string; isPremium: boolean }) {
   const [flyers, setFlyers] = useState<FlyerRow[]>([])
   const [popup, setPopup] = useState<FlyerRow | null>(null)
@@ -106,10 +125,7 @@ export function FlyerCenter({ vendorName, isPremium }: { vendorName: string; isP
         })
       }
       if (action === 'download') {
-        const link = document.createElement('a')
-        link.href = flyer.image_url
-        link.download = `lumex-flyer-${flyer.event_type}-${flyer.variation}.png`
-        link.click()
+        await downloadFlyerFile(flyer)
         await fetch(`/api/vendor/marketing/flyers/${flyer.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -125,9 +141,9 @@ export function FlyerCenter({ vendorName, isPremium }: { vendorName: string; isP
       }
 
       await load()
-    } finally {
-      setBusyId(null)
-    }
+      } finally {
+        setBusyId(null)
+      }
   }
 
   const openFlyer = async (flyer: FlyerRow) => {
@@ -215,10 +231,19 @@ export function FlyerCenter({ vendorName, isPremium }: { vendorName: string; isP
                     <span className="text-[11px] text-white/30">{timeAgo(flyer.created_at)}</span>
                   </div>
                   <p className="mt-2 text-sm font-semibold text-white">{flyer.headline || flyer.event_type.replaceAll('.', ' · ')}</p>
-                  <p className="mt-1 text-xs text-white/40">Variation {flyer.variation + 1} · {flyer.aspect_ratio}</p>
+                  <p className="mt-1 text-xs text-white/40">{flyer.subheadline}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className="rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/55">{flyer.cta}</span>
+                    <span className="rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/45">Variation {flyer.variation + 1}</span>
+                    <span className="rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/45">{flyer.aspect_ratio}</span>
+                  </div>
                   <p className="mt-1 text-[11px] text-white/35">
                     Views {flyer.metrics?.view ?? 0} · Shares {flyer.metrics?.share ?? 0} · Downloads {flyer.metrics?.download ?? 0}
                   </p>
+                  <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 p-3">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-white/35">Writeup</p>
+                    <p className="mt-1 whitespace-pre-line text-xs leading-5 text-white/72">{buildFlyerWriteup(flyer)}</p>
+                  </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button type="button" onClick={() => void track(flyer, 'download')} disabled={busyId === flyer.id} className="rounded-full bg-[#F5A623] px-3 py-1.5 text-xs font-bold text-black disabled:opacity-60">
                       Download
@@ -245,6 +270,12 @@ export function FlyerCenter({ vendorName, isPremium }: { vendorName: string; isP
             <div className="p-5">
               <p className="text-xs uppercase tracking-[0.18em] text-white/40">Your flyer is ready</p>
               <h3 className="mt-1 text-xl font-semibold text-white">Share this update with your customers.</h3>
+              <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.04] p-4">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-white/35">Writeup</p>
+                <p className="mt-2 text-sm font-semibold text-white">{popup.headline}</p>
+                <p className="mt-1 text-sm text-white/60">{popup.subheadline}</p>
+                <p className="mt-2 inline-flex rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-medium text-white/75">{popup.cta}</p>
+              </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button type="button" onClick={() => void track(popup, 'download')} className="rounded-full bg-[#F5A623] px-4 py-2 text-sm font-bold text-black">
                   Download flyer
