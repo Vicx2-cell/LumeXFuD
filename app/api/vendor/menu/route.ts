@@ -5,6 +5,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { createMenuItemInput } from '@/lib/validators'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { toKobo } from '@/lib/money'
+import { generateFlyerVariants } from '@/lib/flyer-marketing'
 
 interface AddonRow {
   id: string
@@ -104,6 +105,21 @@ export async function POST(req: NextRequest) {
         display_order: idx,
       }))
     )
+  }
+
+  try {
+    await generateFlyerVariants(db, {
+      eventType: 'menu_item.created',
+      vendorId: session.userId!,
+      sourceEntityId: item.id,
+      payload: {
+        mealId: item.id,
+        mealName: parsed.name,
+        mealPrice: `\u20A6${parsed.price_naira.toLocaleString('en-NG')}`,
+      },
+    })
+  } catch (err) {
+    console.error('[flyer-marketing] menu_item.created failed:', err instanceof Error ? err.message : err)
   }
 
   return NextResponse.json({ success: true, id: item.id })

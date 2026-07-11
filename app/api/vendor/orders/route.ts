@@ -21,7 +21,7 @@ export async function GET() {
 
   const { data: vendor, error: ve } = await db
     .from('vendors')
-    .select('id, shop_name, status, paused_until, prep_time_minutes, opening_time, closing_time, logo_url, shop_photo_url, pickup_enabled, pickup_max_concurrent, address_text, landmark, latitude, longitude')
+    .select('id, shop_name, phone, status, paused_until, prep_time_minutes, opening_time, closing_time, logo_url, shop_photo_url, pickup_enabled, pickup_max_concurrent, address_text, landmark, latitude, longitude, subscription_tier, is_premium')
     .eq('id', session.userId!)
     .single()
 

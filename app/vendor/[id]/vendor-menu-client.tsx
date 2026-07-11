@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { FOOD_BLUR } from '@/lib/blur'
 import { useRouter } from 'next/navigation'
@@ -11,6 +11,7 @@ import { VerifiedBadge } from '@/components/verified-badge'
 import { Badge } from '@/components/ui/badge'
 import { Pill } from '@/components/ui/pill'
 import { FindStoreCard } from '@/components/find-store-card'
+import { getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
 import type { VendorInfo, MenuItem, VendorReview } from './page'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks', 'Other']
@@ -36,7 +37,7 @@ function Stars({ value, size = 13 }: { value: number; size?: number }) {
   )
 }
 
-export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false }: { vendor: VendorInfo; menu: MenuItem[]; reviews?: VendorReview[]; loggedOut?: boolean }) {
+export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false, campaignId = '' }: { vendor: VendorInfo; menu: MenuItem[]; reviews?: VendorReview[]; loggedOut?: boolean; campaignId?: string }) {
   const router = useRouter()
   const { cart, addItem, clearCart, totalItems, subtotal } = useCart()
   const [activeCategory, setActiveCategory] = useState('All')
@@ -49,6 +50,8 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
   // Transient "+1" fly-to-cart cue: { id: which item, n: nonce to replay }.
   const [fly, setFly] = useState<{ id: string; n: number } | null>(null)
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([])
+  const sentProfileOpen = useRef(false)
+  const sentMenuItems = useRef<Set<string>>(new Set())
 
   const isPaused = vendor.paused_until && new Date(vendor.paused_until) > new Date()
   const isClosed = vendor.status === 'CLOSED' || isPaused
@@ -62,6 +65,27 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
     }
   }, [loggedOut, vendor.id])
 
+  useEffect(() => {
+    if (!campaignId) return
+    try { sessionStorage.setItem('lx_campaign_id', campaignId) } catch { /* ignore */ }
+  }, [campaignId])
+
+  useEffect(() => {
+    if (!campaignId || sentProfileOpen.current) return
+    sentProfileOpen.current = true
+    trackCampaignEvent({
+      campaignId,
+      vendorId: vendor.id,
+      eventType: 'vendor_profile_opened',
+      source: 'vendor',
+      placement: 'vendor_page_header',
+      targetType: 'vendor',
+      targetId: vendor.id,
+      sessionId: getCampaignSessionId(),
+      metadata: { vendor_name: vendor.shop_name },
+    })
+  }, [campaignId, vendor.id, vendor.shop_name])
+
   const vendorNext = encodeURIComponent(`/vendor/${vendor.id}`)
 
   const filtered = useMemo(() => {
@@ -71,6 +95,25 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       return matchCat && matchSearch
     })
   }, [menu, activeCategory, search])
+
+  useEffect(() => {
+    if (!campaignId) return
+    const next = filtered.slice(0, 6).filter((item) => !sentMenuItems.current.has(item.id))
+    for (const item of next) {
+      sentMenuItems.current.add(item.id)
+      trackCampaignEvent({
+        campaignId,
+        vendorId: vendor.id,
+        eventType: 'menu_item_opened',
+        source: 'menu',
+        placement: 'vendor_menu_list',
+        targetType: 'menu_item',
+        targetId: item.id,
+        sessionId: getCampaignSessionId(),
+        metadata: { item_name: item.name },
+      })
+    }
+  }, [campaignId, filtered, vendor.id])
 
   function buildCartItem(item: MenuItem, addons: CartAddon[]): CartItem {
     return {
@@ -91,6 +134,19 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       setPendingItem(cartItem)
       setShowConflict(true)
       return
+    }
+    if (campaignId) {
+      trackCampaignEvent({
+        campaignId,
+        vendorId: vendor.id,
+        eventType: 'item_added_to_cart',
+        source: 'menu',
+        placement: 'vendor_menu_add_button',
+        targetType: 'menu_item',
+        targetId: cartItem.menu_item_id,
+        sessionId: getCampaignSessionId(),
+        metadata: { item_name: cartItem.name, addons: cartItem.addons.length },
+      })
     }
     // Trigger the floating "+1" on this item's button (nonce remounts → replays).
     setFly((current) => ({ id: cartItem.menu_item_id, n: (current?.n ?? 0) + 1 }))
@@ -371,7 +427,13 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       {totalItems > 0 && cart.vendor_id === vendor.id && (
         <div className="fixed left-0 right-0 z-40 px-4 lx-enter" style={{ bottom: 'calc(72px + env(safe-area-inset-bottom))' }}>
           <div className="max-w-lg mx-auto">
-            <button onClick={() => router.push('/cart')} className="lx-btn-amber w-full py-4 flex items-center justify-between px-5" style={{ borderRadius: 16 }}>
+            <button onClick={() => {
+              try {
+                const id = campaignId || sessionStorage.getItem('lx_campaign_id') || ''
+                if (id) sessionStorage.setItem('lx_campaign_id', id)
+              } catch { /* ignore */ }
+              router.push('/cart')
+            }} className="lx-btn-amber w-full py-4 flex items-center justify-between px-5" style={{ borderRadius: 16 }}>
               <span className="w-7 h-7 rounded-full flex items-center justify-center text-sm" style={{ background: 'rgba(0,0,0,0.15)' }}>{totalItems}</span>
               <span>View Cart</span>
               <span>{formatPrice(subtotal)}</span>

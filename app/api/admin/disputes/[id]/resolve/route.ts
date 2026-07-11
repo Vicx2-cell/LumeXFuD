@@ -8,6 +8,7 @@ import { reverseOrderPayout } from '@/lib/wallet'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { requireStepUpForAmount } from '@/lib/step-up'
 import { audit } from '@/lib/audit'
+import { finalizeOrderFeedAttribution, reverseOrderFeedAttribution } from '@/lib/feed/attribution'
 
 export async function POST(
   req: NextRequest,
@@ -81,6 +82,13 @@ export async function POST(
   // Safe even if the order was never credited (no-op). Runs for REFUND only.
   if (parsed.data.resolution === 'REFUND') {
     await reverseOrderPayout(order.id as string)
+    void reverseOrderFeedAttribution(
+      order.id as string,
+      'refunded_order',
+      `Dispute resolved for customer${parsed.data.notes ? `: ${parsed.data.notes}` : ''}`,
+    ).catch((err) => {
+      console.error('[feed-attribution] dispute refund reverse failed:', err)
+    })
   }
 
   await db.from('orders').update({
@@ -115,6 +123,9 @@ export async function POST(
     // locked (release_at pushed out) when the problem was reported — release them
     // now that it's resolved in the vendor/rider's favour.
     await unlockOrderHolds(order.id as string).catch(() => {})
+    void finalizeOrderFeedAttribution(order.id as string).catch((err) => {
+      console.error('[feed-attribution] dispute finalize failed:', err)
+    })
   } else if (order.rider_id) {
     await db.from('riders')
       .update({ active_order_id: null, status: 'ONLINE', last_status_update_at: now })

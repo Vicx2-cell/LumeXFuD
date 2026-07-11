@@ -1,21 +1,8 @@
 import type { SessionRole } from './session'
 
-// ════════════════════════════════════════════════════════════════════════════
-// ROUTE_POLICY — the single source of truth for EVERY API route's authorization
-// class (FORTRESS surface #5). The authz coverage test asserts that every
-// app/api/**/route.ts file appears here; a new route that forgets to declare its
-// class FAILS CI. This is the structural guarantee that an un-gated privileged
-// route can never ship unnoticed — the #1 RLS-coverage idea applied to authz.
-//
-// Classes:
-//   role    — strict role gate (admin panel, wallet, etc.). roles = who may call.
-//   self    — authenticated; the route enforces per-row ownership / multi-role
-//             logic itself (BOLA handled in-handler, e.g. orders/[id]/*).
-//   auth    — auth flow, public by design (login, OTP, register, webauthn…).
-//   public  — unauthenticated public read (homepage vendors, fees, banner).
-//   cron    — protected by the CRON_SECRET bearer header.
-//   webhook — verified by provider HMAC (Paystack).
-// ════════════════════════════════════════════════════════════════════════════
+// ROUTE_POLICY is the single source of truth for every API route's auth class.
+// The authz coverage test asserts that every app/api/**/route.ts file appears
+// here; a new route that forgets to declare its class fails CI.
 
 export type Policy =
   | { kind: 'role'; roles: SessionRole[] }
@@ -36,20 +23,20 @@ const map = (keys: string[], p: Policy): Record<string, Policy> =>
   Object.fromEntries(keys.map((k) => [k, p]))
 
 export const ROUTE_POLICY: Record<string, Policy> = {
-  // ── super_admin only ──
   ...map([
     'admin/feature-flags', 'admin/wallet-adjust', 'admin/block', 'admin/stats',
     'super-admin/announcement', 'super-admin/consent', 'super-admin/controls',
     'super-admin/cron-health', 'super-admin/cron-run', 'super-admin/earnings',
     'super-admin/earnings/history', 'super-admin/feature-usage', 'super-admin/features',
     'super-admin/financials', 'super-admin/lockdown', 'super-admin/pricing',
+    'super-admin/premium',
+    'super-admin/payments',
     'super-admin/revoke-sessions', 'super-admin/rewards', 'super-admin/security-health',
     'super-admin/sentinel', 'super-admin/settings', 'super-admin/super-audit',
     'super-admin/team/create', 'super-admin/users/[id]/force-reset-pin', 'super-admin/withdraw',
     'admin/whatsapp',
   ], role(SUPER)),
 
-  // ── admin + super_admin ──
   ...map([
     'admin/audit', 'admin/dashboard', 'admin/orders', 'admin/disputes',
     'admin/disputes/[id]/analyze', 'admin/disputes/[id]/resolve', 'admin/face',
@@ -62,40 +49,55 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'wallet/freeze', 'wallet/unfreeze', 'paystack/refund',
   ], role(A_S)),
 
-  // ── vendor + rider (shared wallet) ──
   ...map([
     'wallet/withdraw', 'wallet/verify-account', 'wallet/transactions', 'wallet/set-pin',
     'wallet/save-bank', 'wallet/balance', 'wallet/banks',
   ], role(VR)),
 
-  // ── vendor only ──
   ...map([
     'vendor/reviews', 'vendor/menu', 'vendor/menu/[id]', 'upload/menu-image',
     'vendor-ai/daily-summary', 'vendor-ai/describe', 'ai/menu-digitize', 'forecast/vendor',
   ], role(['vendor'])),
 
-  // ── rider only ──
   ...map(['rider/reviews', 'rider-ai', 'forecast/hotspots'], role(['rider'])),
 
-  // ── customer only ──
   ...map([
     'customer-wallet/balance', 'customer-wallet/topup', 'customer-wallet/transactions',
     'orders/history', 'orders/[id]/dispute', 'orders/[id]/confirm', 'orders/[id]/rate',
-  ], role(['customer'])),
+    'feed', 'feed/drafts', 'feed/posts', 'feed/uploads', 'feed/events', 'feed/video-quota',
+    'feed/videos', 'feed/stale-suggestions',
+    'feed/posts/[id]/like', 'feed/posts/[id]/bookmark', 'feed/posts/[id]/repost',
+    'feed/posts/[id]/reply', 'feed/posts/[id]/quote', 'feed/posts/[id]/report',
+    'feed/posts/[id]/feedback', 'feed/posts/[id]/archive', 'feed/posts/[id]/restore',
+    'feed/posts/[id]/retry-processing', 'feed/posts/[id]', 'feed/posts/bulk-archive', 'feed/posts/bulk-restore', 'feed/posts/bulk-delete',
+    'feed/profiles/[profileId]/follow', 'feed/profiles/[profileId]/mute', 'feed/profiles/[profileId]/block',
+  ], { kind: 'auth' }),
 
-  // ── vendor + admin + super ──
   ...map([
     'vendor/orders', 'vendors/[id]/status', 'vendors/[id]/pause', 'vendors/[id]/hours',
     'vendors/[id]/pickup-settings', 'vendors/[id]/location', 'orders/[id]/collect',
   ], role(VAS)),
 
-  // ── rider + admin + super ──
   ...map([
     'rider/orders', 'riders/[id]/status', 'riders/[id]/accept',
     'orders/[id]/deliver', 'orders/[id]/delivery-photo',
   ], role(RAS)),
 
-  // ── authenticated, self-scoped (ownership / multi-role enforced in-handler) ──
+  ...map(['feed/cleanup/diagnostics'], role(SUPER)),
+
+  'flyer-image': { kind: 'public' },
+  'campaign/track': { kind: 'public' },
+
+  ...map([
+    'vendor/marketing/events', 'vendor/marketing/flyers', 'vendor/marketing/flyers/[id]',
+  ], { kind: 'self' }),
+
+  ...map(['premium/plans'], { kind: 'public' }),
+
+  ...map(['premium/subscribe'], role(['vendor'])),
+
+  ...map(['boosts'], role(['vendor'])),
+
   ...map([
     'customer/addresses', 'customer/favorites', 'customer/places', 'customer/places/[id]',
     'customer/places/[id]/use', 'customer/places/photo', 'profile/image', 'customer/locations', 'customer/locations/[id]',
@@ -107,18 +109,18 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'study/ingest', 'sponsor-wallet/topup', 'sponsor-wallet/receipt', 'launch-counter',
   ], { kind: 'self' }),
 
-  // ── auth flow (public by design) ──
   ...map([
     'auth/account', 'auth/bank/status', 'auth/change-pin', 'auth/export', 'auth/face',
     'auth/face/status', 'auth/forgot-pin/get-questions', 'auth/forgot-pin/recovery-code',
     'auth/forgot-pin/security-answers', 'auth/google/callback', 'auth/google/start',
+    'auth/tiktok/callback',
     'auth/login', 'auth/logout', 'auth/me', 'auth/otp/send', 'auth/otp/verify',
     'auth/pin/reset', 'auth/regenerate-recovery-code', 'auth/register', 'auth/remove-pin',
     'auth/setup', 'auth/social/complete', 'auth/webauthn/login-options',
     'auth/webauthn/login-verify', 'auth/webauthn/register-options', 'auth/webauthn/register-verify',
+    'premium/status',
   ], { kind: 'auth' }),
 
-  // ── cron (CRON_SECRET bearer) ──
   ...map([
     'cron/recalculate-vendor-scores', 'cron/release-payments', 'cron/release-scheduled',
     'cron/reset-daily-limits', 'cron/reset-weekly-leaderboard', 'cron/sentinel',
@@ -126,16 +128,13 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'cron/wallet-release-held', 'cron/wallet-sweep',
   ], { kind: 'cron' }),
 
-  // ── webhook (HMAC) ──
   'paystack/webhook': { kind: 'webhook' },
   'whatsapp': { kind: 'webhook' },
 
-  // ── public read (unauthenticated) ──
   ...map(['announcement', 'applications', 'delivery-locations', 'features', 'vendors', 'vendors/[id]', 'lodges', 'settings/fees', 'orders/estimate'],
     { kind: 'public' }),
 }
 
-/** Normalize an app/api file path to its policy key (e.g. admin/vendors/[id]). */
 export function routeKey(filePath: string): string {
   return filePath
     .replace(/\\/g, '/')
@@ -143,7 +142,6 @@ export function routeKey(filePath: string): string {
     .replace(/\/route\.tsx?$/, '')
 }
 
-/** Route keys that are NOT classified in ROUTE_POLICY — the coverage gaps. */
 export function unclassifiedRoutes(keys: string[]): string[] {
   return keys.filter((k) => !(k in ROUTE_POLICY))
 }

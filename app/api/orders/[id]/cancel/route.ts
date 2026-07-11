@@ -6,6 +6,7 @@ import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { renderTemplate } from '@/lib/notify-templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
+import { reverseOrderFeedAttribution } from '@/lib/feed/attribution'
 
 const CANCELLABLE_STATUSES = ['PENDING_PAYMENT', 'SCHEDULED', 'PENDING', 'VENDOR_ACCEPTED']
 
@@ -129,6 +130,14 @@ export async function POST(
         .eq('id', id)
     }
   }
+
+  void reverseOrderFeedAttribution(
+    id,
+    order.payment_status === 'PAID' ? 'refunded_order' : 'cancelled_order',
+    reason,
+  ).catch((err) => {
+    console.error('[feed-attribution] cancel reverse failed:', err)
+  })
 
   // Tell the customer (they need to know — especially when a vendor rejected it).
   if (customerPhone) {

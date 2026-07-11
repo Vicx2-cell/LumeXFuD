@@ -4,6 +4,12 @@ export interface VendorRankingInputs {
   averageRating: number | null
   totalRatings: number
   averagePrepMinutes: number | null
+  availabilityScore?: number
+  deliveryPerformanceScore?: number
+  conversionRate?: number
+  menuQualityScore?: number
+  freshnessScore?: number
+  premiumBoost?: number
 }
 
 export interface VendorRankingResult {
@@ -37,7 +43,21 @@ export function computeVendorRanking(inputs: VendorRankingInputs): VendorRanking
     else if (prepMinutes >= 50) prepScore = -6
   }
 
-  const compositeScore = Math.round((salesScore + reviewScore + volumeTrustScore + prepScore - cancellationPenalty) * 100) / 100
+  const availabilityScore = clamp(inputs.availabilityScore ?? (completed > 0 ? 1 : 0.6), 0, 1)
+  const deliveryPerformanceScore = clamp(inputs.deliveryPerformanceScore ?? (1 - cancelRate), 0, 1)
+  const conversionRate = clamp(inputs.conversionRate ?? (total > 0 ? completed / total : 0), 0, 1)
+  const menuQualityScore = clamp(inputs.menuQualityScore ?? 0.5, 0, 1)
+  const freshnessScore = clamp(inputs.freshnessScore ?? 0.5, 0, 1)
+  const premiumBoost = clamp(inputs.premiumBoost ?? 0, 0, 6)
+
+  const qualityScore =
+    (availabilityScore * 5) +
+    (deliveryPerformanceScore * 10) +
+    (conversionRate * 8) +
+    (menuQualityScore * 5) +
+    (freshnessScore * 4)
+
+  const compositeScore = Math.round((salesScore + reviewScore + volumeTrustScore + prepScore - cancellationPenalty + qualityScore + premiumBoost) * 100) / 100
 
   let visibilityTier: 'TOP' | 'STANDARD' | 'LOW' = 'STANDARD'
   if (completed >= 18 && cancelRate <= 0.12 && (totalRatings === 0 || rating >= 4.1)) {

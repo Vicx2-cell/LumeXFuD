@@ -33,6 +33,35 @@ export default function StylePreview() {
           actions={<span className="lx-mono">12:41</span>}
         />
 
+        <div className="mb-9">
+          <span className="lx-mono">Creative tools</span>
+          <a
+            href="/style-preview/flyers"
+            className="lx-surface lx-focusable mt-4 block p-5 transition-colors hover:border-white/15"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-lg font-semibold text-white">Flyer studio</p>
+                <p className="mt-1 max-w-2xl text-sm text-white/55">
+                  Open the live LumeX Fud flyer editor to preview all 8 campaign formats,
+                  switch square or WhatsApp status layouts, edit vendor details, and export PNGs.
+                </p>
+              </div>
+              <span
+                className="flex h-11 w-11 items-center justify-center rounded-2xl text-white/70"
+                style={{ background: 'rgba(245,166,35,0.14)', border: '1px solid rgba(245,166,35,0.24)' }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" />
+                  <path d="M8 9h8" />
+                  <path d="M8 13h5" />
+                  <path d="m13 17 3-3-3-3" />
+                </svg>
+              </span>
+            </div>
+          </a>
+        </div>
+
         {/* KPI grid */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-9 lx-stagger">
           <StatCard label="Orders today" value="142" sub="Target 50+ · Month 3" status="ok" href="/style-preview" />

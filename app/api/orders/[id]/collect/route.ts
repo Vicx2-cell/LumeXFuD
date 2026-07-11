@@ -11,6 +11,7 @@ import { getFeature } from '@/lib/features'
 import { verifyHandoverCode, recordWrongHandoverAttempt, HANDOVER_ATTEMPT_LIMIT } from '@/lib/handover-code'
 import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
 import { recordSecurityEvent } from '@/lib/security-events'
+import { finalizeOrderFeedAttribution } from '@/lib/feed/attribution'
 
 // POST /api/orders/[id]/collect
 // The vendor hands a pickup (order ahead) order to the customer by entering the
@@ -126,6 +127,9 @@ export async function POST(
     id, order_number: order.order_number as string,
     vendor_id: (order.vendor_id as string | null) ?? null, rider_id: null,
     subtotal: (order.subtotal as number) ?? 0, rider_delivery_cut: 0, tip_amount: 0,
+  })
+  void finalizeOrderFeedAttribution(id).catch((err) => {
+    console.error('[feed-attribution] collect finalize failed:', err)
   })
 
   // Let the customer know it's collected (no code in the message — Invariant I3).

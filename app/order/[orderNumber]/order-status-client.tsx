@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
 import { VerifiedBadge } from '@/components/verified-badge'
 import { useFeatures } from '@/lib/use-features'
 import type { OrderDetail } from './page'
+import { getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
 
 const DISPUTE_REASONS = [
   'I never received my order',
@@ -53,12 +54,14 @@ export function OrderStatusClient({
   alreadyRated = false,
   riderVerified = false,
   pickupHoldMinutes = 85,
+  campaignId = '',
 }: {
   order: OrderDetail
   canRate?: boolean
   alreadyRated?: boolean
   riderVerified?: boolean
   pickupHoldMinutes?: number
+  campaignId?: string
 }) {
   const router = useRouter()
   const features = useFeatures()
@@ -77,6 +80,7 @@ export function OrderStatusClient({
   const [riderStars, setRiderStars] = useState(0)
   const [riderHover, setRiderHover] = useState(0)
   const [riderReviewText, setRiderReviewText] = useState('')
+  const completedTracked = useRef(false)
 
   // Dispute form
   const [showDispute, setShowDispute] = useState(false)
@@ -94,6 +98,22 @@ export function OrderStatusClient({
   useEffect(() => {
     queueMicrotask(() => setOrder(initialOrder))
   }, [initialOrder])
+
+  useEffect(() => {
+    if (!campaignId || order.status !== 'COMPLETED' || completedTracked.current) return
+    completedTracked.current = true
+    trackCampaignEvent({
+      campaignId,
+      vendorId: order.vendor_id,
+      eventType: 'order_completed',
+      source: 'order',
+      placement: 'order_status_page',
+      targetType: 'order',
+      targetId: order.id,
+      sessionId: getCampaignSessionId(),
+      metadata: { order_number: order.order_number },
+    })
+  }, [campaignId, order.id, order.order_number, order.status, order.vendor_id])
 
   // Live updates via polling. The anon Supabase browser client has no session
   // (this app uses a custom JWT in an httpOnly cookie), so Realtime delivers

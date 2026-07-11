@@ -62,11 +62,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid order data', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { vendor_id, items, delivery_type, delivery_address, city_id, zone_id, delivery_lodge, delivery_block, delivery_room, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate, apply_reward } = parsed.data
+  const { vendor_id, items, delivery_type, delivery_address, city_id, zone_id, delivery_lodge, delivery_block, delivery_room, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate, apply_reward, campaign_id } = parsed.data
   const isScheduled = !!scheduled_for
   const isPickup = delivery_type === 'PICKUP'
   const hasCoords = typeof delivery_latitude === 'number' && typeof delivery_longitude === 'number'
   const db = createSupabaseAdmin()
+  const campaignQuery = campaign_id ? `?campaign=${encodeURIComponent(campaign_id)}` : ''
 
   // ── Pickup (order ahead) gates ──────────────────────────────────────────────
   // Master switch + no scheduling/group/coords for the first version (keeps the
@@ -797,11 +798,12 @@ export async function POST(req: NextRequest) {
       email: customerEmail,
       amount: paystackAmount,
       reference: orderNumber,
-      callback_url: `${appUrl}/order/${orderNumber}`,
+      callback_url: `${appUrl}/order/${orderNumber}${campaignQuery}`,
       metadata: {
         order_number: orderNumber,
         customer_phone: customerPhone,
         vendor_id,
+        campaign_id: campaign_id ?? undefined,
       },
     })
   } catch (err) {

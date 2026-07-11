@@ -6,6 +6,7 @@ import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { renderTemplate } from '@/lib/notify-templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
+import { finalizeOrderFeedAttribution } from '@/lib/feed/attribution'
 
 export async function POST(
   _req: NextRequest,
@@ -70,6 +71,9 @@ export async function POST(
     subtotal:           (order.subtotal as number) ?? 0,
     rider_delivery_cut: (order.rider_delivery_cut as number) ?? 0,
     tip_amount:         (order.tip_amount as number) ?? 0,
+  })
+  void finalizeOrderFeedAttribution(id).catch((err) => {
+    console.error('[feed-attribution] confirm finalize failed:', err)
   })
 
   void maybeApplyLateDeliveryCredit(id).catch((err) => {

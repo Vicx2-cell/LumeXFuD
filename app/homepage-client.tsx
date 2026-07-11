@@ -1,7 +1,7 @@
 'use client'
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { PremiumImage } from '@/components/fx'
@@ -9,6 +9,7 @@ import type { VendorData } from './home/page'
 import { vendorTrustBadges } from '@/lib/vendor-trust'
 import { VerifiedBadge } from '@/components/verified-badge'
 import { Pill } from '@/components/ui/pill'
+import { campaignHref, getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks']
 
@@ -27,11 +28,13 @@ export function HomepageClient({
   initialFavorites = [],
   initialLocations = [],
   initialSelectedZoneId = '',
+  campaignId = '',
 }: {
   initialVendors: VendorData[]
   initialFavorites?: string[]
   initialLocations?: LocationRow[]
   initialSelectedZoneId?: string
+  campaignId?: string
 }) {
   // NOTE: realtime vendor-status subscription temporarily removed while isolating
   // the iOS "page couldn't load" crash on /home. Vendors are server-rendered
@@ -207,6 +210,7 @@ export function HomepageClient({
               vendor={vendor}
               favorited={favorites.has(vendor.id)}
               onToggleFavorite={toggleFavorite}
+              campaignId={campaignId}
             />
           ))}
         </div>
@@ -215,9 +219,20 @@ export function HomepageClient({
   )
 }
 
-function VendorCard({ vendor, favorited, onToggleFavorite }: { vendor: VendorData; favorited: boolean; onToggleFavorite: (id: string) => void }) {
+function VendorCard({
+  vendor,
+  favorited,
+  onToggleFavorite,
+  campaignId,
+}: {
+  vendor: VendorData
+  favorited: boolean
+  onToggleFavorite: (id: string) => void
+  campaignId?: string
+}) {
   // One-shot heart "beat" on tap (not on mount) — fires only on user interaction.
   const [beat, setBeat] = useState(false)
+  const sentImpression = useRef(false)
   const isPaused =
     vendor.paused_until && new Date(vendor.paused_until) > new Date()
   const isClosed = vendor.status === 'CLOSED'
@@ -232,9 +247,42 @@ function VendorCard({ vendor, favorited, onToggleFavorite }: { vendor: VendorDat
   const statusLabel = isPaused ? 'Paused' : vendor.status
 
   const trust = vendorTrustBadges(vendor)
+  const href = campaignHref(`/vendor/${vendor.id}`, campaignId)
+
+  useEffect(() => {
+    if (!campaignId || sentImpression.current) return
+    sentImpression.current = true
+    trackCampaignEvent({
+      campaignId,
+      vendorId: vendor.id,
+      eventType: 'marketplace_campaign_impression',
+      source: 'marketplace',
+      placement: 'home_feed_vendor_card',
+      targetType: 'vendor',
+      targetId: vendor.id,
+      sessionId: getCampaignSessionId(),
+      metadata: { vendor_name: vendor.shop_name },
+    })
+  }, [campaignId, vendor.id, vendor.shop_name])
 
   return (
-    <Link href={`/vendor/${vendor.id}`} className="lx-tap glass-thin block rounded-2xl overflow-hidden"
+    <Link
+      href={href}
+      onClick={() => {
+        if (!campaignId) return
+        trackCampaignEvent({
+          campaignId,
+          vendorId: vendor.id,
+          eventType: 'marketplace_campaign_click',
+          source: 'marketplace',
+          placement: 'home_feed_vendor_card',
+          targetType: 'vendor',
+          targetId: vendor.id,
+          sessionId: getCampaignSessionId(),
+          metadata: { vendor_name: vendor.shop_name },
+        })
+      }}
+      className="lx-tap glass-thin block rounded-2xl overflow-hidden"
       style={{ opacity: unavailable ? 0.72 : 1 }}>
       {/* Photo */}
       <div className="relative h-40 bg-white/5">

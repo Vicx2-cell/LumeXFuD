@@ -27,6 +27,22 @@ interface VendorMetaRow {
   id: string
   avg_rating: number | null
   total_ratings: number | null
+  is_active: boolean
+  status: string | null
+  is_premium: boolean | null
+}
+
+interface MenuRow {
+  vendor_id: string
+  is_available: boolean | null
+  updated_at: string | null
+  created_at: string | null
+}
+
+interface FlyerMetricRow {
+  vendor_id: string
+  metric_type: string
+  metric_count: number
 }
 
 // Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
@@ -45,7 +61,7 @@ export async function POST(req: NextRequest) {
   // Active vendors.
   const { data: vendorsRaw, error: vErr } = await db
     .from('vendors')
-    .select('id, avg_rating, total_ratings')
+    .select('id, avg_rating, total_ratings, is_active, status, is_premium')
     .is('deleted_at', null)
   if (vErr) {
     console.error('[cron/recalculate-vendor-scores] vendor query error:', vErr.message)
@@ -54,11 +70,44 @@ export async function POST(req: NextRequest) {
   const vendors = (vendorsRaw ?? []) as VendorMetaRow[]
   const vendorIds = vendors.map((v) => v.id)
   if (vendorIds.length === 0) return NextResponse.json({ updated: 0 })
+  const PAGE = 1000
+
+  const menuRows: MenuRow[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error: mErr } = await db
+      .from('menu_items')
+      .select('vendor_id, is_available, updated_at, created_at')
+      .in('vendor_id', vendorIds)
+      .is('deleted_at', null)
+      .range(from, from + PAGE - 1)
+    if (mErr) {
+      console.error('[cron/recalculate-vendor-scores] menu query error:', mErr.message)
+      return NextResponse.json({ error: 'DB query failed', detail: mErr.message }, { status: 500 })
+    }
+    const batch = (data ?? []) as unknown as MenuRow[]
+    menuRows.push(...batch)
+    if (batch.length < PAGE) break
+  }
+
+  const flyerMetricRows: FlyerMetricRow[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error: fErr } = await db
+      .from('flyer_metrics')
+      .select('vendor_id, metric_type, metric_count')
+      .in('vendor_id', vendorIds)
+      .range(from, from + PAGE - 1)
+    if (fErr) {
+      console.error('[cron/recalculate-vendor-scores] flyer metrics query error:', fErr.message)
+      return NextResponse.json({ error: 'DB query failed', detail: fErr.message }, { status: 500 })
+    }
+    const batch = (data ?? []) as unknown as FlyerMetricRow[]
+    flyerMetricRows.push(...batch)
+    if (batch.length < PAGE) break
+  }
 
   // 30-day order window. Paginate: PostgREST caps a single response at 1000
   // rows, and at target volume (50+/day) a month easily exceeds that — an
   // unpaginated query would silently truncate and skew every score.
-  const PAGE = 1000
   const orderRows: OrderRow[] = []
   for (let from = 0; ; from += PAGE) {
     const { data, error: oErr } = await db
@@ -77,6 +126,8 @@ export async function POST(req: NextRequest) {
   }
 
   const aggs = new Map<string, Agg>()
+  const menuAggs = new Map<string, { total: number; available: number; fresh: number }>()
+  const marketingAggs = new Map<string, { views: number; downloads: number; shares: number; impressions: number; clicks: number }>()
   const ensure = (id: string): Agg => {
     let a = aggs.get(id)
     if (!a) { a = { completed: 0, cancelled: 0, prepTotalMin: 0, prepSamples: 0 }; aggs.set(id, a) }
@@ -97,11 +148,41 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  for (const row of menuRows) {
+    const a = menuAggs.get(row.vendor_id) ?? { total: 0, available: 0, fresh: 0 }
+    a.total += 1
+    if (row.is_available) a.available += 1
+    const updated = row.updated_at ?? row.created_at
+    if (updated && (Date.now() - new Date(updated).getTime()) < 30 * 24 * 60 * 60 * 1000) {
+      a.fresh += 1
+    }
+    menuAggs.set(row.vendor_id, a)
+  }
+
+  for (const row of flyerMetricRows) {
+    const agg = marketingAggs.get(row.vendor_id) ?? { views: 0, downloads: 0, shares: 0, impressions: 0, clicks: 0 }
+    if (row.metric_type === 'view') agg.views += row.metric_count
+    else if (row.metric_type === 'download') agg.downloads += row.metric_count
+    else if (row.metric_type === 'share') agg.shares += row.metric_count
+    else if (row.metric_type === 'impression') agg.impressions += row.metric_count
+    else if (row.metric_type === 'click') agg.clicks += row.metric_count
+    marketingAggs.set(row.vendor_id, agg)
+  }
+
   const now = new Date().toISOString()
   const rows = vendors.map((vendor) => {
     const id = vendor.id
     const a = aggs.get(id) ?? { completed: 0, cancelled: 0, prepTotalMin: 0, prepSamples: 0 }
+    const m = menuAggs.get(id) ?? { total: 0, available: 0, fresh: 0 }
     const avgPrep = a.prepSamples > 0 ? a.prepTotalMin / a.prepSamples : null
+    const availabilityScore = vendor.is_active ? 1 : 0.25
+    const deliveryPerformanceScore = a.completed + a.cancelled > 0 ? Math.max(0, 1 - ((a.cancelled / Math.max(1, a.completed + a.cancelled)) * 0.7)) : 0.5
+    const conversionRate = a.completed + a.cancelled > 0 ? a.completed / (a.completed + a.cancelled) : 0
+    const menuQualityScore = m.total > 0 ? Math.min(1, m.available / Math.max(4, m.total)) : 0.25
+    const freshnessScore = m.total > 0 ? Math.min(1, m.fresh / m.total) : 0.25
+    const marketing = marketingAggs.get(id) ?? { views: 0, downloads: 0, shares: 0, impressions: 0, clicks: 0 }
+    const marketingBoost = Math.min(3, (marketing.views * 0.05) + (marketing.downloads * 0.3) + (marketing.shares * 0.5) + (marketing.clicks * 0.1))
+    const premiumBoost = vendor.is_premium ? 6 + marketingBoost : 0
 
     const ranking = computeVendorRanking({
       completedOrders30d: a.completed,
@@ -109,6 +190,12 @@ export async function POST(req: NextRequest) {
       averageRating: vendor.avg_rating,
       totalRatings: vendor.total_ratings ?? 0,
       averagePrepMinutes: avgPrep,
+      availabilityScore,
+      deliveryPerformanceScore,
+      conversionRate,
+      menuQualityScore,
+      freshnessScore,
+      premiumBoost,
     })
 
     return {
@@ -118,6 +205,7 @@ export async function POST(req: NextRequest) {
       completed_orders_30d: a.completed,
       cancelled_orders_30d: a.cancelled,
       avg_prep_minutes:     avgPrep !== null ? Math.round(avgPrep * 100) / 100 : null,
+      premium_boost:        premiumBoost,
       calculated_at:        now,
     }
   })

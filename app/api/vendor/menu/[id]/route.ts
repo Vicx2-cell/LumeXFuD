@@ -5,6 +5,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { updateMenuItemInput } from '@/lib/validators'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { toKobo } from '@/lib/money'
+import { generateFlyerVariants } from '@/lib/flyer-marketing'
 
 // Next Africa/Lagos midnight (UTC+1, no DST) as a UTC ISO string. Computed
 // server-side so the auto-restore time can never be spoofed by the client clock.
@@ -18,11 +19,11 @@ function nextLagosMidnightISO(): string {
 async function loadOwnedItem(db: ReturnType<typeof createSupabaseAdmin>, id: string, vendorId: string) {
   const { data } = await db
     .from('menu_items')
-    .select('id, vendor_id')
+    .select('id, vendor_id, name, price_kobo, image_url, is_available, sold_out_until')
     .eq('id', id)
     .is('deleted_at', null)
     .maybeSingle()
-  const item = data as { id: string; vendor_id: string } | null
+  const item = data as { id: string; vendor_id: string; name?: string | null; price_kobo?: number | null; image_url?: string | null; is_available?: boolean | null; sold_out_until?: string | null } | null
   if (!item) return { error: 'not_found' as const }
   if (item.vendor_id !== vendorId) return { error: 'forbidden' as const }
   return { item }
@@ -50,6 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const owned = await loadOwnedItem(db, id, session.userId!)
   if (owned.error === 'not_found') return NextResponse.json({ error: 'Item not found' }, { status: 404 })
   if (owned.error === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const previous = owned.item
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (parsed.name !== undefined) updates.name = parsed.name
@@ -88,6 +90,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           display_order: idx,
         }))
       )
+    }
+  }
+
+  const becameAvailable =
+    parsed.is_available === true &&
+    previous?.is_available === false
+
+  if (becameAvailable) {
+    try {
+      await generateFlyerVariants(db, {
+        eventType: 'menu_item.back_in_stock',
+        vendorId: session.userId!,
+        sourceEntityId: id,
+        payload: {
+          mealId: id,
+          mealName: parsed.name ?? previous?.name ?? 'Back in stock',
+          mealPrice: parsed.price_naira !== undefined ? `\u20A6${parsed.price_naira.toLocaleString('en-NG')}` : previous?.price_kobo ? `\u20A6${Math.round((previous.price_kobo ?? 0) / 100).toLocaleString('en-NG')}` : '',
+        },
+      })
+    } catch (err) {
+      console.error('[flyer-marketing] menu_item.back_in_stock failed:', err instanceof Error ? err.message : err)
     }
   }
 

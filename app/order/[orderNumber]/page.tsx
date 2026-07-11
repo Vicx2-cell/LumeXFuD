@@ -9,8 +9,15 @@ import { callPhoneMap } from '@/lib/call-phone'
 
 export const dynamic = 'force-dynamic'
 
-export default async function OrderPage({ params }: { params: Promise<{ orderNumber: string }> }) {
+export default async function OrderPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ orderNumber: string }>
+  searchParams?: Promise<{ campaign?: string }>
+}) {
   const { orderNumber } = await params
+  const search = ((await (searchParams ?? Promise.resolve({})).catch(() => ({}))) as { campaign?: string })
   const session = await getCurrentUser()
 
   const db = createSupabaseAdmin()
@@ -131,6 +138,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNum
         alreadyRated={alreadyRated}
         riderVerified={riderVerified}
         pickupHoldMinutes={pickupHoldMinutes}
+        campaignId={search?.campaign ?? ''}
       />
       <BottomNav />
     </main>

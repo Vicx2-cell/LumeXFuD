@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { notCurrentlySuspendedOr } from '@/lib/vendor-visibility'
 import { getCurrentUser } from '@/lib/session'
@@ -16,6 +17,7 @@ import { VendorCardSkeleton } from '@/components/ui/skeleton'
 import { HomepageClient } from '../homepage-client'
 import { CountUp, SmoothScroll } from '@/components/fx'
 import { Suspense } from 'react'
+import { mapVendorSignals, rankVendorFeed } from '@/lib/vendor-feed-fairness'
 
 type HomeLocationRow = {
   city_id: string
@@ -109,6 +111,23 @@ async function getVendorsAndTrending(zoneId?: string | null) {
     if (zoneId) query = query.eq('zone_id', zoneId)
 
     const { data: vendors } = await query
+    const vendorRows = (vendors ?? []) as VendorData[]
+
+    const vendorIds = vendorRows.map((vendor) => vendor.id)
+    let signals = new Map<string, { impressions?: number; clicks?: number; views?: number; downloads?: number; shares?: number; orders?: number }>()
+    if (vendorIds.length > 0) {
+      const cutoff = new Date(Date.now() - 14 * 86_400_000).toISOString()
+      const { data: eventRows } = await db
+        .from('campaign_events')
+        .select('vendor_id, event_type')
+        .in('vendor_id', vendorIds)
+        .gte('created_at', cutoff)
+      signals = mapVendorSignals((eventRows ?? []).map((row) => ({
+        vendor_id: row.vendor_id as string,
+        event_type: row.event_type as string,
+        count: 1,
+      })))
+    }
 
     const { data: trending } = await db
       .from('trending_data')
@@ -122,15 +141,17 @@ async function getVendorsAndTrending(zoneId?: string | null) {
       const { data: marks } = await db.storage.from('kyc-faces').list('complete', { limit: 1000 })
       verifiedIds = new Set((marks ?? []).map((m) => m.name))
     } catch { /* bucket/marker missing — just no badges */ }
-    const withVerified = (vendors ?? []).map((v) => ({ ...v, kyc_verified: verifiedIds.has(v.id as string) }))
+    const withVerified = vendorRows.map((v) => ({ ...v, kyc_verified: verifiedIds.has(v.id as string) }))
+    const ranked = rankVendorFeed(withVerified, signals)
 
-    return { vendors: withVerified, trending }
+    return { vendors: ranked, trending }
   } catch {
     return { vendors: [], trending: null }
   }
 }
 
 export default async function CustomerHomePage() {
+  const feedCampaignId = crypto.randomUUID()
   const [locations, studyOn, walletOn] = await Promise.all([
     getLocations(),
     getFeature('study'),
@@ -264,6 +285,7 @@ export default async function CustomerHomePage() {
               initialFavorites={favorites}
               initialLocations={locations as HomeLocationRow[]}
               initialSelectedZoneId={preferredZoneId ?? locations[0]?.zone_id ?? ''}
+              campaignId={feedCampaignId}
             />
           </Suspense>
         </div>

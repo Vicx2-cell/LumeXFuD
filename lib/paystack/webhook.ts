@@ -7,6 +7,7 @@ import { recordPlatformEarning } from '../platform-earnings'
 import { processCustomerTopup, spendCustomerWallet, isCustomerWalletEnabled } from '../customer-wallet'
 import { refundTransaction } from './transfer'
 import { verifyPaystackTransaction } from './init'
+import { processPremiumOrBoostWebhook } from './billing'
 import { recordSecurityEvent } from '../security-events'
 
 // Naira for a refund notification, derived from the canonical kobo column.
@@ -40,6 +41,11 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
     case 'charge.success': {
       const reference = data.reference as string
       const metadata = (data.metadata as Record<string, unknown>) ?? {}
+
+      if ((metadata.type as string) === 'PREMIUM_SUBSCRIPTION' || (metadata.type as string) === 'BOOST_PURCHASE') {
+        await processPremiumOrBoostWebhook('charge.success', data)
+        break
+      }
 
       if ((metadata.type as string) === 'SUBSCRIPTION') {
         await handleSubscriptionPayment(db, reference, metadata)
@@ -278,6 +284,12 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
 
     case 'charge.failed': {
       const reference = data.reference as string
+      const metadata = (data.metadata as Record<string, unknown>) ?? {}
+
+      if ((metadata.type as string) === 'PREMIUM_SUBSCRIPTION' || (metadata.type as string) === 'BOOST_PURCHASE') {
+        await processPremiumOrBoostWebhook('charge.failed', data)
+        break
+      }
       // Guard the transition: only cancel an order that is still awaiting its
       // first payment. Without the payment_status + status filter, a late or
       // replayed charge.failed could clobber an order that had already been paid

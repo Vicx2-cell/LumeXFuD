@@ -16,6 +16,9 @@ export default async function TermsPage() {
   return (
     <main style={{ background: '#0A0A0B' }}>
       <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 3rem)' }}>
+      <p className="text-xs text-white/35 mb-4 break-all">
+        tiktok-developers-site-verification=GVw1W1ZcEYXVMbcc7pzaozQcxTytLrWv
+      </p>
       <h1 className="text-2xl font-bold mb-2">Terms of Service</h1>
       <p className="text-sm text-white/40 mb-8">Last updated: June 2026</p>
 

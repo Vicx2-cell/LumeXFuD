@@ -63,6 +63,7 @@ export const createOrderInput = z.object({
   // Defaults to false so customers can save rewards for later. The server still
   // validates eligibility and computes the discount; a client-sent amount is never trusted.
   apply_reward: z.boolean().optional().default(false),
+  campaign_id: z.string().min(1).max(200).optional(),
 })
 
 export const orderEstimateInput = z.object({

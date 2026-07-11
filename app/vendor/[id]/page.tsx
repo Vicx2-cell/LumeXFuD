@@ -11,8 +11,15 @@ import { VendorMenuClient } from './vendor-menu-client'
 // be served stale from a cached page.
 export const dynamic = 'force-dynamic'
 
-export default async function VendorPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function VendorPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams?: Promise<{ campaign?: string }>
+}) {
   const { id } = await params
+  const search = ((await (searchParams ?? Promise.resolve({})).catch(() => ({}))) as { campaign?: string })
   const db = createSupabaseAdmin()
 
   const { data: vendor } = await db
@@ -84,7 +91,13 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
 
   return (
     <main className="lx-page pb-32">
-      <VendorMenuClient vendor={{ ...vendor, kyc_verified } as VendorInfo} menu={menuWithAddons} reviews={reviews} loggedOut={!session} />
+      <VendorMenuClient
+        vendor={{ ...vendor, kyc_verified } as VendorInfo}
+        menu={menuWithAddons}
+        reviews={reviews}
+        loggedOut={!session}
+        campaignId={search?.campaign ?? ''}
+      />
       {vendor.slug && (
         <div className="max-w-xl mx-auto px-4 pb-4 text-center">
           {/* Link to the public, shareable SEO page for this vendor. Useful for

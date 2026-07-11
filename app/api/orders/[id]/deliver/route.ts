@@ -13,6 +13,7 @@ import { completeOrderPayout } from '@/lib/order-payout'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
 import { recordOrderStatusEvent, promoteVerifiedPlaceFromOrder } from '@/lib/location-intelligence'
+import { finalizeOrderFeedAttribution } from '@/lib/feed/attribution'
 
 // POST /api/orders/[id]/deliver
 // Delivery handover (delivery_handover_v1). The DEFAULT path: the ASSIGNED rider
@@ -145,6 +146,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     subtotal: (order.subtotal as number) ?? 0,
     rider_delivery_cut: (order.rider_delivery_cut as number) ?? 0,
     tip_amount: (order.tip_amount as number) ?? 0,
+  })
+  void finalizeOrderFeedAttribution(id).catch((err) => {
+    console.error('[feed-attribution] deliver finalize failed:', err)
   })
 
   void maybeApplyLateDeliveryCredit(id).catch((err) => {

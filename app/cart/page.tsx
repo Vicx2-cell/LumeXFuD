@@ -11,6 +11,7 @@ import { formatHoursRange } from '@/lib/hours'
 import { DeliveryAddress } from '@/components/delivery-address'
 import { CartRewardHint } from '@/components/cart-reward-hint'
 import { composeDeliveryAddress, type DeliveryAddressParts } from '@/lib/delivery-address'
+import { getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
 
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
 
@@ -75,6 +76,7 @@ export default function CartPage() {
   const [coords,           setCoords]           = useState<{ lat: number; lng: number } | null>(null)
   const [gpsBusy,          setGpsBusy]          = useState(false)
   const [gpsMessage,       setGpsMessage]       = useState('')
+  const [campaignId,       setCampaignId]       = useState('')
 
   useEffect(() => {
     fetch('/api/settings/fees')
@@ -125,11 +127,15 @@ export default function CartPage() {
           setReorderNote(`Some items were unavailable and left out: ${skipped}`)
         }, 0)
       }
+      const campaign = sessionStorage.getItem('lx_campaign_id') ?? new URLSearchParams(window.location.search).get('campaign') ?? ''
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (campaign) setCampaignId(campaign)
     } catch { /* ignore */ }
   }, [features.customer_wallet_enabled])
 
   useEffect(() => {
     if (deliveryType === 'PICKUP' || !coords || !cart.vendor_id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEstimate(null)
       setEstimateError('')
       return
@@ -282,6 +288,19 @@ export default function CartPage() {
     if (isPickup && !pickupAgree) { setError('Please accept the pickup collection terms to continue'); return }
     if (!isPickup && !orderAgree) { setError('Please accept the Terms and Refund Policy to continue'); return }
     setError(''); setLoading(true)
+    if (campaignId && cart.vendor_id) {
+      trackCampaignEvent({
+        campaignId,
+        vendorId: cart.vendor_id,
+        eventType: 'checkout_started',
+        source: 'checkout',
+        placement: 'cart_checkout_button',
+        targetType: 'order',
+        targetId: cart.vendor_id,
+        sessionId: getCampaignSessionId(),
+        metadata: { delivery_type: deliveryType, total },
+      })
+    }
 
     try {
       const res = await fetch('/api/orders', {
@@ -315,6 +334,7 @@ export default function CartPage() {
           pickup_agreement:      isPickup ? pickupAgree : undefined,
           // Optional leave-at-gate for delivery (only when the handover flag is on).
           leave_at_gate:         !isPickup && features.delivery_handover_v1 === true ? leaveAtGate : undefined,
+          campaign_id:           campaignId || undefined,
         }),
       })
 
@@ -343,7 +363,7 @@ export default function CartPage() {
         return
       }
       if (data.order_number) {
-        router.push(`/order/${data.order_number}`)
+        router.push(campaignId ? `/order/${data.order_number}?campaign=${encodeURIComponent(campaignId)}` : `/order/${data.order_number}`)
         return
       }
       setError('Could not complete checkout. Please try again.')

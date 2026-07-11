@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { AlertBanner } from '@/components/ui/alert-banner'
 import { RoleTutorial } from '@/components/role-tutorial'
 import { GlassSheen } from '@/components/fx'
+import { FlyerCenter } from '@/components/vendor-marketing/FlyerCenter'
 import { hasUsableLocation } from '@/lib/vendor-location'
 import { UtensilsCrossed, Wallet, Star, Settings2, ChevronRight, MapPin } from 'lucide-react'
 
@@ -33,6 +34,7 @@ interface VendorOrder {
 interface VendorInfo {
   id: string
   shop_name: string
+  phone?: string | null
   status: 'OPEN' | 'BUSY' | 'CLOSED'
   paused_until: string | null
   prep_time_minutes: number
@@ -46,6 +48,8 @@ interface VendorInfo {
   landmark: string | null
   latitude: number | null
   longitude: number | null
+  subscription_tier?: string | null
+  is_premium?: boolean | null
 }
 
 const ACTIVE = ['PENDING', 'VENDOR_ACCEPTED', 'PREPARING', 'READY']
@@ -262,9 +266,10 @@ export default function VendorDashboard() {
   const pendingCount = orders.filter((o) => o.status === 'PENDING').length
   const prepCount = orders.filter((o) => o.status === 'VENDOR_ACCEPTED' || o.status === 'PREPARING').length
   const readyCount = orders.filter((o) => o.status === 'READY').length
+  const isPremium = !!vendor?.is_premium
 
   return (
-    <div className="lx-page lx-console pb-10 overflow-hidden">
+    <div className={`lx-page lx-console pb-10 overflow-hidden ${isPremium ? 'bg-gradient-to-b from-[#24170d] via-[#151110] to-[#0b0a09]' : ''}`}>
       <GlassSheen />
       <AlertBanner open={!!errorBanner} title={errorBanner?.title ?? ''} message={errorBanner?.message ?? ''} onDismiss={clearError} />
       {/* Action toast — failures are never silent */}
@@ -282,7 +287,14 @@ export default function VendorDashboard() {
             <BackButton />
             <div className="min-w-0">
               <p className="text-[10px] text-white/30 uppercase tracking-widest">Vendor</p>
-              <p className="font-semibold text-white leading-tight truncate">{vendor?.shop_name ?? '—'}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-white leading-tight truncate">{vendor?.shop_name ?? '—'}</p>
+                {isPremium && (
+                  <span className="rounded-full bg-[#F5A623] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-black">
+                    Premium
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -333,8 +345,11 @@ export default function VendorDashboard() {
         <div>
           <p className="lx-mono mb-3 px-1">Manage</p>
           <div className="lx-surface overflow-hidden">
-            {[
+            {[ 
+              { href: '/premium',                 Icon: Star,            label: 'Premium plans',      desc: 'See benefits, pricing and entitlement state' },
               { href: '/vendor-dashboard/menu',     Icon: UtensilsCrossed, label: 'Menu & items',     desc: 'Add, edit & price your food' },
+              { href: '/vendor-dashboard/videos',   Icon: UtensilsCrossed, label: 'Videos & archive',   desc: 'Manage active, archived and draft videos' },
+              { href: '/vendor-dashboard/boosts',   Icon: Star,            label: 'Boosts & ads',      desc: 'Buy verified post boosts and track sponsored posts' },
               { href: '/vendor-dashboard/earnings', Icon: Wallet,          label: 'Earnings & payout', desc: 'Balance, withdrawals & bank' },
               { href: '/vendor-dashboard/reviews',  Icon: Star,            label: 'Reviews',           desc: 'What customers are saying' },
               { href: '/vendor-dashboard/settings', Icon: Settings2,       label: 'Settings',          desc: 'Store, hours, pickup, security' },
@@ -360,6 +375,7 @@ export default function VendorDashboard() {
 
         {/* Orders — FIRST on mobile, left column on desktop */}
         <div className="space-y-4 order-1 lg:order-none lg:col-start-1 lg:row-start-1">
+          <FlyerCenter vendorName={vendor?.shop_name ?? 'Vendor'} isPremium={isPremium} />
           <p className="lx-mono px-1">Live</p>
           <div className="lx-surface p-4 space-y-4">
             <div className="flex items-start justify-between gap-3">
