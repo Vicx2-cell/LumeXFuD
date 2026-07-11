@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
-import { InfoCard } from '@/components/ui/info-card'
 import { EmptyState } from '@/components/ui/empty-state'
 import type { FeedTabKey, RankedFeedCandidate } from '@/lib/feed/types'
 
@@ -17,6 +16,10 @@ function hashString(value: string) {
     hash = ((hash << 5) + hash) ^ value.charCodeAt(i)
   }
   return Math.abs(hash).toString(36)
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 }
 
 function getClientFeedSessionId() {
@@ -215,6 +218,7 @@ export function FeedClient({
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<string>('')
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
+  const [composerOpen, setComposerOpen] = useState(false)
 
   useEffect(() => {
     setSelectedTab(tab)
@@ -238,7 +242,6 @@ export function FeedClient({
     : sessionRole === 'rider'
       ? 'Rider pulse: spot busy areas, monitor orders, and watch what is moving.'
       : 'Customer feed: discover meals, creators, deals, and vendors in one place.'
-  const composerOpenByDefault = sessionRole === 'vendor'
 
   function patchFeedItem(id: string, updater: (item: RankedFeedCandidate) => RankedFeedCandidate) {
     setFeedItems((current) => current.map((item) => item.id === id ? updater(item) : item))
@@ -394,16 +397,23 @@ export function FeedClient({
       return
     }
 
+    const campusValue = campusId.trim()
+    const zoneValue = zoneId.trim()
+    const draftValue = draftId?.trim() ?? ''
+    const safeCampusId = campusValue && isUuid(campusValue) ? campusValue : undefined
+    const safeZoneId = zoneValue && isUuid(zoneValue) ? zoneValue : undefined
+    const safeDraftId = draftValue && isUuid(draftValue) ? draftValue : undefined
+
     const payload = {
-      draft_id: draftId ?? undefined,
+      draft_id: safeDraftId,
       mode,
       body: body.trim() || undefined,
       content_warning: contentWarning.trim() || undefined,
       visibility,
       audience_scope: audienceScope,
       post_kind: postKind,
-      campus_id: campusId || undefined,
-      zone_id: zoneId || undefined,
+      campus_id: safeCampusId,
+      zone_id: safeZoneId,
       location_text: locationText.trim() || undefined,
       hashtags: hashtags.split(/[,\s]+/).map((tag) => tag.trim()).filter(Boolean),
       mentions: mentions.split(/[,\s]+/).map((tag) => tag.trim()).filter(Boolean),
@@ -723,68 +733,73 @@ export function FeedClient({
 
   return (
     <section className="space-y-4">
-      <InfoCard tone="amber-strong" className="p-4">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(tabs) as FeedTabKey[]).map((key) => (
-              <button
-                key={key}
-                type="button"
-                disabled={!tabs[key]}
-                onClick={() => {
-                  setSelectedTab(key)
-                  router.push(`/feed?tab=${key}`)
-                }}
-                className="rounded-full px-3 py-1.5 text-xs font-medium transition"
-                style={{
-                  background: selectedTab === key ? 'rgba(245,166,35,0.16)' : 'rgba(255,255,255,0.04)',
-                  border: selectedTab === key ? '1px solid rgba(245,166,35,0.48)' : '1px solid rgba(255,255,255,0.08)',
-                  color: tabs[key] ? (selectedTab === key ? '#F5A623' : 'rgba(255,255,255,0.7)') : 'rgba(255,255,255,0.28)',
-                }}
-              >
-                {key.replaceAll('_', ' ')}
-              </button>
-            ))}
-          </div>
-
-          <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-white/45">Role view</p>
-                <p className="mt-1 text-sm text-white/75">{roleHeadline}</p>
-              </div>
+      <div className="rounded-[28px] border border-white/8 bg-black/70 p-4 shadow-[0_18px_70px_rgba(0,0,0,0.22)]">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-white/35">Feed</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-semibold text-white/85">{roleHeadline}</h2>
               <Badge color="rgba(255,255,255,0.35)">{selectedTab.replaceAll('_', ' ')}</Badge>
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => router.refresh()} className="lx-btn-secondary px-3 py-2 text-xs">
+              Refresh
+            </button>
+            <Badge color="var(--lx-green)">Role: {sessionRole}</Badge>
+          </div>
+        </div>
 
-          <details open={composerOpenByDefault} className="group rounded-2xl border border-white/8 bg-black/20 p-4">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-white/45">Create</p>
-                <h2 className="text-base font-semibold text-white">
-                  {sessionRole === 'vendor' ? 'Post to the feed' : sessionRole === 'rider' ? 'Share a rider update' : 'Create a post'}
-                </h2>
-              </div>
-              <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/55 group-open:hidden">Open</span>
-              <span className="hidden rounded-full border border-white/10 px-3 py-1 text-xs text-white/55 group-open:inline">Close</span>
-            </summary>
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {(Object.keys(tabs) as FeedTabKey[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              disabled={!tabs[key]}
+              onClick={() => {
+                setSelectedTab(key)
+                router.push(`/feed?tab=${key}`)
+              }}
+              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-medium capitalize transition"
+              style={{
+                background: selectedTab === key ? 'rgba(245,166,35,0.16)' : 'rgba(255,255,255,0.04)',
+                border: selectedTab === key ? '1px solid rgba(245,166,35,0.48)' : '1px solid rgba(255,255,255,0.08)',
+                color: tabs[key] ? (selectedTab === key ? '#F5A623' : 'rgba(255,255,255,0.7)') : 'rgba(255,255,255,0.28)',
+              }}
+            >
+              {key.replaceAll('_', ' ')}
+            </button>
+          ))}
+        </div>
 
-          <div className="mt-4 flex items-center justify-between gap-3">
+        {sessionRole !== 'customer' && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] text-white/45">Post</p>
+              <p className="text-sm text-white/72">{sessionRole === 'vendor' ? 'Share an update, deal, or video.' : 'Share a rider update.'}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setComposerOpen((current) => !current)}
+              className="rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-white/75"
+            >
+              {composerOpen ? 'Hide composer' : 'Create post'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {sessionRole !== 'customer' && composerOpen && (
+        <div className="rounded-[28px] border border-white/8 bg-black/30 p-4 shadow-[0_18px_70px_rgba(0,0,0,0.22)]">
+          <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-white/45">Composer</p>
               <h2 className="text-lg font-semibold text-white">
                 {sessionRole === 'vendor' ? 'What are you promoting today?' : sessionRole === 'rider' ? 'What should riders notice?' : 'What are you sharing?'}
               </h2>
             </div>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => router.refresh()} className="lx-btn-secondary px-3 py-2 text-xs">
-                Refresh
-              </button>
-              <Badge color="var(--lx-green)">Role: {sessionRole}</Badge>
-            </div>
           </div>
-
-          <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
+          <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 p-3">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-[0.16em] text-white/45">Current feed</p>
@@ -1010,18 +1025,17 @@ export function FeedClient({
               Publish post
             </button>
           </div>
-          </details>
         </div>
-      </InfoCard>
+      )}
 
       {feedItems.length === 0 ? (
         <EmptyState
-          title={sessionRole === 'vendor' ? 'No posts are live yet' : 'No feed posts yet'}
+          title={sessionRole === 'vendor' ? 'Your feed is quiet for now' : 'No posts yet'}
           description={sessionRole === 'vendor'
-            ? 'Create your first menu update, deal or video post so customers can discover it here.'
-            : 'Vendor posts, deals and campus updates will appear here as soon as they are published.'}
+            ? 'Publish a post and it will appear here like a social timeline, with media, replies, likes, and reposts.'
+            : 'When vendors post, you will see their updates here in a cleaner timeline like X or TikTok.'}
           action={sessionRole === 'vendor'
-            ? <button type="button" onClick={() => document.querySelector('details')?.setAttribute('open', 'true')} className="lx-btn-amber">Create post</button>
+            ? <button type="button" onClick={() => setComposerOpen(true)} className="lx-btn-amber">Create post</button>
             : <Link href="/" className="lx-btn-amber">Browse vendors</Link>}
         />
       ) : (
@@ -1040,6 +1054,43 @@ export function FeedClient({
                   <Badge color="var(--lx-green)">{item.score.toFixed(3)}</Badge>
                 </div>
               </div>
+
+              {item.body && (
+                <p className="whitespace-pre-wrap text-sm leading-6 text-white/82">
+                  {item.body}
+                </p>
+              )}
+
+              {(item.locationText || item.contentWarning) && (
+                <div className="flex flex-wrap gap-2 text-xs text-white/55">
+                  {item.locationText && <span className="rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1">{item.locationText}</span>}
+                  {item.contentWarning && <span className="rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1">Warning: {item.contentWarning}</span>}
+                </div>
+              )}
+
+              {item.hashtags?.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {item.hashtags.slice(0, 6).map((tag) => (
+                    <span key={tag} className="rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1 text-xs text-amber-300">
+                      {tag.startsWith('#') ? tag : `#${tag}`}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              {item.media?.length ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {item.media.slice(0, 2).map((media, index) => (
+                    <div key={`${media.publicUrl ?? media.kind}-${index}`} className="overflow-hidden rounded-2xl border border-white/8 bg-black/30">
+                      {media.kind === 'video' ? (
+                        <video src={media.publicUrl ?? undefined} className="h-52 w-full object-cover" controls muted playsInline />
+                      ) : (
+                        <img src={media.publicUrl ?? ''} alt="" className="h-52 w-full object-cover" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
 
               <div className="grid grid-cols-2 gap-2 text-xs text-white/55 sm:grid-cols-4">
                 <span>Likes: {item.likeCount ?? 0}</span>
