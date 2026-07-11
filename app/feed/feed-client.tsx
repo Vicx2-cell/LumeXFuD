@@ -22,6 +22,14 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 }
 
+function getAvatarLabel(name?: string | null, handle?: string | null) {
+  const raw = (name ?? handle ?? 'LX').trim()
+  const pieces = raw.split(/\s+/).filter(Boolean)
+  if (pieces.length === 0) return 'LX'
+  if (pieces.length === 1) return pieces[0].slice(0, 2).toUpperCase()
+  return `${pieces[0][0] ?? 'L'}${pieces[1][0] ?? 'X'}`.toUpperCase()
+}
+
 function getClientFeedSessionId() {
   if (typeof window === 'undefined') return 'server'
   const existing = window.localStorage.getItem(FEED_EVENT_SESSION_KEY)
@@ -1041,19 +1049,36 @@ export function FeedClient({
       ) : (
         <div className="space-y-4">
           {feedItems.map((item) => (
-            <article key={item.id} id={item.id} className="lx-surface p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-white">{item.authorDisplayName ?? item.authorHandle ?? `Post ${item.id.slice(0, 8)}`}</p>
-                  <p className="text-xs text-white/45 mt-0.5">
+            <article key={item.id} id={item.id} className="overflow-hidden rounded-[28px] border border-white/8 bg-[#101010] shadow-[0_18px_70px_rgba(0,0,0,0.20)]">
+              <div className="flex items-start gap-3 p-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#F5A623] to-[#f97316] text-sm font-black text-black">
+                  {getAvatarLabel(item.authorDisplayName, item.authorHandle)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-white">{item.authorDisplayName ?? item.authorHandle ?? `Post ${item.id.slice(0, 8)}`}</p>
+                    {item.isSponsored && <Badge color="var(--lx-amber)">Sponsored</Badge>}
+                  </div>
+                  <p className="text-xs text-white/45">
                     {item.postKind} · {item.visibility} · {item.status}
                   </p>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  {item.isSponsored && <Badge color="var(--lx-amber)">Sponsored</Badge>}
-                  <Badge color="var(--lx-green)">{item.score.toFixed(3)}</Badge>
-                </div>
+                <Badge color="var(--lx-green)">{item.score.toFixed(3)}</Badge>
               </div>
+              {item.media?.length ? (
+                <div className="px-4">
+                  {item.media.slice(0, 1).map((media, index) => (
+                    <div key={`${media.publicUrl ?? media.kind}-${index}`} className="overflow-hidden rounded-[24px] border border-white/8 bg-black/30">
+                      {media.kind === 'video' ? (
+                        <video src={media.publicUrl ?? undefined} className="h-[420px] w-full object-cover md:h-[520px]" controls muted playsInline />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={media.publicUrl ?? ''} alt="" className="h-[420px] w-full object-cover md:h-[520px]" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
 
               {item.body && (
                 <p className="whitespace-pre-wrap text-sm leading-6 text-white/82">
@@ -1074,20 +1099,6 @@ export function FeedClient({
                     <span key={tag} className="rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1 text-xs text-amber-300">
                       {tag.startsWith('#') ? tag : `#${tag}`}
                     </span>
-                  ))}
-                </div>
-              ) : null}
-
-              {item.media?.length ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {item.media.slice(0, 2).map((media, index) => (
-                    <div key={`${media.publicUrl ?? media.kind}-${index}`} className="overflow-hidden rounded-2xl border border-white/8 bg-black/30">
-                      {media.kind === 'video' ? (
-                        <video src={media.publicUrl ?? undefined} className="h-52 w-full object-cover" controls muted playsInline />
-                      ) : (
-                        <img src={media.publicUrl ?? ''} alt="" className="h-52 w-full object-cover" />
-                      )}
-                    </div>
                   ))}
                 </div>
               ) : null}
