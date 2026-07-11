@@ -11,11 +11,8 @@ export function toKobo(naira: number): number {
 /**
  * Format kobo amount as ₦1,234.56.
  *
- * IMPORTANT: manual grouping, NOT toLocaleString('en-NG'). The 'en-NG' locale
- * crashes the iOS Safari renderer ("page couldn't load") on any page that calls
- * it — which, since formatPrice is used app-wide, took out the dashboard, orders,
- * cart, wallet, etc. on iPhone. Locale-free formatting is identical visually and
- * safe on every browser.
+ * IMPORTANT: manual grouping, NOT toLocaleString('en-NG'). The locale can be
+ * flaky on some browsers, so this stays deterministic and safe.
  */
 export function formatPrice(kobo: bigint | number): string {
   const naira = toNaira(kobo)
@@ -27,7 +24,7 @@ export function formatPrice(kobo: bigint | number): string {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
 
-/** Locale-free "5 Jun 2026" (avoids the iOS-crashing toLocaleDateString('en-NG')). */
+/** Locale-free "5 Jun 2026". */
 export function formatDate(input: string | number | Date): string {
   const d = new Date(input)
   if (Number.isNaN(d.getTime())) return ''

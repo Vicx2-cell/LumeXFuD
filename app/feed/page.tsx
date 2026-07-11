@@ -1,12 +1,41 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { getCurrentUser } from '@/lib/session'
 import { loadFeedSnapshot } from '@/lib/feed/service'
-import { Badge } from '@/components/ui/badge'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { FeedClient } from './feed-client'
+import { FeedShell } from './feed-shell'
+import { getCampusDeals, getFeaturedVendors, getTrendingTopics } from '@/lib/feed/discovery'
 
 export const dynamic = 'force-dynamic'
+
+function roleMeta(role: 'customer' | 'vendor' | 'rider' | 'admin' | 'super_admin') {
+  if (role === 'vendor') {
+    return {
+      title: 'Studio',
+      subtitle: 'Post, promote, and watch what customers respond to.',
+      badge: 'Vendor',
+    }
+  }
+  if (role === 'rider') {
+    return {
+      title: 'Pulse',
+      subtitle: 'See what is moving around campus.',
+      badge: 'Rider',
+    }
+  }
+  return {
+    title: 'Feed',
+    subtitle: 'Food posts, deals, and campus cravings.',
+    badge: role === 'customer' ? 'Customer' : 'Admin',
+  }
+}
+
+function ownerColumn(role: 'customer' | 'vendor' | 'rider' | 'admin' | 'super_admin') {
+  if (role === 'vendor') return 'vendor_id'
+  if (role === 'rider') return 'rider_id'
+  if (role === 'admin' || role === 'super_admin') return 'admin_id'
+  return 'customer_id'
+}
 
 export default async function FeedPage({
   searchParams,
@@ -18,27 +47,28 @@ export default async function FeedPage({
 
   const search = ((await (searchParams ?? Promise.resolve({})).catch(() => ({}))) as { tab?: string })
   const snapshot = await loadFeedSnapshot(search.tab)
-  const roleCopy = session.role === 'vendor'
-    ? {
-        title: 'Studio',
-        subtitle: 'Post, promote, and watch what customers respond to.',
-        accent: 'var(--lx-amber)',
-      }
-    : session.role === 'rider'
-      ? {
-          title: 'Pulse',
-          subtitle: 'See what is moving around campus.',
-          accent: 'var(--lx-green)',
-        }
-      : {
-          title: 'Feed',
-          subtitle: 'Food posts, deals, and campus cravings.',
-          accent: 'var(--lx-blue)',
-        }
+  const roleCopy = roleMeta(session.role)
 
   let menuItems: Array<{ id: string; name: string; price_kobo: number; is_available: boolean }> = []
+  let profileName = session.name ?? session.phone
+  let profileHandle = session.phone
+  let campusName: string | null = null
+  let campusState: string | null = null
   if (session.role === 'vendor' && session.userId) {
     const db = createSupabaseAdmin()
+    const owner = ownerColumn(session.role)
+    const { data: profile } = await db
+      .from('social_profiles')
+      .select('display_name, handle, campus_id')
+      .eq(owner, session.userId)
+      .maybeSingle()
+    profileName = (profile?.display_name as string | null)?.trim() || profileName
+    profileHandle = (profile?.handle as string | null)?.trim() || profileHandle
+    if (profile?.campus_id) {
+      const { data: campus } = await db.from('cities').select('name, state').eq('id', profile.campus_id).maybeSingle()
+      campusName = campus?.name ?? null
+      campusState = campus?.state ?? null
+    }
     const { data } = await db
       .from('menu_items')
       .select('id, name, price_kobo, is_available')
@@ -46,26 +76,43 @@ export default async function FeedPage({
       .is('deleted_at', null)
       .order('display_order', { ascending: true })
     menuItems = (data ?? []) as Array<{ id: string; name: string; price_kobo: number; is_available: boolean }>
+  } else {
+    const db = createSupabaseAdmin()
+    const owner = ownerColumn(session.role)
+    const { data: profile } = await db
+      .from('social_profiles')
+      .select('display_name, handle, campus_id')
+      .eq(owner, session.userId ?? '')
+      .maybeSingle()
+    profileName = (profile?.display_name as string | null)?.trim() || profileName
+    profileHandle = (profile?.handle as string | null)?.trim() || profileHandle
+    if (profile?.campus_id) {
+      const { data: campus } = await db.from('cities').select('name, state').eq('id', profile.campus_id).maybeSingle()
+      campusName = campus?.name ?? null
+      campusState = campus?.state ?? null
+    }
   }
 
-  return (
-    <main className="lx-page pb-24">
-      <div className="sticky top-0 z-40 border-b border-white/8 bg-black/80 px-4 py-3 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black tracking-normal text-white">LumeX {roleCopy.title}</h1>
-              <Badge color={roleCopy.accent}>{session.role}</Badge>
-            </div>
-            <p className="truncate text-xs text-white/45">{roleCopy.subtitle}</p>
-          </div>
-          <Link href={session.role === 'vendor' ? '/vendor-dashboard' : session.role === 'rider' ? '/rider' : '/'} className="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold text-white/70">
-            Home
-          </Link>
-        </div>
-      </div>
+  const trendingTopics = getTrendingTopics(snapshot.items, 5)
+  const featuredVendors = getFeaturedVendors(snapshot.items, 5)
+  const campusDeals = getCampusDeals(snapshot.items, 4)
 
-      <div className="mx-auto max-w-2xl px-0 sm:px-4 sm:py-5">
+  return (
+    <FeedShell
+      role={session.role}
+      roleLabel={roleCopy.title}
+      roleSubtitle={roleCopy.subtitle}
+      profileName={profileName}
+      profileHandle={profileHandle}
+      profileBadge={roleCopy.badge}
+      campusName={campusName}
+      campusState={campusState}
+      selectedTab={snapshot.tab}
+      trendingTopics={trendingTopics}
+      featuredVendors={featuredVendors}
+      campusDeals={campusDeals}
+    >
+      <div className="mx-auto min-w-0 max-w-[760px] px-0 sm:px-0">
         <FeedClient
           tab={snapshot.tab}
           tabs={snapshot.tabs}
@@ -76,6 +123,6 @@ export default async function FeedPage({
           hasMore={snapshot.hasMore}
         />
       </div>
-    </main>
+    </FeedShell>
   )
 }

@@ -93,6 +93,15 @@ The goal is not a generic social network. Every feed surface should support a me
 - [x] Remaining external dependency: live Paystack activation still depends on the configured Paystack keys, webhook secret, and production callback domain.
 - [x] Known limitation: marketplace/order payments still use their existing settlement path by design; Premium and boost billing are isolated on separate event tables and ledger entries, but broader admin tooling for refunds, renewals, and campaign operations will continue in later slices.
 
+### Feed UI Redesign
+
+- [x] Completed work: redesigned the `/feed` surface into a responsive social-commerce shell with a sticky mobile top bar, sticky desktop left rail, sticky discovery rail, role-aware navigation, a searchable discovery column, a composer shortcut that opens the existing composer, denser post cards, and a mobile-friendly bottom nav.
+- [x] Files changed: `app/feed/page.tsx`, `app/feed/feed-client.tsx`, `app/feed/feed-shell.tsx`, `lib/feed/discovery.ts`, `lib/feed/discovery.test.ts`, `lib/money.ts`, `lib/authz-policy.ts`, `docs/LUMEX_FEED_UI_REDESIGN.md`.
+- [x] Tests added: discovery helper coverage for trending topics, vendor aggregation, and campus deal derivation.
+- [x] Verification result: targeted `eslint` passed on the changed feed and helper files; focused `vitest` passed for the new discovery test and authz coverage test; full `npm.cmd test -- --maxWorkers=1` passed with 56 files and 518 tests; `npm.cmd run build` passed.
+- [x] Remaining external dependency: none for the local shell refactor.
+- [x] Known limitation: search and some discovery cards are present as product entry points, but the repo does not yet expose a dedicated feed search backend or a separate immersive-video mode toggle.
+
 ## Repository Reality Check
 
 ### Already in place

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { Bookmark, Heart, MessageCircle, MoreHorizontal, Repeat2, Share2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import type { FeedTabKey, RankedFeedCandidate } from '@/lib/feed/types'
@@ -237,6 +238,18 @@ export function FeedClient({
     setPageCursor(nextCursor)
     setCanLoadMore(hasMore)
   }, [items, nextCursor, hasMore])
+
+  useEffect(() => {
+    const syncComposerFromHash = () => {
+      if (typeof window === 'undefined') return
+      if (window.location.hash === '#composer') {
+        setComposerOpen(true)
+      }
+    }
+    syncComposerFromHash()
+    window.addEventListener('hashchange', syncComposerFromHash)
+    return () => window.removeEventListener('hashchange', syncComposerFromHash)
+  }, [])
 
   const selectedMenuItems = useMemo(() => {
     const map = new Map(menuItems.map((item) => [item.id, item]))
@@ -741,14 +754,15 @@ export function FeedClient({
 
   return (
     <section className="space-y-4">
-      <div className="rounded-[28px] border border-white/8 bg-black/70 p-4 shadow-[0_18px_70px_rgba(0,0,0,0.22)]">
+      <div className="sticky top-3 z-30 rounded-[28px] border border-white/8 bg-[rgba(8,8,10,0.82)] p-4 shadow-[0_18px_70px_rgba(0,0,0,0.24)] backdrop-blur-xl">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-[0.22em] text-white/35">Feed</p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <h2 className="text-sm font-semibold text-white/85">{roleHeadline}</h2>
+              <h2 className="text-lg font-black tracking-tight text-white">LumeX Feed</h2>
               <Badge color="rgba(255,255,255,0.35)">{selectedTab.replaceAll('_', ' ')}</Badge>
             </div>
+            <p className="mt-1 max-w-2xl text-sm text-white/52">{roleHeadline}</p>
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => router.refresh()} className="lx-btn-secondary px-3 py-2 text-xs">
@@ -798,7 +812,7 @@ export function FeedClient({
       </div>
 
       {sessionRole !== 'customer' && composerOpen && (
-        <div className="rounded-[28px] border border-white/8 bg-black/30 p-4 shadow-[0_18px_70px_rgba(0,0,0,0.22)]">
+        <div id="composer" className="rounded-[28px] border border-white/8 bg-black/30 p-4 shadow-[0_18px_70px_rgba(0,0,0,0.22)]">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-white/45">Composer</p>
@@ -1063,7 +1077,20 @@ export function FeedClient({
                     {item.postKind} · {item.visibility} · {item.status}
                   </p>
                 </div>
-                <Badge color="var(--lx-green)">{item.score.toFixed(3)}</Badge>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleFollow(item)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                      item.viewerFollowsAuthor
+                        ? 'border-white/10 bg-white/[0.05] text-white/55'
+                        : 'border-[#F5A623]/30 bg-[#F5A623]/10 text-[#ffd08a] hover:bg-[#F5A623]/16'
+                    }`}
+                  >
+                    {item.viewerFollowsAuthor ? 'Following' : 'Follow'}
+                  </button>
+                  <Badge color="var(--lx-green)">{item.score.toFixed(3)}</Badge>
+                </div>
               </div>
               {item.media?.length ? (
                 <div className="px-4">
@@ -1110,24 +1137,26 @@ export function FeedClient({
                 <span>Saves: {item.saveCount ?? 0}</span>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => void handleLike(item)} className="lx-btn-secondary px-3 py-2 text-xs">
-                  {item.viewerHasLiked ? 'Unlike' : 'Like'}
+              <div className="grid grid-cols-3 gap-2 rounded-3xl border border-white/6 bg-black/25 p-2 text-xs text-white/70 sm:grid-cols-6">
+                <button type="button" onClick={() => void handleLike(item)} className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 transition ${item.viewerHasLiked ? 'bg-[#f87171]/12 text-[#ff9c9c]' : 'hover:bg-white/[0.04]'}`}>
+                  <Heart className={`h-4 w-4 ${item.viewerHasLiked ? 'fill-current' : ''}`} aria-hidden="true" />
+                  <span>{item.likeCount ?? 0}</span>
                 </button>
-                <button type="button" onClick={() => void handleReply(item)} className="lx-btn-secondary px-3 py-2 text-xs">
-                  Reply
+                <button type="button" onClick={() => void handleReply(item)} className="flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 transition hover:bg-white/[0.04]">
+                  <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                  <span>{item.replyCount ?? 0}</span>
                 </button>
-                <button type="button" onClick={() => void handleRepost(item)} className="lx-btn-secondary px-3 py-2 text-xs">
-                  {item.viewerHasReposted ? 'Undo repost' : 'Repost'}
+                <button type="button" onClick={() => void handleRepost(item)} className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 transition ${item.viewerHasReposted ? 'bg-[#60a5fa]/10 text-[#92c5ff]' : 'hover:bg-white/[0.04]'}`}>
+                  <Repeat2 className="h-4 w-4" aria-hidden="true" />
+                  <span>{item.repostCount ?? 0}</span>
                 </button>
-                <button type="button" onClick={() => void handleBookmark(item)} className="lx-btn-secondary px-3 py-2 text-xs">
-                  {item.viewerHasBookmarked ? 'Saved' : 'Save'}
+                <button type="button" onClick={() => void handleBookmark(item)} className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 transition ${item.viewerHasBookmarked ? 'bg-[#F5A623]/10 text-[#ffd08a]' : 'hover:bg-white/[0.04]'}`}>
+                  <Bookmark className={`h-4 w-4 ${item.viewerHasBookmarked ? 'fill-current' : ''}`} aria-hidden="true" />
+                  <span>{item.saveCount ?? 0}</span>
                 </button>
-                <button type="button" onClick={() => void handleFollow(item)} className="lx-btn-secondary px-3 py-2 text-xs">
-                  {item.viewerFollowsAuthor ? 'Following' : 'Follow'}
-                </button>
-                <button type="button" onClick={() => void handleShare(item)} className="lx-btn-secondary px-3 py-2 text-xs">
-                  Share
+                <button type="button" onClick={() => void handleShare(item)} className="flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 transition hover:bg-white/[0.04]">
+                  <Share2 className="h-4 w-4" aria-hidden="true" />
+                  <span>{item.shareCount ?? 0}</span>
                 </button>
                 <button
                   type="button"
@@ -1135,9 +1164,10 @@ export function FeedClient({
                     trackFeedAction(item, 'menu_click', { open: openMenuFor !== item.id })
                     setOpenMenuFor((current) => current === item.id ? null : item.id)
                   }}
-                  className="lx-btn-secondary px-3 py-2 text-xs"
+                  className="flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 transition hover:bg-white/[0.04]"
                 >
-                  More
+                  <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                  <span>More</span>
                 </button>
               </div>
 

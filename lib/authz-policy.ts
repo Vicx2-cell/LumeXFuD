@@ -90,6 +90,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
 
   ...map([
     'vendor/marketing/events', 'vendor/marketing/flyers', 'vendor/marketing/flyers/[id]',
+    'vendor/marketing/flyers/[id]/download',
   ], { kind: 'self' }),
 
   ...map(['premium/plans'], { kind: 'public' }),
@@ -113,7 +114,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'auth/account', 'auth/bank/status', 'auth/change-pin', 'auth/export', 'auth/face',
     'auth/face/status', 'auth/forgot-pin/get-questions', 'auth/forgot-pin/recovery-code',
     'auth/forgot-pin/security-answers', 'auth/google/callback', 'auth/google/start',
-    'auth/tiktok/callback',
+    'auth/tiktok/start', 'auth/tiktok/callback',
     'auth/login', 'auth/logout', 'auth/me', 'auth/otp/send', 'auth/otp/verify',
     'auth/pin/reset', 'auth/regenerate-recovery-code', 'auth/register', 'auth/remove-pin',
     'auth/setup', 'auth/social/complete', 'auth/webauthn/login-options',

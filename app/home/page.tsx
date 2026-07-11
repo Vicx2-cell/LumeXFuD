@@ -1,22 +1,14 @@
 import crypto from 'node:crypto'
+import { Suspense } from 'react'
+import { BottomNav } from '@/components/nav-bottom'
+import LumiChat from '@/components/LumiChat'
+import { getFeature } from '@/lib/features'
+import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { notCurrentlySuspendedOr } from '@/lib/vendor-visibility'
-import { getCurrentUser } from '@/lib/session'
-import { formatPrice } from '@/lib/money'
-import { BottomNav } from '@/components/nav-bottom'
-import { BackButton } from '@/components/back-button'
-import { BrandLogo } from '@/components/brand-logo'
-import LumiChat from '@/components/LumiChat'
-import { NotificationBell } from '@/components/notification-bell'
-import { StreakNudge } from '@/components/streak-nudge'
-import { LaunchCounter } from '@/components/launch-counter'
-import ActiveGroupBanner from '@/components/active-group-banner'
-import { RoleTutorial } from '@/components/role-tutorial'
-import { getFeature } from '@/lib/features'
 import { VendorCardSkeleton } from '@/components/ui/skeleton'
 import { HomepageClient } from '../homepage-client'
-import { CountUp, SmoothScroll } from '@/components/fx'
-import { Suspense } from 'react'
+import { SmoothScroll } from '@/components/fx'
 import { mapVendorSignals, rankVendorFeed } from '@/lib/vendor-feed-fairness'
 
 type HomeLocationRow = {
@@ -29,7 +21,7 @@ type HomeLocationRow = {
   uses_lodge_catalog: boolean
 }
 
-// Always render fresh — vendor open/closed status and the ranked list must never
+// Always render fresh - vendor open/closed status and the ranked list must never
 // be served stale from a cached page. (Realtime keeps it live after first paint.)
 export const dynamic = 'force-dynamic'
 
@@ -102,10 +94,7 @@ async function getVendorsAndTrending(zoneId?: string | null) {
       `)
       .eq('is_active', true)
       .is('deleted_at', null)
-      .or(notCurrentlySuspendedOr()) // a suspended vendor must drop off the home list
-      // NOTE: no status filter — vendors NEVER disappear from home, even when
-      // CLOSED or paused. The client sorts the unavailable ones to the bottom
-      // and marks them clearly so customers don't waste time tapping them.
+      .or(notCurrentlySuspendedOr())
       .order('composite_score', { referencedTable: 'vendor_scores', ascending: false })
 
     if (zoneId) query = query.eq('zone_id', zoneId)
@@ -135,12 +124,14 @@ async function getVendorsAndTrending(zoneId?: string | null) {
       .eq('id', 1)
       .single()
 
-    // One cheap storage call: which vendors are fully KYC-verified (marker file).
     let verifiedIds = new Set<string>()
     try {
       const { data: marks } = await db.storage.from('kyc-faces').list('complete', { limit: 1000 })
       verifiedIds = new Set((marks ?? []).map((m) => m.name))
-    } catch { /* bucket/marker missing — just no badges */ }
+    } catch {
+      // Bucket or marker missing - just skip the badge.
+    }
+
     const withVerified = vendorRows.map((v) => ({ ...v, kyc_verified: verifiedIds.has(v.id as string) }))
     const ranked = rankVendorFeed(withVerified, signals)
 
@@ -162,8 +153,6 @@ export default async function CustomerHomePage() {
     getVendorsAndTrending(preferredZoneId ?? locations[0]?.zone_id ?? null),
   ])
 
-  // The signed-in customer's favourite vendor ids — powers the heart state + the
-  // one-tap "Favourites" filter on the list. Empty for guests/other roles.
   let favorites: string[] = []
   let firstName = ''
   try {
@@ -177,142 +166,34 @@ export default async function CustomerHomePage() {
       favorites = (favs ?? []).map((r) => r.vendor_id as string)
       firstName = ((me?.name as string | null) ?? '').trim().split(' ')[0] ?? ''
     }
-  } catch { /* non-critical — never block the home render */ }
+  } catch {
+    // Non-critical - never block the home render.
+  }
 
-  // Time-of-day greeting in campus (Lagos) time — a warm, personal header beats a
-  // static line. force-dynamic, so server time is correct per request.
-  const lagosHour = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'Africa/Lagos' }).format(new Date()))
+  const lagosHour = Number(new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    hour12: false,
+    timeZone: 'Africa/Lagos',
+  }).format(new Date()))
   const partOfDay = lagosHour < 12 ? 'morning' : lagosHour < 17 ? 'afternoon' : 'evening'
   const greeting = `Good ${partOfDay}${firstName ? `, ${firstName}` : ''}`
 
   return (
     <main className="lx-page pb-24">
-      {/* Smooth scroll on the dashboard — native touch (no synced-touch) so fast
-          flicks to a vendor stay instant and the keyboard/nested scrollers behave. */}
       <SmoothScroll />
-      {/* Header */}
-      <div className="lx-topbar sticky top-0 z-40 px-4 py-3">
-        <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <BackButton />
-            <BrandLogo size={34} rounded={10} />
-            <div className="min-w-0">
-              <span className="text-xs text-white/40">{greeting} 👋</span>
-              <h1 className="text-sm sm:text-base font-semibold leading-tight lx-foodie-text truncate">What are you eating today?</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {walletOn && (
-            <a
-              href="/profile/wallet"
-              className="lx-card-amber-strong h-11 px-3 rounded-full flex items-center gap-1.5"
-              aria-label="Wallet"
-            >
-              <span className="text-sm" aria-hidden="true">💰</span>
-              <span className="lx-amber text-xs font-semibold">Wallet</span>
-            </a>
-            )}
-            <RoleTutorial role="customer" variant="icon" />
-            <NotificationBell />
-            <a
-              href="/profile"
-              className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center"
-              aria-label="Profile"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-5 lx-stagger">
-        {/* Active group orders — always shows the way back into a group you're in */}
-        <ActiveGroupBanner />
-
-        {/* Streak nudge — loss-aversion hook for returning customers */}
-        <StreakNudge />
-
-        {/* Launch counter — self-hides unless the super-admin flag is on */}
-        <LaunchCounter />
-
-        <a
-          href="/feed"
-          className="block rounded-2xl p-4"
-          style={{ background: 'rgba(245,166,35,0.12)', border: '1px solid rgba(245,166,35,0.28)' }}
-        >
-          <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl" style={{ background: 'rgba(245,166,35,0.16)', color: '#F5A623' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="3" y="4" width="18" height="16" rx="3" />
-                <path d="m10 9 5 3-5 3V9Z" />
-              </svg>
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white">Open customer feed</p>
-              <p className="mt-0.5 text-xs text-white/55">Watch food posts, deals, vendor updates and campus trends.</p>
-            </div>
-            <svg className="shrink-0 opacity-50" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </div>
-        </a>
-
-        {/* Study entry — the course tool (separate product). Gated by the `study` flag. */}
-        {studyOn && (
-          <a
-            href="/study"
-            className="block rounded-2xl p-4"
-            style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)' }}
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-2xl shrink-0" aria-hidden="true">📚</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-white">
-                  Study <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full align-middle" style={{ background: 'rgba(99,102,241,0.25)', color: '#c7d2fe' }}>beta</span>
-                </p>
-                <p className="text-xs text-white/55 mt-0.5">Pick your department to see your courses &amp; practice.</p>
-              </div>
-              <svg className="shrink-0 opacity-50" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </div>
-          </a>
-        )}
-
-        {/* Trending */}
-        {trending && trending.orders_last_hour && (
-          <div className="lx-card-amber rounded-2xl p-4 flex items-center gap-3">
-            <span className="text-2xl">🔥</span>
-            <div>
-              <p className="lx-amber text-sm font-semibold">
-                <CountUp value={trending.orders_last_hour} /> orders in the last hour
-              </p>
-              {trending.top_item_name && (
-                <p className="text-xs text-white/60 mt-0.5">
-                  Top item: {trending.top_item_name}
-                  {trending.top_item_count ? ` (${trending.top_item_count} orders)` : ''}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div id="vendors" className="scroll-mt-20">
-          <Suspense fallback={<SkeletonGrid />}>
-            <HomepageClient
-              initialVendors={vendors as VendorData[]}
-              initialFavorites={favorites}
-              initialLocations={locations as HomeLocationRow[]}
-              initialSelectedZoneId={preferredZoneId ?? locations[0]?.zone_id ?? ''}
-              campaignId={feedCampaignId}
-            />
-          </Suspense>
-        </div>
-      </div>
-
+      <Suspense fallback={<SkeletonGrid />}>
+        <HomepageClient
+          greeting={greeting}
+          studyOn={studyOn}
+          walletOn={walletOn}
+          trending={trending}
+          initialVendors={vendors as VendorData[]}
+          initialFavorites={favorites}
+          initialLocations={locations as HomeLocationRow[]}
+          initialSelectedZoneId={preferredZoneId ?? locations[0]?.zone_id ?? ''}
+          campaignId={feedCampaignId}
+        />
+      </Suspense>
       <LumiChat />
       <BottomNav />
     </main>
@@ -341,5 +222,3 @@ export interface VendorData {
   vendor_scores: Array<{ composite_score: number; visibility_tier: string }> | null
   kyc_verified?: boolean
 }
-
-export { formatPrice }
