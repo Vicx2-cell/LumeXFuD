@@ -81,6 +81,13 @@ const actions = [
     highlight: true,
   },
   {
+    href: '/super-admin/premium',
+    label: 'Premium Billing',
+    desc: 'Plan prices, overrides, and subscription control',
+    icon: svg(<><path d="M12 2 3 6v6c0 5.25 3.7 9.9 9 10 5.3-.1 9-4.75 9-10V6l-9-4Z"/><path d="M12 7v10"/><path d="M8.5 11.5h7"/></>),
+    highlight: true,
+  },
+  {
     href: '/super-admin/rewards',
     label: 'Rewards',
     desc: 'Surprise odds, referral amounts, tier perks',
@@ -139,8 +146,8 @@ const GROUPS = [
   },
   {
     title: 'Revenue and market setup',
-    description: 'Pricing, rewards, financials, and launch readiness.',
-    hrefs: ['/super-admin/financials', '/super-admin/pricing', '/super-admin/rewards', '/super-admin/launch-counter'],
+    description: 'Premium billing, pricing, rewards, financials, and launch readiness.',
+    hrefs: ['/super-admin/financials', '/super-admin/pricing', '/super-admin/premium', '/super-admin/rewards', '/super-admin/launch-counter'],
   },
   {
     title: 'Access and oversight',

@@ -232,6 +232,11 @@ export function FeedClient({
 
   const attachedPreview = useMemo(() => media.filter((m) => m.status === 'done'), [media])
   const feedSessionId = useMemo(() => getClientFeedSessionId(), [])
+  const roleHeadline = sessionRole === 'vendor'
+    ? 'Vendor studio: post updates, attach items, and turn attention into orders.'
+    : sessionRole === 'rider'
+      ? 'Rider pulse: spot busy areas, monitor orders, and watch what is moving.'
+      : 'Customer feed: discover meals, creators, deals, and vendors in one place.'
 
   function patchFeedItem(id: string, updater: (item: RankedFeedCandidate) => RankedFeedCandidate) {
     setFeedItems((current) => current.map((item) => item.id === id ? updater(item) : item))
@@ -740,10 +745,22 @@ export function FeedClient({
             ))}
           </div>
 
+          <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-white/45">Role view</p>
+                <p className="mt-1 text-sm text-white/75">{roleHeadline}</p>
+              </div>
+              <Badge color="rgba(255,255,255,0.35)">{selectedTab.replaceAll('_', ' ')}</Badge>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-white/45">Composer</p>
-              <h2 className="text-lg font-semibold text-white">What are you sharing?</h2>
+              <h2 className="text-lg font-semibold text-white">
+                {sessionRole === 'vendor' ? 'What are you promoting today?' : sessionRole === 'rider' ? 'What should riders notice?' : 'What are you sharing?'}
+              </h2>
             </div>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => router.refresh()} className="lx-btn-secondary px-3 py-2 text-xs">

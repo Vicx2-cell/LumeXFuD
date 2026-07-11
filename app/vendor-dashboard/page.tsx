@@ -267,6 +267,13 @@ export default function VendorDashboard() {
   const prepCount = orders.filter((o) => o.status === 'VENDOR_ACCEPTED' || o.status === 'PREPARING').length
   const readyCount = orders.filter((o) => o.status === 'READY').length
   const isPremium = !!vendor?.is_premium
+  const quickActions = [
+    { href: '/vendor-dashboard/menu', label: 'Menu', desc: 'Edit prices', Icon: UtensilsCrossed },
+    { href: '/vendor-dashboard/videos', label: 'Videos', desc: 'Archive flow', Icon: UtensilsCrossed },
+    { href: '/vendor-dashboard/boosts', label: 'Boosts', desc: 'Sponsored push', Icon: Star },
+    { href: '/premium', label: 'Premium', desc: 'Plan status', Icon: Star },
+    { href: '/vendor-dashboard/settings', label: 'Settings', desc: 'Store info', Icon: Settings2 },
+  ]
 
   return (
     <div className={`lx-page lx-console pb-10 overflow-hidden ${isPremium ? 'bg-gradient-to-b from-[#24170d] via-[#151110] to-[#0b0a09]' : ''}`}>
@@ -310,7 +317,91 @@ export default function VendorDashboard() {
         </div>
       </div>
 
-      <div className="max-w-lg lg:max-w-5xl mx-auto px-4 py-4 flex flex-col gap-5 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:items-start lx-enter">
+      <div className="max-w-6xl mx-auto px-4 pt-4">
+        <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="lx-surface p-4 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-white/40">Dashboard board</p>
+                <h2 className="text-2xl font-semibold text-white">Clean view for today</h2>
+                <p className="mt-1 text-sm text-white/55">Orders on one side, controls on the other, with the most important actions at the top.</p>
+              </div>
+              {isPremium && <Badge color="#F5A623">Premium store</Badge>}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                { label: 'New', value: pendingCount, tint: 'rgba(245,166,35,0.16)', color: '#F5A623' },
+                { label: 'Preparing', value: prepCount, tint: 'rgba(96,165,250,0.14)', color: '#60a5fa' },
+                { label: 'Ready', value: readyCount, tint: 'rgba(74,222,128,0.14)', color: '#4ade80' },
+              ].map((stat) => (
+                <div key={stat.label} className="rounded-2xl border border-white/8 p-3" style={{ background: stat.tint }}>
+                  <p className="text-[11px] uppercase tracking-wide text-white/45">{stat.label}</p>
+                  <p className="mt-1 text-lg font-semibold lx-nums" style={{ color: stat.color }}>{stat.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {quickActions.map((action) => (
+                <button
+                  key={action.href}
+                  onClick={() => router.push(action.href)}
+                  className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-left transition hover:border-white/15"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-white/80">
+                      <action.Icon size={16} />
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-white">{action.label}</p>
+                      <p className="text-[11px] text-white/40">{action.desc}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="lx-surface p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-white/40">Store status</p>
+                <h3 className="text-lg font-semibold text-white">{vendor?.shop_name ?? 'Vendor'}</h3>
+              </div>
+              <Badge color={vendor?.status === 'OPEN' ? 'var(--lx-green)' : vendor?.status === 'BUSY' ? 'var(--color-amber)' : 'rgba(255,255,255,0.45)'}>{vendor?.status ?? 'OPEN'}</Badge>
+            </div>
+            {vendor && !hasUsableLocation(vendor) ? (
+              <button
+                onClick={() => router.push('/vendor-dashboard/settings')}
+                className="w-full rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3 text-left"
+              >
+                <p className="text-sm font-medium text-white">Add your store location</p>
+                <p className="mt-1 text-xs text-white/45">Drop a pin so customers and riders can find you faster.</p>
+              </button>
+            ) : (
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                <p className="text-sm font-medium text-white">Location ready</p>
+                <p className="mt-1 text-xs text-white/45">Your store is visible on maps and delivery zones.</p>
+              </div>
+            )}
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                <p className="text-[11px] uppercase tracking-wide text-white/40">Queue</p>
+                <p className="mt-1 text-white font-semibold">{pendingCount + prepCount + readyCount}</p>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                <p className="text-[11px] uppercase tracking-wide text-white/40">Open</p>
+                <p className="mt-1 text-white font-semibold">{vendor?.status ?? 'OPEN'}</p>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                <p className="text-[11px] uppercase tracking-wide text-white/40">Premium</p>
+                <p className="mt-1 text-white font-semibold">{isPremium ? 'Yes' : 'No'}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col gap-5 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:items-start lx-enter">
         {/* Controls — sidebar on desktop (right), BELOW the orders on mobile */}
         <div className="space-y-5 order-2 lg:order-none lg:col-start-2">
         {/* Location nudge — customers & riders can't find a store with no pin. */}
