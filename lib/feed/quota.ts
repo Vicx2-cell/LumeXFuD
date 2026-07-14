@@ -29,7 +29,7 @@ export const DEFAULT_VIDEO_QUOTA: VideoQuotaConfig = {
   tikTokCountsTowardLimit: true,
   archivedCountsTowardStorage: false,
   maxVideoSizeBytes: 100 * 1024 * 1024,
-  maxVideoDurationSeconds: 180,
+  maxVideoDurationSeconds: 60,
   supportedFormats: ['video/mp4', 'video/webm', 'video/quicktime'],
   imageLimits: { maxItems: 10, maxBytes: 5 * 1024 * 1024 },
   storageQuotaBytes: 2 * 1024 * 1024 * 1024,
@@ -59,4 +59,3 @@ export function assessVideoQuota(
     remaining: unlimited ? null : Math.max(limit - activeVideoCount, 0),
   }
 }
-

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getCampusDeals, getFeaturedVendors, getTrendingTopics } from './discovery'
+import { buildDiscoveryModules, classifyDiscoveryTopics, getCampusDeals, getDiscoveryTopicLabels, getFeaturedVendors, getTrendingTopics } from './discovery'
 
 describe('feed discovery helpers', () => {
   const items = [
@@ -44,8 +44,31 @@ describe('feed discovery helpers', () => {
 
   it('builds campus deal cards from menu-linked posts', () => {
     expect(getCampusDeals(items, 2)).toEqual([
-      { title: 'Goat meat basmati', vendor: 'Chines Kitchen', priceLabel: '₦3,800', badge: 'Menu item' },
-      { title: 'Jollof & chicken', vendor: 'Buka Joint', priceLabel: '₦2,500', badge: 'Deal' },
+      { title: 'Goat meat basmati', vendor: 'Chines Kitchen', priceLabel: '\u20A63,800', badge: 'Menu item' },
+      { title: 'Jollof & chicken', vendor: 'Buka Joint', priceLabel: '\u20A62,500', badge: 'Deal' },
     ])
+  })
+
+  it('classifies topic labels from food text and builds compact modules', () => {
+    expect(classifyDiscoveryTopics({
+      authorDisplayName: 'Rice House',
+      authorHandle: 'ricehouse',
+      body: 'Fresh jollof rice and chicken',
+      hashtags: ['uturu'],
+      postKind: 'TEXT',
+      menuItems: [{ name: 'Jollof rice', priceKobo: 280000, isPrimary: true }],
+    })).toContain('rice')
+    expect(getDiscoveryTopicLabels([
+      ...items,
+      {
+        authorDisplayName: 'Rice House',
+        authorHandle: 'ricehouse',
+        body: 'Fresh jollof rice and chicken',
+        hashtags: ['uturu'],
+        postKind: 'TEXT',
+        menuItems: [{ name: 'Jollof rice', priceKobo: 280000, isPrimary: true }],
+      },
+    ], 3).map((topic) => topic.label)).toContain('Rice')
+    expect(buildDiscoveryModules(items).length).toBeGreaterThan(0)
   })
 })

@@ -47,6 +47,12 @@ class Query {
     return this
   }
 
+  update(values: Row) {
+    this.mode = 'update'
+    this.updateValues = values
+    return this
+  }
+
   select(columns = '*') {
     if (this.mode === 'update') {
       const rows = this.executeRows()
@@ -59,6 +65,14 @@ class Query {
   maybeSingle() {
     const rows = this.executeRows()
     return Promise.resolve({ data: rows.length > 0 ? this.project(rows[0]!, this.selected ?? '*') : null, error: null })
+  }
+
+  then(onFulfilled: (value: { data: Row[] | null; error: null }) => unknown) {
+    const rows = this.executeRows().map((row) => this.project(row, this.selected ?? '*'))
+    return Promise.resolve({
+      data: rows,
+      error: null,
+    }).then(onFulfilled)
   }
 
   single() {
@@ -78,15 +92,9 @@ class Query {
     return Promise.resolve({ data: rows, error: null })
   }
 
-  update(values: Row) {
-    this.mode = 'update'
-    this.updateValues = values
-    return this
-  }
-
-  private executeRows() {
-    const table = state.tables.get(this.table) ?? []
-    const rows = table.filter((row) => this.filters.every((filter) => filter(row)))
+    private executeRows() {
+      const table = state.tables.get(this.table) ?? []
+      const rows = table.filter((row) => this.filters.every((filter) => filter(row)))
     if (this.mode === 'update') {
       for (const row of rows) Object.assign(row, this.updateValues ?? {})
     }
@@ -157,6 +165,33 @@ describe('feed event batching', () => {
     expect(second.deduped).toBe(1)
     expect((state.tables.get('feed_events') ?? []).length).toBe(1)
     expect((state.tables.get('feed_impressions') ?? []).length).toBe(1)
+  })
+
+  it('counts a qualified impression as one post view and ignores a replayed batch', async () => {
+    state.tables.set('posts', [
+      { id: '11111111-1111-4111-8111-111111111111', view_count: 0 },
+    ])
+
+    const batch = {
+      batch_key: 'batch-0002',
+      source_tab: 'for_you' as const,
+      events: [
+        {
+          event_key: 'evt-view-0001',
+          post_id: '11111111-1111-4111-8111-111111111111',
+          event_type: 'qualified_impression',
+          source_tab: 'for_you' as const,
+          metadata: { session_id: 'session-2', dwell_ms: 1400, visibility_ratio: 0.8 },
+        },
+      ],
+    }
+
+    const first = await recordFeedEventBatch(batch, 'session-2')
+    const second = await recordFeedEventBatch(batch, 'session-2')
+
+    expect(first.inserted).toBe(1)
+    expect(second.deduped).toBe(1)
+    expect((state.tables.get('posts') ?? [])[0]).toMatchObject({ view_count: 1 })
   })
 })
 

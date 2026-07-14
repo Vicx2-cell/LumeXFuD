@@ -53,14 +53,14 @@ describe('feed restore route', () => {
 
   it('blocks suspended vendors from restoring videos', async () => {
     state.vendor = { id: 'vendor-1', suspended_until: new Date(Date.now() + 60_000).toISOString() }
-    const res = await POST(new Request('http://localhost', { method: 'POST' }) as never, { params: Promise.resolve({ id: 'post-1' }) })
+    const res = (await POST(new Request('http://localhost', { method: 'POST' }) as never, { params: Promise.resolve({ id: 'post-1' }) }))!
     expect(res.status).toBe(403)
     expect(restoreVideo).not.toHaveBeenCalled()
   })
 
   it('rejects cross-vendor restore attempts', async () => {
     state.post = { id: 'post-1', author_profile_id: 'profile-2', deleted_at: null }
-    const res = await POST(new Request('http://localhost', { method: 'POST' }) as never, { params: Promise.resolve({ id: 'post-1' }) })
+    const res = (await POST(new Request('http://localhost', { method: 'POST' }) as never, { params: Promise.resolve({ id: 'post-1' }) }))!
     expect(res.status).toBe(404)
     expect(restoreVideo).not.toHaveBeenCalled()
   })

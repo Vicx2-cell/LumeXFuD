@@ -46,6 +46,27 @@ const actions = [
     highlight: true,
   },
   {
+    href: '/super-admin/official-feed',
+    label: 'Official Feed',
+    desc: 'Review, publish, or archive generated feed posts',
+    icon: svg(<><path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h16"/><path d="m15 10 5 2-5 2"/></>),
+    highlight: true,
+  },
+  {
+    href: '/super-admin/feed-stories',
+    label: 'Story Approvals',
+    desc: 'Approve or reject student stories before they go live',
+    icon: svg(<><path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h8"/><path d="m16 11 3 3 4-4"/></>),
+    highlight: true,
+  },
+  {
+    href: '/super-admin/feed-reports',
+    label: 'Feed Reports',
+    desc: 'Review reports, remove bad posts, and clear false flags',
+    icon: svg(<><path d="M12 2 3 6v6c0 5.25 3.7 9.9 9 10 5.3-.1 9-4.75 9-10V6l-9-4Z"/><path d="M12 8v4"/><path d="M12 16h.01"/></>),
+    highlight: true,
+  },
+  {
     href: '/super-admin/usage',
     label: 'Feature Usage',
     desc: 'Most-used features, by customers/vendors/riders',
@@ -142,7 +163,7 @@ const GROUPS = [
   {
     title: 'Controls and growth',
     description: 'The switches and knobs that shape the live product.',
-    hrefs: ['/super-admin/controls', '/super-admin/features', '/super-admin/settings', '/super-admin/usage', '/super-admin/announce'],
+    hrefs: ['/super-admin/controls', '/super-admin/features', '/super-admin/settings', '/super-admin/usage', '/super-admin/announce', '/super-admin/official-feed', '/super-admin/feed-stories', '/super-admin/feed-reports'],
   },
   {
     title: 'Revenue and market setup',

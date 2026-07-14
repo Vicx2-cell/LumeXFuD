@@ -1,5 +1,12 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { ensureSocialProfileForSession } from './service'
+import {
+  canPublishFeedPost,
+  loadFeedPermissionContext,
+  resolveFeedPublisherKind,
+  type FeedPermissionProfile,
+  type FeedPermissionVendor,
+} from './permissions'
 
 export type FeedToggleState = {
   enabled: boolean
@@ -102,8 +109,30 @@ export async function toggleFollow(followedProfileId: string, enabled: boolean) 
   const db = createSupabaseAdmin()
   const profile = await requireProfile()
   if (profile.id === followedProfileId) throw new Error('You cannot follow yourself')
-  const { data: target } = await db.from('social_profiles').select('id, deleted_at').eq('id', followedProfileId).maybeSingle()
+  const { data: target } = await db
+    .from('social_profiles')
+    .select('id, deleted_at, profile_kind, is_verified, is_system_account, official_badge_kind, premium_verified, premium_label, vendor_id')
+    .eq('id', followedProfileId)
+    .maybeSingle()
   if (!target) throw new Error('Profile not found')
+  const targetProfile = target as FeedPermissionProfile & { deleted_at?: string | null }
+  if (targetProfile.deleted_at) throw new Error('Profile not found')
+  const { data: targetVendor } = targetProfile.vendor_id
+    ? await db
+        .from('vendors')
+        .select('id, approval_state, is_active, is_verified, business_verified, id_verified')
+        .eq('id', targetProfile.vendor_id)
+        .maybeSingle()
+    : { data: null }
+  const targetKind = resolveFeedPublisherKind(targetProfile, (targetVendor ?? null) as FeedPermissionVendor | null)
+  if (!['official', 'verified_vendor', 'ambassador'].includes(targetKind)) {
+    throw new Error('You can only follow vendors, ambassadors, and official accounts')
+  }
+  const [outgoingBlock, incomingBlock] = await Promise.all([
+    db.from('blocks').select('id').eq('blocker_profile_id', profile.id).eq('blocked_profile_id', followedProfileId).maybeSingle(),
+    db.from('blocks').select('id').eq('blocker_profile_id', followedProfileId).eq('blocked_profile_id', profile.id).maybeSingle(),
+  ])
+  if (outgoingBlock.data || incomingBlock.data) throw new Error('You cannot follow a blocked profile')
   const followed = await upsertToggle(db, 'follows', 'follower_profile_id', 'followed_profile_id', profile.id, followedProfileId, enabled)
   const followCount = await countRows(db, 'follows', 'followed_profile_id', followedProfileId)
   return { followedProfileId, followed, followCount }
@@ -157,6 +186,10 @@ export async function createReply(postId: string, body: string, parentReplyId?: 
 export async function createQuote(postId: string, body: string) {
   const db = createSupabaseAdmin()
   const profile = await requireProfile()
+  const permissionContext = await loadFeedPermissionContext(db, profile.id)
+  if (!canPublishFeedPost(permissionContext.profile, permissionContext.vendor)) {
+    throw new Error('Only verified vendors, approved ambassadors, and official accounts can quote posts')
+  }
   const post = await loadTargetPost(db, postId)
   if (post.deleted_at || post.is_archived || post.status !== 'published') throw new Error('Post is not available')
   const now = new Date().toISOString()

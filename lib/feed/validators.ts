@@ -38,6 +38,7 @@ export const feedComposerPromotionSchema = z.object({
 
 export const feedComposerInput = z.object({
   draft_id: z.string().uuid().optional(),
+  publish_as: z.enum(['self', 'lumex']).optional().default('self'),
   body: safeText.optional(),
   content_warning: z.string().trim().max(240).optional(),
   visibility: z.enum(['public', 'followers', 'private', 'unlisted']).default('public'),
@@ -47,6 +48,7 @@ export const feedComposerInput = z.object({
   zone_id: z.string().uuid().optional(),
   location_text: z.string().max(200).optional(),
   scheduled_for: z.string().datetime({ offset: true }).nullable().optional(),
+  is_pinned: z.boolean().optional().default(false),
   hashtags: z.array(z.string().trim().min(1).max(50)).max(20).default([]),
   mentions: z.array(z.string().trim().min(1).max(100)).max(20).default([]),
   media: z.array(feedComposerMediaSchema).max(12).default([]),
@@ -101,6 +103,21 @@ export const rankingSimulationInput = z.object({
 
 export const feedToggleInput = z.object({
   enabled: z.boolean().default(true),
+})
+
+export const feedStoryCreateInput = z.object({
+  media_url: z.string().url().max(500).optional(),
+  media_kind: z.enum(['image', 'video']).default('image'),
+  caption: z.string().trim().max(500).optional(),
+  post_id: z.string().uuid().optional(),
+}).refine((value) => Boolean(value.media_url || value.caption?.trim()), {
+  message: 'Add text, a photo, or a video',
+})
+
+export const feedStoryModerationInput = z.object({
+  storyId: z.string().uuid(),
+  action: z.enum(['approve', 'reject']),
+  reason: z.string().trim().max(500).optional(),
 })
 
 export const feedReplyInput = z.object({

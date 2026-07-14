@@ -141,6 +141,54 @@ export async function recordFeedEventBatch(input: unknown, sessionId?: string) {
     if (error) throw new Error(error.message)
   }
 
+  const viewRows = eventRows.filter((event) => event.event_type === 'qualified_impression' && event.post_id)
+  if (viewRows.length > 0) {
+    const viewCounts = new Map<string, number>()
+    for (const row of viewRows) {
+      if (!row.post_id) continue
+      viewCounts.set(row.post_id, (viewCounts.get(row.post_id) ?? 0) + 1)
+    }
+    const postIds = Array.from(viewCounts.keys())
+    const { data: currentPosts, error: postError } = await db
+      .from('posts')
+      .select('id, view_count')
+      .in('id', postIds)
+    if (postError) throw new Error(postError.message)
+    const currentById = new Map((currentPosts ?? []).map((row) => {
+      const typed = row as { id: string; view_count: number | null }
+      return [typed.id, Number(typed.view_count ?? 0)] as const
+    }))
+    for (const postId of postIds) {
+      const nextCount = (currentById.get(postId) ?? 0) + (viewCounts.get(postId) ?? 0)
+      const { error } = await db.from('posts').update({ view_count: nextCount }).eq('id', postId)
+      if (error) throw new Error(error.message)
+    }
+  }
+
+  const shareRows = eventRows.filter((event) => event.event_type === 'share' && event.post_id)
+  if (shareRows.length > 0) {
+    const shareCounts = new Map<string, number>()
+    for (const row of shareRows) {
+      if (!row.post_id) continue
+      shareCounts.set(row.post_id, (shareCounts.get(row.post_id) ?? 0) + 1)
+    }
+    const postIds = Array.from(shareCounts.keys())
+    const { data: currentPosts, error: postError } = await db
+      .from('posts')
+      .select('id, share_count')
+      .in('id', postIds)
+    if (postError) throw new Error(postError.message)
+    const currentById = new Map((currentPosts ?? []).map((row) => {
+      const typed = row as { id: string; share_count: number | null }
+      return [typed.id, Number(typed.share_count ?? 0)] as const
+    }))
+    for (const postId of postIds) {
+      const nextCount = (currentById.get(postId) ?? 0) + (shareCounts.get(postId) ?? 0)
+      const { error } = await db.from('posts').update({ share_count: nextCount }).eq('id', postId)
+      if (error) throw new Error(error.message)
+    }
+  }
+
   await db
     .from('feed_event_batches')
     .update({ deduped_count: parsed.data.events.length - eventRows.length })

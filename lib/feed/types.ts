@@ -9,6 +9,7 @@ export interface FeedWeights {
   campusWeight: number
   freshnessWeight: number
   watchCompletionWeight: number
+  watchTimeWeight: number
   engagementWeight: number
   menuClickWeight: number
   addToCartWeight: number
@@ -17,6 +18,7 @@ export interface FeedWeights {
   vendorReliabilityWeight: number
   riderReliabilityWeight: number
   premiumBoostWeight: number
+  featuredPlacementWeight: number
   sponsoredBoostWeight: number
   negativeFeedbackPenalty: number
   cancellationPenalty: number
@@ -32,6 +34,8 @@ export interface FeedCandidate {
   authorProfileId: string
   authorHandle?: string | null
   authorDisplayName?: string | null
+  authorAvatarUrl?: string | null
+  authorIsSystemAccount?: boolean
   body?: string | null
   contentWarning?: string | null
   locationText?: string | null
@@ -56,6 +60,7 @@ export interface FeedCandidate {
   addToCartCount?: number
   orderCount?: number
   revenueKobo?: number
+  watchTimeMs?: number
   watchCompletionRate?: number
   rewatchRate?: number
   dwellTimeMs?: number
@@ -66,6 +71,7 @@ export interface FeedCandidate {
   reportCount?: number
   blockCount?: number
   isPremiumBoosted?: boolean
+  isFeatured?: boolean
   isSponsored?: boolean
   repetitionScore?: number
   qualityScore?: number
@@ -76,6 +82,14 @@ export interface FeedCandidate {
   viewerFollowsAuthor?: boolean
   viewerMutedAuthor?: boolean
   viewerBlockedAuthor?: boolean
+  authorVerified?: boolean
+  officialCollectionType?: 'new_on_lumex' | 'lumex_picks' | 'morning_collection' | 'evening_collection' | 'breakfast_picks' | 'lunch_picks' | 'dinner_picks' | 'student_budget' | 'open_right_now' | 'closing_soon' | 'rice_lovers' | 'shawarma_picks' | 'pizza_friday' | 'drinks_around_you' | 'fast_delivery_picks' | 'new_vendors' | 'new_menus_week' | 'active_deals' | 'sponsored' | 'event' | null
+  officialGenerationReason?: string | null
+  officialSelectionMetadata?: Record<string, unknown> | null
+  officialSourceType?: string | null
+  officialSourceId?: string | null
+  officialAreaId?: string | null
+  officialAreaScope?: 'city' | 'zone' | null
 }
 
 export interface FeedMediaSummary {
@@ -92,10 +106,12 @@ export interface FeedMediaSummary {
 export interface FeedMenuItemSummary {
   id: string
   menuItemId: string | null
+  vendorId?: string | null
   name: string
-  priceKobo: number
+  priceKobo: number | null
   isAvailable: boolean
   isPrimary: boolean
+  imageUrl?: string | null
 }
 
 export interface FeedViewerContext {
@@ -108,6 +124,7 @@ export interface FeedViewerContext {
   mutedAuthor?: boolean
   hasPremium?: boolean
   premiumInfluenceEnabled?: boolean
+  featuredInfluenceEnabled?: boolean
   sponsorInfluenceEnabled?: boolean
 }
 
@@ -121,6 +138,7 @@ export interface FeedScoreBreakdown {
   campus: number
   freshness: number
   watchCompletion: number
+  watchTime: number
   engagement: number
   menuClick: number
   addToCart: number
@@ -129,6 +147,7 @@ export interface FeedScoreBreakdown {
   vendorReliability: number
   riderReliability: number
   premiumBoost: number
+  featuredPlacement: number
   sponsoredBoost: number
   negativeFeedbackPenalty: number
   cancellationPenalty: number

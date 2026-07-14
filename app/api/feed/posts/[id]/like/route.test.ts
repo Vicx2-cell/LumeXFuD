@@ -7,7 +7,7 @@ vi.mock('@/lib/session', () => ({
 
 describe('feed like route', () => {
   it('rejects unauthorized requests', async () => {
-    const res = await POST(new Request('http://localhost', { method: 'POST', body: '{}' }) as never, { params: Promise.resolve({ id: 'post-1' }) })
+    const res = (await POST(new Request('http://localhost', { method: 'POST', body: '{}' }) as never, { params: Promise.resolve({ id: 'post-1' }) }))!
     expect(res.status).toBe(401)
   })
 })

@@ -14,6 +14,7 @@ export const DEFAULT_FEED_WEIGHTS: FeedWeights = {
   campusWeight: 1.1,
   freshnessWeight: 1.0,
   watchCompletionWeight: 1.2,
+  watchTimeWeight: 0.45,
   engagementWeight: 1.0,
   menuClickWeight: 1.1,
   addToCartWeight: 1.2,
@@ -22,6 +23,7 @@ export const DEFAULT_FEED_WEIGHTS: FeedWeights = {
   vendorReliabilityWeight: 0.9,
   riderReliabilityWeight: 0.4,
   premiumBoostWeight: 0.35,
+  featuredPlacementWeight: 0.55,
   sponsoredBoostWeight: 0.25,
   negativeFeedbackPenalty: 1.1,
   cancellationPenalty: 1.25,
@@ -68,6 +70,7 @@ function scoreEngagement(candidate: FeedCandidate): number {
 function buildBreakdown(candidate: FeedCandidate, viewer: FeedViewerContext): FeedScoreBreakdown {
   const freshness = scoreFreshness(safeNumber(candidate.freshnessHours, 24))
   const watchCompletion = clamp(safeNumber(candidate.watchCompletionRate), 0, 1)
+  const watchTime = clamp(safeNumber(candidate.watchTimeMs) / 60000, 0, 3)
   const engagement = scoreEngagement(candidate)
   const menuClick = clamp(safeNumber(candidate.menuClickCount) / 20, 0, 2)
   const addToCart = clamp(safeNumber(candidate.addToCartCount) / 12, 0, 2)
@@ -78,6 +81,11 @@ function buildBreakdown(candidate: FeedCandidate, viewer: FeedViewerContext): Fe
   const premiumBoost = viewer.premiumInfluenceEnabled && candidate.isPremiumBoosted && viewer.hasPremium
     ? 1
     : candidate.isPremiumBoosted
+      ? 0.5
+      : 0
+  const featuredPlacement = viewer.featuredInfluenceEnabled && candidate.isFeatured
+    ? 1
+    : candidate.isFeatured
       ? 0.5
       : 0
   const sponsoredBoost = viewer.sponsorInfluenceEnabled && candidate.isSponsored ? 1 : candidate.isSponsored ? 0.5 : 0
@@ -94,6 +102,7 @@ function buildBreakdown(candidate: FeedCandidate, viewer: FeedViewerContext): Fe
     campus: scoreCampus(candidate, viewer),
     freshness,
     watchCompletion,
+    watchTime,
     engagement,
     menuClick,
     addToCart,
@@ -102,6 +111,7 @@ function buildBreakdown(candidate: FeedCandidate, viewer: FeedViewerContext): Fe
     vendorReliability,
     riderReliability,
     premiumBoost,
+    featuredPlacement,
     sponsoredBoost,
     negativeFeedbackPenalty,
     cancellationPenalty,
@@ -124,6 +134,7 @@ export function scoreFeedCandidate(
     explanation.campus * weights.campusWeight +
     explanation.freshness * weights.freshnessWeight +
     explanation.watchCompletion * weights.watchCompletionWeight +
+    explanation.watchTime * weights.watchTimeWeight +
     explanation.engagement * weights.engagementWeight +
     explanation.menuClick * weights.menuClickWeight +
     explanation.addToCart * weights.addToCartWeight +
@@ -136,6 +147,7 @@ export function scoreFeedCandidate(
 
   const paid =
     explanation.premiumBoost * weights.premiumBoostWeight +
+    explanation.featuredPlacement * weights.featuredPlacementWeight +
     explanation.sponsoredBoost * weights.sponsoredBoostWeight
 
   const penalties =
