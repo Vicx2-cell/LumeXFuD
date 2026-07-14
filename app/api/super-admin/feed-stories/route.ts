@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { canModerateStories } from '@/lib/feed/permissions'
+import { loadRecipientsFromProfileIds, notifyFeedRecipients } from '@/lib/feed/notifications'
 import { feedStoryModerationInput } from '@/lib/feed/validators'
 
 export async function GET() {
@@ -50,6 +51,12 @@ export async function PATCH(req: NextRequest) {
 
   const db = createSupabaseAdmin()
   const now = new Date().toISOString()
+  const { data: storyRow } = await db
+    .from('feed_stories')
+    .select('id, author_profile_id')
+    .eq('id', parsed.data.storyId)
+    .maybeSingle()
+
   const { error } = await db
     .from('feed_stories')
     .update({
@@ -63,5 +70,18 @@ export async function PATCH(req: NextRequest) {
     .eq('status', 'under_review')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  const authorProfileId = (storyRow as { author_profile_id?: string } | null)?.author_profile_id
+  if (authorProfileId) {
+    const recipients = await loadRecipientsFromProfileIds([authorProfileId])
+    await notifyFeedRecipients({
+      recipients,
+      title: parsed.data.action === 'approve' ? 'Story approved' : 'Story rejected',
+      body: parsed.data.action === 'approve' ? 'Your story is now live.' : 'Your story was not approved.',
+      link: '/feed-v2',
+      template: parsed.data.action === 'approve' ? 'FEED_STORY_APPROVED' : 'FEED_STORY_REJECTED',
+      tag: `feed-story-${parsed.data.storyId}-${parsed.data.action}`,
+    })
+  }
   return NextResponse.json({ ok: true })
 }

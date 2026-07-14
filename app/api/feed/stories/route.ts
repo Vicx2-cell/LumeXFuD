@@ -3,6 +3,7 @@ import { getFeature } from '@/lib/features'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { ensureSocialProfileForSession } from '@/lib/feed/service'
 import { canCreateStory, loadFeedPermissionContext, resolveFeedPublisherKind, storyStatusForPublisher } from '@/lib/feed/permissions'
+import { loadAdminRecipients, notifyFeedRecipients } from '@/lib/feed/notifications'
 import { feedStoryCreateInput } from '@/lib/feed/validators'
 import { parseJsonBody, rateLimitFeed, requireFeedSession } from '../_shared'
 
@@ -65,6 +66,18 @@ export async function POST(req: NextRequest) {
 
   if (error || !data) {
     return NextResponse.json({ error: error?.message ?? 'Could not create story' }, { status: 400 })
+  }
+
+  if (status === 'under_review') {
+    const admins = await loadAdminRecipients()
+    await notifyFeedRecipients({
+      recipients: admins,
+      title: 'Story waiting for approval',
+      body: 'A student story is ready for review.',
+      link: '/super-admin/feed-stories',
+      template: 'FEED_STORY_PENDING',
+      tag: `feed-story-review-${data.id}`,
+    })
   }
 
   return NextResponse.json({ ok: true, storyId: data.id, status: data.status })

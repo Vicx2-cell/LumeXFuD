@@ -1,5 +1,6 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { ensureSocialProfileForSession } from './service'
+import { loadRecipientsFromProfileIds, notifyFeedRecipients } from './notifications'
 import {
   canPublishFeedPost,
   loadFeedPermissionContext,
@@ -135,6 +136,17 @@ export async function toggleFollow(followedProfileId: string, enabled: boolean) 
   if (outgoingBlock.data || incomingBlock.data) throw new Error('You cannot follow a blocked profile')
   const followed = await upsertToggle(db, 'follows', 'follower_profile_id', 'followed_profile_id', profile.id, followedProfileId, enabled)
   const followCount = await countRows(db, 'follows', 'followed_profile_id', followedProfileId)
+  if (enabled) {
+    const recipients = await loadRecipientsFromProfileIds([followedProfileId])
+    await notifyFeedRecipients({
+      recipients,
+      title: 'New follower',
+      body: 'Someone started following your profile.',
+      link: '/feed',
+      template: 'FEED_NEW_FOLLOWER',
+      tag: `feed-follow-${profile.id}-${followedProfileId}`,
+    })
+  }
   return { followedProfileId, followed, followCount }
 }
 
@@ -180,6 +192,29 @@ export async function createReply(postId: string, body: string, parentReplyId?: 
   if (error || !data) throw new Error(error?.message ?? 'Could not create reply')
   const replyCount = await countRows(db, 'post_replies', 'post_id', postId)
   await db.from('posts').update({ reply_count: replyCount, updated_at: now }).eq('id', postId)
+  const recipientProfileIds: string[] = []
+  if (parentReplyId) {
+    const { data: parentReply } = await db
+      .from('post_replies')
+      .select('author_profile_id')
+      .eq('id', parentReplyId)
+      .maybeSingle()
+    const parentAuthorProfileId = (parentReply as { author_profile_id?: string } | null)?.author_profile_id
+    if (parentAuthorProfileId && parentAuthorProfileId !== profile.id) recipientProfileIds.push(parentAuthorProfileId)
+  } else if (post.author_profile_id !== profile.id) {
+    recipientProfileIds.push(post.author_profile_id)
+  }
+  if (recipientProfileIds.length > 0) {
+    const recipients = await loadRecipientsFromProfileIds(recipientProfileIds)
+    await notifyFeedRecipients({
+      recipients,
+      title: parentReplyId ? 'Reply to your comment' : 'New comment on your post',
+      body: parentReplyId ? 'Someone replied to your comment.' : 'Someone commented on your post.',
+      link: '/feed',
+      template: parentReplyId ? 'FEED_COMMENT_REPLY' : 'FEED_POST_COMMENT',
+      tag: `feed-reply-${postId}-${String((data as { id: string }).id)}`,
+    })
+  }
   return { postId, replyId: String((data as { id: string }).id), replyCount }
 }
 

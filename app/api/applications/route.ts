@@ -6,6 +6,7 @@ import { rateLimitGeneric } from '@/lib/rate-limit'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { audit } from '@/lib/audit'
+import { loadAdminRecipients, notifyFeedRecipients } from '@/lib/feed/notifications'
 
 export const runtime = 'nodejs'
 
@@ -240,6 +241,16 @@ export async function POST(req: NextRequest) {
       target_id: application.id,
       new_value: { vendor_id: vendor.id, status: 'application_submitted' },
       ip_address: ip,
+    })
+
+    const admins = await loadAdminRecipients()
+    await notifyFeedRecipients({
+      recipients: admins,
+      title: 'New vendor application',
+      body: `${business_name} has applied for verification.`,
+      link: '/super-admin/campus-partners',
+      template: 'VENDOR_APPLICATION_SUBMITTED',
+      tag: `vendor-application-${application.id}`,
     })
 
     const res = NextResponse.json({
