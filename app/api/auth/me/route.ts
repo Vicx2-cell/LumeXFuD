@@ -3,6 +3,8 @@ import { verifySessionToken, type SessionRole } from '@/lib/session'
 import { sessionCookieName } from '@/lib/session-cookie'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
 async function getUserDetails(phone: string, role: SessionRole) {
   const db = createSupabaseAdmin()
 
@@ -18,7 +20,7 @@ async function getUserDetails(phone: string, role: SessionRole) {
   if (role === 'vendor') {
     const { data } = await db
       .from('vendors')
-      .select('id, phone, shop_name, owner_name, status, is_active')
+      .select('id, phone, slug, shop_name, owner_name, status, is_active')
       .eq('phone', phone)
       .is('deleted_at', null)
       .single()

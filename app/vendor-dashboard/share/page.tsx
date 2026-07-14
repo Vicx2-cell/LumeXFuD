@@ -3,22 +3,24 @@
 import { useEffect, useState } from 'react'
 import { GlassSheen } from '@/components/fx'
 import { PageHeader } from '@/components/ui/page-header'
+import { vendorPath } from '@/lib/seo/config'
 
 export default function ShareStorePage() {
-  const [vendor, setVendor] = useState<{ id: string; shop_name?: string } | null>(null)
+  const [vendor, setVendor] = useState<{ id: string; shop_name?: string; slug?: string | null } | null>(null)
   const [copied, setCopied] = useState('')
 
   useEffect(() => {
-    fetch('/api/auth/me')
+    fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { id?: string; shop_name?: string } | null) => {
-        if (d?.id) setVendor({ id: d.id, shop_name: d.shop_name })
+      .then((d: { id?: string; shop_name?: string; slug?: string | null } | null) => {
+        if (d?.id) setVendor({ id: d.id, shop_name: d.shop_name, slug: d.slug ?? null })
       })
       .catch(() => {})
   }, [])
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://lumexfud.com.ng'
-  const url = vendor ? `${origin}/vendor/${vendor.id}` : ''
+  const publicPath = vendor?.slug ? vendorPath(vendor.slug) : (vendor ? `/vendor/${vendor.id}` : '')
+  const url = vendor ? `${origin}${publicPath}` : ''
   const shop = vendor?.shop_name ?? 'our kitchen'
 
   function copy(text: string, id: string) {
@@ -32,7 +34,7 @@ export default function ShareStorePage() {
   }
 
   const captions: Array<{ id: string; label: string; text: string }> = vendor ? [
-    { id: 'link', label: 'Just the link', text: url },
+    { id: 'link', label: 'Public link', text: url },
     { id: 'whatsapp', label: 'WhatsApp', text: `Order from ${shop} on LumeX!\nFresh food, delivered to your hostel. Tap to see the menu and order:\n${url}` },
     { id: 'status', label: 'WhatsApp / IG status', text: `Hungry? Order from ${shop} now - delivered on campus.\n${url}` },
     { id: 'bio', label: 'Instagram / TikTok bio', text: `Order online: ${url}` },
@@ -68,7 +70,7 @@ export default function ShareStorePage() {
                     {copied === caption.id ? 'Copied' : 'Copy'}
                   </button>
                 </div>
-                <p className="whitespace-pre-line break-words text-sm text-white/75">{caption.text}</p>
+                <p className="whitespace-pre-line break-words rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-sm text-white/75">{caption.text}</p>
               </div>
             ))}
 

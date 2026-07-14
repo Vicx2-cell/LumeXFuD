@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useCallback, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { startAuthentication } from '@simplewebauthn/browser'
 import PinInput from '@/components/auth/PinInput'
 import GoogleButton from '@/components/auth/GoogleButton'
 import { BrandLogo } from '@/components/brand-logo'
 import { GlowField } from '@/components/fx'
 import { useFeatures } from '@/lib/use-features'
+import { ROLE_HOME } from '@/lib/redirect'
 
 // Friendly text for the ?error= slugs the Google flow can redirect back with.
 const GOOGLE_ERRORS: Record<string, string> = {
@@ -22,25 +23,28 @@ const GOOGLE_ERRORS: Record<string, string> = {
 }
 
 export default function AuthPage() {
-  return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
-  )
+  return <LoginForm />
 }
 
 function LoginForm() {
   const router   = useRouter()
-  const params   = useSearchParams()
-  const rawNext  = params.get('next')
-  const nextPath = rawNext ?? '/'
+  const [checkingSession, setCheckingSession] = useState(true)
+  const [rawNext] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return new URLSearchParams(window.location.search).get('next') ?? ''
+  })
+  const [errorSlug] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return new URLSearchParams(window.location.search).get('error') ?? ''
+  })
+  const nextPath = rawNext || '/'
   // Only treat in-app paths as a deep-link destination (avoid open-redirects).
   const hasNext  = !!rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
 
   const features = useFeatures()
   const googleEnabled = features.google_login === true
   // The Google flow redirects back here with ?error=<slug> on failure.
-  const googleError = GOOGLE_ERRORS[params.get('error') ?? ''] ?? ''
+  const googleError = GOOGLE_ERRORS[errorSlug] ?? ''
 
   // Fallback: a vendor page (visited logged-out via a share link) stashes itself
   // here, so we return there after auth even when no ?next= was carried through.
@@ -58,6 +62,38 @@ function LoginForm() {
   const [notRegistered, setNotRegistered] = useState(false)
   const [mfaError, setMfaError] = useState('')
   const [mfaBusy,  setMfaBusy]  = useState(false)
+
+  async function settleAndRedirect(dest: string) {
+    for (let i = 0; i < 5; i += 1) {
+      try {
+        const res = await fetch('/api/auth/me', { cache: 'no-store' })
+        if (res.ok) break
+      } catch {
+        // ignore and retry briefly
+      }
+      await new Promise((resolve) => setTimeout(resolve, 150))
+    }
+    window.location.replace(dest)
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    const checkSession = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json() as { role?: keyof typeof ROLE_HOME }
+        const role = data.role && ROLE_HOME[data.role] ? data.role : 'customer'
+        if (!cancelled) router.replace(ROLE_HOME[role])
+      } catch {
+        // If the session check fails, we keep the login form visible.
+      } finally {
+        if (!cancelled) setCheckingSession(false)
+      }
+    }
+    void checkSession()
+    return () => { cancelled = true }
+  }, [router])
 
   const goRegister = useCallback(() => {
     const q = new URLSearchParams({ phone })
@@ -91,7 +127,9 @@ function LoginForm() {
       // and we bypass any cached pre-login redirect. Use the server's
       // role-correct redirect_path (or a returning vendor share-link), never a
       // raw `next`, so a privileged role is never dropped on /home.
-      setTimeout(() => window.location.assign(popReturnVendor() ?? data.redirect_path ?? '/'), 650)
+      setTimeout(() => {
+        void settleAndRedirect(popReturnVendor() ?? data.redirect_path ?? '/')
+      }, 650)
     } catch (e) {
       const name = (e as { name?: string })?.name
       setMfaError(name === 'NotAllowedError'
@@ -147,7 +185,7 @@ function LoginForm() {
         // safe `next`). A returning vendor share-link still wins. We never use a
         // raw `next` here — that's how a privileged role got dropped on /home.
         const dest = data.pin_reset_pending ? '/auth/setup' : (popReturnVendor() ?? data.redirect_path ?? '/')
-        window.location.assign(dest)
+        void settleAndRedirect(dest)
       }, 650)
     } catch {
       setPin('')
@@ -163,6 +201,16 @@ function LoginForm() {
     setError('')
     setNotRegistered(false)
     setStep('pin')
+  }
+
+  if (checkingSession) {
+    return (
+      <main className="lx-page flex items-center justify-center px-5 py-12 overflow-hidden">
+        <div className="glass w-full max-w-sm p-6 text-center text-sm text-white/50">
+          Checking your session...
+        </div>
+      </main>
+    )
   }
 
   return (
