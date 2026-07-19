@@ -333,9 +333,9 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       )}
 
       {/* Menu items */}
-      <div className="max-w-lg mx-auto px-4 py-3 space-y-3 lx-stagger">
+      <div className="mx-auto grid max-w-lg grid-cols-2 gap-3 px-4 py-3 lx-stagger">
         {filtered.length === 0 ? (
-          <div className="text-center py-16 px-6">
+          <div className="col-span-full px-6 py-16 text-center">
             <div className="lx-icon-badge w-16 h-16 rounded-2xl mb-4">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>
             </div>
@@ -347,30 +347,29 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
             const qty = qtyForItem(item.id)
             const soldOut = !item.is_available || (item.daily_limit !== null && item.sold_today >= item.daily_limit)
             return (
-              <div key={item.id} className="glass-thin flex gap-4 p-4 transition-transform hover:-translate-y-0.5" style={{ opacity: soldOut ? 0.5 : 1 }}>
-                <div className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 bg-white/5">
+              <div key={item.id} className="glass-thin relative flex min-w-0 flex-col overflow-hidden transition-transform hover:-translate-y-0.5" style={{ opacity: soldOut ? 0.5 : 1 }}>
+                <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-white/5">
                   {item.image_url
-                    ? <Image src={item.image_url} alt={item.name} fill className="object-cover" sizes="96px" placeholder="blur" blurDataURL={FOOD_BLUR} />
+                    ? <Image src={item.image_url} alt={item.name} fill className="object-cover" sizes="(max-width: 512px) 50vw, 240px" placeholder="blur" blurDataURL={FOOD_BLUR} />
                     : <div className="w-full h-full flex items-center justify-center text-white/15"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2" /><path d="M7 2v20" /><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></svg></div>}
                 </div>
-                <div className="flex-1 min-w-0 py-0.5">
-                  <h3 className="font-semibold text-[15px] leading-tight text-white">{item.name}</h3>
-                  {item.description && <p className="text-sm text-white/48 mt-1 line-clamp-2">{item.description}</p>}
-                  <p className="lx-amber font-semibold text-base mt-2">{formatPrice(item.price_kobo)}</p>
+                <div className="flex min-w-0 flex-1 flex-col p-3 pb-14">
+                  <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-white">{item.name}</h3>
+                  {item.description && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-white/48">{item.description}</p>}
+                  <p className="lx-amber mt-2 text-[15px] font-semibold">{formatPrice(item.price_kobo)}</p>
                   {item.prep_time_minutes != null && <p className="text-xs text-white/40 mt-0.5">⏱ {item.prep_time_minutes} min</p>}
-                  {item.addons.length > 0 && <p className="text-xs text-white/30 mt-1.5">{item.addons.length} add-on{item.addons.length === 1 ? '' : 's'} available</p>}
+                  {item.addons.length > 0 && <p className="mt-1 text-[10px] text-white/30">{item.addons.length} add-on{item.addons.length === 1 ? '' : 's'}</p>}
                   {soldOut && <p className="text-xs text-red-400 mt-1">Sold out</p>}
                 </div>
-                <div className="shrink-0 flex flex-col items-center justify-center relative">
+                <div className="absolute bottom-3 right-3 flex shrink-0 flex-col items-center justify-center">
                   {/* Floating "+1" cue rising from the button on add */}
                   {fly?.id === item.id && (
                     <span key={fly.n} className="lx-flyplus absolute top-0 left-1/2 -translate-x-1/2 font-bold text-sm pointer-events-none z-10" style={{ color: '#F5A623' }} aria-hidden="true">+1</span>
                   )}
                   <button onClick={() => handleAdd(item)} disabled={isClosed || soldOut}
-                    className="min-w-[68px] h-12 rounded-2xl flex items-center justify-center gap-2 font-semibold text-sm disabled:opacity-30 relative transition-transform active:scale-90 hover:scale-105 px-3"
-                    style={{ background: '#F5A623', color: '#000', boxShadow: '0 0 16px rgba(245,166,35,0.35)', minHeight: 48 }} aria-label={`Add ${item.name}`}>
-                    <span className="text-lg leading-none" aria-hidden="true">+</span>
-                    <span>Add</span>
+                    className="relative flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold transition-transform hover:scale-105 active:scale-90 disabled:opacity-30"
+                    style={{ background: '#F5A623', color: '#000', boxShadow: '0 0 16px rgba(245,166,35,0.35)', minHeight: 44 }} aria-label={`Add ${item.name}`}>
+                    <span className="text-2xl leading-none" aria-hidden="true">+</span>
                     {qty > 0 && (
                       <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-[11px] flex items-center justify-center font-bold" style={{ background: '#000', color: '#F5A623' }}>{qty}</span>
                     )}

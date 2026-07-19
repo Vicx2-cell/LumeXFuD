@@ -197,7 +197,7 @@ export function HomepageClient({
       {/* Vendor list */}
       {loadingVendors ? (
         <div className="grid grid-cols-1 gap-3">
-          {[1, 2, 3].map((i) => <div key={i} className="lx-skeleton h-48" style={{ borderRadius: 20 }} />)}
+          {[1, 2, 3].map((i) => <div key={i} className="lx-skeleton h-[124px]" style={{ borderRadius: 20 }} />)}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
@@ -206,16 +206,25 @@ export function HomepageClient({
           <p className="text-white/30 text-xs mt-1">Try a different name or category.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3">
-          {filtered.map((vendor) => (
-            <VendorCard
-              key={vendor.id}
-              vendor={vendor}
-              favorited={favorites.has(vendor.id)}
-              onToggleFavorite={toggleFavorite}
-              campaignId={campaignId}
-            />
-          ))}
+        <div>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-white/90">Vendors in your zone</h2>
+              <p className="mt-0.5 text-xs text-white/40">Compare nearby options at a glance</p>
+            </div>
+            <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-xs text-white/55 tabular-nums">{filtered.length}</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            {filtered.map((vendor) => (
+              <VendorCard
+                key={vendor.id}
+                vendor={vendor}
+                favorited={favorites.has(vendor.id)}
+                onToggleFavorite={toggleFavorite}
+                campaignId={campaignId}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -285,16 +294,16 @@ function VendorCard({
           metadata: { vendor_name: vendor.shop_name },
         })
       }}
-      className="lx-tap glass-thin block rounded-2xl overflow-hidden"
+      className="lx-tap glass-thin grid min-h-[124px] grid-cols-[106px_minmax(0,1fr)] overflow-hidden rounded-2xl sm:grid-cols-[118px_minmax(0,1fr)]"
       style={{ opacity: unavailable ? 0.72 : 1 }}>
       {/* Photo */}
-      <div className="relative h-36 bg-white/5">
+      <div className="relative min-h-[124px] bg-white/5">
         {vendor.shop_photo_url ? (
           <PremiumImage
             src={vendor.shop_photo_url}
             alt={vendor.shop_name}
             fill
-            sizes="(max-width: 512px) 100vw, 512px"
+            sizes="118px"
             frameClassName="absolute inset-0"
             className="object-cover"
             style={unavailable ? { filter: 'grayscale(1)' } : undefined}
@@ -317,7 +326,7 @@ function VendorCard({
 
         {/* Status badge */}
         <div
-          className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+          className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold"
           style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}
         >
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} />
@@ -330,7 +339,7 @@ function VendorCard({
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBeat(true); onToggleFavorite(vendor.id) }}
           aria-label={favorited ? `Remove ${vendor.shop_name} from favourites` : `Add ${vendor.shop_name} to favourites`}
           aria-pressed={favorited}
-          className="absolute top-3 left-3 w-9 h-9 rounded-full flex items-center justify-center lx-tap"
+          className="absolute left-2 top-2 flex h-9 w-9 items-center justify-center rounded-full lx-tap"
           style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill={favorited ? '#F5A623' : 'none'} stroke={favorited ? '#F5A623' : '#fff'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
@@ -341,21 +350,21 @@ function VendorCard({
 
         {/* Vendor logo badge overlaid on the cover */}
         {vendor.logo_url && (
-          <div className="absolute bottom-2 left-2 w-10 h-10 rounded-xl overflow-hidden" style={{ border: '2px solid rgba(255,255,255,0.25)', boxShadow: '0 4px 12px rgba(0,0,0,0.45)' }}>
-            <Image src={vendor.logo_url} alt="" fill className="object-cover" sizes="40px" />
+          <div className="absolute bottom-2 left-2 h-8 w-8 overflow-hidden rounded-lg" style={{ border: '2px solid rgba(255,255,255,0.25)', boxShadow: '0 4px 12px rgba(0,0,0,0.45)' }}>
+            <Image src={vendor.logo_url} alt="" fill className="object-cover" sizes="32px" />
           </div>
         )}
       </div>
 
       {/* Info */}
-      <div className="p-3.5">
+      <div className="flex min-w-0 flex-col justify-center p-3">
         <div className="flex items-start justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <h2 className="font-semibold text-base leading-tight">{vendor.shop_name}</h2>
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <h2 className="truncate text-[15px] font-semibold leading-tight">{vendor.shop_name}</h2>
               {vendor.kyc_verified && <VerifiedBadge kind="vendor" />}
             </div>
-            <p className="text-xs text-white/50 mt-0.5">{vendor.category}</p>
+            <p className="mt-1 truncate text-xs text-white/50">{vendor.category}</p>
           </div>
           <div className="text-right shrink-0">
             {vendor.total_ratings >= 5 ? (
@@ -375,13 +384,13 @@ function VendorCard({
             {isClosed ? 'Closed — not taking orders now' : 'Paused — back shortly'} · tap to view menu
           </p>
         ) : (
-          <div className="flex items-center gap-3 mt-2">
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-xs text-white/40 flex items-center gap-1">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
               {vendor.prep_time_minutes}–{vendor.prep_time_minutes + 10} min
             </span>
-            {trust.map((b) => (
-              <span key={b.label} className="lx-card-amber lx-amber text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+            {trust.slice(0, 1).map((b) => (
+              <span key={b.label} className="lx-card-amber lx-amber inline-flex min-w-0 items-center gap-1 truncate rounded-full px-2 py-0.5 text-[10px]">
                 <span aria-hidden="true">{b.emoji}</span>{b.label}
               </span>
             ))}
