@@ -31,6 +31,9 @@ const CHECK_BALANCE_PATTERNS = [
   /\bwhat is my balance\b/,
   /\bhow much do i have\b/,
   /\bshow (?:my )?wallet\b/,
+  /\baccount balance\b/,
+  /\b(?:wetin|what) (?:remain|dey) (?:for|inside) my wallet\b/,
+  /\bhow much money (?:is|dey) (?:in|inside) my wallet\b/,
 ]
 
 const BROWSE_VENDOR_PATTERNS = [
@@ -40,6 +43,10 @@ const BROWSE_VENDOR_PATTERNS = [
   /\bwhere can i order\b/,
   /\bwhat restaurants are available\b/,
   /\bbrowse vendors\b/,
+  /\bwho (?:is|dey) open\b/,
+  /\bfood (?:near|around) me\b/,
+  /\brestaurants? (?:near|around|available|open)\b/,
+  /\bvendors? (?:near|around|available|open)\b/,
 ]
 
 const VIEW_MENU_PATTERNS = [
@@ -65,6 +72,9 @@ const ORDER_STATUS_PATTERNS = [
   /\bwhat is my order status\b/,
   /\bcheck order\b/,
   /\border status\b/,
+  /\btrack (?:the|my) food\b/,
+  /\bwhere my food dey\b/,
+  /\bhow far (?:with )?my order\b/,
 ]
 
 const FUND_WALLET_PATTERNS = [
@@ -85,6 +95,24 @@ const CANCEL_PATTERNS = [
   /\bi don['’]?t want the order anymore\b/,
 ]
 
+const TOKEN_CORRECTIONS: Record<string, string> = {
+  balace: 'balance',
+  ballance: 'balance',
+  balnce: 'balance',
+  resturant: 'restaurant',
+  resturants: 'restaurants',
+  resteraunt: 'restaurant',
+  vendr: 'vendor',
+  venders: 'vendors',
+  walet: 'wallet',
+  walllet: 'wallet',
+  menue: 'menu',
+  cancle: 'cancel',
+  cnacel: 'cancel',
+  oder: 'order',
+  odrer: 'order',
+}
+
 function normalizeMessage(input: string): string {
   return input
     .normalize('NFKC')
@@ -95,6 +123,9 @@ function normalizeMessage(input: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase()
+    .split(' ')
+    .map((token) => TOKEN_CORRECTIONS[token] ?? token)
+    .join(' ')
 }
 
 function parseIntegerToken(token: string | undefined): number | undefined {

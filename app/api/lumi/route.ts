@@ -7,6 +7,8 @@ import { createLumiContext, processLumiMessage } from '@/lib/lumi/actions'
 import { matchIntent } from '@/lib/lumi/intents'
 import { clearState, getState, setState } from '@/lib/lumi/state'
 import { LUMI_MAX_MESSAGE_LENGTH } from '@/lib/lumi/types'
+import { isSecuritySensitiveMessage } from '@/lib/lumi/local-intelligence'
+import { redactPII } from '@/lib/ai/guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +17,7 @@ const requestSchema = z.object({
 })
 
 function sanitizeForLogging(message: string): string {
-  return message
+  return redactPII(message)
     .replace(/\b\d{12,19}\b/g, '[redacted-number]')
     .slice(0, LUMI_MAX_MESSAGE_LENGTH)
 }
@@ -64,7 +66,7 @@ export async function POST(req: NextRequest) {
     }
 
     const intentResult = matchIntent(parsed.data.message)
-    if (intentResult.intent === 'fallback' && parsed.data.message.trim()) {
+    if (intentResult.intent === 'fallback' && parsed.data.message.trim() && !isSecuritySensitiveMessage(parsed.data.message)) {
       const db = createSupabaseAdmin()
       db.from('lumi_unmatched_messages')
         .insert({

@@ -16,6 +16,7 @@ import {
   parseSelectionToken,
 } from './intents'
 import { lumiResponses } from './responses'
+import { localGeneralResponse, securityResponse } from './local-intelligence'
 import type {
   LumiActionResult,
   LumiConfirmationPayload,
@@ -87,8 +88,9 @@ function extractAmount(message: string): number | undefined {
   return Number.isFinite(amount) ? amount : undefined
 }
 
-async function listOpenVendors(db: DbClient): Promise<Array<{ id: string; name: string }>> {
-  const { data } = await db
+async function listOpenVendors(ctx: LumiContext): Promise<Array<{ id: string; name: string }>> {
+  const location = await getActiveCustomerLocation(ctx.db, ctx.customerId)
+  let query = ctx.db
     .from('vendors')
     .select('id, shop_name')
     .eq('is_active', true)
@@ -97,14 +99,17 @@ async function listOpenVendors(db: DbClient): Promise<Array<{ id: string; name: 
     .in('status', ['OPEN', 'BUSY'])
     .order('shop_name', { ascending: true })
     .limit(6)
+  if (location?.zone_id) query = query.eq('zone_id', location.zone_id)
+  const { data } = await query
   return ((data ?? []) as Array<{ id: string; shop_name: string }>).map((vendor) => ({
     id: vendor.id,
     name: vendor.shop_name,
   }))
 }
 
-async function findVendorsByName(db: DbClient, name: string): Promise<Array<{ id: string; name: string }>> {
-  const { data } = await db
+async function findVendorsByName(ctx: LumiContext, name: string): Promise<Array<{ id: string; name: string }>> {
+  const location = await getActiveCustomerLocation(ctx.db, ctx.customerId)
+  let query = ctx.db
     .from('vendors')
     .select('id, shop_name')
     .eq('is_active', true)
@@ -114,6 +119,8 @@ async function findVendorsByName(db: DbClient, name: string): Promise<Array<{ id
     .ilike('shop_name', `%${name}%`)
     .order('shop_name', { ascending: true })
     .limit(6)
+  if (location?.zone_id) query = query.eq('zone_id', location.zone_id)
+  const { data } = await query
   return ((data ?? []) as Array<{ id: string; shop_name: string }>).map((vendor) => ({
     id: vendor.id,
     name: vendor.shop_name,
@@ -201,11 +208,20 @@ async function buildOrderPreview(
   ])
 
   if (!vendor || !vendor.is_active || !['OPEN', 'BUSY'].includes(vendor.status)) {
-    return { error: lumiResponses.chooseVendor('That vendor is not available right now. Pick another vendor.', await listOpenVendors(ctx.db)) }
+    return { error: lumiResponses.chooseVendor('That vendor is not available right now. Pick another vendor.', await listOpenVendors(ctx)) }
   }
 
   if (!location) {
     return { error: lumiResponses.missingLocation() }
+  }
+
+  if (location.zone_id && vendor.zone_id && location.zone_id !== vendor.zone_id) {
+    return {
+      error: lumiResponses.chooseVendor(
+        'That vendor is outside your active delivery zone. Pick a vendor in your current zone.',
+        await listOpenVendors(ctx),
+      ),
+    }
   }
 
   const itemIds = draft.items.map((item) => item.menuItemId)
@@ -348,7 +364,7 @@ async function listCancellableOrders(ctx: LumiContext) {
 }
 
 async function handleBrowseVendors(ctx: LumiContext): Promise<LumiActionResult> {
-  const vendors = await listOpenVendors(ctx.db)
+  const vendors = await listOpenVendors(ctx)
   return {
     response: lumiResponses.browseVendors(vendors),
     nextState: nextState({
@@ -391,7 +407,7 @@ async function handleViewMenu(ctx: LumiContext, entities: LumiEntities, currentS
   }
 
   if (!entities.vendorName) {
-    const vendors = await listOpenVendors(ctx.db)
+    const vendors = await listOpenVendors(ctx)
     return {
       response: lumiResponses.chooseVendor('Which vendor would you like to view?', vendors),
       nextState: nextState({
@@ -401,14 +417,14 @@ async function handleViewMenu(ctx: LumiContext, entities: LumiEntities, currentS
     }
   }
 
-  const matches = await findVendorsByName(ctx.db, entities.vendorName)
+  const matches = await findVendorsByName(ctx, entities.vendorName)
   if (matches.length !== 1) {
     return {
       response: lumiResponses.chooseVendor(
         matches.length > 1
           ? `I found a few vendors matching "${entities.vendorName}". Which one did you mean?`
           : `I could not find "${entities.vendorName}". Pick one of these instead.`,
-        matches.length > 0 ? matches : await listOpenVendors(ctx.db),
+        matches.length > 0 ? matches : await listOpenVendors(ctx),
       ),
       nextState: nextState({
         step: 'awaiting_vendor_selection',
@@ -422,7 +438,7 @@ async function handleViewMenu(ctx: LumiContext, entities: LumiEntities, currentS
 
 async function handlePlaceOrder(ctx: LumiContext, entities: LumiEntities, currentState?: LumiConversationState): Promise<LumiActionResult> {
   if (!entities.vendorName && !currentState?.orderDraft?.vendorId) {
-    const vendors = await listOpenVendors(ctx.db)
+    const vendors = await listOpenVendors(ctx)
     return {
       response: lumiResponses.chooseVendor('Which vendor would you like to order from?', vendors),
       nextState: nextState({
@@ -435,14 +451,14 @@ async function handlePlaceOrder(ctx: LumiContext, entities: LumiEntities, curren
   let orderDraft = currentState?.orderDraft ?? { items: [] }
 
   if (!orderDraft.vendorId && entities.vendorName) {
-    const vendors = await findVendorsByName(ctx.db, entities.vendorName)
+    const vendors = await findVendorsByName(ctx, entities.vendorName)
     if (vendors.length !== 1) {
       return {
         response: lumiResponses.chooseVendor(
           vendors.length > 1
             ? `I found a few vendors matching "${entities.vendorName}". Which one should I use?`
             : `I could not find "${entities.vendorName}". Pick one of these vendors.`,
-          vendors.length > 0 ? vendors : await listOpenVendors(ctx.db),
+          vendors.length > 0 ? vendors : await listOpenVendors(ctx),
         ),
         nextState: nextState({
           step: 'awaiting_vendor_selection',
@@ -460,7 +476,7 @@ async function handlePlaceOrder(ctx: LumiContext, entities: LumiEntities, curren
 
   if (!orderDraft.vendorId || !orderDraft.vendorName) {
     return {
-      response: lumiResponses.chooseVendor('Which vendor would you like to order from?', await listOpenVendors(ctx.db)),
+      response: lumiResponses.chooseVendor('Which vendor would you like to order from?', await listOpenVendors(ctx)),
       nextState: nextState({
         step: 'awaiting_vendor_selection',
         activeIntent: 'place_order',
@@ -790,6 +806,9 @@ export async function processLumiMessage(
   message: string,
   state: LumiConversationState | null,
 ): Promise<LumiActionResult> {
+  const security = securityResponse(message)
+  if (security) return { response: security }
+
   if (isFlowExitMessage(message) && state?.step && state.step !== 'idle') {
     return { response: lumiResponses.cancelled(), clearState: true }
   }
@@ -872,7 +891,7 @@ export async function processLumiMessage(
       return { response: lumiResponses.help(), clearState: true }
     case 'fallback':
     default:
-      return { response: lumiResponses.fallback(), clearState: true }
+      return { response: localGeneralResponse(message) ?? lumiResponses.fallback(), clearState: true }
   }
 }
 
