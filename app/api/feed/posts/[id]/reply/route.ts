@@ -44,7 +44,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       const profile = profileById.get(typed.author_profile_id)
       return {
         id: typed.id,
-        profileId: typed.author_profile_id,
         body: typed.body,
         author: profile?.display_name ?? profile?.handle ?? 'Student',
         handle: profile?.handle ?? null,

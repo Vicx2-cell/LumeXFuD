@@ -96,17 +96,17 @@ describe('super-admin premium route', () => {
 
   it('rejects non-admin updates', async () => {
     state.session = { role: 'vendor', phone: '+2348000000000', userId: 'vendor-1' }
-    const res = (await PATCH(new Request('http://localhost', {
+    const res = await PATCH(new Request('http://localhost', {
       method: 'PATCH',
       body: JSON.stringify({ premiumEnabled: true }),
       headers: { 'content-type': 'application/json' },
-    }) as never))!
+    }) as never)
 
     expect(res.status).toBe(403)
   })
 
   it('updates global premium config and writes audit history', async () => {
-    const res = (await PATCH(new Request('http://localhost', {
+    const res = await PATCH(new Request('http://localhost', {
       method: 'PATCH',
       body: JSON.stringify({
         action: 'set_config',
@@ -118,7 +118,7 @@ describe('super-admin premium route', () => {
         reason: 'turn on premium',
       }),
       headers: { 'content-type': 'application/json' },
-    }) as never))!
+    }) as never)
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -127,7 +127,7 @@ describe('super-admin premium route', () => {
   })
 
   it('grants a manual entitlement override', async () => {
-    const res = (await PATCH(new Request('http://localhost', {
+    const res = await PATCH(new Request('http://localhost', {
       method: 'PATCH',
       body: JSON.stringify({
         action: 'grant_override',
@@ -137,7 +137,7 @@ describe('super-admin premium route', () => {
         reason: 'support credit',
       }),
       headers: { 'content-type': 'application/json' },
-    }) as never))!
+    }) as never)
 
     expect(res.status).toBe(200)
   })

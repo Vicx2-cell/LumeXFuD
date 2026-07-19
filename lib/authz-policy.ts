@@ -30,7 +30,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'super-admin/earnings/history', 'super-admin/feature-usage', 'super-admin/features',
     'super-admin/financials', 'super-admin/lockdown', 'super-admin/pricing',
     'super-admin/premium',
-    'super-admin/payments', 'super-admin/feed-reports', 'super-admin/feed-stories', 'super-admin/official-feed',
+    'super-admin/payments',
     'super-admin/revoke-sessions', 'super-admin/rewards', 'super-admin/security-health',
     'super-admin/sentinel', 'super-admin/settings', 'super-admin/super-audit',
     'super-admin/team/create', 'super-admin/users/[id]/force-reset-pin', 'super-admin/withdraw',
@@ -64,7 +64,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   ...map([
     'customer-wallet/balance', 'customer-wallet/topup', 'customer-wallet/transactions',
     'orders/history', 'orders/[id]/dispute', 'orders/[id]/confirm', 'orders/[id]/rate',
-    'feed', 'feed/drafts', 'feed/posts', 'feed/stories', 'feed/uploads', 'feed/events', 'feed/video-quota', 'feed/watch',
+    'feed', 'feed/drafts', 'feed/posts', 'feed/uploads', 'feed/events', 'feed/video-quota',
     'feed/videos', 'feed/stale-suggestions',
     'feed/posts/[id]/like', 'feed/posts/[id]/bookmark', 'feed/posts/[id]/repost',
     'feed/posts/[id]/reply', 'feed/posts/[id]/quote', 'feed/posts/[id]/report',

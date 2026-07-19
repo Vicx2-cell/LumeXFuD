@@ -66,25 +66,6 @@ export interface VendorDashboardReviewSummary {
   total_ratings: number
 }
 
-export interface VendorDashboardSummary {
-  orders_today: number
-  revenue_today_kobo: number
-  pending_orders: number
-  active_orders: number
-  completed_today: number
-  avg_prep_minutes: number | null
-  store_status: VendorDashboardStatus
-}
-
-export interface VendorDashboardRecentOrder {
-  id: string
-  order_number: string
-  status: string
-  total_amount: number
-  created_at: string
-  order_items?: Array<{ name: string; quantity: number }>
-}
-
 export type TrendTone = 'amber' | 'blue' | 'green' | 'violet'
 
 export const STATUS_LABEL: Record<string, string> = {

@@ -162,7 +162,7 @@ export async function createOrSaveFeedPost(
 
   if (body.media.length > 0) {
     postTasks.push((async () => {
-      const { error } = await db.from('post_media').insert(
+      await db.from('post_media').insert(
         body.media.map((media, index) => ({
           post_id: draftId,
           media_kind: media.kind,
@@ -180,7 +180,6 @@ export async function createOrSaveFeedPost(
           is_primary: media.is_primary ?? index === 0,
         }))
       )
-      if (error) throw new Error(`Could not attach uploaded media: ${error.message}`)
     })())
   }
 

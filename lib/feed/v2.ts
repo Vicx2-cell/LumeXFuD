@@ -773,12 +773,7 @@ async function filterPostsForTab(
       .eq('follower_profile_id', viewer.profileId)
       .in('followed_profile_id', authorIds)
     const followed = new Set((data ?? []).map((row) => String((row as { followed_profile_id: string }).followed_profile_id)))
-    return posts.filter((post) => Boolean(
-      post.kind === 'official'
-      || post.kind === 'collection'
-      || post.author === 'LumeX Fud'
-      || (post.authorProfileId && followed.has(post.authorProfileId)),
-    ))
+    return posts.filter((post) => Boolean(post.authorProfileId && followed.has(post.authorProfileId)))
   }
   return posts
 }

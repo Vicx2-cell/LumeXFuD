@@ -16,7 +16,6 @@ import {
   Play,
   Repeat2,
   Search,
-  Send,
   ShoppingBag,
   Sparkles,
   X,
@@ -73,7 +72,6 @@ type TimelineProps = Pick<FeedV2ScreenProps,
 
 type FeedComment = {
   id: string
-  profileId: string
   body: string
   author: string
   handle: string | null
@@ -91,14 +89,11 @@ function canFollowPostAuthor(post: FeedV2Post) {
   return Boolean(
     post.authorProfileId
       && (
-        post.publisherType === 'vendor'
+        isOfficial(post)
+        || post.publisherType === 'vendor'
         || post.publisherType === 'ambassador'
       ),
   )
-}
-
-function profileHref(post: FeedV2Post) {
-  return post.authorProfileId ? `/feed-v2/profile/${post.authorProfileId}` : null
 }
 
 function LeftNavIcon({ icon }: { icon: FeedV2LeftNavIcon }) {
@@ -154,20 +149,12 @@ function formatMeta(post: FeedV2Post) {
 
 function formatViewCount(viewCount?: number) {
   if (viewCount == null) return null
-  return `${new Intl.NumberFormat('en-US').format(viewCount)} qualified views`
+  return `${new Intl.NumberFormat('en-US').format(viewCount)} views`
 }
 
 function formatActionCount(count?: number) {
   if (count == null) return ''
   return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(count)
-}
-
-function formatCommentTime(value: string) {
-  const elapsed = Math.max(0, Date.now() - new Date(value).getTime())
-  if (elapsed < 60_000) return 'now'
-  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)}m`
-  if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)}h`
-  return `${Math.floor(elapsed / 86_400_000)}d`
 }
 
 function stopPostClick(event: MouseEvent<HTMLElement>) {
@@ -292,14 +279,10 @@ function PostHeader({
 
   return (
     <header className={styles.postHeader}>
-      {profileHref(post) ? (
-        <Link href={profileHref(post)!} className={styles.authorLink} onClick={(event) => event.stopPropagation()} aria-label={`Open ${post.author}'s profile`}>
-          <Avatar post={post} />
-        </Link>
-      ) : <Avatar post={post} />}
+      <Avatar post={post} />
       <div className={styles.postHeaderCopy}>
         <div className={styles.postAuthorRow}>
-          {profileHref(post) ? <Link href={profileHref(post)!} className={styles.authorName} onClick={(event) => event.stopPropagation()}>{post.author}</Link> : <span className={styles.authorName}>{post.author}</span>}
+          <span className={styles.authorName}>{post.author}</span>
           {badgeTone ? (
             <span className={verificationBadgeClass(badgeTone)} title={badgeTitle} aria-label={badgeTitle}>
               <BadgeCheck size={16} fill="currentColor" strokeWidth={2.6} aria-hidden="true" />
@@ -322,7 +305,7 @@ function PostHeader({
           {followingAuthor ? 'Following' : 'Follow'}
         </button>
       ) : null}
-      {!official ? <button
+      <button
         type="button"
         className={styles.moreButton}
         aria-label="More options"
@@ -332,7 +315,7 @@ function PostHeader({
         }}
       >
         <MoreHorizontal size={16} aria-hidden="true" />
-      </button> : null}
+      </button>
     </header>
   )
 }
@@ -473,11 +456,13 @@ function PostMedia({
               </div>
             ) : null
           })()}
-          {item.kind === 'video' ? (
-            <video src={item.src} className={styles.feedVideo} controls playsInline preload="metadata" onClick={(event) => event.stopPropagation()} />
-          ) : (
-            <Image src={item.src} alt={post.body} fill sizes="(max-width: 767px) 100vw, 760px" className="object-cover" />
-          )}
+          <Image
+            src={item.src}
+            alt={post.body}
+            fill
+            sizes="(max-width: 767px) 100vw, 760px"
+            className="object-cover"
+          />
           {item.kind === 'video' && index === 0 ? (
             <div className={styles.playBadge}>
               <span className={styles.playChip}>
@@ -630,7 +615,6 @@ function PostMenu({
   onMute?: (post: FeedV2Post) => void
   onBlock?: (post: FeedV2Post) => void
 }) {
-  if (isOfficial(post)) return null
   return (
     <div className={styles.postMenuPanel} role="menu" aria-label="Post actions">
       <button type="button" className={styles.postMenuItem} onClick={() => onFollow?.(post)} disabled={!canFollowPostAuthor(post) || isActionPending?.(post.id, 'follow')}>
@@ -1176,11 +1160,12 @@ function CommentSheet({
   return (
     <div className={`${styles.sheetScrim} ${styles.sheetScrimVisible}`} onClick={onClose}>
       <div className={styles.commentSheet} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Comments on ${post.author} post`}>
-        <div className={styles.commentSheetHandle} />
-        <div className={styles.commentHeader}>
+        <div className={styles.sheetHandle} />
+        <div className={styles.sheetHeader}>
           <div>
-            <h3 className={styles.commentTitle}>Comments</h3>
-            <p className={styles.commentSubtitle}>{post.replyCount ? `${formatActionCount(post.replyCount)} responses` : `Start the conversation on ${post.author}'s post`}</p>
+            <p className={styles.sectionKicker}>Comments</p>
+            <h3 className={styles.sheetTitle}>{post.author}</h3>
+            <p className={styles.sheetMeta}>{formatActionCount(post.replyCount)} comments</p>
           </div>
           <button type="button" className={styles.iconButton} onClick={onClose} aria-label="Close comments">
             <X size={16} aria-hidden="true" />
@@ -1188,21 +1173,19 @@ function CommentSheet({
         </div>
 
         <div className={styles.commentList}>
-          {loading ? <p className={styles.commentEmpty}>Loading comments…</p> : null}
-          {!loading && comments.length === 0 ? <div className={styles.commentEmptyState}><MessageCircle size={22} /><strong>No comments yet</strong><span>Be the first to add something useful.</span></div> : null}
+          {loading ? <p className={styles.commentEmpty}>Loading comments...</p> : null}
+          {!loading && comments.length === 0 ? <p className={styles.commentEmpty}>No comments yet. Be the first to reply.</p> : null}
           {comments.map((comment) => (
             <article key={comment.id} className={styles.commentItem}>
-              <Link href={`/feed-v2/profile/${comment.profileId}`} className={styles.commentAvatar} onClick={onClose}>
+              <div className={styles.commentAvatar}>
                 {comment.avatarUrl ? <Image src={comment.avatarUrl} alt="" fill sizes="36px" className="object-cover" /> : <DefaultAvatar className={styles.avatarFallback} />}
-              </Link>
+              </div>
               <div className={styles.commentCopy}>
                 <div className={styles.commentMeta}>
-                  <Link href={`/feed-v2/profile/${comment.profileId}`} onClick={onClose}><strong>{comment.author}</strong></Link>
+                  <strong>{comment.author}</strong>
                   {comment.handle ? <span>@{comment.handle}</span> : null}
-                  <time dateTime={comment.createdAt}>{formatCommentTime(comment.createdAt)}</time>
                 </div>
                 <p>{comment.body}</p>
-                {(comment.likeCount > 0 || comment.replyCount > 0) ? <div className={styles.commentStats}>{comment.likeCount > 0 ? <span>{comment.likeCount} likes</span> : null}{comment.replyCount > 0 ? <span>{comment.replyCount} replies</span> : null}</div> : null}
               </div>
             </article>
           ))}
@@ -1212,13 +1195,11 @@ function CommentSheet({
           <textarea
             value={draft}
             onChange={(event) => onDraftChange(event.target.value)}
-            rows={1}
-            maxLength={2000}
-            enterKeyHint="send"
-            placeholder="Add a comment…"
+            rows={3}
+            placeholder="Write a comment..."
           />
-          <button type="submit" disabled={submitting || !draft.trim()} aria-label="Post comment">
-            {submitting ? <span className={styles.commentSending}>…</span> : <Send size={16} />}
+          <button type="submit" disabled={submitting || !draft.trim()}>
+            {submitting ? 'Sending...' : 'Reply'}
           </button>
         </form>
       </div>
@@ -1572,25 +1553,15 @@ export function FeedV2Screen({
     const root = screenRef.current
     if (!root || typeof window === 'undefined' || !('IntersectionObserver' in window)) return
     const seen = new Set<string>()
-    const dwellTimers = new Map<string, number>()
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
+          if (!entry.isIntersecting || entry.intersectionRatio < 0.55) continue
           const postId = (entry.target as HTMLElement).dataset.feedPostId
           if (!postId || seen.has(postId)) continue
-          if (!entry.isIntersecting || entry.intersectionRatio < 0.55) {
-            const timer = dwellTimers.get(postId)
-            if (timer) window.clearTimeout(timer)
-            dwellTimers.delete(postId)
-            continue
-          }
-          if (dwellTimers.has(postId)) continue
-          dwellTimers.set(postId, window.setTimeout(() => {
-            seen.add(postId)
-            dwellTimers.delete(postId)
-            void recordFeedEvent(postId, 'qualified_impression')
-            observer.unobserve(entry.target)
-          }, 2000))
+          seen.add(postId)
+          void recordFeedEvent(postId, 'qualified_impression')
+          observer.unobserve(entry.target)
         }
       },
       { threshold: [0.55] },
@@ -1598,10 +1569,7 @@ export function FeedV2Screen({
 
     const nodes = root.querySelectorAll<HTMLElement>('[data-feed-post-id]')
     nodes.forEach((node) => observer.observe(node))
-    return () => {
-      observer.disconnect()
-      dwellTimers.forEach((timer) => window.clearTimeout(timer))
-    }
+    return () => observer.disconnect()
   }, [posts])
 
   return (
