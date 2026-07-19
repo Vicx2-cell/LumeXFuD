@@ -46,7 +46,6 @@ export const CRON_JOBS: CronJob[] = [
   { key: 'subscription-check',        path: '/api/cron/subscription-check',        schedule: '0 8 * * *',   label: 'Subscription check',      description: 'Charges/flags overdue vendor subscriptions.',                                                  money: true,  staleMs: 26 * HOUR },
   { key: 'recalculate-vendor-scores', path: '/api/cron/recalculate-vendor-scores', schedule: '0 */3 * * *', label: 'Recalculate vendor scores', description: 'Rebuilds vendor visibility from sales, reviews, reliability, and prep speed.',               money: false, staleMs: 10 * HOUR },
   { key: 'reset-weekly-leaderboard',  path: '/api/cron/reset-weekly-leaderboard',  schedule: '0 23 * * 0',  label: 'Reset weekly leaderboard', description: 'Weekly leaderboard reset.',                                                                   money: false, staleMs: 8 * 24 * HOUR },
-  { key: 'official-feed',             path: '/api/cron/official-feed',             schedule: '*/15 * * * *', label: 'Official feed',          description: 'Builds and publishes protected official editorial collections for each configured area.',          money: false, staleMs: 45 * MIN },
 ]
 
 export const CRON_KEYS = CRON_JOBS.map((j) => j.key)

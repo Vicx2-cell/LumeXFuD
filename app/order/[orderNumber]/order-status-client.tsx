@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { DefaultAvatar } from '@/components/default-avatar'
 import { formatPrice } from '@/lib/money'
 import { VerifiedBadge } from '@/components/verified-badge'
 import { useFeatures } from '@/lib/use-features'
@@ -416,8 +415,8 @@ export function OrderStatusClient({
                 <Image src={order.riders.avatar_url} alt="" fill className="object-cover" sizes="48px" />
               </div>
             ) : (
-              <div className="w-12 h-12 rounded-full overflow-hidden shrink-0">
-                <DefaultAvatar size={18} />
+              <div className="lx-icon-badge w-12 h-12 rounded-full">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5h-5l-2.5-6"/><path d="M12 6h3l2 5"/><path d="M6 11h7"/></svg>
               </div>
             )}
             <div className="flex-1 min-w-0">

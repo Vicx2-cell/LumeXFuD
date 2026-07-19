@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 // Consistent one-tap logout for every dashboard. Revokes the session
-// server-side (POST /api/auth/logout clears the httpOnly cookie and marks the
-// sessions row revoked), then returns to the landing page.
+// server-side (POST /api/auth/logout clears the httpOnly cookie + marks the
+// sessions row revoked) then returns to the landing page.
 export function LogoutButton({ className = '' }: { className?: string }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
@@ -16,7 +16,7 @@ export function LogoutButton({ className = '' }: { className?: string }) {
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
     } catch {
-      // Even if the call fails, fall through to redirect. The cookie is
+      // Even if the call fails, fall through to redirect — the cookie is
       // httpOnly and the session is re-checked on every protected request.
     }
     router.push('/')
@@ -36,7 +36,7 @@ export function LogoutButton({ className = '' }: { className?: string }) {
         <polyline points="16 17 21 12 16 7" />
         <line x1="21" x2="9" y1="12" y2="12" />
       </svg>
-      {busy ? 'Logging out...' : 'Log out'}
+      {busy ? 'Logging out…' : 'Log out'}
     </button>
   )
 }

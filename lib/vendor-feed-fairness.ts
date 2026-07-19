@@ -95,6 +95,15 @@ export function mapVendorSignals(rows: Array<{ vendor_id: string; event_type: st
       case 'marketplace_campaign_click':
         current.clicks = (current.clicks ?? 0) + row.count
         break
+      case 'flyer_viewed':
+        current.views = (current.views ?? 0) + row.count
+        break
+      case 'flyer_downloaded':
+        current.downloads = (current.downloads ?? 0) + row.count
+        break
+      case 'flyer_shared':
+        current.shares = (current.shares ?? 0) + row.count
+        break
       case 'order_completed':
         current.orders = (current.orders ?? 0) + row.count
         break

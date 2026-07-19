@@ -47,7 +47,6 @@ export function HomepageClient({
   const [category, setCategory] = useState('All')
   const [favorites, setFavorites] = useState<Set<string>>(() => new Set(initialFavorites))
   const [favOnly, setFavOnly] = useState(false)
-  const lastFetchedZoneRef = useRef(initialSelectedZoneId || (initialLocations[0]?.zone_id ?? ''))
 
   const zoneOptions = useMemo(() => locations, [locations])
   const selectedZone = useMemo(
@@ -67,8 +66,6 @@ export function HomepageClient({
 
   useEffect(() => {
     if (!selectedZoneId) return
-    if (lastFetchedZoneRef.current === selectedZoneId) return
-    lastFetchedZoneRef.current = selectedZoneId
     const controller = new AbortController()
     setLoadingVendors(true)
     fetch(`/api/vendors?zone_id=${encodeURIComponent(selectedZoneId)}`, { signal: controller.signal })
@@ -119,20 +116,20 @@ export function HomepageClient({
   }, [vendors, search, category, favOnly, favorites])
 
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-4">
       {locations.length > 0 && (
-        <div className="lx-surface px-3.5 py-2.5">
-          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="lx-surface px-4 py-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wide text-white/40">Delivery area</p>
-              <p className="mt-0.5 text-[11px] text-white/50">Pick the zone you are in right now.</p>
+              <p className="mt-0.5 text-xs text-white/50">Pick the zone you are in right now.</p>
             </div>
             <label className="block w-full sm:w-[340px]">
               <span className="sr-only">Select delivery zone</span>
               <select
                 value={selectedZoneId}
                 onChange={(e) => setSelectedZoneId(e.target.value)}
-                className="lx-field w-full px-3 py-2.5 text-sm outline-none"
+                className="lx-field w-full px-3.5 py-3 text-sm outline-none"
                 style={{ colorScheme: 'dark' }}
                 disabled={zoneOptions.length === 0}
               >
@@ -146,7 +143,7 @@ export function HomepageClient({
             </label>
           </div>
           {selectedZone && (
-            <div className="mt-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/55">
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/55">
               <span className="font-medium text-white/80">{selectedZone.city_name}, {selectedZone.city_state}</span>
               <span className="mx-2 text-white/25">•</span>
               <span>{selectedZone.zone_name}</span>
@@ -196,8 +193,8 @@ export function HomepageClient({
 
       {/* Vendor list */}
       {loadingVendors ? (
-        <div className="grid grid-cols-1 gap-3">
-          {[1, 2, 3].map((i) => <div key={i} className="lx-skeleton h-48" style={{ borderRadius: 20 }} />)}
+        <div className="grid grid-cols-1 gap-4">
+          {[1, 2, 3].map((i) => <div key={i} className="lx-skeleton h-52" style={{ borderRadius: 20 }} />)}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
@@ -206,7 +203,7 @@ export function HomepageClient({
           <p className="text-white/30 text-xs mt-1">Try a different name or category.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3">
+        <div className="grid grid-cols-1 gap-4 lx-stagger">
           {filtered.map((vendor) => (
             <VendorCard
               key={vendor.id}
@@ -288,7 +285,7 @@ function VendorCard({
       className="lx-tap glass-thin block rounded-2xl overflow-hidden"
       style={{ opacity: unavailable ? 0.72 : 1 }}>
       {/* Photo */}
-      <div className="relative h-36 bg-white/5">
+      <div className="relative h-40 bg-white/5">
         {vendor.shop_photo_url ? (
           <PremiumImage
             src={vendor.shop_photo_url}
@@ -348,7 +345,7 @@ function VendorCard({
       </div>
 
       {/* Info */}
-      <div className="p-3.5">
+      <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="flex items-center gap-1.5 flex-wrap">

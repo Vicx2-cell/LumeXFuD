@@ -64,6 +64,7 @@ export default function VendorReviews() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-5 space-y-4 lx-enter">
+        {/* Average summary — glassy hero */}
         <div className="lx-surface rounded-3xl p-7 text-center relative overflow-hidden">
           <div aria-hidden="true" className="absolute inset-x-0 -top-12 h-32 pointer-events-none" style={{ background: 'radial-gradient(ellipse at center, rgba(245,166,35,0.28), transparent 70%)' }} />
           {total > 0 ? (

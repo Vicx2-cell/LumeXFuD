@@ -5,7 +5,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { createMenuItemInput } from '@/lib/validators'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { toKobo } from '@/lib/money'
-import { createOfficialEventCollection, getOfficialAreaSettingByScope } from '@/lib/feed/official-scheduler'
+import { generateFlyerVariants } from '@/lib/flyer-marketing'
 
 interface AddonRow {
   id: string
@@ -108,46 +108,18 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { data: vendor } = await db.from('vendors').select('id, shop_name, city_id, zone_id, approval_state, is_active, shop_photo_url, logo_url, avg_rating, total_ratings').eq('id', session.userId!).maybeSingle()
-    if (vendor && vendor.approval_state === 'approved' && vendor.is_active) {
-      const areaScope = vendor.zone_id ? 'zone' : 'city'
-      const areaId = String(vendor.zone_id ?? vendor.city_id ?? '')
-      if (areaId) {
-        const area = await getOfficialAreaSettingByScope(db, areaScope, areaId)
-        if (area) {
-          await createOfficialEventCollection({
-            area,
-            collectionType: 'new_on_lumex',
-            reason: 'Newly published menu item surfaced in New on LumeX.',
-            sourceId: `menu-item:${item.id}`,
-            source: [{
-              id: item.id,
-              vendorId: String(vendor.id),
-              vendorName: String(vendor.shop_name ?? 'Vendor'),
-              itemName: parsed.name,
-              priceKobo,
-              imageUrl: parsed.image_url ?? null,
-              imageBelongsToItem: Boolean(parsed.image_url),
-              isAvailable: parsed.is_available ?? true,
-              vendorApproved: true,
-              vendorActive: true,
-              vendorVisible: true,
-              servesArea: true,
-              areaScope,
-              areaId,
-              sourceType: 'menu_item',
-              sourceId: item.id,
-              popularityOrders30d: Number(vendor.total_ratings ?? 0),
-              totalRatings: Number(vendor.total_ratings ?? 0),
-              avgRating: Number(vendor.avg_rating ?? 0),
-            } as never],
-            publish: !!area?.autoPublish,
-          })
-        }
-      }
-    }
+    await generateFlyerVariants(db, {
+      eventType: 'menu_item.created',
+      vendorId: session.userId!,
+      sourceEntityId: item.id,
+      payload: {
+        mealId: item.id,
+        mealName: parsed.name,
+        mealPrice: `\u20A6${parsed.price_naira.toLocaleString('en-NG')}`,
+      },
+    })
   } catch (err) {
-    console.error('[official-feed] menu_item.created failed:', err instanceof Error ? err.message : err)
+    console.error('[flyer-marketing] menu_item.created failed:', err instanceof Error ? err.message : err)
   }
 
   return NextResponse.json({ success: true, id: item.id })

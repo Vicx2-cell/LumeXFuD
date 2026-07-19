@@ -72,7 +72,6 @@ type TimelineProps = Pick<FeedV2ScreenProps,
 
 type FeedComment = {
   id: string
-  profileId: string
   body: string
   author: string
   handle: string | null
@@ -87,11 +86,14 @@ function isOfficial(post: FeedV2Post) {
 }
 
 function canFollowPostAuthor(post: FeedV2Post) {
-  return Boolean(post.authorProfileId && !isOfficial(post))
-}
-
-function profileHref(post: FeedV2Post) {
-  return post.authorProfileId ? `/feed-v2/profile/${post.authorProfileId}` : null
+  return Boolean(
+    post.authorProfileId
+      && (
+        isOfficial(post)
+        || post.publisherType === 'vendor'
+        || post.publisherType === 'ambassador'
+      ),
+  )
 }
 
 function LeftNavIcon({ icon }: { icon: FeedV2LeftNavIcon }) {
@@ -147,20 +149,12 @@ function formatMeta(post: FeedV2Post) {
 
 function formatViewCount(viewCount?: number) {
   if (viewCount == null) return null
-  return `${new Intl.NumberFormat('en-US').format(viewCount)} qualified views`
+  return `${new Intl.NumberFormat('en-US').format(viewCount)} views`
 }
 
 function formatActionCount(count?: number) {
   if (count == null) return ''
   return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(count)
-}
-
-function formatCommentTime(value: string) {
-  const elapsed = Math.max(0, Date.now() - new Date(value).getTime())
-  if (elapsed < 60_000) return 'now'
-  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)}m`
-  if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)}h`
-  return `${Math.floor(elapsed / 86_400_000)}d`
 }
 
 function stopPostClick(event: MouseEvent<HTMLElement>) {
@@ -285,16 +279,10 @@ function PostHeader({
 
   return (
     <header className={styles.postHeader}>
-      {profileHref(post) ? (
-        <Link href={profileHref(post)!} className={styles.authorLink} onClick={(event) => event.stopPropagation()} aria-label={`Open ${post.author}'s profile`}>
-          <Avatar post={post} />
-        </Link>
-      ) : <Avatar post={post} />}
+      <Avatar post={post} />
       <div className={styles.postHeaderCopy}>
         <div className={styles.postAuthorRow}>
-          {profileHref(post) ? (
-            <Link href={profileHref(post)!} className={styles.authorName} onClick={(event) => event.stopPropagation()}>{post.author}</Link>
-          ) : <span className={styles.authorName}>{post.author}</span>}
+          <span className={styles.authorName}>{post.author}</span>
           {badgeTone ? (
             <span className={verificationBadgeClass(badgeTone)} title={badgeTitle} aria-label={badgeTitle}>
               <BadgeCheck size={16} fill="currentColor" strokeWidth={2.6} aria-hidden="true" />
@@ -317,7 +305,7 @@ function PostHeader({
           {followingAuthor ? 'Following' : 'Follow'}
         </button>
       ) : null}
-      {!official ? <button
+      <button
         type="button"
         className={styles.moreButton}
         aria-label="More options"
@@ -327,7 +315,7 @@ function PostHeader({
         }}
       >
         <MoreHorizontal size={16} aria-hidden="true" />
-      </button> : null}
+      </button>
     </header>
   )
 }
@@ -468,11 +456,13 @@ function PostMedia({
               </div>
             ) : null
           })()}
-          {item.kind === 'video' ? (
-            <video src={item.src} className={styles.feedVideo} controls playsInline preload="metadata" onClick={(event) => event.stopPropagation()} />
-          ) : (
-            <Image src={item.src} alt={post.body} fill sizes="(max-width: 767px) 100vw, 760px" className="object-cover" />
-          )}
+          <Image
+            src={item.src}
+            alt={post.body}
+            fill
+            sizes="(max-width: 767px) 100vw, 760px"
+            className="object-cover"
+          />
           {item.kind === 'video' && index === 0 ? (
             <div className={styles.playBadge}>
               <span className={styles.playChip}>
@@ -625,7 +615,6 @@ function PostMenu({
   onMute?: (post: FeedV2Post) => void
   onBlock?: (post: FeedV2Post) => void
 }) {
-  if (isOfficial(post)) return null
   return (
     <div className={styles.postMenuPanel} role="menu" aria-label="Post actions">
       <button type="button" className={styles.postMenuItem} onClick={() => onFollow?.(post)} disabled={!canFollowPostAuthor(post) || isActionPending?.(post.id, 'follow')}>
@@ -1154,7 +1143,6 @@ function CommentSheet({
   draft,
   loading,
   submitting,
-  error,
   onDraftChange,
   onSubmit,
   onClose,
@@ -1164,7 +1152,6 @@ function CommentSheet({
   draft: string
   loading: boolean
   submitting: boolean
-  error: string
   onDraftChange: (value: string) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onClose: () => void
@@ -1190,20 +1177,15 @@ function CommentSheet({
           {!loading && comments.length === 0 ? <p className={styles.commentEmpty}>No comments yet. Be the first to reply.</p> : null}
           {comments.map((comment) => (
             <article key={comment.id} className={styles.commentItem}>
-              <Link href={`/feed-v2/profile/${comment.profileId}`} className={styles.commentAvatar} onClick={onClose}>
+              <div className={styles.commentAvatar}>
                 {comment.avatarUrl ? <Image src={comment.avatarUrl} alt="" fill sizes="36px" className="object-cover" /> : <DefaultAvatar className={styles.avatarFallback} />}
-              </Link>
+              </div>
               <div className={styles.commentCopy}>
                 <div className={styles.commentMeta}>
-                  <Link href={`/feed-v2/profile/${comment.profileId}`} onClick={onClose}><strong>{comment.author}</strong></Link>
+                  <strong>{comment.author}</strong>
                   {comment.handle ? <span>@{comment.handle}</span> : null}
-                  <time dateTime={comment.createdAt}>{formatCommentTime(comment.createdAt)}</time>
                 </div>
                 <p>{comment.body}</p>
-                <div className={styles.commentActions}>
-                  <span><Heart size={13} /> {comment.likeCount || 'Like'}</span>
-                  {comment.replyCount > 0 ? <span>{comment.replyCount} replies</span> : <span>Reply</span>}
-                </div>
               </div>
             </article>
           ))}
@@ -1213,12 +1195,9 @@ function CommentSheet({
           <textarea
             value={draft}
             onChange={(event) => onDraftChange(event.target.value)}
-            rows={2}
-            maxLength={2000}
-            enterKeyHint="send"
+            rows={3}
             placeholder="Write a comment..."
           />
-          {error ? <p className={styles.commentError} role="alert">{error}</p> : null}
           <button type="submit" disabled={submitting || !draft.trim()}>
             {submitting ? 'Sending...' : 'Reply'}
           </button>
@@ -1348,8 +1327,6 @@ export function FeedV2Screen({
   const [commentsByPostId, setCommentsByPostId] = useState<Record<string, FeedComment[]>>({})
   const [commentDraft, setCommentDraft] = useState('')
   const [commentsLoading, setCommentsLoading] = useState(false)
-  const [commentError, setCommentError] = useState('')
-  const [actionNotice, setActionNotice] = useState('')
   const screenRef = useRef<HTMLDivElement | null>(null)
   const headerRef = useRef<HTMLElement | null>(null)
 
@@ -1379,7 +1356,7 @@ export function FeedV2Screen({
     kind: 'like' | 'save' | 'repost',
     enabled: boolean,
     endpoint: string,
-  ): Promise<Record<string, unknown>> => {
+  ) => {
     setPendingActions((current) => [...current, { postId: post.id, kind }])
     try {
       const res = await fetch(endpoint, {
@@ -1387,9 +1364,7 @@ export function FeedV2Screen({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled }),
       })
-      const data = await res.json().catch(() => ({})) as Record<string, unknown> & { error?: string }
-      if (!res.ok) throw new Error(data.error ?? 'Could not update this post')
-      return data
+      if (!res.ok) throw new Error('Engagement failed')
     } finally {
       setPendingActions((current) => current.filter((item) => !(item.postId === post.id && item.kind === kind)))
     }
@@ -1476,31 +1451,19 @@ export function FeedV2Screen({
     setRepostedIds((current) => (next ? [...current, post.id] : current.filter((id) => id !== post.id)))
     adjustCount(post.id, 'repostCount', next ? 1 : -1)
     try {
-      const result = await runToggle(post, 'repost', next, `/api/feed/posts/${post.id}/repost`)
-      if (typeof result.repostCount === 'number') {
-        setCountOverrides((current) => ({
-          ...current,
-          [post.id]: { ...(current[post.id] ?? {}), repostCount: result.repostCount as number },
-        }))
-      }
-      setActionNotice(next ? 'Reposted' : 'Repost removed')
-    } catch (error) {
+      await runToggle(post, 'repost', next, `/api/feed/posts/${post.id}/repost`)
+    } catch {
       setRepostedIds((current) => (next ? current.filter((id) => id !== post.id) : [...current, post.id]))
       adjustCount(post.id, 'repostCount', next ? -1 : 1)
-      setActionNotice(error instanceof Error ? error.message : 'Could not repost')
     }
   }
 
   const loadComments = async (postId: string) => {
     setCommentsLoading(true)
-    setCommentError('')
     try {
       const res = await fetch(`/api/feed/posts/${postId}/reply`)
-      const data = await res.json().catch(() => ({})) as { comments?: FeedComment[]; error?: string }
-      if (!res.ok) throw new Error(data.error ?? 'Could not load comments')
-      setCommentsByPostId((current) => ({ ...current, [postId]: data.comments ?? [] }))
-    } catch (error) {
-      setCommentError(error instanceof Error ? error.message : 'Could not load comments')
+      const data = await res.json().catch(() => ({})) as { comments?: FeedComment[] }
+      if (res.ok) setCommentsByPostId((current) => ({ ...current, [postId]: data.comments ?? [] }))
     } finally {
       setCommentsLoading(false)
     }
@@ -1513,7 +1476,6 @@ export function FeedV2Screen({
     }
     setCommentPostId(post.id)
     setCommentDraft('')
-    setCommentError('')
     void loadComments(post.id)
   }
 
@@ -1533,7 +1495,6 @@ export function FeedV2Screen({
     event.preventDefault()
     if (!commentPost || !commentDraft.trim()) return
     const body = commentDraft.trim()
-    setCommentError('')
     setPendingActions((current) => [...current, { postId: commentPost.id, kind: 'reply' }])
     try {
       const res = await fetch(`/api/feed/posts/${commentPost.id}/reply`, {
@@ -1541,39 +1502,14 @@ export function FeedV2Screen({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body }),
       })
-      const data = await res.json().catch(() => ({})) as { error?: string; replyCount?: number }
-      if (!res.ok) throw new Error(data.error ?? 'Could not comment')
+      if (!res.ok) throw new Error('Could not comment')
       setCommentDraft('')
-      if (typeof data.replyCount === 'number') {
-        setCountOverrides((current) => ({
-          ...current,
-          [commentPost.id]: { ...(current[commentPost.id] ?? {}), replyCount: data.replyCount as number },
-        }))
-      } else {
-        adjustCount(commentPost.id, 'replyCount', 1)
-      }
+      adjustCount(commentPost.id, 'replyCount', 1)
       await loadComments(commentPost.id)
-    } catch (error) {
-      setCommentError(error instanceof Error ? error.message : 'Could not comment')
     } finally {
       setPendingActions((current) => current.filter((item) => !(item.postId === commentPost.id && item.kind === 'reply')))
     }
   }
-
-  useEffect(() => {
-    if (!actionNotice) return
-    const timeout = window.setTimeout(() => setActionNotice(''), 2400)
-    return () => window.clearTimeout(timeout)
-  }, [actionNotice])
-
-  useEffect(() => {
-    if (!commentPostId) return
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previousOverflow
-    }
-  }, [commentPostId])
 
   useEffect(() => {
     if (!selectedPostId) return
@@ -1617,25 +1553,15 @@ export function FeedV2Screen({
     const root = screenRef.current
     if (!root || typeof window === 'undefined' || !('IntersectionObserver' in window)) return
     const seen = new Set<string>()
-    const dwellTimers = new Map<string, number>()
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
+          if (!entry.isIntersecting || entry.intersectionRatio < 0.55) continue
           const postId = (entry.target as HTMLElement).dataset.feedPostId
           if (!postId || seen.has(postId)) continue
-          if (!entry.isIntersecting || entry.intersectionRatio < 0.55) {
-            const timer = dwellTimers.get(postId)
-            if (timer) window.clearTimeout(timer)
-            dwellTimers.delete(postId)
-            continue
-          }
-          if (dwellTimers.has(postId)) continue
-          dwellTimers.set(postId, window.setTimeout(() => {
-            seen.add(postId)
-            dwellTimers.delete(postId)
-            void recordFeedEvent(postId, 'qualified_impression')
-            observer.unobserve(entry.target)
-          }, 2000))
+          seen.add(postId)
+          void recordFeedEvent(postId, 'qualified_impression')
+          observer.unobserve(entry.target)
         }
       },
       { threshold: [0.55] },
@@ -1643,10 +1569,7 @@ export function FeedV2Screen({
 
     const nodes = root.querySelectorAll<HTMLElement>('[data-feed-post-id]')
     nodes.forEach((node) => observer.observe(node))
-    return () => {
-      observer.disconnect()
-      dwellTimers.forEach((timer) => window.clearTimeout(timer))
-    }
+    return () => observer.disconnect()
   }, [posts])
 
   return (
@@ -1704,17 +1627,13 @@ export function FeedV2Screen({
           draft={commentDraft}
           loading={commentsLoading}
           submitting={Boolean(commentPost && isPending(commentPost.id, 'reply'))}
-          error={commentError}
           onDraftChange={setCommentDraft}
           onSubmit={submitComment}
           onClose={() => {
             setCommentPostId(null)
             setCommentDraft('')
-            setCommentError('')
           }}
         />
-
-        {actionNotice ? <div className={styles.actionNotice} role="status">{actionNotice}</div> : null}
 
         <div className={styles.likeTray} aria-hidden="true">
           {likedIds.slice(-1).map((id) => (

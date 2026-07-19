@@ -79,9 +79,7 @@ export async function GET(req: NextRequest) {
       .eq('id', 1)
       .single()
 
-    const response = NextResponse.json({ vendors: ranked, trending: trending ?? null })
-    response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=30, stale-while-revalidate=300')
-    return response
+    return NextResponse.json({ vendors: ranked, trending: trending ?? null })
   } catch {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }

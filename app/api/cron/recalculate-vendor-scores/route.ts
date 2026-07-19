@@ -39,6 +39,12 @@ interface MenuRow {
   created_at: string | null
 }
 
+interface FlyerMetricRow {
+  vendor_id: string
+  metric_type: string
+  metric_count: number
+}
+
 // Vercel Cron invokes via GET; POST kept for manual/curl triggering. Both gated.
 export async function GET(req: NextRequest) {
   return withCronHealth('recalculate-vendor-scores', () => POST(req))
@@ -83,6 +89,22 @@ export async function POST(req: NextRequest) {
     if (batch.length < PAGE) break
   }
 
+  const flyerMetricRows: FlyerMetricRow[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error: fErr } = await db
+      .from('flyer_metrics')
+      .select('vendor_id, metric_type, metric_count')
+      .in('vendor_id', vendorIds)
+      .range(from, from + PAGE - 1)
+    if (fErr) {
+      console.error('[cron/recalculate-vendor-scores] flyer metrics query error:', fErr.message)
+      return NextResponse.json({ error: 'DB query failed', detail: fErr.message }, { status: 500 })
+    }
+    const batch = (data ?? []) as unknown as FlyerMetricRow[]
+    flyerMetricRows.push(...batch)
+    if (batch.length < PAGE) break
+  }
+
   // 30-day order window. Paginate: PostgREST caps a single response at 1000
   // rows, and at target volume (50+/day) a month easily exceeds that — an
   // unpaginated query would silently truncate and skew every score.
@@ -105,6 +127,7 @@ export async function POST(req: NextRequest) {
 
   const aggs = new Map<string, Agg>()
   const menuAggs = new Map<string, { total: number; available: number; fresh: number }>()
+  const marketingAggs = new Map<string, { views: number; downloads: number; shares: number; impressions: number; clicks: number }>()
   const ensure = (id: string): Agg => {
     let a = aggs.get(id)
     if (!a) { a = { completed: 0, cancelled: 0, prepTotalMin: 0, prepSamples: 0 }; aggs.set(id, a) }
@@ -136,6 +159,16 @@ export async function POST(req: NextRequest) {
     menuAggs.set(row.vendor_id, a)
   }
 
+  for (const row of flyerMetricRows) {
+    const agg = marketingAggs.get(row.vendor_id) ?? { views: 0, downloads: 0, shares: 0, impressions: 0, clicks: 0 }
+    if (row.metric_type === 'view') agg.views += row.metric_count
+    else if (row.metric_type === 'download') agg.downloads += row.metric_count
+    else if (row.metric_type === 'share') agg.shares += row.metric_count
+    else if (row.metric_type === 'impression') agg.impressions += row.metric_count
+    else if (row.metric_type === 'click') agg.clicks += row.metric_count
+    marketingAggs.set(row.vendor_id, agg)
+  }
+
   const now = new Date().toISOString()
   const rows = vendors.map((vendor) => {
     const id = vendor.id
@@ -147,7 +180,9 @@ export async function POST(req: NextRequest) {
     const conversionRate = a.completed + a.cancelled > 0 ? a.completed / (a.completed + a.cancelled) : 0
     const menuQualityScore = m.total > 0 ? Math.min(1, m.available / Math.max(4, m.total)) : 0.25
     const freshnessScore = m.total > 0 ? Math.min(1, m.fresh / m.total) : 0.25
-    const premiumBoost = vendor.is_premium ? 6 : 0
+    const marketing = marketingAggs.get(id) ?? { views: 0, downloads: 0, shares: 0, impressions: 0, clicks: 0 }
+    const marketingBoost = Math.min(3, (marketing.views * 0.05) + (marketing.downloads * 0.3) + (marketing.shares * 0.5) + (marketing.clicks * 0.1))
+    const premiumBoost = vendor.is_premium ? 6 + marketingBoost : 0
 
     const ranking = computeVendorRanking({
       completedOrders30d: a.completed,

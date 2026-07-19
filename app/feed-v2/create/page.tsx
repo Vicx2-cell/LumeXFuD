@@ -50,7 +50,7 @@ export default function FeedV2CreatePage() {
   const [message, setMessage] = useState('')
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const videoInputRef = useRef<HTMLInputElement | null>(null)
-  const roleLoading = viewerRole === null
+  const storyOnly = viewerRole === 'customer' || viewerRole === null
 
   useEffect(() => {
     return () => {
@@ -67,13 +67,14 @@ export default function FeedV2CreatePage() {
       .then((json) => {
         const role = json && typeof json === 'object' ? (json as { role?: string }).role ?? null : null
         setViewerRole(role)
+        if (role === 'customer') setMode('story')
       })
       .catch(() => {})
   }, [])
 
   const hasText = Boolean(body.trim())
   const canSubmit = Boolean(hasText || media)
-  const composerModes: ComposerMode[] = ['post', 'story']
+  const composerModes: ComposerMode[] = storyOnly ? ['story'] : ['post', 'story']
 
   async function pickMedia(event: ChangeEvent<HTMLInputElement>, kind: 'image' | 'video') {
     const file = event.target.files?.[0]
@@ -122,10 +123,10 @@ export default function FeedV2CreatePage() {
 
     try {
       const uploaded = media ? await uploadMedia(media) : null
-      const res = await fetch(mode === 'post' ? '/api/feed/posts' : '/api/feed/stories', {
+      const res = await fetch(mode === 'post' && !storyOnly ? '/api/feed/posts' : '/api/feed/stories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mode === 'post'
+        body: JSON.stringify(mode === 'post' && !storyOnly
           ? {
               body: body.trim() || undefined,
               post_kind: uploaded?.media_kind === 'video' ? 'VIDEO' : uploaded ? 'IMAGE' : 'TEXT',
@@ -180,7 +181,7 @@ export default function FeedV2CreatePage() {
           </Link>
         </header>
 
-        <div className="grid grid-cols-2 bg-black/20 p-1">
+        <div className={`grid bg-black/20 p-1 ${storyOnly ? 'grid-cols-1' : 'grid-cols-2'}`}>
           {composerModes.map((item) => (
             <button
               key={item}
@@ -196,7 +197,11 @@ export default function FeedV2CreatePage() {
           ))}
         </div>
 
-        {roleLoading ? <p className="px-5 pt-4 text-sm text-white/48">Loading your publishing options…</p> : null}
+        {storyOnly ? (
+          <p className="px-5 pt-4 text-sm text-white/48">
+            Customer accounts can only submit stories for review.
+          </p>
+        ) : null}
 
         <div className="p-5">
           <textarea
@@ -228,8 +233,8 @@ export default function FeedV2CreatePage() {
             </div>
           ) : null}
 
-          <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" className="hidden" onChange={(event) => void pickMedia(event, 'image')} />
-          <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" className="hidden" onChange={(event) => void pickMedia(event, 'video')} />
+          <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => void pickMedia(event, 'image')} />
+          <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={(event) => void pickMedia(event, 'video')} />
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/session'
-import { getFeature } from '@/lib/features'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { initializePremiumBilling } from '@/lib/paystack/billing'
 
@@ -15,10 +14,6 @@ export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
   if (!session || session.role !== 'vendor' || !session.userId) {
     return NextResponse.json({ error: 'Vendor authentication required' }, { status: 401 })
-  }
-
-  if (!(await getFeature('premium_enabled')) || !(await getFeature('premium_new_subscriptions_enabled')) || !(await getFeature('premium_checkout_enabled'))) {
-    return NextResponse.json({ error: 'Premium checkout is disabled right now' }, { status: 503 })
   }
 
   const rl = await rateLimitGeneric(`premium-subscribe:${session.phone}`, 10, 300)

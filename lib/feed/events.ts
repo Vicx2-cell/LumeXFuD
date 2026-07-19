@@ -34,12 +34,7 @@ function normalizeBatchKey(batchKey: string) {
 }
 
 function normalizeEvent(input: FeedEventInput & { source_tab?: string }, profileId: string, batchKey: string) {
-  // A qualified view is one unique viewer/post/day. Random client keys used to
-  // let refreshes inflate vendor numbers indefinitely.
-  const viewDay = new Date().toISOString().slice(0, 10)
-  const eventKey = input.event_type === 'qualified_impression' && input.post_id
-    ? `${profileId}:qualified:${input.post_id}:${viewDay}`
-    : normalizeEventKey(profileId, batchKey, input.event_key)
+  const eventKey = normalizeEventKey(profileId, batchKey, input.event_key)
   const sourceTab = input.source_tab ?? undefined
   const metadata = input.metadata ?? {}
   return {
@@ -156,27 +151,17 @@ export async function recordFeedEventBatch(input: unknown, sessionId?: string) {
     const postIds = Array.from(viewCounts.keys())
     const { data: currentPosts, error: postError } = await db
       .from('posts')
-      .select('id, view_count, author_profile_id')
+      .select('id, view_count')
       .in('id', postIds)
     if (postError) throw new Error(postError.message)
     const currentById = new Map((currentPosts ?? []).map((row) => {
-      const typed = row as { id: string; view_count: number | null; author_profile_id: string }
+      const typed = row as { id: string; view_count: number | null }
       return [typed.id, Number(typed.view_count ?? 0)] as const
     }))
-    const ownPostIds = new Set((currentPosts ?? [])
-      .filter((row) => String((row as { author_profile_id: string }).author_profile_id) === profile.id)
-      .map((row) => String((row as { id: string }).id)))
     for (const postId of postIds) {
-      if (ownPostIds.has(postId)) continue
       const nextCount = (currentById.get(postId) ?? 0) + (viewCounts.get(postId) ?? 0)
-      const atomic = typeof db.rpc === 'function'
-        ? await db.rpc('increment_post_qualified_view', { p_post_id: postId })
-        : { error: new Error('RPC unavailable') }
-      if (atomic.error) {
-        // Compatibility fallback while migration 118 rolls through environments.
-        const { error } = await db.from('posts').update({ view_count: nextCount }).eq('id', postId)
-        if (error) throw new Error(error.message)
-      }
+      const { error } = await db.from('posts').update({ view_count: nextCount }).eq('id', postId)
+      if (error) throw new Error(error.message)
     }
   }
 

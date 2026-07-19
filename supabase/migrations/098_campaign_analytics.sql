@@ -7,6 +7,7 @@
 CREATE TABLE IF NOT EXISTS campaign_events (
   event_id     TEXT PRIMARY KEY,
   campaign_id  TEXT NOT NULL,
+  flyer_id     UUID,
   vendor_id    UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   user_id      UUID,
   session_id   TEXT NOT NULL,

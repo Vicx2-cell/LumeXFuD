@@ -110,7 +110,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // per request. Reading it here makes pages render per-request (dynamic).
   const features = await getAllFeatures()
   return (
-    <html lang="en" className={display.variable} suppressHydrationWarning>
+    <html lang="en" className={display.variable}>
       <head>
         {/* Set data-theme before first paint so light mode never flashes dark
             (or vice-versa). Mirrors ThemeProvider; dashboards forced dark. */}

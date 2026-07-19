@@ -15,7 +15,7 @@ export async function GET(
       .select(`
         id, shop_name, owner_name, logo_url, shop_photo_url,
         prep_time_minutes, status, paused_until, category, description,
-        avg_rating, total_ratings, is_active, opening_time, closing_time
+        avg_rating, total_ratings, is_active
       `)
       .eq('id', id)
       .eq('is_active', true)

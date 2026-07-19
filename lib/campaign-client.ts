@@ -1,4 +1,8 @@
 export type CampaignEventType =
+  | 'flyer_viewed'
+  | 'flyer_downloaded'
+  | 'flyer_shared'
+  | 'flyer_link_opened'
   | 'marketplace_campaign_impression'
   | 'marketplace_campaign_click'
   | 'vendor_profile_opened'
@@ -11,7 +15,8 @@ export type CampaignTrackInput = {
   campaignId: string
   eventType: CampaignEventType
   vendorId: string
-  source: 'marketplace' | 'vendor' | 'menu' | 'cart' | 'checkout' | 'order'
+  flyerId?: string | null
+  source: 'flyer' | 'marketplace' | 'vendor' | 'menu' | 'cart' | 'checkout' | 'order'
   placement: string
   targetType?: string
   targetId?: string | null

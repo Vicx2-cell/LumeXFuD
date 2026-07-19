@@ -6,7 +6,6 @@ import { getCurrentUser } from '@/lib/session'
 import { BottomNav } from '@/components/nav-bottom'
 import { vendorPath } from '@/lib/seo/config'
 import { VendorMenuClient } from './vendor-menu-client'
-import { VendorProfileHeader } from './vendor-profile-header'
 
 // Always render fresh — a vendor's menu, prices and open/closed status must not
 // be served stale from a cached page.
@@ -38,45 +37,6 @@ export default async function VendorPage({
     .single()
 
   if (!vendor) notFound()
-
-  const { data: vendorProfile } = await db
-    .from('social_profiles')
-    .select('id, handle, display_name, avatar_url, is_verified, official_badge_kind')
-    .eq('vendor_id', id)
-    .maybeSingle()
-
-  const vendorProfileId = (vendorProfile as { id?: string } | null)?.id ?? null
-  const [followerResult, followingResult, postResult] = vendorProfileId
-    ? await Promise.all([
-        db.from('follows').select('id', { count: 'exact', head: true }).eq('followed_profile_id', vendorProfileId),
-        db.from('follows').select('id', { count: 'exact', head: true }).eq('follower_profile_id', vendorProfileId),
-        db.from('posts').select('id', { count: 'exact', head: true }).eq('author_profile_id', vendorProfileId).eq('status', 'published').is('deleted_at', null),
-      ])
-    : [{ count: 0 }, { count: 0 }, { count: 0 }]
-  const followerCount = followerResult.count ?? 0
-  const followingCount = followingResult.count ?? 0
-  const postCount = postResult.count ?? 0
-
-  const session = await getCurrentUser()
-  let viewerFollowsVendor = false
-  if (session && vendorProfileId) {
-    const viewerProfile = session.role === 'vendor'
-      ? await db.from('social_profiles').select('id').eq('vendor_id', session.userId ?? '').maybeSingle()
-      : session.role === 'customer'
-        ? await db.from('social_profiles').select('id').eq('customer_id', session.userId ?? '').maybeSingle()
-        : session.role === 'rider'
-          ? await db.from('social_profiles').select('id').eq('rider_id', session.userId ?? '').maybeSingle()
-          : await db.from('social_profiles').select('id').or(`customer_id.eq.${session.userId ?? ''},admin_id.eq.${session.userId ?? ''}`).maybeSingle()
-    if (viewerProfile.data?.id) {
-      const { data: followRow } = await db
-        .from('follows')
-        .select('id')
-        .eq('follower_profile_id', viewerProfile.data.id)
-        .eq('followed_profile_id', vendorProfileId)
-        .maybeSingle()
-      viewerFollowsVendor = Boolean(followRow)
-    }
-  }
 
   // Fully KYC-verified? (one tiny marker check) — drives the customer Verified badge.
   let kyc_verified = false
@@ -127,27 +87,10 @@ export default async function VendorPage({
     .limit(30)
   const reviews = (reviewRows ?? []) as VendorReview[]
 
+  const session = await getCurrentUser()
+
   return (
-    <main className="lx-page feed-dark pb-32">
-      <div className="mx-auto max-w-3xl px-4 pt-4">
-        <VendorProfileHeader
-          vendorId={vendor.id}
-          shopName={vendor.shop_name}
-          handle={(vendorProfile as { handle?: string | null } | null)?.handle ?? null}
-          category={vendor.category}
-          logoUrl={vendor.logo_url}
-          verified={Boolean((vendorProfile as { is_verified?: boolean | null } | null)?.is_verified)}
-          status={vendor.status}
-          isPaused={Boolean(vendor.paused_until && new Date(vendor.paused_until) > new Date())}
-          avgRating={Number(vendor.avg_rating ?? 0)}
-          totalRatings={Number(vendor.total_ratings ?? 0)}
-          followerCount={followerCount}
-          followingCount={followingCount}
-          postCount={postCount}
-          viewerFollowsVendor={viewerFollowsVendor}
-          vendorProfileId={vendorProfileId}
-        />
-      </div>
+    <main className="lx-page pb-32">
       <VendorMenuClient
         vendor={{ ...vendor, kyc_verified } as VendorInfo}
         menu={menuWithAddons}

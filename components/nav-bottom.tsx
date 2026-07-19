@@ -7,7 +7,7 @@ import { useFeatures } from '@/lib/use-features'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Home', icon: HomeIcon },
-  { href: '/feed-v2', label: 'Feed', icon: FeedIcon, feature: 'feed_enabled' },
+  { href: '/feed', label: 'Feed', icon: FeedIcon, feature: 'feed_enabled' },
   { href: '/orders', label: 'Orders', icon: OrdersIcon },
   { href: '/cart', label: 'Cart', icon: CartIcon, showBadge: true },
   { href: '/leaderboard', label: 'Ranks', icon: TrophyIcon, feature: 'leaderboard' },
@@ -117,12 +117,10 @@ function HomeIcon({ active }: { active: boolean }) {
 
 function FeedIcon({ active }: { active: boolean }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? '#F5A623' : 'none'}
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
       stroke={active ? '#F5A623' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" />
-      <path d="M8 9h8" />
-      <path d="M8 13h8" />
-      <path d="M8 17h5" />
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <path d="m10 9 5 3-5 3V9Z" fill={active ? '#F5A623' : 'none'} />
     </svg>
   )
 }

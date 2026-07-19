@@ -29,8 +29,8 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'super-admin/cron-health', 'super-admin/cron-run', 'super-admin/earnings',
     'super-admin/earnings/history', 'super-admin/feature-usage', 'super-admin/features',
     'super-admin/financials', 'super-admin/lockdown', 'super-admin/pricing',
-    'super-admin/premium', 'super-admin/campus-partners', 'super-admin/official-feed',
-    'super-admin/payments', 'super-admin/feed-reports', 'super-admin/feed-stories',
+    'super-admin/premium',
+    'super-admin/payments',
     'super-admin/revoke-sessions', 'super-admin/rewards', 'super-admin/security-health',
     'super-admin/sentinel', 'super-admin/settings', 'super-admin/super-audit',
     'super-admin/team/create', 'super-admin/users/[id]/force-reset-pin', 'super-admin/withdraw',
@@ -64,14 +64,13 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   ...map([
     'customer-wallet/balance', 'customer-wallet/topup', 'customer-wallet/transactions',
     'orders/history', 'orders/[id]/dispute', 'orders/[id]/confirm', 'orders/[id]/rate',
-    'feed', 'feed/drafts', 'feed/posts', 'feed/stories', 'feed/uploads', 'feed/events', 'feed/video-quota', 'feed/watch',
+    'feed', 'feed/drafts', 'feed/posts', 'feed/uploads', 'feed/events', 'feed/video-quota',
     'feed/videos', 'feed/stale-suggestions',
     'feed/posts/[id]/like', 'feed/posts/[id]/bookmark', 'feed/posts/[id]/repost',
     'feed/posts/[id]/reply', 'feed/posts/[id]/quote', 'feed/posts/[id]/report',
     'feed/posts/[id]/feedback', 'feed/posts/[id]/archive', 'feed/posts/[id]/restore',
     'feed/posts/[id]/retry-processing', 'feed/posts/[id]', 'feed/posts/bulk-archive', 'feed/posts/bulk-restore', 'feed/posts/bulk-delete',
     'feed/profiles/[profileId]/follow', 'feed/profiles/[profileId]/mute', 'feed/profiles/[profileId]/block',
-    'referrals', 'campus-partners',
   ], { kind: 'auth' }),
 
   ...map([
@@ -86,7 +85,13 @@ export const ROUTE_POLICY: Record<string, Policy> = {
 
   ...map(['feed/cleanup/diagnostics'], role(SUPER)),
 
+  'flyer-image': { kind: 'public' },
   'campaign/track': { kind: 'public' },
+
+  ...map([
+    'vendor/marketing/events', 'vendor/marketing/flyers', 'vendor/marketing/flyers/[id]',
+    'vendor/marketing/flyers/[id]/download',
+  ], { kind: 'self' }),
 
   ...map(['premium/plans'], { kind: 'public' }),
 
@@ -117,12 +122,10 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'premium/status',
   ], { kind: 'auth' }),
 
-  'dev/qa/customer-session': { kind: 'public' },
-
   ...map([
     'cron/recalculate-vendor-scores', 'cron/release-payments', 'cron/release-scheduled',
     'cron/reset-daily-limits', 'cron/reset-weekly-leaderboard', 'cron/sentinel',
-    'cron/official-feed', 'cron/subscription-check', 'cron/vendor-auto-cancel', 'cron/wallet-reconciliation',
+    'cron/subscription-check', 'cron/vendor-auto-cancel', 'cron/wallet-reconciliation',
     'cron/wallet-release-held', 'cron/wallet-sweep',
   ], { kind: 'cron' }),
 

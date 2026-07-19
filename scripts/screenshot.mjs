@@ -77,7 +77,7 @@ async function main() {
     const url = `${BASE}${route}`
     const file = join(outDir, `${slug(route)}.png`)
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 })
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 20000 })
       // Let spring/enter animations settle before capturing.
       await page.waitForTimeout(1200)
       await page.screenshot({ path: file, fullPage: true })

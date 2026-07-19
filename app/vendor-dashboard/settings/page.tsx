@@ -7,7 +7,7 @@ import { VendorSettings } from './settings-client'
 
 export const dynamic = 'force-dynamic'
 
-// Consolidated vendor Settings - everything settable about the store in one
+// Consolidated vendor Settings — everything settable about the store in ONE
 // organised place (store appearance, hours, pickup, security) + quick links to
 // the deeper areas, instead of scattering controls across the ops dashboard.
 export default async function VendorSettingsPage() {
@@ -17,7 +17,7 @@ export default async function VendorSettingsPage() {
   const db = createSupabaseAdmin()
   const { data: vendor } = await db
     .from('vendors')
-    .select('id, shop_name, status, shop_photo_url, logo_url, opening_time, closing_time, pickup_enabled, pickup_max_concurrent, address_text, landmark, latitude, longitude, location_photo_url')
+    .select('id, shop_name, shop_photo_url, logo_url, opening_time, closing_time, pickup_enabled, pickup_max_concurrent, address_text, landmark, latitude, longitude, location_photo_url')
     .eq('id', session.userId)
     .single()
 
@@ -27,7 +27,7 @@ export default async function VendorSettingsPage() {
     <div className="lx-page lx-console pb-20 overflow-hidden">
       <GlassSheen />
       <div className="max-w-lg mx-auto px-4 py-7">
-        <PageHeader title="Settings" subtitle={`${(vendor as VendorSettable).shop_name} - everything about your store, in one place.`} />
+        <PageHeader title="Settings" subtitle={`${(vendor as VendorSettable).shop_name} — everything about your store, in one place.`} />
         <VendorSettings vendor={vendor as VendorSettable} />
       </div>
     </div>
@@ -37,7 +37,6 @@ export default async function VendorSettingsPage() {
 export interface VendorSettable {
   id: string
   shop_name: string
-  status: 'OPEN' | 'BUSY' | 'CLOSED'
   shop_photo_url: string | null
   logo_url: string | null
   opening_time: string | null

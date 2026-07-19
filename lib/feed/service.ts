@@ -6,7 +6,6 @@ import type { FeedCandidate, FeedTabKey, FeedViewerContext } from './types'
 import { rankFeedCandidates } from './ranking'
 import { feedTabKeySchema } from './validators'
 import crypto from 'node:crypto'
-import { autoFollowOfficialAccount } from './official-follow'
 
 export interface FeedSnapshot {
   tab: FeedTabKey
@@ -101,16 +100,13 @@ export async function ensureSocialProfileForSession() {
         .then(({ data }) => data ?? null)]
 
   const existing = lookup.find(Boolean)
-  if (existing) {
-    await autoFollowOfficialAccount(String(existing.id), db)
-    return existing as {
+  if (existing) return existing as {
     id: string
     profile_kind: string
     handle: string
     display_name: string
     campus_id: string | null
     zone_id: string | null
-    }
   }
 
   let displayName = session.name ?? session.phone
@@ -152,7 +148,6 @@ export async function ensureSocialProfileForSession() {
     .select('id, profile_kind, handle, display_name, campus_id, zone_id')
     .single()
 
-  if (inserted?.id) await autoFollowOfficialAccount(String(inserted.id), db)
   return inserted as {
     id: string
     profile_kind: string

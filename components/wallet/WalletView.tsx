@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
-import { DefaultAvatar } from '@/components/default-avatar'
 import WithdrawSheet from './WithdrawSheet'
 import AddBankSheet from './AddBankSheet'
 import { BackButton } from '@/components/back-button'
@@ -642,9 +641,7 @@ function PartyRow({ role, party, orderNumber }: { role: 'Vendor' | 'Rider'; part
           <Image src={party.avatar} alt="" fill className="object-cover" sizes="32px" />
         </div>
       ) : (
-        <div className="w-8 h-8 rounded-full shrink-0 overflow-hidden">
-          <DefaultAvatar size={12} />
-        </div>
+        <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-xs font-semibold" style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }}>{initial}</div>
       )}
       <div className="min-w-0">
         <p className="text-xs text-white/90 truncate">{party.name}</p>

@@ -1,9 +1,7 @@
 import crypto from 'node:crypto'
-import dynamicImport from 'next/dynamic'
 import { Suspense } from 'react'
 import { BottomNav } from '@/components/nav-bottom'
-import { BackButton } from '@/components/back-button'
-import { BrandLogo } from '@/components/brand-logo'
+import LumiChat from '@/components/LumiChat'
 import { getFeature } from '@/lib/features'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
@@ -26,16 +24,6 @@ type HomeLocationRow = {
 // Always render fresh - vendor open/closed status and the ranked list must never
 // be served stale from a cached page. (Realtime keeps it live after first paint.)
 export const dynamic = 'force-dynamic'
-
-const LumiChat = dynamicImport(() => import('@/components/LumiChat'))
-const NotificationBell = dynamicImport(
-  () => import('@/components/notification-bell').then((mod) => mod.NotificationBell),
-  {
-    loading: () => (
-      <div className="w-11 h-11 rounded-full bg-white/10" aria-hidden="true" />
-    ),
-  },
-)
 
 async function getLocations() {
   const db = createSupabaseAdmin()
@@ -73,7 +61,8 @@ async function getLocations() {
   })
 }
 
-async function getPreferredZoneId(session: Awaited<ReturnType<typeof getCurrentUser>>): Promise<string | null> {
+async function getPreferredZoneId(): Promise<string | null> {
+  const session = await getCurrentUser()
   if (!session || session.role !== 'customer') return null
   const db = createSupabaseAdmin()
   let customerId = session.userId ?? null
@@ -154,77 +143,33 @@ async function getVendorsAndTrending(zoneId?: string | null) {
 
 export default async function CustomerHomePage() {
   const marketplaceCampaignId = crypto.randomUUID()
-  const [locations, , walletOn, session] = await Promise.all([
+  const [locations] = await Promise.all([
     getLocations(),
     getFeature('study'),
     getFeature('customer_wallet_enabled'),
-    getCurrentUser(),
   ])
-  const preferredZoneId = await getPreferredZoneId(session)
+  const preferredZoneId = await getPreferredZoneId()
   const [{ vendors }] = await Promise.all([
     getVendorsAndTrending(preferredZoneId ?? locations[0]?.zone_id ?? null),
   ])
 
   let favorites: string[] = []
-  let firstName = ''
   try {
+    const session = await getCurrentUser()
     if (session?.userId && session.role === 'customer') {
       const db = createSupabaseAdmin()
-      const [{ data: favs }, { data: me }] = await Promise.all([
+      const [{ data: favs }] = await Promise.all([
         db.from('customer_favorites').select('vendor_id').eq('customer_id', session.userId),
-        db.from('customers').select('name').eq('id', session.userId).maybeSingle(),
       ])
       favorites = (favs ?? []).map((r) => r.vendor_id as string)
-      firstName = ((me?.name as string | null) ?? '').trim().split(' ')[0] ?? ''
     }
   } catch {
     // Non-critical - never block the home render.
   }
 
-  const lagosHour = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'Africa/Lagos' }).format(new Date()))
-  const partOfDay = lagosHour < 12 ? 'morning' : lagosHour < 17 ? 'afternoon' : 'evening'
-  const greeting = `Good ${partOfDay}${firstName ? `, ${firstName}` : ''}`
-
   return (
     <main className="lx-page pb-24">
       <SmoothScroll />
-      <div className="lx-topbar sticky top-0 z-40 px-4 py-3">
-        <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <BackButton />
-            <BrandLogo size={34} rounded={10} />
-            <div className="min-w-0">
-              <span className="text-xs text-white/40">{greeting} 👋</span>
-              <h1 className="text-sm sm:text-base font-semibold leading-tight lx-foodie-text truncate">What are you eating today?</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {walletOn && (
-              <a
-                href="/profile/wallet"
-                className="lx-card-amber-strong h-11 px-3 rounded-full flex items-center gap-1.5"
-                aria-label="Wallet"
-              >
-                <span className="text-sm" aria-hidden="true">💰</span>
-                <span className="lx-amber text-xs font-semibold">Wallet</span>
-              </a>
-            )}
-            <NotificationBell />
-            <a
-              href="/profile"
-              className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center"
-              aria-label="Profile"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-lg mx-auto px-4 py-4">
       <Suspense fallback={<SkeletonGrid />}>
         <HomepageClient
           initialVendors={vendors as VendorData[]}
@@ -234,7 +179,6 @@ export default async function CustomerHomePage() {
           campaignId={marketplaceCampaignId}
         />
       </Suspense>
-      </div>
       <LumiChat />
       <BottomNav />
     </main>
