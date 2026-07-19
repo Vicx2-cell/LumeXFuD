@@ -18,6 +18,7 @@ import { GET as walletReconciliation } from '@/app/api/cron/wallet-reconciliatio
 import { GET as subscriptionCheck } from '@/app/api/cron/subscription-check/route'
 import { GET as recalculateVendorScores } from '@/app/api/cron/recalculate-vendor-scores/route'
 import { GET as resetWeeklyLeaderboard } from '@/app/api/cron/reset-weekly-leaderboard/route'
+import { GET as officialFeed } from '@/app/api/cron/official-feed/route'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -36,6 +37,7 @@ const HANDLERS: Record<string, CronHandler> = {
   'subscription-check': subscriptionCheck,
   'recalculate-vendor-scores': recalculateVendorScores,
   'reset-weekly-leaderboard': resetWeeklyLeaderboard,
+  'official-feed': officialFeed,
 }
 
 const schema = z.object({ key: z.enum(CRON_KEYS as [string, ...string[]]) })

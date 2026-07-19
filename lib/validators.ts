@@ -215,6 +215,8 @@ const answerField = z.string().min(2).max(200).transform((s) => s.trim().toLower
 
 export const registerInput = z.object({
   name:         z.string().min(1).max(100).transform((s) => s.trim()),
+  email:        z.string().trim().email().max(254).transform((s) => s.toLowerCase()),
+  username:     z.string().trim().min(3).max(30).regex(/^[a-zA-Z0-9._-]+$/).optional(),
   phone:        phoneField,                  // the WhatsApp / account number
   call_phone:   phoneField.optional(),       // optional separate call number
   default_delivery_address: z.string().trim().min(5).max(200),

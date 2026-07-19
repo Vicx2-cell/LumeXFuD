@@ -62,6 +62,7 @@ export const FEATURES: FeatureDef[] = [
   { key: 'feed_premium_enabled', label: 'Feed premium', description: 'Master switch for premium feed features.', default: false, enforced: true },
   { key: 'premium_enabled', label: 'Premium', description: 'Master switch for premium plans and benefits.', default: false, enforced: true },
   { key: 'premium_new_subscriptions_enabled', label: 'Premium new subscriptions', description: 'Allow new premium sign-ups.', default: false, enforced: true },
+  { key: 'premium_checkout_enabled', label: 'Premium checkout', description: 'Show the Paystack checkout flow for premium subscriptions. Off = the pricing page stays visible but checkout is read-only.', default: false, enforced: true },
   { key: 'premium_trials_enabled', label: 'Premium trials', description: 'Allow free trials on premium plans.', default: false, enforced: true },
   { key: 'premium_visibility_boost_enabled', label: 'Premium visibility boost', description: 'Allow premium visibility uplift in ranking.', default: false, enforced: true },
   { key: 'premium_tiktok_enabled', label: 'Premium TikTok', description: 'Allow TikTok connection for premium vendors.', default: false, enforced: true },

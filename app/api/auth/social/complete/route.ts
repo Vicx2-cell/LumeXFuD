@@ -10,9 +10,12 @@ import { rateLimitGeneric } from '@/lib/rate-limit'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { verifySocialPending, SOCIAL_PENDING_COOKIE, shortCookieOptions } from '@/lib/google-oauth'
 import { isPhoneBlocked } from '@/lib/blocklist'
+import { buildPublicDisplayName, buildPublicHandleCandidates, chooseAvailablePublicHandle } from '@/lib/social-profile'
+import { autoFollowOfficialAccount } from '@/lib/feed/official-follow'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Enter your name').max(80),
+  username: z.string().trim().min(3).max(30).regex(/^[a-zA-Z0-9._-]+$/).optional(),
   phone: z.string().min(7).max(20),
   default_delivery_address: z.string().trim().min(5, 'Enter your usual delivery location').max(200),
 })
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { name, phone, default_delivery_address } = schema.parse(body)
+    const { name, phone, default_delivery_address, username } = schema.parse(body)
 
     let normalizedPhone: string
     try {
@@ -98,6 +101,16 @@ export async function POST(req: NextRequest) {
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
     const userAgent = req.headers.get('user-agent') ?? undefined
     const role: SessionRole = 'customer'
+    const chosenHandle = username
+      ? buildPublicHandleCandidates({
+          username: username ?? null,
+          displayName: name,
+          phone: normalizedPhone,
+        })[0] ?? ''
+      : await chooseAvailablePublicHandle(db, {
+          displayName: name,
+          phone: normalizedPhone,
+        })
 
     // The Google email may already belong to another account — let the partial
     // unique index guard it, but only attach the email when it's free so a
@@ -111,6 +124,17 @@ export async function POST(req: NextRequest) {
         .is('deleted_at', null)
         .maybeSingle()
       if (emailOwner) emailToStore = null // already linked elsewhere — don't duplicate
+    }
+
+    if (username) {
+      const { data: takenHandle } = await db
+        .from('social_profiles')
+        .select('id')
+        .eq('handle', chosenHandle)
+        .maybeSingle()
+      if (takenHandle) {
+        return NextResponse.json({ error: 'That username is already taken. Please choose another one.' }, { status: 409 })
+      }
     }
 
     // ── Existing customer with this phone → link Google, log in. ──
@@ -188,9 +212,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unable to create account. Please try again.' }, { status: 500 })
     }
 
+    const { data: createdProfile, error: profileError } = await db.from('social_profiles').insert({
+      customer_id: user.id,
+      profile_kind: 'customer',
+      handle: chosenHandle,
+      display_name: buildPublicDisplayName(name, name),
+      is_verified: false,
+    }).select('id').single()
+    if (profileError) {
+      await db.from('customers').delete().eq('id', user.id)
+      if (profileError.code === '23505') {
+        return NextResponse.json({ error: 'That username is already taken. Please choose another one.' }, { status: 409 })
+      }
+      return NextResponse.json({ error: 'Unable to create public profile' }, { status: 500 })
+    }
+    await autoFollowOfficialAccount(String(createdProfile.id), db)
+
     const { token } = await createSession(user.id, normalizedPhone, role, ipAddress, userAgent)
     const res = NextResponse.json({ role, redirect_path: getRoleRedirect(role) })
-    res.cookies.set('session', token, setCookieOptions(role))
+    res.cookies.set(sessionCookieName(), token, setCookieOptions(role))
     res.cookies.set(SOCIAL_PENDING_COOKIE, '', shortCookieOptions(0))
     res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
     return res

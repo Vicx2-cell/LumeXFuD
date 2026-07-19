@@ -13,6 +13,7 @@ export default function CompleteSignupPage() {
 
   const [ready, setReady] = useState(false)         // pending session confirmed?
   const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
   const [phone, setPhone] = useState('+234')
   const [defaultDeliveryAddress, setDefaultDeliveryAddress] = useState('')
   // Read the deep-link destination once, at first render (client-only) — keeps
@@ -38,7 +39,7 @@ export default function CompleteSignupPage() {
     fetch('/api/auth/social/complete')
       .then(async (res) => {
         if (!res.ok) { window.location.assign('/auth?error=google_state'); return }
-        const data = await res.json() as { name?: string }
+        const data = await res.json() as { name?: string; email?: string }
         if (data.name) setName(data.name)
         setReady(true)
       })
@@ -107,7 +108,12 @@ export default function CompleteSignupPage() {
       const res = await fetch('/api/auth/social/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone, default_delivery_address: defaultDeliveryAddress }),
+        body: JSON.stringify({
+          name,
+          username: username.trim() ? username.trim().toLowerCase() : undefined,
+          phone,
+          default_delivery_address: defaultDeliveryAddress,
+        }),
       })
       const data = await res.json().catch(() => ({})) as {
         error?: string; redirect_path?: string; restart?: boolean; already_registered?: boolean
@@ -144,7 +150,7 @@ export default function CompleteSignupPage() {
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <h1 className="text-2xl font-semibold text-white">Almost there</h1>
           <p className="mt-2 text-sm text-white/60">
-            Add your phone number and usual delivery location so riders can reach you without the usual back-and-forth later.
+            Add your phone number, public username and usual delivery location so riders can reach you without the usual back-and-forth later.
           </p>
         </div>
 
@@ -159,6 +165,24 @@ export default function CompleteSignupPage() {
               autoComplete="name"
               autoCapitalize="words"
             />
+          </label>
+
+          <label className="block text-sm text-white/70">
+            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Public username</span>
+            <span className="mb-2 block text-xs text-white/40">Optional. This is what people will see when you post later.</span>
+            <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-[#111113] px-4 py-3">
+              <span className="text-white/45">@</span>
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value.replace(/\s/g, '').toLowerCase())}
+                className="w-full bg-transparent text-base text-white outline-none placeholder:text-white/30"
+                placeholder="chibuike.food"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+            </div>
           </label>
 
           <label className="block text-sm text-white/70">

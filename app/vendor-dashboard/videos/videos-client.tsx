@@ -29,6 +29,16 @@ type Item = {
   }>
 }
 
+function performanceGuidance(item: Item) {
+  const views = Math.max(0, item.view_count)
+  const orders = Math.max(0, item.order_count)
+  if (views < 20) return 'Reach is still building. Post near lunch or dinner, use a clear food close-up, and name the dish in the first line.'
+  if (orders === 0) return 'People are watching but not ordering yet. Add the price, availability, and a direct “Order now” reason to your next post.'
+  const conversion = (orders / views) * 100
+  if (conversion < 2) return 'Your post gets attention. Improve conversion with a clearer price, faster delivery promise, or a limited-time offer.'
+  return 'This format converts well. Reuse the same dish, opening hook, posting time, and call to action in your next post.'
+}
+
 type Quota = {
   activeCount: number
   draftCount: number
@@ -200,7 +210,7 @@ export function VideosClient() {
           <div className="grid gap-3 md:grid-cols-3">
             <button
               type="button"
-              onClick={() => router.push('/feed')}
+              onClick={() => router.push('/feed-v2')}
               className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 text-left transition hover:border-white/15"
             >
               <p className="text-xs uppercase tracking-wide text-white/40">Native upload</p>
@@ -256,6 +266,10 @@ export function VideosClient() {
             <div className="rounded-2xl border border-white/8 p-3 bg-white/[0.03]">
               <p className="text-xs uppercase tracking-wide text-white/40">Premium badge</p>
               <p className="mt-1 text-sm text-white">{premium?.benefits?.badge ? 'Shown' : 'Hidden'}</p>
+            </div>
+            <div className="rounded-2xl border border-white/8 p-3 bg-white/[0.03]">
+              <p className="text-xs uppercase tracking-wide text-white/40">Verified tick</p>
+              <p className="mt-1 text-sm text-white">{premium?.entitlements?.['premium.feed.verified_tick'] ? 'Shown' : 'Hidden'}</p>
             </div>
             <div className="rounded-2xl border border-white/8 p-3 bg-white/[0.03]">
               <p className="text-xs uppercase tracking-wide text-white/40">Boost discount</p>
@@ -385,7 +399,7 @@ export function VideosClient() {
                         <p className="font-medium text-white truncate">{item.caption ?? item.post_kind}</p>
                         <p className="text-xs text-white/45">{providerLabel} · {item.status} · {item.is_archived ? 'Archived' : 'Visible'}</p>
                       </div>
-                      <Badge color="var(--lx-green)">{item.view_count} views</Badge>
+                      <Badge color="var(--lx-green)">{item.view_count} qualified views</Badge>
                     </div>
                     <p className="mt-2 text-xs text-white/45">
                       Orders: {item.order_count} · Storage: {fmtBytes(item.storage_bytes ?? 0)} · Created: {fmtDate(item.created_at)}
@@ -427,12 +441,20 @@ export function VideosClient() {
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-2xl border border-white/8 p-3">
-                <p className="text-white/45 text-xs uppercase">Views</p>
+                <p className="text-white/45 text-xs uppercase">Qualified views</p>
                 <p className="text-white text-lg font-semibold">{performanceItem.view_count}</p>
               </div>
               <div className="rounded-2xl border border-white/8 p-3">
                 <p className="text-white/45 text-xs uppercase">Attributed orders</p>
                 <p className="text-white text-lg font-semibold">{performanceItem.order_count}</p>
+              </div>
+              <div className="rounded-2xl border border-white/8 p-3">
+                <p className="text-white/45 text-xs uppercase">Order conversion</p>
+                <p className="text-white text-lg font-semibold">{performanceItem.view_count > 0 ? `${((performanceItem.order_count / performanceItem.view_count) * 100).toFixed(1)}%` : '—'}</p>
+              </div>
+              <div className="rounded-2xl border border-amber-400/15 bg-amber-400/5 p-3 col-span-2">
+                <p className="text-amber-300/80 text-xs font-semibold uppercase">What to do next</p>
+                <p className="mt-1 text-sm leading-6 text-white/75">{performanceGuidance(performanceItem)}</p>
               </div>
               <div className="rounded-2xl border border-white/8 p-3 col-span-2">
                 <p className="text-white/45 text-xs uppercase">Lifecycle</p>

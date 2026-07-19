@@ -1,5 +1,6 @@
 import { FaceGate } from '@/components/face-gate'
 import { BankGate } from '@/components/bank-gate'
+import { VendorDashboardShell } from '@/components/vendor-dashboard/shell'
 
 // Every vendor page is gated, in order: KYC selfie → verified payout bank. A
 // vendor must clear both before they can use the dashboard or open for orders
@@ -8,7 +9,9 @@ import { BankGate } from '@/components/bank-gate'
 export default function VendorDashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <FaceGate>
-      <BankGate>{children}</BankGate>
+      <BankGate>
+        <VendorDashboardShell>{children}</VendorDashboardShell>
+      </BankGate>
     </FaceGate>
   )
 }

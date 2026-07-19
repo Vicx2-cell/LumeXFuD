@@ -15,6 +15,7 @@ export const REWARD_FEATURE_KEYS = ['referral', 'loyalty_tiers', 'surprise_rewar
 
 export async function anyRewardFeatureOn(): Promise<boolean> {
   const f = await getAllFeatures()
+  if (!f.customer_rewards_enabled) return false
   return REWARD_FEATURE_KEYS.some((k) => f[k])
 }
 
@@ -87,6 +88,10 @@ function settingKobo(rows: Array<{ id: string; value: { amount_kobo?: number; va
 export async function getRewardSummary(customerId: string): Promise<RewardSummary> {
   const db = createSupabaseAdmin()
   const features = await getAllFeatures()
+  const customerRewardsOn = !!features.customer_rewards_enabled
+  const customerReferralOn = customerRewardsOn && !!features.customer_referrals_enabled && !!features.referral
+  const loyaltyOn = customerRewardsOn && !!features.loyalty_tiers
+  const surpriseOn = customerRewardsOn && !!features.surprise_reward
 
   // Lazy expiry hygiene — retire any lapsed credits before we read them.
   void db.rpc('expire_reward_credits').then(() => {}, () => {})
@@ -133,7 +138,7 @@ export async function getRewardSummary(customerId: string): Promise<RewardSummar
   const qualified = referralRows.filter((r) => r.status === 'QUALIFIED_1' || r.status === 'QUALIFIED_2').length
 
   return {
-    enabled: { referral: !!features.referral, tiers: !!features.loyalty_tiers, surprise: !!features.surprise_reward },
+    enabled: { referral: customerReferralOn, tiers: loyaltyOn, surprise: surpriseOn },
     tier: { tier, orders_30d: orders30, silver_at: silverAt, gold_at: goldAt, next_tier: nextTier, orders_to_next: toNext },
     credits: {
       total_kobo: credits.reduce((s, c) => s + Number(c.remaining_kobo), 0),

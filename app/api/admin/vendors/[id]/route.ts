@@ -5,7 +5,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { nextVendorReviewState, vendorReadyForApproval } from '@/lib/onboarding'
-import { generateFlyerVariants } from '@/lib/flyer-marketing'
+import { createOfficialEventCollection, getOfficialAreaSettingByScope } from '@/lib/feed/official-scheduler'
 
 const updateInput = z.object({
   action: z.enum(['review', 'schedule_inspection', 'mark_inspected', 'approve', 'reject', 'suspend', 'unsuspend', 'activate_premium']),
@@ -35,10 +35,11 @@ export async function PATCH(
   const db = createSupabaseAdmin()
   const { data: vendor } = await db
     .from('vendors')
-    .select('id, shop_name, is_active, is_premium, approval_state, official_latitude, official_longitude, storefront_photo_url, site_inspected, business_verified')
+  .select('id, shop_name, is_active, is_premium, approval_state, official_latitude, official_longitude, storefront_photo_url, site_inspected, business_verified, city_id, zone_id, logo_url, shop_photo_url, avg_rating, total_ratings')
     .eq('id', id)
     .single()
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
+  const vendorRatings = vendor as typeof vendor & { total_ratings?: number; avg_rating?: number }
 
   const now = new Date().toISOString()
   const updates: Record<string, unknown> = { updated_at: now }
@@ -85,30 +86,47 @@ export async function PATCH(
     updates.approval_state = 'approved'
   } else if (parsed.data.action === 'activate_premium') {
     updates.is_premium = true
-    if (!vendor.is_premium) {
-      try {
-        await generateFlyerVariants(db, {
-          eventType: 'vendor.premium_activated',
-          vendorId: id,
-          sourceEntityId: id,
-          premium: true,
-        })
-      } catch (err) {
-        console.error('[flyer-marketing] premium flyer failed:', err instanceof Error ? err.message : err)
-      }
-    }
   }
 
   if (parsed.data.action === 'approve') {
     try {
-      await generateFlyerVariants(db, {
-        eventType: 'vendor.onboarding_completed',
-        vendorId: id,
-        sourceEntityId: id,
-        payload: { milestoneLabel: 'onboarding completed' },
-      })
+      const areaScope = vendor.zone_id ? 'zone' : 'city'
+      const areaId = String(vendor.zone_id ?? vendor.city_id ?? '')
+      if (areaId) {
+        const area = await getOfficialAreaSettingByScope(db, areaScope, areaId)
+        if (area) {
+          await createOfficialEventCollection({
+            area,
+            collectionType: 'new_on_lumex',
+            reason: 'Recently approved vendor surfaced in New on LumeX.',
+            sourceId: `vendor:${id}`,
+            source: [{
+              id: `vendor:${id}`,
+              vendorId: id,
+              vendorName: String(vendor.shop_name ?? 'Vendor'),
+              itemName: String(vendor.shop_name ?? 'Vendor'),
+              priceKobo: 0,
+              imageUrl: String((vendor.shop_photo_url ?? vendor.logo_url ?? vendor.storefront_photo_url) ?? '') || null,
+              imageBelongsToItem: Boolean(vendor.shop_photo_url ?? vendor.logo_url ?? vendor.storefront_photo_url),
+              isAvailable: true,
+              vendorApproved: true,
+              vendorActive: true,
+              vendorVisible: true,
+              servesArea: true,
+              areaScope,
+              areaId,
+              sourceType: 'vendor',
+              sourceId: `vendor:${id}`,
+              popularityOrders30d: Number(vendorRatings.total_ratings ?? 0),
+              totalRatings: Number(vendorRatings.total_ratings ?? 0),
+              avgRating: Number(vendorRatings.avg_rating ?? 0),
+            } as never],
+            publish: !!area?.autoPublish,
+          })
+        }
+      }
     } catch (err) {
-      console.error('[flyer-marketing] onboarding flyer failed:', err instanceof Error ? err.message : err)
+      console.error('[official-feed] vendor.approved failed:', err instanceof Error ? err.message : err)
     }
   }
 

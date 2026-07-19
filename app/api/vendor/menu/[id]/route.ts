@@ -5,7 +5,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { updateMenuItemInput } from '@/lib/validators'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { toKobo } from '@/lib/money'
-import { generateFlyerVariants } from '@/lib/flyer-marketing'
+import { createOfficialEventCollection, getOfficialAreaSettingByScope } from '@/lib/feed/official-scheduler'
 
 // Next Africa/Lagos midnight (UTC+1, no DST) as a UTC ISO string. Computed
 // server-side so the auto-restore time can never be spoofed by the client clock.
@@ -99,18 +99,46 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (becameAvailable) {
     try {
-      await generateFlyerVariants(db, {
-        eventType: 'menu_item.back_in_stock',
-        vendorId: session.userId!,
-        sourceEntityId: id,
-        payload: {
-          mealId: id,
-          mealName: parsed.name ?? previous?.name ?? 'Back in stock',
-          mealPrice: parsed.price_naira !== undefined ? `\u20A6${parsed.price_naira.toLocaleString('en-NG')}` : previous?.price_kobo ? `\u20A6${Math.round((previous.price_kobo ?? 0) / 100).toLocaleString('en-NG')}` : '',
-        },
-      })
+      const { data: vendor } = await db.from('vendors').select('id, shop_name, city_id, zone_id, approval_state, is_active, shop_photo_url, logo_url, avg_rating, total_ratings').eq('id', session.userId!).maybeSingle()
+      if (vendor && vendor.approval_state === 'approved' && vendor.is_active) {
+        const areaScope = vendor.zone_id ? 'zone' : 'city'
+        const areaId = String(vendor.zone_id ?? vendor.city_id ?? '')
+        if (areaId) {
+          const area = await getOfficialAreaSettingByScope(db, areaScope, areaId)
+          if (area) {
+            await createOfficialEventCollection({
+              area,
+              collectionType: 'new_on_lumex',
+              reason: 'Menu item came back in stock.',
+              sourceId: `menu-item:${id}:back-in-stock`,
+              source: [{
+                id,
+                vendorId: String(vendor.id),
+                vendorName: String(vendor.shop_name ?? 'Vendor'),
+                itemName: parsed.name ?? previous?.name ?? 'Back in stock',
+                priceKobo: parsed.price_naira !== undefined ? toKobo(parsed.price_naira) : Number(previous?.price_kobo ?? 0),
+                imageUrl: parsed.image_url ?? previous?.image_url ?? null,
+                imageBelongsToItem: Boolean(parsed.image_url ?? previous?.image_url),
+                isAvailable: true,
+                vendorApproved: true,
+                vendorActive: true,
+                vendorVisible: true,
+                servesArea: true,
+                areaScope,
+                areaId,
+                sourceType: 'menu_item',
+                sourceId: id,
+                popularityOrders30d: Number(vendor.total_ratings ?? 0),
+                totalRatings: Number(vendor.total_ratings ?? 0),
+                avgRating: Number(vendor.avg_rating ?? 0),
+              } as never],
+              publish: !!area?.autoPublish,
+            })
+          }
+        }
+      }
     } catch (err) {
-      console.error('[flyer-marketing] menu_item.back_in_stock failed:', err instanceof Error ? err.message : err)
+      console.error('[official-feed] menu_item.back_in_stock failed:', err instanceof Error ? err.message : err)
     }
   }
 

@@ -6,15 +6,10 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 const input = z.object({
   eventId: z.string().min(8).max(120),
   campaignId: z.string().min(1).max(200),
-  flyerId: z.string().uuid().optional().nullable(),
   vendorId: z.string().uuid(),
   userId: z.string().uuid().optional().nullable(),
   sessionId: z.string().min(8).max(120),
   eventType: z.enum([
-    'flyer_viewed',
-    'flyer_downloaded',
-    'flyer_shared',
-    'flyer_link_opened',
     'marketplace_campaign_impression',
     'marketplace_campaign_click',
     'vendor_profile_opened',
@@ -23,7 +18,7 @@ const input = z.object({
     'checkout_started',
     'order_completed',
   ]),
-  source: z.enum(['flyer', 'marketplace', 'vendor', 'menu', 'cart', 'checkout', 'order']),
+  source: z.enum(['marketplace', 'vendor', 'menu', 'cart', 'checkout', 'order']),
   placement: z.string().min(1).max(120),
   targetType: z.string().max(120).optional().default(''),
   targetId: z.string().max(200).optional().default(''),
@@ -43,7 +38,6 @@ export async function POST(req: NextRequest) {
   await db.from('campaign_events').upsert({
     event_id: parsed.data.eventId,
     campaign_id: parsed.data.campaignId,
-    flyer_id: parsed.data.flyerId ?? null,
     vendor_id: parsed.data.vendorId,
     user_id: session?.userId ?? parsed.data.userId ?? null,
     session_id: parsed.data.sessionId,

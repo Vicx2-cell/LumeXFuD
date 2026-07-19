@@ -8,15 +8,17 @@ import { BusinessHours } from '@/components/business-hours'
 import { VendorLocationEditor } from '@/components/vendor-location-editor'
 import { FaceIdSetup } from '@/components/face-id-setup'
 import { ConfirmSheet } from '@/components/ui/confirm-sheet'
-import { UtensilsCrossed, Wallet, Star, Share2, ChevronRight } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { UtensilsCrossed, Wallet, LifeBuoy, ChevronRight } from 'lucide-react'
 import type { VendorSettable } from './page'
 
 const LINKS = [
   { href: '/vendor-dashboard/menu',     Icon: UtensilsCrossed, label: 'Menu & items',     desc: 'Add, edit and price your food' },
   { href: '/vendor-dashboard/earnings', Icon: Wallet,          label: 'Earnings & payout', desc: 'Balance, withdrawals & bank account' },
-  { href: '/vendor-dashboard/reviews',  Icon: Star,            label: 'Reviews',           desc: 'See what customers are saying' },
-  { href: '/vendor-dashboard/share',    Icon: Share2,          label: 'Share your store',   desc: 'Your link & ready-made captions' },
+  { href: '/vendor-dashboard/support',   Icon: LifeBuoy,       label: 'Support',           desc: 'Report order, payout, or account issues' },
 ]
+
+type StoreStatus = 'OPEN' | 'BUSY' | 'CLOSED'
 
 /** A settings group: a mono section label over a tight cluster of cards, with a
  *  generous gap to the next group (the iOS/Stripe grouped-settings rhythm). */
@@ -29,11 +31,21 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-export function VendorSettings({ vendor: v0 }: { vendor: VendorSettable }) {
+export function VendorSettings({
+  vendor: v0,
+  showManageLinks = true,
+  showAccount = true,
+}: {
+  vendor: VendorSettable
+  showManageLinks?: boolean
+  showAccount?: boolean
+}) {
   const [vendor, setVendor] = useState(v0)
   const [cap, setCap] = useState(String(vendor.pickup_max_concurrent ?? 0))
   const [signOutOpen, setSignOutOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const [statusBusy, setStatusBusy] = useState(false)
+  const [statusError, setStatusError] = useState('')
   const pickupOn = vendor.pickup_enabled !== false
 
   async function savePickup(patch: { pickup_enabled?: boolean; pickup_max_concurrent?: number }) {
@@ -43,6 +55,28 @@ export function VendorSettings({ vendor: v0 }: { vendor: VendorSettable }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     })
+  }
+
+  async function saveStatus(status: StoreStatus) {
+    if (statusBusy) return
+    const previous = vendor.status
+    setStatusBusy(true)
+    setStatusError('')
+    setVendor((x) => ({ ...x, status }))
+    try {
+      const res = await fetch(`/api/vendors/${vendor.id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const data = await res.json().catch(() => ({})) as { error?: string }
+      if (!res.ok) {
+        setVendor((x) => ({ ...x, status: previous }))
+        setStatusError(data.error ?? 'Could not update store status.')
+      }
+    } finally {
+      setStatusBusy(false)
+    }
   }
 
   async function handleLogout() {
@@ -64,6 +98,37 @@ export function VendorSettings({ vendor: v0 }: { vendor: VendorSettable }) {
           <p className="font-semibold text-white truncate">{vendor.shop_name}</p>
           <p className="lx-mono mt-0.5">Vendor account</p>
         </div>
+      </div>
+
+      <div className="lx-surface p-4 space-y-3 mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-white/40">Store status</p>
+            <p className="mt-1 text-sm text-white/60">Open or close the store when you are ready for orders.</p>
+          </div>
+          <Badge color={vendor.status === 'OPEN' ? 'var(--lx-green)' : vendor.status === 'BUSY' ? 'var(--color-amber)' : 'rgba(255,255,255,0.45)'}>
+            {vendor.status}
+          </Badge>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void saveStatus('OPEN')}
+            disabled={statusBusy || vendor.status === 'OPEN'}
+            className="rounded-full border border-white/8 bg-white/[0.03] px-4 py-2 text-sm font-semibold text-white/75 transition disabled:opacity-50"
+          >
+            Open store
+          </button>
+          <button
+            type="button"
+            onClick={() => void saveStatus('CLOSED')}
+            disabled={statusBusy || vendor.status === 'CLOSED'}
+            className="rounded-full border border-white/8 bg-white/[0.03] px-4 py-2 text-sm font-semibold text-white/75 transition disabled:opacity-50"
+          >
+            Close store
+          </button>
+        </div>
+        {statusError && <p className="text-xs text-red-300">{statusError}</p>}
       </div>
 
       {/* ── STORE ── */}
@@ -136,41 +201,43 @@ export function VendorSettings({ vendor: v0 }: { vendor: VendorSettable }) {
         </div>
       </Group>
 
-      {/* ── MANAGE ── */}
-      <Group title="Manage">
-        <div className="lx-surface overflow-hidden">
-          {LINKS.map((l, i) => (
-            <Link
-              key={l.href} href={l.href}
-              className={`flex items-center gap-3 p-4 lx-tap${i > 0 ? ' border-t border-white/[0.06]' : ''}`}
-            >
-              <span className="w-9 h-9 rounded-xl grid place-items-center text-white/55 shrink-0" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--lx-border)' }}>
-                <l.Icon size={18} strokeWidth={1.75} />
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white/90">{l.label}</p>
-                <p className="text-xs text-white/40">{l.desc}</p>
-              </div>
-              <ChevronRight size={16} strokeWidth={2} className="text-white/30 shrink-0" />
-            </Link>
-          ))}
-        </div>
-      </Group>
+      {showManageLinks && (
+        <Group title="Manage">
+          <div className="lx-surface overflow-hidden">
+            {LINKS.map((l, i) => (
+              <Link
+                key={l.href} href={l.href}
+                className={`flex items-center gap-3 p-4 lx-tap${i > 0 ? ' border-t border-white/[0.06]' : ''}`}
+              >
+                <span className="w-9 h-9 rounded-xl grid place-items-center text-white/55 shrink-0" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--lx-border)' }}>
+                  <l.Icon size={18} strokeWidth={1.75} />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white/90">{l.label}</p>
+                  <p className="text-xs text-white/40">{l.desc}</p>
+                </div>
+                <ChevronRight size={16} strokeWidth={2} className="text-white/30 shrink-0" />
+              </Link>
+            ))}
+          </div>
+        </Group>
+      )}
 
-      {/* ── ACCOUNT ── */}
-      <Group title="Account">
-        <div className="lx-surface p-4 space-y-3">
-          <p className="text-xs text-white/45">Sign-in & security</p>
-          <FaceIdSetup />
-        </div>
-        <button
-          onClick={() => setSignOutOpen(true)}
-          className="w-full rounded-xl py-3.5 text-sm font-semibold transition-colors active:scale-[0.99]"
-          style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.18)' }}
-        >
-          Sign out
-        </button>
-      </Group>
+      {showAccount && (
+        <Group title="Account">
+          <div className="lx-surface p-4 space-y-3">
+            <p className="text-xs text-white/45">Sign-in & security</p>
+            <FaceIdSetup />
+          </div>
+          <button
+            onClick={() => setSignOutOpen(true)}
+            className="w-full rounded-xl py-3.5 text-sm font-semibold transition-colors active:scale-[0.99]"
+            style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.18)' }}
+          >
+            Sign out
+          </button>
+        </Group>
+      )}
 
       <ConfirmSheet
         open={signOutOpen}
