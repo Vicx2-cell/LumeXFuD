@@ -82,7 +82,7 @@ export async function createOrSaveFeedPost(
     throw new Error('Only super-admin or admin can post as LumeX Fud')
   }
   if (!canPublishFeedPost(permissionContext.profile, permissionContext.vendor)) {
-    throw new Error('Customer accounts can only submit stories for approval')
+    throw new Error('This account cannot publish feed posts')
   }
   if (isOfficialAuthor && (body.menu_items.length > 0 || body.promotion)) {
     throw new Error('Official posts cannot attach commerce items')

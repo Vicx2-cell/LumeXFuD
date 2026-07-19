@@ -56,10 +56,12 @@ export function resolveFeedPublisherKind(
   return 'blocked'
 }
 
-export function canPublishFeedPost(profile: FeedPermissionProfile | null | undefined, _vendor: FeedPermissionVendor | null | undefined) {
-  // Customers participate through moderated stories, not permanent feed posts.
-  // Keep this server-side so the restriction cannot be bypassed via the API.
-  return Boolean(profile && profile.profile_kind !== 'customer')
+export function canPublishFeedPost(profile: FeedPermissionProfile | null | undefined, vendor: FeedPermissionVendor | null | undefined) {
+  const kind = resolveFeedPublisherKind(profile, vendor)
+  // Every signed-in social profile may publish ordinary feed posts. Commerce
+  // attachments remain vendor-only in posts.ts, while unapproved vendors are
+  // still prevented from presenting themselves as verified businesses.
+  return Boolean(profile && (kind !== 'blocked' || profile.profile_kind === 'vendor' || profile.profile_kind === 'rider' || profile.profile_kind === 'admin'))
 }
 
 export function canCreateStory(profile: FeedPermissionProfile | null | undefined, _vendor: FeedPermissionVendor | null | undefined) {
