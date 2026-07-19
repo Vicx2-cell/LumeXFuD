@@ -1,25 +1,31 @@
-/** Convert kobo (integer) to naira float */
+/** Convert kobo (integer) to naira float. */
 export function toNaira(kobo: bigint | number): number {
   return Number(kobo) / 100
 }
 
-/** Convert naira float to kobo integer (always floors) */
+/** Convert naira float to kobo integer (always floors). */
 export function toKobo(naira: number): number {
   return Math.floor(naira * 100)
 }
 
+/** True when a value is a finite integer kobo amount. */
+export function isValidKoboAmount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value)
+}
+
 /**
- * Format kobo amount as ₦1,234.56.
+ * Format kobo amount as \u20A61,234.56.
  *
  * IMPORTANT: manual grouping, NOT toLocaleString('en-NG'). The locale can be
  * flaky on some browsers, so this stays deterministic and safe.
  */
 export function formatPrice(kobo: bigint | number): string {
   const naira = toNaira(kobo)
+  if (!Number.isFinite(naira)) return ''
   const [intPart, decRaw] = Math.abs(naira).toFixed(2).split('.')
   const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   const dec = decRaw === '00' ? '' : '.' + decRaw.replace(/0+$/, '')
-  return (naira < 0 ? '-₦' : '₦') + grouped + dec
+  return (naira < 0 ? '-\u20A6' : '\u20A6') + grouped + dec
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const

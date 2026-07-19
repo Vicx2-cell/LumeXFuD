@@ -15,7 +15,6 @@ import { rateLimitGeneric } from '@/lib/rate-limit'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
 import { recordOrderStatusEvent, promoteVerifiedPlaceFromOrder } from '@/lib/location-intelligence'
-import { generateFlyerVariants } from '@/lib/flyer-marketing'
 import { finalizeOrderFeedAttribution, reverseOrderFeedAttribution } from '@/lib/feed/attribution'
 import {
   MAX_READY_EXTENSION_COUNT,
@@ -299,47 +298,6 @@ export async function PATCH(
       console.error('[feed-attribution] status finalize failed:', err)
     })
 
-    const { data: vendorMeta } = await db
-      .from('vendors')
-      .select('id, shop_name, avg_rating, total_ratings, is_premium')
-      .eq('id', order.vendor_id)
-      .maybeSingle()
-
-    const { count: completedCount } = await db
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .eq('vendor_id', order.vendor_id)
-      .eq('status', 'COMPLETED')
-
-    const milestones: Array<{ label: string; threshold?: number }> = [
-      { label: '100 orders', threshold: 100 },
-      { label: '500 orders', threshold: 500 },
-    ]
-    if (vendorMeta && (vendorMeta.avg_rating ?? 0) >= 4.8 && (vendorMeta.total_ratings ?? 0) >= 20) {
-      milestones.push({ label: 'top-rated vendor' })
-    }
-    if (vendorMeta && (vendorMeta.avg_rating ?? 0) >= 4.6 && (vendorMeta.total_ratings ?? 0) >= 80) {
-      milestones.push({ label: 'customer favourite' })
-    }
-
-    const completed = completedCount ?? 0
-    const hit = milestones.find((milestone) => !milestone.threshold || completed >= milestone.threshold)
-    if (hit) {
-      try {
-        await generateFlyerVariants(db, {
-          eventType: 'vendor.milestone_reached',
-          vendorId: order.vendor_id as string,
-          sourceEntityId: `${order.vendor_id}:${hit.label}`,
-          premium: !!vendorMeta?.is_premium,
-          payload: {
-            milestoneLabel: hit.label,
-            milestone: hit.label,
-          },
-        })
-      } catch (err) {
-        console.error('[flyer-marketing] milestone flyer failed:', err instanceof Error ? err.message : err)
-      }
-    }
   }
 
   if (newStatus === 'CANCELLED' || newStatus === 'REFUNDED') {

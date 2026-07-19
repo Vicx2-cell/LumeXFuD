@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import RecoveryCodeDisplay from '@/components/auth/RecoveryCodeDisplay'
 import SecurityQuestionSelect from '@/components/auth/SecurityQuestionSelect'
@@ -13,6 +13,8 @@ import { readJsonResponse } from '@/lib/http'
 
 const initialForm = {
   name: '',
+  email: '',
+  username: '',
   phone: '+234',
   default_delivery_address: '',
   pin: '',
@@ -30,7 +32,12 @@ export default function RegisterPage() {
   const features = useFeatures()
   const verificationRequired = features.phone_verification !== false
   const googleEnabled = features.google_login === true
-  const [form, setForm] = useState(initialForm)
+  const [form, setForm] = useState(() => {
+    if (typeof window === 'undefined') return initialForm
+    const q = new URLSearchParams(window.location.search)
+    const p = q.get('phone')
+    return p && p.startsWith('+') ? { ...initialForm, phone: p } : initialForm
+  })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [recoveryCode, setRecoveryCode] = useState('')
@@ -41,10 +48,20 @@ export default function RegisterPage() {
   const [callSame, setCallSame] = useState(true)
   const [callPhone, setCallPhone] = useState('+234')
   // Deep-link destination (e.g. a vendor's store link) — land here after signup.
-  const [nextPath, setNextPath] = useState('/')
+  const [nextPath] = useState(() => {
+    if (typeof window === 'undefined') return '/'
+    const q = new URLSearchParams(window.location.search)
+    const n = q.get('next')
+    return n && n.startsWith('/') && !n.startsWith('//') ? n : '/'
+  })
   // Referral code from a /auth/register?ref=CODE invite link. Sent with sign-up;
   // the server does all fraud validation and silently ignores a bad code.
-  const [referralCode, setReferralCode] = useState('')
+  const [referralCode] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    const q = new URLSearchParams(window.location.search)
+    const ref = q.get('ref')
+    return ref ? ref.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12) : ''
+  })
 
   // Phone-ownership verification (sign-up only).
   const [code, setCode] = useState('')
@@ -57,16 +74,6 @@ export default function RegisterPage() {
   // Prefill the phone when arriving from the login screen's "not registered"
   // prompt (/auth/register?phone=+234...). Client-only — avoids needing a
   // useSearchParams Suspense boundary.
-  useEffect(() => {
-    const q = new URLSearchParams(window.location.search)
-    const p = q.get('phone')
-    if (p && p.startsWith('+')) setForm((current) => ({ ...current, phone: p }))
-    const n = q.get('next')
-    if (n && n.startsWith('/') && !n.startsWith('//')) setNextPath(n)
-    const ref = q.get('ref')
-    if (ref) setReferralCode(ref.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12))
-  }, [])
-
   const question2Options = useMemo(
     () => SECURITY_QUESTIONS.filter((question) => question !== form.question_1),
     [form.question_1]
@@ -160,6 +167,10 @@ export default function RegisterPage() {
       setError('Please enter your usual delivery location.')
       return
     }
+    if (form.email.trim().length < 5) {
+      setError('Please enter your email address.')
+      return
+    }
     if (!agreed) {
       setError('Please accept the Terms, Privacy Policy and Refund Policy to continue.')
       return
@@ -169,7 +180,12 @@ export default function RegisterPage() {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, call_phone: callSame ? undefined : callPhone, referral_code: referralCode || undefined }),
+        body: JSON.stringify({
+          ...form,
+          username: form.username.trim() ? form.username.trim().toLowerCase() : undefined,
+          call_phone: callSame ? undefined : callPhone,
+          referral_code: referralCode || undefined,
+        }),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -234,7 +250,7 @@ export default function RegisterPage() {
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <h1 className="text-2xl font-semibold text-white">Create your account</h1>
           <p className="mt-2 text-sm text-white/60">
-            Secure your account with a PIN, security questions and a recovery code.
+            Secure your account with email, a PIN, security questions and a recovery code.
           </p>
         </div>
 
@@ -313,6 +329,41 @@ export default function RegisterPage() {
               placeholder="Blessed Lodge, Block C, Room 12"
               autoComplete="street-address"
             />
+          </label>
+
+          <label className="block text-sm text-white/70">
+            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Email address</span>
+            <span className="mb-2 block text-xs text-white/40">Required. We use this for order updates and future account communication.</span>
+            <input
+              value={form.email}
+              onChange={(event) => handleChange('email', event.target.value)}
+              className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60"
+              placeholder="you@example.com"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+          </label>
+
+          <label className="block text-sm text-white/70">
+            <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Public username</span>
+            <span className="mb-2 block text-xs text-white/40">Optional. Choose the name people will see when you post later. We’ll create one for you if you skip it.</span>
+            <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-[#111113] px-4 py-3">
+              <span className="text-white/45">@</span>
+              <input
+                value={form.username}
+                onChange={(event) => handleChange('username', event.target.value.replace(/\s/g, '').toLowerCase())}
+                className="w-full bg-transparent text-base text-white outline-none placeholder:text-white/30"
+                placeholder="chibuike.food"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+            </div>
           </label>
 
           {verificationRequired && (phoneVerified ? (

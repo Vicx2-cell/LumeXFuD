@@ -82,7 +82,7 @@ export async function createOrSaveFeedPost(
     throw new Error('Only super-admin or admin can post as LumeX Fud')
   }
   if (!canPublishFeedPost(permissionContext.profile, permissionContext.vendor)) {
-    throw new Error('Only verified vendors, approved ambassadors, and official accounts can publish feed posts')
+    throw new Error('This account cannot publish feed posts')
   }
   if (isOfficialAuthor && (body.menu_items.length > 0 || body.promotion)) {
     throw new Error('Official posts cannot attach commerce items')
@@ -162,7 +162,7 @@ export async function createOrSaveFeedPost(
 
   if (body.media.length > 0) {
     postTasks.push((async () => {
-      await db.from('post_media').insert(
+      const { error } = await db.from('post_media').insert(
         body.media.map((media, index) => ({
           post_id: draftId,
           media_kind: media.kind,
@@ -180,6 +180,7 @@ export async function createOrSaveFeedPost(
           is_primary: media.is_primary ?? index === 0,
         }))
       )
+      if (error) throw new Error(`Could not attach uploaded media: ${error.message}`)
     })())
   }
 

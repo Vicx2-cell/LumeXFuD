@@ -13,6 +13,7 @@ import { RiderHotspots } from '@/components/rider-hotspots'
 import { KycPanel } from '@/components/kyc-panel'
 import { LaunchCounter } from '@/components/launch-counter'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
+import { DefaultAvatar } from '@/components/default-avatar'
 import { AlertBanner } from '@/components/ui/alert-banner'
 import { RoleTutorial } from '@/components/role-tutorial'
 import { useFeatures } from '@/lib/use-features'
@@ -581,7 +582,9 @@ export default function RiderDashboard() {
                       <Image src={current.customers.avatar_url} alt="" fill className="object-cover" sizes="28px" />
                     </div>
                   ) : (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/40" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <div className="w-7 h-7 rounded-full overflow-hidden shrink-0">
+                      <DefaultAvatar size={11} />
+                    </div>
                   )}
                   <a href={`tel:${current.customers.call_phone ?? current.customers.phone}`} className="text-amber-400">{current.customers.name ?? current.customers.phone}</a>
                   <a

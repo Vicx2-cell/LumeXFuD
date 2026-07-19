@@ -74,6 +74,26 @@ export async function initializePremiumBilling(input: PremiumBillingInitInput): 
     throw new Error('Plan is not available for vendors')
   }
 
+  const { data: existingEvent } = await db
+    .from('premium_payment_events')
+    .select('paystack_reference, provider_response, amount_kobo, metadata, status')
+    .eq('profile_id', input.profileId)
+    .maybeSingle()
+  if (existingEvent) {
+    const metadata = (existingEvent as { metadata?: Record<string, unknown> }).metadata ?? {}
+    if (String(metadata.plan_key ?? '') === input.planKey && String(metadata.billing_cycle ?? '') === input.billingCycle) {
+      const response = (existingEvent as { provider_response?: Record<string, unknown> }).provider_response ?? {}
+      if (typeof response.authorization_url === 'string' && typeof response.access_code === 'string' && typeof response.reference === 'string') {
+        return {
+          authorization_url: response.authorization_url,
+          access_code: response.access_code,
+          reference: response.reference,
+          amount_kobo: Number((existingEvent as { amount_kobo?: number }).amount_kobo ?? 0),
+        }
+      }
+    }
+  }
+
   const amountKobo = input.billingCycle === 'yearly' ? plan.yearly_price_kobo : plan.monthly_price_kobo
   if (!Number.isFinite(amountKobo) || amountKobo <= 0) throw new Error('Plan price is not configured')
 

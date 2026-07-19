@@ -25,7 +25,11 @@ export type PremiumEntitlementKey =
   | 'premium.video.active_limit'
   | 'premium.video.unlimited'
   | 'premium.feed.visibility_boost'
+  | 'premium.feed.featured_placement'
+  | 'premium.feed.verified_tick'
+  | 'premium.feed.profile_style'
   | 'premium.analytics.advanced'
+  | 'premium.analytics.export'
   | 'premium.posts.schedule'
   | 'premium.posts.pin'
   | 'premium.badge'
@@ -183,7 +187,11 @@ const PREMIUM_ENTITLEMENT_DEFAULTS: Record<PremiumEntitlementKey, PremiumEntitle
   'premium.video.active_limit': 60,
   'premium.video.unlimited': false,
   'premium.feed.visibility_boost': 0,
+  'premium.feed.featured_placement': false,
+  'premium.feed.verified_tick': false,
+  'premium.feed.profile_style': false,
   'premium.analytics.advanced': false,
+  'premium.analytics.export': false,
   'premium.posts.schedule': false,
   'premium.posts.pin': false,
   'premium.badge': false,
@@ -199,7 +207,11 @@ const PREMIUM_FEATURE_LABELS: Record<PremiumEntitlementKey, string> = {
   'premium.video.active_limit': 'Active video quota',
   'premium.video.unlimited': 'Unlimited videos',
   'premium.feed.visibility_boost': 'Feed visibility uplift',
+  'premium.feed.featured_placement': 'Featured placement',
+  'premium.feed.verified_tick': 'Verified tick',
+  'premium.feed.profile_style': 'Premium profile styling',
   'premium.analytics.advanced': 'Advanced analytics',
+  'premium.analytics.export': 'Analytics export',
   'premium.posts.schedule': 'Scheduling',
   'premium.posts.pin': 'Pinning',
   'premium.badge': 'Premium badge',
@@ -215,7 +227,11 @@ const FREE_BENEFIT_KEYS: PremiumEntitlementKey[] = [
   'premium.video.active_limit',
   'premium.video.unlimited',
   'premium.feed.visibility_boost',
+  'premium.feed.featured_placement',
+  'premium.feed.verified_tick',
+  'premium.feed.profile_style',
   'premium.analytics.advanced',
+  'premium.analytics.export',
   'premium.posts.schedule',
   'premium.posts.pin',
   'premium.badge',
@@ -229,7 +245,11 @@ const PREMIUM_BENEFIT_MAP: Record<string, PremiumEntitlementKey> = {
   tiktok_connection: 'premium.tiktok.connect',
   tiktok_selection_quota: 'premium.tiktok.video_limit',
   visibility_boost: 'premium.feed.visibility_boost',
+  featured_placement: 'premium.feed.featured_placement',
+  verified_tick: 'premium.feed.verified_tick',
+  profile_style: 'premium.feed.profile_style',
   analytics: 'premium.analytics.advanced',
+  analytics_export: 'premium.analytics.export',
   scheduling: 'premium.posts.schedule',
   badge: 'premium.badge',
   unlimited_videos: 'premium.video.unlimited',
@@ -455,6 +475,14 @@ export async function loadPremiumPlans() {
       const raw = versionEntitlements[entitlementKey] ?? includedBenefits[entitlementKey] ?? includedBenefits[key]
       resolvedBenefits[key] = entitlementValueTruthy(toJSONValue(raw))
     }
+    if (resolvedBenefits.visibility_boost) {
+      resolvedBenefits.featured_placement = true
+      resolvedBenefits.verified_tick = true
+      resolvedBenefits.profile_style = true
+    }
+    if (resolvedBenefits.analytics) {
+      resolvedBenefits.analytics_export = true
+    }
     return {
       id: planId,
       plan_key: String((plan as { plan_key?: string }).plan_key ?? ''),
@@ -636,13 +664,25 @@ function resolveCoreEntitlements(input: {
       applied.push(key)
     }
 
+    if (entitlementValueTruthy(entitlements['premium.feed.visibility_boost'])) {
+      entitlements['premium.feed.featured_placement'] = true
+      entitlements['premium.feed.verified_tick'] = true
+      entitlements['premium.feed.profile_style'] = true
+    }
+    if (entitlementValueTruthy(entitlements['premium.analytics.advanced'])) {
+      entitlements['premium.analytics.export'] = true
+    }
     if (input.subscriptionState === 'manually_granted') {
       entitlements['premium.video.active_limit'] = entitlements['premium.video.active_limit'] ?? 240
       entitlements['premium.tiktok.connect'] = true
       entitlements['premium.analytics.advanced'] = true
+      entitlements['premium.analytics.export'] = true
       entitlements['premium.posts.schedule'] = true
       entitlements['premium.posts.pin'] = true
       entitlements['premium.badge'] = true
+      entitlements['premium.feed.verified_tick'] = true
+      entitlements['premium.feed.featured_placement'] = true
+      entitlements['premium.feed.profile_style'] = true
       entitlements['premium.menu.multiple_tags'] = true
       entitlements['premium.templates'] = true
       entitlements['premium.support.priority'] = true

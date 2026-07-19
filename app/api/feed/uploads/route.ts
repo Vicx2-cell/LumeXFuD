@@ -99,8 +99,17 @@ export async function POST(req: NextRequest) {
   }
 
   const db = createSupabaseAdmin()
-  const { error: uploadErr } = await db.storage.from(BUCKET).upload(storagePath, out, { contentType, upsert: false })
+  let { error: uploadErr } = await db.storage.from(BUCKET).upload(storagePath, out, { contentType, upsert: false })
+  if (uploadErr && /bucket.*not found|not found.*bucket/i.test(uploadErr.message)) {
+    await db.storage.createBucket(BUCKET, {
+      public: true,
+      fileSizeLimit: DEFAULT_VIDEO_QUOTA.maxVideoSizeBytes,
+      allowedMimeTypes: [...allowedImage, ...allowedVideo],
+    })
+    uploadErr = (await db.storage.from(BUCKET).upload(storagePath, out, { contentType, upsert: false })).error
+  }
   if (uploadErr) {
+    console.error('[feed/uploads] storage error:', uploadErr.message)
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
   }
 

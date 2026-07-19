@@ -6,11 +6,13 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizePhone, safeNormalizePhone } from '@/lib/phone'
 import { registerInput } from '@/lib/validators'
 import { rateLimitGeneric } from '@/lib/rate-limit'
-import { compareSecret, findAuthUserByPhone, generateRecoveryCode, hashSecret, normalizeSecurityAnswer, validatePin } from '@/lib/pin-auth'
+import { findAuthUserByPhone, generateRecoveryCode, hashSecret, normalizeSecurityAnswer, validatePin } from '@/lib/pin-auth'
 import { getFeature } from '@/lib/features'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { isPhoneBlocked } from '@/lib/blocklist'
 import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
+import { buildPublicDisplayName, buildPublicHandleCandidates, chooseAvailablePublicHandle } from '@/lib/social-profile'
+import { autoFollowOfficialAccount } from '@/lib/feed/official-follow'
 
 export async function POST(req: NextRequest) {
   try {
@@ -84,6 +86,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Phone is already registered' }, { status: 409 })
     }
 
+    const db = createSupabaseAdmin()
+    const email = data.email.trim().toLowerCase()
+    const { data: existingEmail } = await db
+      .from('customers')
+      .select('id')
+      .ilike('email', email)
+      .is('deleted_at', null)
+      .maybeSingle()
+    if (existingEmail) {
+      return NextResponse.json({ error: 'Email is already registered' }, { status: 409 })
+    }
+
+    const chosenHandle = data.username
+      ? buildPublicHandleCandidates({
+          username: data.username ?? null,
+          displayName: data.name,
+          phone: normalizedPhone,
+        })[0] ?? ''
+      : await chooseAvailablePublicHandle(db, {
+          displayName: data.name,
+          phone: normalizedPhone,
+        })
+    if (data.username) {
+      const { data: takenHandle } = await db
+        .from('social_profiles')
+        .select('id')
+        .eq('handle', chosenHandle)
+        .maybeSingle()
+      if (takenHandle) {
+        return NextResponse.json({ error: 'That username is already taken. Please choose another one.' }, { status: 409 })
+      }
+    }
+
     const [pinHash, answer1Hash, answer2Hash] = await Promise.all([
       hashSecret(data.pin),
       hashSecret(normalizeSecurityAnswer(data.answer_1)),
@@ -92,10 +127,11 @@ export async function POST(req: NextRequest) {
     const recoveryCode = generateRecoveryCode()
     const recoveryCodeHash = await hashSecret(recoveryCode)
 
-    const db = createSupabaseAdmin()
     const insertData = {
       phone: normalizedPhone,
       name: data.name,
+      email,
+      email_verified: false,
       default_delivery_address: data.default_delivery_address,
       // Stamp whether the phone was actually proven. FALSE means the account was
       // created while phone_verification was off (OTP down) — flag it for
@@ -117,6 +153,24 @@ export async function POST(req: NextRequest) {
     if (error || !user) {
       return NextResponse.json({ error: 'Unable to create account' }, { status: 500 })
     }
+
+    const displayName = buildPublicDisplayName(data.name, data.name)
+    const handle = chosenHandle
+    const { data: createdProfile, error: profileError } = await db.from('social_profiles').insert({
+      customer_id: user.id,
+      profile_kind: 'customer',
+      handle,
+      display_name: displayName,
+      is_verified: false,
+    }).select('id').single()
+    if (profileError) {
+      await db.from('customers').delete().eq('id', user.id)
+      if (profileError.code === '23505') {
+        return NextResponse.json({ error: 'That username is already taken. Please choose another one.' }, { status: 409 })
+      }
+      return NextResponse.json({ error: 'Unable to create public profile' }, { status: 500 })
+    }
+    await autoFollowOfficialAccount(String(createdProfile.id), db)
 
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
     const userAgent = req.headers.get('user-agent') ?? undefined

@@ -12,6 +12,8 @@ export async function GET() {
   }
 
   const db = createSupabaseAdmin()
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
 
   // Self-heal pickup no-shows for THIS vendor on every poll (the per-minute cron
   // has been unreliable). Scoped + cheap; idempotent claim makes it safe.
@@ -43,18 +45,52 @@ export async function GET() {
 
   const { data: recent } = await db
     .from('orders')
-    .select('id, order_number, status, total_amount, created_at')
+    .select('id, order_number, status, total_amount, created_at, order_items ( name, quantity )')
     .eq('vendor_id', vendor.id)
     .in('status', ['COMPLETED', 'CANCELLED', 'NO_SHOW'])
     .order('created_at', { ascending: false })
     .limit(10)
 
+  const { data: todayOrders } = await db
+    .from('orders')
+    .select('id, status, total_amount, preparing_at, ready_at')
+    .eq('vendor_id', vendor.id)
+    .gte('created_at', todayStart)
+    .order('created_at', { ascending: false })
+
   // Customer call numbers (migration 074) — resolved non-fatally so the dashboard
   // never breaks pre-074. tel: uses the call number; wa.me uses the WhatsApp number.
-  type VOrder = { customer_id?: string | null; customers?: { phone: string; call_phone?: string | null } | null }
+  type VOrder = { customer_id?: string | null; status?: string; total_amount?: number | null; customers?: { phone: string; call_phone?: string | null } | null }
   const list = (orders ?? []) as unknown as VOrder[]
   const cMap = await callPhoneMap('customers', list.map((o) => o.customer_id), db)
   for (const o of list) if (o.customers && o.customer_id) o.customers.call_phone = cMap.get(o.customer_id) ?? null
 
-  return NextResponse.json({ vendor, orders: list, recent: recent ?? [] })
+  const todays = todayOrders ?? []
+  const completedToday = todays.filter((order) => order.status === 'COMPLETED')
+  const prepSamples = completedToday
+    .map((order) => {
+      if (!order.preparing_at || !order.ready_at) return null
+      const start = new Date(order.preparing_at).getTime()
+      const end = new Date(order.ready_at).getTime()
+      if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null
+      return (end - start) / 60000
+    })
+    .filter((value): value is number => value !== null)
+  const avgPrepMinutes = prepSamples.length > 0
+    ? Math.round((prepSamples.reduce((sum, value) => sum + value, 0) / prepSamples.length) * 10) / 10
+    : null
+
+  const summary = {
+    orders_today: todays.length,
+    revenue_today_kobo: todays
+      .filter((order) => order.status === 'COMPLETED')
+      .reduce((sum, order) => sum + (order.total_amount ?? 0), 0),
+    pending_orders: list.filter((order) => order.status === 'PENDING').length,
+    active_orders: list.length,
+    completed_today: completedToday.length,
+    avg_prep_minutes: avgPrepMinutes,
+    store_status: vendor.status,
+  }
+
+  return NextResponse.json({ vendor, orders: list, recent: recent ?? [], summary })
 }

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
 import { GlassSheen, PremiumImage } from '@/components/fx'
 import { EmptyState } from '@/components/ui/empty-state'
+import { LogoutButton } from '@/components/logout-button'
 
 const CATEGORIES = ['RICE', 'PROTEIN', 'DRINKS', 'SNACKS', 'OTHER'] as const
 type Category = (typeof CATEGORIES)[number]
@@ -64,7 +65,11 @@ export default function VendorMenuPage() {
     setLoading(false)
   }, [router])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    queueMicrotask(() => {
+      void load()
+    })
+  }, [load])
 
   function openAdd() {
     setEditingId(null)
@@ -200,6 +205,7 @@ export default function VendorMenuPage() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
           <h1 className="font-semibold flex-1 truncate">My Menu</h1>
+          <LogoutButton className="h-11 px-4" />
           <button onClick={openAdd} className="lx-btn-amber lx-tap text-xs px-4 min-h-[44px] shrink-0">+ Add food</button>
         </div>
       </div>

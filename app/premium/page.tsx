@@ -1,6 +1,8 @@
+import { redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/ui/page-header'
 import { loadPremiumPlans, loadPremiumStatus } from '@/lib/premium'
+import { getCurrentUser } from '@/lib/session'
 import { PremiumPurchaseActions } from '@/components/premium/purchase-actions'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +21,11 @@ const BENEFIT_LABELS: Record<string, string> = {
   tiktok_connection: 'TikTok connection',
   tiktok_selection_quota: 'TikTok selection quota',
   visibility_boost: 'Feed visibility uplift',
+  featured_placement: 'Featured placement',
+  verified_tick: 'Verified tick',
+  profile_style: 'Premium profile styling',
   analytics: 'Advanced analytics',
+  analytics_export: 'Analytics export',
   scheduling: 'Scheduling',
   badge: 'Premium badge',
   unlimited_videos: 'Unlimited videos',
@@ -36,6 +42,9 @@ function benefitState(enabled: boolean) {
 }
 
 export default async function PremiumPage() {
+  const session = await getCurrentUser().catch(() => null)
+  if (session?.role === 'vendor') redirect('/vendor-dashboard')
+
   const [plans, status] = await Promise.all([loadPremiumPlans().catch(() => []), loadPremiumStatus().catch(() => null)])
   const plan = status?.effectivePlan ?? plans.find((item) => item.plan_key === status?.activePlanKey) ?? null
   const stateLabel = status?.subscriptionState ?? 'none'
@@ -45,7 +54,7 @@ export default async function PremiumPage() {
       <div className="mx-auto max-w-5xl space-y-5">
         <PageHeader
           title="Premium"
-          subtitle="Centralized Premium entitlements, versioned plans, and server-side access rules."
+          subtitle="Centralized Premium entitlements, versioned plans, server-side access rules, and the vendor-facing value stack."
           badge="Subscriptions"
           back={false}
         />
@@ -65,7 +74,7 @@ export default async function PremiumPage() {
               </p>
             </div>
             <div className="flex flex-col gap-2">
-              <p className="text-xs text-white/40">Checkout is live when Premium is enabled and subscriptions are open.</p>
+              <p className="text-xs text-white/40">Checkout is live only when Premium, new subscriptions, and checkout are explicitly enabled.</p>
               {plan && (
                 <PremiumPurchaseActions
                   planKey={plan.plan_key}

@@ -58,12 +58,14 @@ export function resolveFeedPublisherKind(
 
 export function canPublishFeedPost(profile: FeedPermissionProfile | null | undefined, vendor: FeedPermissionVendor | null | undefined) {
   const kind = resolveFeedPublisherKind(profile, vendor)
-  return kind === 'official' || kind === 'verified_vendor' || kind === 'ambassador'
+  // Every signed-in social profile may publish ordinary feed posts. Commerce
+  // attachments remain vendor-only in posts.ts, while unapproved vendors are
+  // still prevented from presenting themselves as verified businesses.
+  return Boolean(profile && (kind !== 'blocked' || profile.profile_kind === 'vendor' || profile.profile_kind === 'rider' || profile.profile_kind === 'admin'))
 }
 
-export function canCreateStory(profile: FeedPermissionProfile | null | undefined, vendor: FeedPermissionVendor | null | undefined) {
-  const kind = resolveFeedPublisherKind(profile, vendor)
-  return kind !== 'blocked'
+export function canCreateStory(profile: FeedPermissionProfile | null | undefined, _vendor: FeedPermissionVendor | null | undefined) {
+  return Boolean(profile)
 }
 
 export function storyStatusForPublisher(profile: FeedPermissionProfile | null | undefined, vendor: FeedPermissionVendor | null | undefined) {

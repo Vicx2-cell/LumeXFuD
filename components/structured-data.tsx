@@ -12,7 +12,6 @@
 import { getControls } from '@/lib/controls'
 
 const SITE_URL = 'https://lumexfud.com.ng'
-
 function buildStructuredData(opens: string, closes: string) {
   return {
   '@context': 'https://schema.org',

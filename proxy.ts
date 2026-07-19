@@ -62,6 +62,8 @@ function buildCsp(_nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     // OSM tiles are loaded as <img> by Leaflet (the campus lodge map).
     "img-src 'self' data: blob: https://*.supabase.co https://*.tile.openstreetmap.org",
+    // Story/feed videos use blob: while previewing and Supabase after upload.
+    "media-src 'self' blob: https://*.supabase.co",
     // wss://*.supabase.co is REQUIRED for Supabase Realtime (live vendor status
     // on /home, leaderboard). Without it the socket is CSP-blocked and retries in
     // a loop, which can destabilise iOS Safari ("page couldn't load").

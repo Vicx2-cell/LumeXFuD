@@ -45,12 +45,12 @@ describe('super-admin payments route', () => {
 
   it('requires super admin access', async () => {
     state.session = { role: 'vendor', phone: '+2348000000000', userId: 'vendor-1' }
-    const res = await GET(new NextRequest('http://localhost') as never)
+    const res = (await GET(new NextRequest('http://localhost') as never))!
     expect(res.status).toBe(403)
   })
 
   it('returns recent billing diagnostics and payment events', async () => {
-    const res = await GET(new NextRequest('http://localhost?domain=all&limit=5') as never)
+    const res = (await GET(new NextRequest('http://localhost?domain=all&limit=5') as never))!
     const json = await res.json()
 
     expect(res.status).toBe(200)

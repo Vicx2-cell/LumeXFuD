@@ -22,8 +22,14 @@ vi.mock('@/lib/rate-limit', () => ({
   rateLimitGeneric: vi.fn(async () => ({ success: true })),
 }))
 
+const featureFlags = {
+  premium_enabled: true,
+  premium_new_subscriptions_enabled: true,
+  premium_checkout_enabled: true,
+}
+
 vi.mock('@/lib/features', () => ({
-  getFeature: vi.fn(async () => true),
+  getFeature: vi.fn(async (key: string) => featureFlags[key as keyof typeof featureFlags] ?? true),
 }))
 
 vi.mock('@/lib/paystack/billing', () => ({
@@ -77,5 +83,15 @@ describe('premium subscribe route', () => {
       planKey: 'vendor-premium',
       billingCycle: 'yearly',
     }))
+  })
+
+  it('blocks checkout behind the feature flag', async () => {
+    featureFlags.premium_checkout_enabled = false
+    const res = await POST(new Request('http://localhost', {
+      method: 'POST',
+      body: JSON.stringify({ plan_key: 'vendor-premium', billing_cycle: 'monthly' }),
+      headers: { 'content-type': 'application/json' },
+    }) as never)
+    expect(res.status).toBe(503)
   })
 })

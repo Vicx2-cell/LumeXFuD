@@ -48,6 +48,17 @@ const overrideInput = z.object({
   reason: z.string().trim().max(500).optional(),
 })
 
+const vendorControlInput = z.object({
+  profile_id: z.string().trim().min(1).max(120),
+  action: z.enum(['vendor_enable', 'vendor_disable', 'vendor_comp', 'vendor_revoke']),
+  reason: z.string().trim().max(500).optional(),
+  premium_featured_until: z.string().datetime({ offset: true }).nullable().optional(),
+  premium_label: z.string().trim().max(120).nullable().optional(),
+  premium_style: z.record(z.string(), z.unknown()).default({}),
+  plan_key: z.string().trim().max(120).nullable().optional(),
+  idempotency_key: z.string().trim().max(200).optional(),
+})
+
 async function requireSuperAdmin() {
   const session = await getCurrentUser()
   if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
@@ -140,6 +151,65 @@ export async function PATCH(req: NextRequest) {
       old_value: (current.data as Record<string, unknown>) ?? undefined,
       new_value: payload,
       ip_address: req.headers.get('x-forwarded-for') ?? undefined,
+    })
+    return NextResponse.json({ ok: true })
+  }
+
+  if (rawAction === 'vendor_enable' || rawAction === 'vendor_disable' || rawAction === 'vendor_comp' || rawAction === 'vendor_revoke') {
+    const parsed = vendorControlInput.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid vendor premium payload' }, { status: 400 })
+
+    const current = await db.from('social_profiles').select('id, premium_verified, premium_featured_until, premium_label, premium_style, premium_enabled_at, premium_comped_at, premium_revoked_at').eq('id', parsed.data.profile_id).maybeSingle()
+    if (!current.data) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+
+    const now = new Date().toISOString()
+    const normalizedAction = parsed.data.action.replace('vendor_', '')
+    const style = parsed.data.premium_style && Object.keys(parsed.data.premium_style).length > 0
+      ? parsed.data.premium_style
+      : (normalizedAction === 'disable' ? {} : { accent: '#F5A623', badge: 'verified' })
+    const nextState: Record<string, unknown> = {
+      premium_verified: normalizedAction === 'disable' || normalizedAction === 'revoke' ? false : true,
+      premium_featured_until: parsed.data.premium_featured_until ?? (normalizedAction === 'comp' ? new Date(Date.now() + 30 * 86_400_000).toISOString() : (current.data as { premium_featured_until?: string | null }).premium_featured_until ?? null),
+      premium_label: parsed.data.premium_label ?? (normalizedAction === 'comp' ? 'Comped Premium' : 'LumeX Premium'),
+      premium_style: style,
+      premium_enabled_at: normalizedAction === 'enable' ? now : (current.data as { premium_enabled_at?: string | null }).premium_enabled_at ?? null,
+      premium_comped_at: normalizedAction === 'comp' ? now : (current.data as { premium_comped_at?: string | null }).premium_comped_at ?? null,
+      premium_revoked_at: normalizedAction === 'revoke' ? now : (current.data as { premium_revoked_at?: string | null }).premium_revoked_at ?? null,
+      updated_at: now,
+    }
+
+    const { error } = await db.from('social_profiles').update(nextState).eq('id', parsed.data.profile_id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    const controlPayload = {
+      profile_id: parsed.data.profile_id,
+      action: parsed.data.action,
+      previous_state: current.data,
+      next_state: nextState,
+      reason: parsed.data.reason ?? null,
+      actor: auth.session.phone,
+      idempotency_key: parsed.data.idempotency_key ?? `premium-control:${parsed.data.profile_id}:${parsed.data.action}:${JSON.stringify({
+        featured_until: nextState.premium_featured_until ?? null,
+        label: nextState.premium_label ?? null,
+        plan_key: parsed.data.plan_key ?? null,
+        style: nextState.premium_style ?? {},
+      })}`,
+      metadata: { plan_key: parsed.data.plan_key ?? null },
+    }
+    const { error: controlError } = await db.from('premium_vendor_controls').insert(controlPayload)
+    if (controlError && !/duplicate key/i.test(controlError.message)) return NextResponse.json({ error: controlError.message }, { status: 400 })
+
+    await writePremiumAudit(db, {
+      actor: auth.session.phone,
+      actor_role: auth.session.role,
+      action: parsed.data.action,
+      target_type: 'social_profiles',
+      target_id: parsed.data.profile_id,
+      old_value: current.data ?? undefined,
+      new_value: nextState,
+      reason: parsed.data.reason ?? null,
+      version: 1,
+      metadata: { plan_key: parsed.data.plan_key ?? null },
     })
     return NextResponse.json({ ok: true })
   }
