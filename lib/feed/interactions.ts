@@ -3,10 +3,9 @@ import { ensureSocialProfileForSession } from './service'
 import { loadRecipientsFromProfileIds, notifyFeedRecipients } from './notifications'
 import {
   canPublishFeedPost,
+  isOfficialFeedProfile,
   loadFeedPermissionContext,
-  resolveFeedPublisherKind,
   type FeedPermissionProfile,
-  type FeedPermissionVendor,
 } from './permissions'
 
 export type FeedToggleState = {
@@ -118,16 +117,8 @@ export async function toggleFollow(followedProfileId: string, enabled: boolean) 
   if (!target) throw new Error('Profile not found')
   const targetProfile = target as FeedPermissionProfile & { deleted_at?: string | null }
   if (targetProfile.deleted_at) throw new Error('Profile not found')
-  const { data: targetVendor } = targetProfile.vendor_id
-    ? await db
-        .from('vendors')
-        .select('id, approval_state, is_active, is_verified, business_verified, id_verified')
-        .eq('id', targetProfile.vendor_id)
-        .maybeSingle()
-    : { data: null }
-  const targetKind = resolveFeedPublisherKind(targetProfile, (targetVendor ?? null) as FeedPermissionVendor | null)
-  if (!['official', 'verified_vendor', 'ambassador'].includes(targetKind)) {
-    throw new Error('You can only follow vendors, ambassadors, and official accounts')
+  if (isOfficialFeedProfile(targetProfile) && !enabled) {
+    return { followedProfileId, followed: true, followCount: await countRows(db, 'follows', 'followed_profile_id', followedProfileId) }
   }
   const [outgoingBlock, incomingBlock] = await Promise.all([
     db.from('blocks').select('id').eq('blocker_profile_id', profile.id).eq('blocked_profile_id', followedProfileId).maybeSingle(),
@@ -137,15 +128,10 @@ export async function toggleFollow(followedProfileId: string, enabled: boolean) 
   const followed = await upsertToggle(db, 'follows', 'follower_profile_id', 'followed_profile_id', profile.id, followedProfileId, enabled)
   const followCount = await countRows(db, 'follows', 'followed_profile_id', followedProfileId)
   if (enabled) {
-    const recipients = await loadRecipientsFromProfileIds([followedProfileId])
-    await notifyFeedRecipients({
-      recipients,
-      title: 'New follower',
-      body: 'Someone started following your profile.',
-      link: '/feed',
-      template: 'FEED_NEW_FOLLOWER',
-      tag: `feed-follow-${profile.id}-${followedProfileId}`,
-    })
+    void (async () => {
+      const recipients = await loadRecipientsFromProfileIds([followedProfileId])
+      await notifyFeedRecipients({ recipients, title: 'New follower', body: 'Someone started following your profile.', link: '/feed-v2', template: 'FEED_NEW_FOLLOWER', tag: `feed-follow-${profile.id}-${followedProfileId}` })
+    })().catch(() => {})
   }
   return { followedProfileId, followed, followCount }
 }
@@ -154,8 +140,9 @@ export async function toggleMute(mutedProfileId: string, enabled: boolean) {
   const db = createSupabaseAdmin()
   const profile = await requireProfile()
   if (profile.id === mutedProfileId) throw new Error('You cannot mute yourself')
-  const { data: target } = await db.from('social_profiles').select('id, deleted_at').eq('id', mutedProfileId).maybeSingle()
+  const { data: target } = await db.from('social_profiles').select('id, deleted_at, is_system_account, official_badge_kind').eq('id', mutedProfileId).maybeSingle()
   if (!target) throw new Error('Profile not found')
+  if ((target as { is_system_account?: boolean; official_badge_kind?: string }).is_system_account || (target as { official_badge_kind?: string }).official_badge_kind === 'official') throw new Error('The LumeX Fud account cannot be muted')
   const muted = await upsertToggle(db, 'mutes', 'muter_profile_id', 'muted_profile_id', profile.id, mutedProfileId, enabled)
   return { mutedProfileId, muted }
 }
@@ -164,8 +151,9 @@ export async function toggleBlock(blockedProfileId: string, enabled: boolean, re
   const db = createSupabaseAdmin()
   const profile = await requireProfile()
   if (profile.id === blockedProfileId) throw new Error('You cannot block yourself')
-  const { data: target } = await db.from('social_profiles').select('id, deleted_at').eq('id', blockedProfileId).maybeSingle()
+  const { data: target } = await db.from('social_profiles').select('id, deleted_at, is_system_account, official_badge_kind').eq('id', blockedProfileId).maybeSingle()
   if (!target) throw new Error('Profile not found')
+  if ((target as { is_system_account?: boolean; official_badge_kind?: string }).is_system_account || (target as { official_badge_kind?: string }).official_badge_kind === 'official') throw new Error('The LumeX Fud account cannot be blocked')
   if (enabled) {
     const { error } = await db.from('blocks').insert({ blocker_profile_id: profile.id, blocked_profile_id: blockedProfileId, reason: reason ?? null })
     if (error && !/duplicate key/i.test(error.message)) throw new Error(error.message)
@@ -248,6 +236,8 @@ export async function createReport(postId: string, reportType: string, reason: s
   const profile = await requireProfile()
   const post = await loadTargetPost(db, postId)
   if (post.deleted_at || post.is_archived || post.status === 'deleted') throw new Error('Post is not available')
+  const { data: postAuthor } = await db.from('social_profiles').select('is_system_account, official_badge_kind').eq('id', post.author_profile_id).maybeSingle()
+  if ((postAuthor as { is_system_account?: boolean } | null)?.is_system_account || (postAuthor as { official_badge_kind?: string } | null)?.official_badge_kind === 'official') throw new Error('Official LumeX Fud posts cannot be reported here')
   const now = new Date().toISOString()
   const existingKey = `${profile.id}:${postId}:${reportType}`
   const { data: existing } = await db

@@ -100,13 +100,22 @@ export async function ensureSocialProfileForSession() {
         .then(({ data }) => data ?? null)]
 
   const existing = lookup.find(Boolean)
-  if (existing) return existing as {
+  const ensureOfficialFollow = async (profileId: string) => {
+    const { data: official } = await db.from('social_profiles').select('id').eq('system_account_key', 'lumex_fud').maybeSingle()
+    if (official?.id && official.id !== profileId) {
+      await db.from('follows').upsert({ follower_profile_id: profileId, followed_profile_id: official.id }, { onConflict: 'follower_profile_id,followed_profile_id', ignoreDuplicates: true })
+    }
+  }
+  if (existing) {
+    await ensureOfficialFollow(String(existing.id))
+    return existing as {
     id: string
     profile_kind: string
     handle: string
     display_name: string
     campus_id: string | null
     zone_id: string | null
+    }
   }
 
   let displayName = session.name ?? session.phone
@@ -147,6 +156,8 @@ export async function ensureSocialProfileForSession() {
     })
     .select('id, profile_kind, handle, display_name, campus_id, zone_id')
     .single()
+
+  if (inserted?.id) await ensureOfficialFollow(String(inserted.id))
 
   return inserted as {
     id: string

@@ -51,6 +51,7 @@ export default function FeedV2CreatePage() {
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const videoInputRef = useRef<HTMLInputElement | null>(null)
   const storyOnly = viewerRole === 'customer' || viewerRole === null
+  const publishingBlocked = viewerRole === 'rider'
 
   useEffect(() => {
     return () => {
@@ -73,8 +74,8 @@ export default function FeedV2CreatePage() {
   }, [])
 
   const hasText = Boolean(body.trim())
-  const canSubmit = Boolean(hasText || media)
-  const composerModes: ComposerMode[] = storyOnly ? ['story'] : ['post', 'story']
+  const canSubmit = !publishingBlocked && Boolean(hasText || media)
+  const composerModes: ComposerMode[] = publishingBlocked ? [] : storyOnly ? ['story'] : ['post', 'story']
 
   async function pickMedia(event: ChangeEvent<HTMLInputElement>, kind: 'image' | 'video') {
     const file = event.target.files?.[0]
@@ -117,7 +118,7 @@ export default function FeedV2CreatePage() {
   }
 
   async function submit() {
-    if (!canSubmit || busy) return
+    if (!canSubmit || busy || publishingBlocked) return
     setBusy(true)
     setMessage('')
 
@@ -174,7 +175,7 @@ export default function FeedV2CreatePage() {
         <header className="flex items-center justify-between gap-4 border-b border-white/6 px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">Create</p>
-            <h1 className="mt-1 text-xl font-semibold">{mode === 'story' ? 'New story' : 'New post'}</h1>
+            <h1 className="mt-1 text-xl font-semibold">{publishingBlocked ? 'Create' : mode === 'story' ? 'New story' : 'New post'}</h1>
           </div>
           <Link href="/feed-v2" className="grid h-10 w-10 place-items-center rounded-full bg-white/6 text-white/75 transition hover:bg-white/10 hover:text-white" aria-label="Back to feed">
             <X size={18} aria-hidden="true" />
@@ -197,13 +198,13 @@ export default function FeedV2CreatePage() {
           ))}
         </div>
 
-        {storyOnly ? (
+        {publishingBlocked ? <p className="px-5 py-6 text-sm text-white/60">Rider accounts cannot publish feed posts or stories.</p> : storyOnly ? (
           <p className="px-5 pt-4 text-sm text-white/48">
             Customer accounts can only submit stories for review.
           </p>
         ) : null}
 
-        <div className="p-5">
+        {!publishingBlocked ? <div className="p-5">
           <textarea
             value={body}
             onChange={(event) => setBody(event.target.value)}
@@ -284,7 +285,7 @@ export default function FeedV2CreatePage() {
               Student stories go to review first. Verified vendors, ambassadors, and LumeX official stories publish immediately.
             </p>
           ) : null}
-        </div>
+        </div> : null}
       </section>
     </main>
   )
