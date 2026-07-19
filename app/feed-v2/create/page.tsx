@@ -51,6 +51,7 @@ export default function FeedV2CreatePage() {
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const videoInputRef = useRef<HTMLInputElement | null>(null)
   const roleLoading = viewerRole === null
+  const storyOnly = roleLoading || viewerRole === 'customer'
 
   useEffect(() => {
     return () => {
@@ -67,13 +68,14 @@ export default function FeedV2CreatePage() {
       .then((json) => {
         const role = json && typeof json === 'object' ? (json as { role?: string }).role ?? null : null
         setViewerRole(role)
+        if (role === 'customer') setMode('story')
       })
       .catch(() => {})
   }, [])
 
   const hasText = Boolean(body.trim())
-  const canSubmit = Boolean(hasText || media)
-  const composerModes: ComposerMode[] = ['post', 'story']
+  const canSubmit = !roleLoading && Boolean(hasText || media)
+  const composerModes: ComposerMode[] = storyOnly ? ['story'] : ['post', 'story']
 
   async function pickMedia(event: ChangeEvent<HTMLInputElement>, kind: 'image' | 'video') {
     const file = event.target.files?.[0]
@@ -180,7 +182,7 @@ export default function FeedV2CreatePage() {
           </Link>
         </header>
 
-        <div className="grid grid-cols-2 bg-black/20 p-1">
+        <div className={`grid bg-black/20 p-1 ${storyOnly ? 'grid-cols-1' : 'grid-cols-2'}`}>
           {composerModes.map((item) => (
             <button
               key={item}
@@ -197,6 +199,7 @@ export default function FeedV2CreatePage() {
         </div>
 
         {roleLoading ? <p className="px-5 pt-4 text-sm text-white/48">Loading your publishing options…</p> : null}
+        {viewerRole === 'customer' ? <p className="px-5 pt-4 text-sm text-white/48">Customer stories are reviewed by an admin before they appear.</p> : null}
 
         <div className="p-5">
           <textarea
@@ -276,7 +279,7 @@ export default function FeedV2CreatePage() {
           {message ? <p className="mt-4 text-sm text-white/60">{message}</p> : null}
           {mode === 'story' ? (
             <p className="mt-4 text-xs leading-relaxed text-white/35">
-              Student stories go to review first. Verified vendors, ambassadors, and LumeX official stories publish immediately.
+              Customer stories go to review first. Vendor, ambassador, and LumeX official stories publish immediately.
             </p>
           ) : null}
         </div>
