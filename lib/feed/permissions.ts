@@ -56,14 +56,12 @@ export function resolveFeedPublisherKind(
   return 'blocked'
 }
 
-export function canPublishFeedPost(profile: FeedPermissionProfile | null | undefined, _vendor: FeedPermissionVendor | null | undefined) {
-  // Customers participate through moderated stories, not permanent feed posts.
-  // Keep this server-side so the restriction cannot be bypassed via the API.
-  return Boolean(profile && profile.profile_kind !== 'customer')
+export function canPublishFeedPost(profile: FeedPermissionProfile | null | undefined, vendor: FeedPermissionVendor | null | undefined) {
+  return ['official', 'verified_vendor', 'ambassador'].includes(resolveFeedPublisherKind(profile, vendor))
 }
 
-export function canCreateStory(profile: FeedPermissionProfile | null | undefined, _vendor: FeedPermissionVendor | null | undefined) {
-  return Boolean(profile)
+export function canCreateStory(profile: FeedPermissionProfile | null | undefined, vendor: FeedPermissionVendor | null | undefined) {
+  return resolveFeedPublisherKind(profile, vendor) !== 'blocked'
 }
 
 export function storyStatusForPublisher(profile: FeedPermissionProfile | null | undefined, vendor: FeedPermissionVendor | null | undefined) {

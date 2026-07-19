@@ -13,6 +13,7 @@ import {
   Menu,
   MessageCircle,
   MoreHorizontal,
+  Pause,
   Play,
   Repeat2,
   Search,
@@ -23,6 +24,8 @@ import {
   Flame,
   User,
   Wallet,
+  Volume2,
+  VolumeX,
 } from 'lucide-react'
 import styles from '@/app/feed-v2/feed-v2.module.css'
 import { BrandLogo } from '@/components/brand-logo'
@@ -1048,9 +1051,16 @@ function StoryViewer({
   onChangeIndex: (index: number) => void
 }) {
   const gestureStartY = useRef<number | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const wheelLocked = useRef(false)
+  const [muted, setMuted] = useState(true)
+  const [paused, setPaused] = useState(false)
 
   useEffect(() => {
     if (activeIndex === null) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -1067,14 +1077,32 @@ function StoryViewer({
     }
 
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = previousOverflow
+    }
   }, [activeIndex, onChangeIndex, onClose, stories.length])
+
+  useEffect(() => {
+    setPaused(false)
+  }, [activeIndex])
 
   if (activeIndex === null || stories.length === 0 || activeIndex >= stories.length) return null
 
   const story = stories[activeIndex]
   const goNext = () => onChangeIndex((activeIndex + 1) % stories.length)
   const goPrev = () => onChangeIndex((activeIndex - 1 + stories.length) % stories.length)
+  const togglePlayback = () => {
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) {
+      void video.play()
+      setPaused(false)
+    } else {
+      video.pause()
+      setPaused(true)
+    }
+  }
 
   return (
     <div
@@ -1102,12 +1130,31 @@ function StoryViewer({
         onPointerCancel={() => {
           gestureStartY.current = null
         }}
+        onWheel={(event) => {
+          if (wheelLocked.current || Math.abs(event.deltaY) < 36) return
+          wheelLocked.current = true
+          if (event.deltaY > 0) goNext()
+          else goPrev()
+          window.setTimeout(() => { wheelLocked.current = false }, 420)
+        }}
       >
         <div key={`${story.label}-${activeIndex}`} className={styles.storyViewerInner}>
           <div className={styles.storyViewerMedia}>
             {story.image ? (
               story.mediaKind === 'video' ? (
-                <video src={story.image} className={styles.storyViewerVideo} autoPlay muted loop playsInline controls />
+                <video
+                  ref={videoRef}
+                  src={story.image}
+                  className={styles.storyViewerVideo}
+                  autoPlay
+                  muted={muted}
+                  playsInline
+                  preload="metadata"
+                  onEnded={goNext}
+                  onPlay={() => setPaused(false)}
+                  onPause={() => setPaused(true)}
+                  onClick={togglePlayback}
+                />
               ) : (
                 <Image src={story.image} alt={story.label} fill sizes="100vw" className="object-cover" priority />
               )
@@ -1118,29 +1165,30 @@ function StoryViewer({
             )}
             <div className={styles.storyViewerOverlay} />
           </div>
+          <div className={styles.storyViewerProgress} aria-hidden="true">
+            {stories.map((_, index) => <span key={index} className={index <= activeIndex ? styles.storyViewerProgressActive : ''} />)}
+          </div>
           <div className={styles.storyViewerTopBar}>
-            <div className={styles.storyViewerIdentity}>
-              <span className={styles.storyViewerDot} />
-              <div>
-                <h3 className={styles.storyViewerTitle}>{story.label}</h3>
-                <p className={styles.storyViewerMeta}>{story.meta}</p>
-              </div>
-            </div>
-            <div className={styles.storyViewerActions}>
-              <button type="button" className={styles.storyViewerNav} onClick={goPrev} aria-label="Previous story">
-                <ArrowRight size={14} aria-hidden="true" style={{ transform: 'rotate(-90deg)' }} />
-              </button>
-              <button type="button" className={styles.storyViewerNav} onClick={goNext} aria-label="Next story">
-                <ArrowRight size={14} aria-hidden="true" style={{ transform: 'rotate(90deg)' }} />
-              </button>
-              <button type="button" className={styles.storyViewerClose} onClick={onClose} aria-label="Close stories">
-                <X size={16} aria-hidden="true" />
-              </button>
-            </div>
+            <span className={styles.storyViewerCount}>{activeIndex + 1} / {stories.length}</span>
+            <button type="button" className={styles.storyViewerClose} onClick={onClose} aria-label="Close stories"><X size={20} aria-hidden="true" /></button>
+          </div>
+          {story.mediaKind === 'video' ? <button type="button" className={styles.storyViewerPlayState} onClick={togglePlayback} aria-label={paused ? 'Play story' : 'Pause story'}>{paused ? <Play size={24} fill="currentColor" /> : null}</button> : null}
+          <div className={styles.storyViewerSideActions}>
+            {story.mediaKind === 'video' ? <button type="button" onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Unmute story' : 'Mute story'}>{muted ? <VolumeX size={21} /> : <Volume2 size={21} />}<span>{muted ? 'Sound' : 'Mute'}</span></button> : null}
+            {story.mediaKind === 'video' ? <button type="button" onClick={togglePlayback} aria-label={paused ? 'Play story' : 'Pause story'}>{paused ? <Play size={21} /> : <Pause size={21} />}<span>{paused ? 'Play' : 'Pause'}</span></button> : null}
+            <button type="button" onClick={goPrev} aria-label="Previous story"><ArrowRight size={20} style={{ transform: 'rotate(-90deg)' }} /><span>Previous</span></button>
+            <button type="button" onClick={goNext} aria-label="Next story"><ArrowRight size={20} style={{ transform: 'rotate(90deg)' }} /><span>Next</span></button>
           </div>
           <div className={styles.storyViewerFooter}>
-            <span className={styles.storyViewerRole}>{storyRoleLabel(story)}</span>
-            {story.approvalState === 'pending' ? <span className={styles.storyViewerPending}>Pending review</span> : null}
+            <div className={styles.storyViewerIdentity}>
+              <span className={styles.storyViewerAvatar}>
+                {story.publisherType === 'lumex' ? <BrandLogo size={42} rounded={9999} /> : story.avatarUrl ? <Image src={story.avatarUrl} alt="" fill sizes="42px" className="object-cover" /> : <DefaultAvatar size={16} />}
+              </span>
+              <div><h3 className={styles.storyViewerTitle}>{story.label}</h3><p className={styles.storyViewerMeta}>{story.meta}</p></div>
+            </div>
+            {story.text ? <p className={styles.storyViewerCaption}>{story.text}</p> : null}
+            <div className={styles.storyViewerStatus}><span className={styles.storyViewerRole}>{storyRoleLabel(story)}</span>{story.approvalState === 'pending' ? <span className={styles.storyViewerPending}>Pending review</span> : null}</div>
+            <p className={styles.storyViewerHint}>Swipe up for next story</p>
           </div>
         </div>
       </div>

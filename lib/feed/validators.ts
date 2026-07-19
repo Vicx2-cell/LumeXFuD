@@ -71,6 +71,16 @@ export const feedUploadInput = z.object({
   media_kind: z.enum(['image', 'video']),
   duration_seconds: z.number().int().min(0).max(24 * 60 * 60).optional(),
   alt_text: z.string().max(280).optional(),
+  purpose: z.enum(['post', 'story']).optional(),
+}).strict()
+
+export const feedVideoUploadPrepareInput = z.object({
+  action: z.literal('prepare_video'),
+  file_name: z.string().trim().min(1).max(240),
+  mime_type: z.enum(['video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v']),
+  size_bytes: z.number().int().positive(),
+  duration_seconds: z.number().int().min(1).max(24 * 60 * 60),
+  purpose: z.enum(['post', 'story']),
 }).strict()
 
 export const feedEventInput = z.object({

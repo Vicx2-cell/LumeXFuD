@@ -9,12 +9,48 @@ import { detectImageMime } from '@/lib/security'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { DEFAULT_VIDEO_QUOTA } from '@/lib/feed/quota'
 import { ensureSocialProfileForSession } from '@/lib/feed/service'
-import { feedUploadInput } from '@/lib/feed/validators'
+import { canCreateStory, canPublishFeedPost, loadFeedPermissionContext } from '@/lib/feed/permissions'
+import { feedUploadInput, feedVideoUploadPrepareInput } from '@/lib/feed/validators'
 import { ZodError } from 'zod'
 
 export const runtime = 'nodejs'
 
 const BUCKET = 'feed-media'
+const ALLOWED_IMAGES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const ALLOWED_VIDEOS = new Set(['video/mp4', 'video/webm', 'video/quicktime'])
+
+function normalizeVideoMime(mime: string) {
+  return mime === 'video/x-m4v' ? 'video/mp4' : mime
+}
+
+function videoExtension(mime: string, fileName = '') {
+  if (mime === 'video/webm') return 'webm'
+  if (mime === 'video/quicktime' || /\.mov$/i.test(fileName)) return 'mov'
+  return 'mp4'
+}
+
+async function ensureFeedBucket(db: ReturnType<typeof createSupabaseAdmin>) {
+  const { data } = await db.storage.getBucket(BUCKET)
+  if (data) return
+  const { error } = await db.storage.createBucket(BUCKET, {
+    public: true,
+    fileSizeLimit: DEFAULT_VIDEO_QUOTA.maxVideoSizeBytes,
+    allowedMimeTypes: [...ALLOWED_IMAGES, ...ALLOWED_VIDEOS],
+  })
+  if (error && !/already exists|duplicate/i.test(error.message)) throw new Error(error.message)
+}
+
+async function canUploadForPurpose(
+  db: ReturnType<typeof createSupabaseAdmin>,
+  profileId: string,
+  purpose: 'post' | 'story' | undefined,
+) {
+  if (!purpose) return true
+  const context = await loadFeedPermissionContext(db, profileId)
+  return purpose === 'post'
+    ? canPublishFeedPost(context.profile, context.vendor)
+    : canCreateStory(context.profile, context.vendor)
+}
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
@@ -25,6 +61,50 @@ export async function POST(req: NextRequest) {
 
   const rl = await rateLimitGeneric(`feed-upload:${session.userId ?? session.phone}`, 30, 300)
   if (!rl.success) return NextResponse.json({ error: 'Too many uploads. Please slow down.' }, { status: 429 })
+
+  const db = createSupabaseAdmin()
+  const profile = await ensureSocialProfileForSession()
+  if (!profile) return NextResponse.json({ error: 'Could not resolve profile' }, { status: 500 })
+
+  if (req.headers.get('content-type')?.includes('application/json')) {
+    let parsed
+    try {
+      parsed = feedVideoUploadPrepareInput.parse(await req.json())
+    } catch (err) {
+      if (err instanceof ZodError) return NextResponse.json({ error: err.issues[0]?.message ?? 'Invalid video upload' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid video upload' }, { status: 400 })
+    }
+
+    if (!(await canUploadForPurpose(db, profile.id, parsed.purpose))) {
+      return NextResponse.json({ error: 'This account cannot upload for that feed destination' }, { status: 403 })
+    }
+    if (parsed.size_bytes > DEFAULT_VIDEO_QUOTA.maxVideoSizeBytes) {
+      return NextResponse.json({ error: `Video is too large (max ${Math.floor(DEFAULT_VIDEO_QUOTA.maxVideoSizeBytes / 1024 / 1024)} MB)` }, { status: 400 })
+    }
+    if (parsed.duration_seconds > DEFAULT_VIDEO_QUOTA.maxVideoDurationSeconds) {
+      return NextResponse.json({ error: `Video is too long (max ${DEFAULT_VIDEO_QUOTA.maxVideoDurationSeconds} seconds)` }, { status: 400 })
+    }
+
+    const mime = normalizeVideoMime(parsed.mime_type)
+    const storagePath = `${profile.id}/${crypto.randomUUID()}.${videoExtension(mime, parsed.file_name)}`
+    try {
+      await ensureFeedBucket(db)
+      const { data, error } = await db.storage.from(BUCKET).createSignedUploadUrl(storagePath)
+      if (error || !data?.token) throw new Error(error?.message ?? 'Could not prepare upload')
+      const { data: pub } = db.storage.from(BUCKET).getPublicUrl(storagePath)
+      return NextResponse.json({
+        storage_path: storagePath,
+        public_url: pub.publicUrl,
+        mime_type: mime,
+        duration_seconds: parsed.duration_seconds,
+        media_kind: 'video',
+        upload_token: data.token,
+      })
+    } catch (error) {
+      console.error('[feed/uploads] signed upload error:', error instanceof Error ? error.message : error)
+      return NextResponse.json({ error: 'Could not prepare video upload' }, { status: 500 })
+    }
+  }
 
   let file: File | null = null
   let extra: Record<string, unknown> = {}
@@ -69,11 +149,11 @@ export async function POST(req: NextRequest) {
   const mime = ft?.mime ?? file.type
   if (!mime) return NextResponse.json({ error: 'Could not detect file type' }, { status: 400 })
 
-  const allowedImage = new Set(['image/jpeg', 'image/png', 'image/webp'])
-  const allowedVideo = new Set(['video/mp4', 'video/webm', 'video/quicktime'])
   const bucketPathId = crypto.randomUUID()
-  const profile = await ensureSocialProfileForSession()
-  if (!profile) return NextResponse.json({ error: 'Could not resolve profile' }, { status: 500 })
+
+  if (!(await canUploadForPurpose(db, profile.id, parsed.purpose))) {
+    return NextResponse.json({ error: 'This account cannot upload for that feed destination' }, { status: 403 })
+  }
 
   let out: Buffer = inputBuf
   let contentType = mime
@@ -82,7 +162,7 @@ export async function POST(req: NextRequest) {
   let height: number | null = null
 
   if (parsed.media_kind === 'image') {
-    if (!allowedImage.has(mime) || !detectImageMime(inputBuf)) {
+    if (!ALLOWED_IMAGES.has(mime) || !detectImageMime(inputBuf)) {
       return NextResponse.json({ error: 'Invalid image â€” must be JPG, PNG, or WebP' }, { status: 400 })
     }
     const processed = await sharp(inputBuf).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toBuffer({ resolveWithObject: true })
@@ -92,19 +172,18 @@ export async function POST(req: NextRequest) {
     width = processed.info.width ?? null
     height = processed.info.height ?? null
   } else {
-    if (!allowedVideo.has(mime)) {
+    if (!ALLOWED_VIDEOS.has(mime)) {
       return NextResponse.json({ error: 'Invalid video â€” must be MP4, WebM, or MOV' }, { status: 400 })
     }
     storagePath = `${profile.id}/${bucketPathId}.${ft?.ext ?? 'mp4'}`
   }
 
-  const db = createSupabaseAdmin()
   let { error: uploadErr } = await db.storage.from(BUCKET).upload(storagePath, out, { contentType, upsert: false })
   if (uploadErr && /bucket.*not found|not found.*bucket/i.test(uploadErr.message)) {
     await db.storage.createBucket(BUCKET, {
       public: true,
       fileSizeLimit: DEFAULT_VIDEO_QUOTA.maxVideoSizeBytes,
-      allowedMimeTypes: [...allowedImage, ...allowedVideo],
+      allowedMimeTypes: [...ALLOWED_IMAGES, ...ALLOWED_VIDEOS],
     })
     uploadErr = (await db.storage.from(BUCKET).upload(storagePath, out, { contentType, upsert: false })).error
   }

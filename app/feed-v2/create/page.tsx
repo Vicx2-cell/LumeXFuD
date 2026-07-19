@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ImageIcon, Loader2, Play, Type, Video, X } from 'lucide-react'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 type ComposerMode = 'post' | 'story'
 type PickedMedia = {
@@ -20,6 +21,14 @@ type UploadResult = {
   height: number | null
   duration_seconds: number | null
   media_kind: 'image' | 'video'
+  upload_token?: string
+}
+
+function videoMime(file: File) {
+  if (file.type === 'video/x-m4v') return 'video/x-m4v'
+  if (file.type === 'video/webm') return 'video/webm'
+  if (file.type === 'video/quicktime' || /\.mov$/i.test(file.name)) return 'video/quicktime'
+  return 'video/mp4'
 }
 
 function getVideoDuration(file: File) {
@@ -52,6 +61,7 @@ export default function FeedV2CreatePage() {
   const videoInputRef = useRef<HTMLInputElement | null>(null)
   const roleLoading = viewerRole === null
   const storyOnly = roleLoading || viewerRole === 'customer'
+  const publishingBlocked = viewerRole === 'rider'
 
   useEffect(() => {
     return () => {
@@ -74,8 +84,8 @@ export default function FeedV2CreatePage() {
   }, [])
 
   const hasText = Boolean(body.trim())
-  const canSubmit = !roleLoading && Boolean(hasText || media)
-  const composerModes: ComposerMode[] = storyOnly ? ['story'] : ['post', 'story']
+  const canSubmit = !roleLoading && !publishingBlocked && Boolean(hasText || media)
+  const composerModes: ComposerMode[] = publishingBlocked ? [] : storyOnly ? ['story'] : ['post', 'story']
 
   async function pickMedia(event: ChangeEvent<HTMLInputElement>, kind: 'image' | 'video') {
     const file = event.target.files?.[0]
@@ -99,11 +109,43 @@ export default function FeedV2CreatePage() {
   }
 
   async function uploadMedia(picked: PickedMedia) {
+    if (picked.kind === 'video') {
+      const prepareRes = await fetch('/api/feed/uploads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'prepare_video',
+          file_name: picked.file.name,
+          mime_type: videoMime(picked.file),
+          size_bytes: picked.file.size,
+          duration_seconds: picked.durationSeconds ?? 1,
+          purpose: mode,
+        }),
+      })
+      const prepared = await prepareRes.json().catch(() => ({})) as Partial<UploadResult> & { error?: string }
+      if (!prepareRes.ok || !prepared.storage_path || !prepared.public_url || !prepared.upload_token || !prepared.mime_type) {
+        throw new Error(prepared.error ?? 'Could not prepare video upload')
+      }
+
+      const supabase = createSupabaseBrowserClient()
+      const uploadFile = picked.file.type === prepared.mime_type
+        ? picked.file
+        : new File([picked.file], picked.file.name, { type: prepared.mime_type })
+      const { error } = await supabase.storage
+        .from('feed-media')
+        .uploadToSignedUrl(prepared.storage_path, prepared.upload_token, uploadFile, {
+          contentType: prepared.mime_type,
+          upsert: false,
+        })
+      if (error) throw new Error(error.message || 'Video upload failed')
+      return prepared as UploadResult
+    }
+
     const form = new FormData()
     form.append('file', picked.file)
     form.append('meta', JSON.stringify({
       media_kind: picked.kind,
-      duration_seconds: picked.kind === 'video' ? picked.durationSeconds ?? 1 : undefined,
+      purpose: mode,
     }))
 
     const res = await fetch('/api/feed/uploads', {
@@ -118,16 +160,16 @@ export default function FeedV2CreatePage() {
   }
 
   async function submit() {
-    if (!canSubmit || busy) return
+    if (!canSubmit || busy || publishingBlocked) return
     setBusy(true)
     setMessage('')
 
     try {
       const uploaded = media ? await uploadMedia(media) : null
-      const res = await fetch(mode === 'post' ? '/api/feed/posts' : '/api/feed/stories', {
+      const res = await fetch(mode === 'post' && !storyOnly ? '/api/feed/posts' : '/api/feed/stories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mode === 'post'
+        body: JSON.stringify(mode === 'post' && !storyOnly
           ? {
               body: body.trim() || undefined,
               post_kind: uploaded?.media_kind === 'video' ? 'VIDEO' : uploaded ? 'IMAGE' : 'TEXT',
@@ -199,9 +241,10 @@ export default function FeedV2CreatePage() {
         </div>
 
         {roleLoading ? <p className="px-5 pt-4 text-sm text-white/48">Loading your publishing options…</p> : null}
+        {publishingBlocked ? <p className="px-5 py-6 text-sm text-white/60">Rider accounts cannot publish feed posts or stories.</p> : null}
         {viewerRole === 'customer' ? <p className="px-5 pt-4 text-sm text-white/48">Customer stories are reviewed by an admin before they appear.</p> : null}
 
-        <div className="p-5">
+        {!publishingBlocked ? <div className="p-5">
           <textarea
             value={body}
             onChange={(event) => setBody(event.target.value)}
@@ -282,7 +325,7 @@ export default function FeedV2CreatePage() {
               Customer stories go to review first. Vendor, ambassador, and LumeX official stories publish immediately.
             </p>
           ) : null}
-        </div>
+        </div> : null}
       </section>
     </main>
   )
