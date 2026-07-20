@@ -14,6 +14,7 @@ export type SecurityEventType =
   | 'session_revoked' | 'rls_coverage_gap' | 'chain_tamper'
   | 'order_status_transition' | 'order_handover_completed' | 'rider_order_accepted'
   | 'late_delivery_credit_issued'
+  | 'order_delivery_delay_detected'
 
 export interface SecurityEventInput {
   eventType: SecurityEventType

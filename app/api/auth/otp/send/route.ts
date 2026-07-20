@@ -12,6 +12,7 @@ import { maskPhone } from '@/lib/phone'
 // Sendchamp's verification/create can take several seconds from Vercel's region;
 // give the function headroom beyond the fetch timeout.
 export const maxDuration = 30
+export const runtime = 'nodejs'
 
 // purpose=signup -> must NOT already have an account; purpose=reset -> must HAVE
 // one; purpose=admin_create -> an admin/super-admin provisioning a vendor/rider/

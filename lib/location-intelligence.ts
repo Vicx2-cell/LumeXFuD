@@ -51,6 +51,7 @@ export async function captureCustomerLocation(db: DB, input: {
 }
 
 export async function recordOrderStatusEvent(db: DB, input: {
+  eventId?: string
   orderId: string
   actorType: string
   actorId: string
@@ -61,7 +62,8 @@ export async function recordOrderStatusEvent(db: DB, input: {
   distanceFromExpectedMeters?: number | null
   validationStatus?: string
 }) {
-  await db.from('order_status_events').insert({
+  const { data, error } = await db.from('order_status_events').insert({
+    ...(input.eventId ? { id: input.eventId } : {}),
     order_id: input.orderId,
     actor_type: input.actorType,
     actor_id: input.actorId,
@@ -71,7 +73,9 @@ export async function recordOrderStatusEvent(db: DB, input: {
     gps_accuracy: input.gpsAccuracy ?? null,
     distance_from_expected_meters: input.distanceFromExpectedMeters ?? null,
     validation_status: input.validationStatus ?? (input.latitude != null && input.longitude != null ? 'captured' : 'not_validated'),
-  })
+  }).select('id').single()
+  if (error) throw error
+  return (data as { id: string }).id
 }
 
 function placeNameFromOrder(order: {

@@ -10,7 +10,7 @@ interface PendingReset {
   pin_reset_requested_at: string | null
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const session = await getCurrentUser()
     if (!session || (session.role !== 'admin' && session.role !== 'super_admin')) {

@@ -1,6 +1,7 @@
 import { createSupabaseAdmin } from './supabase/server'
 import { creditWalletHeld, getTierAndCount, calculateReleaseTime, getHoldPolicy } from './wallet'
 import { maybeApplyLateDeliveryCredit } from './late-delivery-credit'
+import { emailCommittedOrderStatus } from './order-status-email'
 
 export interface PayoutOrder {
   id: string
@@ -155,6 +156,12 @@ export async function settleDueDeliveriesForUser(
         subtotal: Number(o.subtotal) || 0,
         rider_delivery_cut: Number(o.rider_delivery_cut) || 0,
         tip_amount: Number(o.tip_amount) || 0,
+      })
+      await emailCommittedOrderStatus(db, {
+        orderId: o.id,
+        status: 'COMPLETED',
+        actorType: 'system',
+        actorId: `settle:${userType}:${userId}`,
       })
       void maybeApplyLateDeliveryCredit(o.id).catch((err) => {
         console.error('[settleDueDeliveries] late delivery credit failed:', err)

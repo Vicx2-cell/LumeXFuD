@@ -120,7 +120,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   'dev/qa/customer-session': { kind: 'public' },
 
   ...map([
-    'cron/recalculate-vendor-scores', 'cron/release-payments', 'cron/release-scheduled',
+    'cron/order-delay-watch', 'cron/recalculate-vendor-scores', 'cron/release-payments', 'cron/release-scheduled',
     'cron/reset-daily-limits', 'cron/reset-weekly-leaderboard', 'cron/sentinel',
     'cron/official-feed', 'cron/subscription-check', 'cron/vendor-auto-cancel', 'cron/wallet-reconciliation',
     'cron/wallet-release-held', 'cron/wallet-sweep',

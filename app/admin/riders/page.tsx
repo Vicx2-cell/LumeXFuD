@@ -64,7 +64,7 @@ export default function AdminRiders() {
     setLoading(false)
   }
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+
   useEffect(() => { fetchRiders() }, [])
 
   async function doAction(riderId: string, action: 'review' | 'verification_failed' | 'approve' | 'suspend' | 'unsuspend') {

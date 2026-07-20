@@ -7,6 +7,7 @@ import { renderTemplate } from '@/lib/notify-templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 import { reverseOrderFeedAttribution } from '@/lib/feed/attribution'
+import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 
 const CANCELLABLE_STATUSES = ['PENDING_PAYMENT', 'SCHEDULED', 'PENDING', 'VENDOR_ACCEPTED']
 
@@ -88,6 +89,7 @@ export async function POST(
   // Optimistic claim — only the first caller flips it to CANCELLED, so the refund
   // below runs at most once even if customer-cancel and vendor-reject race.
   const now = new Date().toISOString()
+  let customerEmailStatus: 'CANCELLED' | 'REFUNDED' = 'CANCELLED'
   const { data: claimed } = await db
     .from('orders')
     .update({ status: 'CANCELLED', order_state: 'cancelled', cancelled_at: now, updated_at: now })
@@ -128,6 +130,7 @@ export async function POST(
         .from('orders')
         .update({ payment_status: 'REFUNDED', updated_at: new Date().toISOString() })
         .eq('id', id)
+      customerEmailStatus = 'REFUNDED'
     }
   }
 
@@ -166,6 +169,13 @@ export async function POST(
       ip_address: req.headers.get('x-forwarded-for') ?? undefined,
     })
   }
+
+  await emailCommittedOrderStatus(db, {
+    orderId: id,
+    status: customerEmailStatus,
+    actorType: session.role,
+    actorId: session.userId ?? session.phone,
+  })
 
   return NextResponse.json({ success: true })
 }

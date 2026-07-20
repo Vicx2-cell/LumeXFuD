@@ -128,14 +128,14 @@ export default function CartPage() {
         }, 0)
       }
       const campaign = sessionStorage.getItem('lx_campaign_id') ?? new URLSearchParams(window.location.search).get('campaign') ?? ''
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+
       if (campaign) setCampaignId(campaign)
     } catch { /* ignore */ }
   }, [features.customer_wallet_enabled])
 
   useEffect(() => {
     if (deliveryType === 'PICKUP' || !coords || !cart.vendor_id) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+
       setEstimate(null)
       setEstimateError('')
       return

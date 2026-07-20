@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifySessionToken, type SessionRole } from '@/lib/session'
 import { sessionCookieName } from '@/lib/session-cookie'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { normalizeEmail } from '@/lib/email'
+import { sendWelcomeEmail, shouldSendWelcomeForEmailChange } from '@/lib/transactional-email'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +13,7 @@ async function getUserDetails(phone: string, role: SessionRole) {
   if (role === 'customer') {
     const { data } = await db
       .from('customers')
-      .select('id, phone, name, hostel, default_delivery_address')
+      .select('id, phone, name, email, hostel, default_delivery_address')
       .eq('phone', phone)
       .is('deleted_at', null)
       .single()
@@ -99,17 +101,30 @@ export async function PATCH(req: NextRequest) {
     .single()
   if (!session) return NextResponse.json({ error: 'Session expired or revoked' }, { status: 401 })
 
-  let body: { name?: unknown; hostel?: unknown; room_number?: unknown }
+  let body: { name?: unknown; email?: unknown; hostel?: unknown; room_number?: unknown }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid body' }, { status: 400 }) }
 
   if (payload.role !== 'customer') {
     return NextResponse.json({ error: 'Profile editing not supported for this account' }, { status: 400 })
   }
 
+  const { data: existing } = await db
+    .from('customers')
+    .select('id, name, email, welcome_email_sent_at')
+    .eq('phone', payload.phone)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (!existing) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
   const update: Record<string, string | null> = {}
   if (typeof body.name === 'string') update.name = body.name.trim().slice(0, 80) || null
   if (typeof body.hostel === 'string') update.hostel = body.hostel.trim().slice(0, 120) || null
   if (typeof body.room_number === 'string') update.room_number = body.room_number.trim().slice(0, 40) || null
+  if (body.email !== undefined) {
+    const email = normalizeEmail(body.email)
+    if (!email) return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 })
+    update.email = email
+  }
 
   if (Object.keys(update).length === 0) return NextResponse.json({ ok: true })
 
@@ -119,8 +134,21 @@ export async function PATCH(req: NextRequest) {
     .eq('phone', payload.phone)
     .is('deleted_at', null)
   if (error) {
-    console.error('[auth/me PATCH] update error:', error.message)
+    if (error.code === '23505') return NextResponse.json({ error: 'Email is already registered' }, { status: 409 })
+    console.error('[auth/me PATCH] update failed')
     return NextResponse.json({ error: 'Could not save your details' }, { status: 500 })
+  }
+
+  if (shouldSendWelcomeForEmailChange({
+    previousEmail: existing.email,
+    nextEmail: update.email,
+    welcomeEmailSentAt: existing.welcome_email_sent_at,
+  })) {
+    await sendWelcomeEmail(db, {
+      customerId: existing.id,
+      email: update.email,
+      name: update.name ?? existing.name,
+    })
   }
 
   return NextResponse.json({ ok: true })

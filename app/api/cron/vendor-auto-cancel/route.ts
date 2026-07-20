@@ -6,6 +6,7 @@ import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { audit } from '@/lib/audit'
 import { getControls } from '@/lib/controls'
 import { settleDuePickupNoShows } from '@/lib/pickup'
+import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 import { UNPICKED_CEILING_STATUSES } from '@/lib/order-state'
 import { recordSecurityEvent } from '@/lib/security-events'
 
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
       // money sources — wallet portion back to the wallet, card portion via
       // Paystack — so a wallet/split order isn't left un-refunded. A failure is
       // recorded as NEEDS_ATTENTION inside the helper rather than swallowed.
+      let refunded = false
       if (order.payment_status === 'PAID') {
         const { walletOk, paystackOk } = await refundOrderPayments({
           order: {
@@ -120,8 +122,16 @@ export async function POST(req: NextRequest) {
             .from('orders')
             .update({ payment_status: 'REFUNDED', updated_at: new Date().toISOString() })
             .eq('id', order.id)
+          refunded = true
         }
       }
+
+      await emailCommittedOrderStatus(db, {
+        orderId: order.id,
+        status: refunded ? 'REFUNDED' : 'CANCELLED',
+        actorType: 'system',
+        actorId: 'SYSTEM_AUTO_CANCEL',
+      })
 
       await audit({
         actor_id:     'SYSTEM',
@@ -243,6 +253,13 @@ async function settlePickupCeiling(db: ReturnType<typeof createSupabaseAdmin>): 
           .update({ payment_status: 'REFUNDED', updated_at: nowIso })
           .eq('id', order.id)
       }
+
+      await emailCommittedOrderStatus(db, {
+        orderId: order.id,
+        status: walletOk && paystackOk ? 'REFUNDED' : 'CANCELLED',
+        actorType: 'system',
+        actorId: 'SYSTEM_PICKUP_CEILING',
+      })
 
       await audit({
         actor_id:     'SYSTEM',

@@ -62,7 +62,6 @@ export default function OpsMap({ points }: { points: MapPoint[] }) {
       mapRef.current = null
       layerRef.current = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Re-render markers whenever the points change.
@@ -72,7 +71,6 @@ export default function OpsMap({ points }: { points: MapPoint[] }) {
       const L = (await import('leaflet')).default
       renderMarkers(L)
     })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points])
 
   function renderMarkers(L: typeof import('leaflet')) {

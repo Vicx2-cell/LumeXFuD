@@ -7,6 +7,7 @@ import { renderTemplate } from '@/lib/notify-templates'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
 import { finalizeOrderFeedAttribution } from '@/lib/feed/attribution'
+import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 
 export async function POST(
   _req: NextRequest,
@@ -99,6 +100,13 @@ export async function POST(
       }).catch(() => {})
     }
   }
+
+  await emailCommittedOrderStatus(db, {
+    orderId: id,
+    status: 'COMPLETED',
+    actorType: session.role,
+    actorId: session.userId ?? session.phone,
+  })
 
   return NextResponse.json({ success: true })
 }

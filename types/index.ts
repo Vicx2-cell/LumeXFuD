@@ -187,6 +187,14 @@ export interface Order {
   rider_auto_release_at: string | null
   placed_at: string | null
   promised_ready_at: string | null
+  promised_delivery_at: string | null
+  speed_target_at: string | null
+  vendor_estimated_prep_minutes: number | null
+  vendor_estimated_delivery_minutes: number | null
+  vendor_estimate_reason: string | null
+  speed_commitment_flagged_at: string | null
+  delay_detected_at: string | null
+  delay_owner: 'vendor' | 'dispatch' | 'rider' | null
   promised_ready_extended_at: string | null
   promised_ready_extension_count: number
   auto_cancel_reason: string | null
@@ -484,7 +492,7 @@ export interface Notification {
   template: string
   payload: Record<string, unknown> | null
   status: 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'
-  termii_id: string | null
+  provider_message_id: string | null
   error: string | null
   retry_count: number
   sent_at: string | null

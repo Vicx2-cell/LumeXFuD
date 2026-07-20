@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     const user = await findAuthUserByPhone(normalizedPhone)
     const now = new Date()
-    let target = user
+    const target = user
     if (!target) {
       await compareSecret(normalizeSecurityAnswer(answer_1), null)
       await compareSecret(normalizeSecurityAnswer(answer_2), null)
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json({ redirect_path: target.role === 'customer' ? '/' : target.role === 'vendor' ? '/vendor-dashboard' : target.role === 'rider' ? '/rider' : target.role === 'admin' ? '/admin' : '/super-admin' })
     res.cookies.set(sessionCookieName(), token, setCookieOptions(target.role))
     return res
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 }

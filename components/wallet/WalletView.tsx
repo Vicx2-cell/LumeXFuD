@@ -100,7 +100,7 @@ function formatCountdown(ms: number): string {
   return remHrs ? `${days}d ${remHrs}h` : `${days}d`
 }
 
-export default function WalletView({ userType }: Props) {
+export default function WalletView({ userType: _userType }: Props) {
   const [wallet, setWallet] = useState<WalletData | null>(null)
   const [txs, setTxs] = useState<TxRow[]>([])
   const [openReceipt, setOpenReceipt] = useState<string | null>(null)
@@ -633,7 +633,6 @@ export default function WalletView({ userType }: Props) {
 // in the transaction receipt so each party can see — and reach — who they worked
 // with. WhatsApp/Call deep links only; no sensitive data beyond the contact number.
 function PartyRow({ role, party, orderNumber }: { role: 'Vendor' | 'Rider'; party: TxParty; orderNumber: string | null }) {
-  const initial = (party.name || role).charAt(0).toUpperCase()
   const msg = `Hi${party.name ? ' ' + party.name.split(' ')[0] : ''}, regarding LumeX order ${orderNumber ?? ''}`.trim()
   return (
     <div className="flex items-center gap-2.5">

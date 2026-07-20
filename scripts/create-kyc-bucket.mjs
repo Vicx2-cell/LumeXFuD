@@ -6,7 +6,7 @@ for (const line of readFileSync(new URL('../.env.local', import.meta.url), 'utf8
 }
 const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
 // PRIVATE bucket — KYC selfies are sensitive (NDPR). No public read; admins view via signed URLs.
-const { data, error } = await db.storage.createBucket('kyc-faces', {
+const { error } = await db.storage.createBucket('kyc-faces', {
   public: false,
   fileSizeLimit: 5242880,
   allowedMimeTypes: ['image/webp', 'image/jpeg', 'image/png'],

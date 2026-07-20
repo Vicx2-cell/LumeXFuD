@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 
@@ -72,7 +72,7 @@ export function VideosClient() {
   const [error, setError] = useState('')
   const [performanceItem, setPerformanceItem] = useState<Item | null>(null)
 
-  const load = async (state: StateTab = tab) => {
+  const load = useCallback(async (state: StateTab) => {
     setLoading(true)
     setError('')
     try {
@@ -95,11 +95,11 @@ export function VideosClient() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     void load(tab)
-  }, [tab])
+  }, [load, tab])
 
   const quotaWarning = useMemo(() => {
     if (!quota || !Number.isFinite(quota.limit) || quota.limit <= 0) return null

@@ -1,5 +1,5 @@
 'use client'
-/* eslint-disable react-hooks/set-state-in-effect */
+
 
 import { useEffect, useState, useMemo, useRef } from 'react'
 import Link from 'next/link'

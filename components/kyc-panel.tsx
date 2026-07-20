@@ -45,7 +45,7 @@ export function KycPanel({ role }: { role: 'vendor' | 'rider' }) {
           <span className="text-sm text-white/80">Verification</span>
           <span className="text-xs font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E' }}>✓ Verified <span className="opacity-60">ⓘ</span></span>
         </button>
-        {explain && <Explain role={role} onClose={() => setExplain(false)} />}
+        {explain && <Explain onClose={() => setExplain(false)} />}
       </>
     )
   }
@@ -91,7 +91,7 @@ export function KycPanel({ role }: { role: 'vendor' | 'rider' }) {
   )
 }
 
-function Explain({ role, onClose }: { role: string; onClose: () => void }) {
+function Explain({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
       <div className="glass max-w-xs p-5 text-center lx-enter" onClick={(e) => e.stopPropagation()}>

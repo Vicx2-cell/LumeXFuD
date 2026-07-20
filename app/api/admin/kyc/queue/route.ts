@@ -19,7 +19,7 @@ export async function GET() {
 
   // Folders under pending/ and verified/ are user ids (id === null = folder).
   // complete/ entries are the fully-verified markers.
-  const [pf, vf, cf] = await Promise.all([
+  const [pf, , cf] = await Promise.all([
     db.storage.from(BUCKET).list('pending', { limit: 500 }),
     db.storage.from(BUCKET).list('verified', { limit: 500 }),
     db.storage.from(BUCKET).list('complete', { limit: 500 }),

@@ -1,5 +1,6 @@
 {
   "crons": [
+    { "path": "/api/cron/order-delay-watch", "schedule": "* * * * *" },
     { "path": "/api/cron/release-payments", "schedule": "* * * * *" },
     { "path": "/api/cron/vendor-auto-cancel", "schedule": "* * * * *" },
     { "path": "/api/cron/release-scheduled", "schedule": "* * * * *" },

@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
   )
 
   // ── Build vendor/rider rows ────────────────────────────────────────────────
-  let rows = wallets.map((w) => {
+  const rows = wallets.map((w) => {
     const isVendor = w.user_type === 'VENDOR'
     const userInfo = isVendor ? vendorMap.get(w.user_id) : riderMap.get(w.user_id)
     return {

@@ -2,90 +2,62 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import {
-  ArrowUpRight,
   CircleDollarSign,
   Grid2x2,
-  MenuSquare,
   LifeBuoy,
-  Newspaper,
+  ListOrdered,
+  Menu,
   Settings2,
-  Video,
+  Star,
+  Store,
+  UtensilsCrossed,
   X,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { formatClock, initials, type VendorDashboardVendor } from './helpers'
+import { initials, type VendorDashboardVendor } from './helpers'
 
 type SidebarItem = {
   label: string
-  href?: string
-  scrollToId?: string
-  desc: string
+  href: string
   icon: typeof Grid2x2
 }
 
-const ITEMS: SidebarItem[] = [
-  { label: 'Dashboard', href: '/vendor-dashboard', desc: 'Live orders and store health', icon: Grid2x2 },
-  { label: 'Orders', href: '/vendor-dashboard/orders', desc: 'Incoming queue and actions', icon: MenuSquare },
-  { label: 'Menu', href: '/vendor-dashboard/menu', desc: 'Edit items and availability', icon: MenuSquare },
-  { label: 'Store', href: '/vendor-dashboard/store', desc: 'Store info and hours', icon: Settings2 },
-  { label: 'Videos', href: '/vendor-dashboard/videos', desc: 'Manage clips and drafts', icon: Video },
-  { label: 'Reviews', href: '/vendor-dashboard/reviews', desc: 'Ratings and customer feedback', icon: Newspaper },
-  { label: 'Earnings', href: '/vendor-dashboard/earnings', desc: 'Payouts and revenue history', icon: CircleDollarSign },
-  { label: 'Share', href: '/vendor-dashboard/share', desc: 'Store link', icon: ArrowUpRight },
-  { label: 'Settings', href: '/vendor-dashboard/settings', desc: 'Store profile and access', icon: Settings2 },
-  { label: 'Support', href: '/vendor-dashboard/support', desc: 'Report an issue', icon: LifeBuoy },
+const PRIMARY_ITEMS: SidebarItem[] = [
+  { label: 'Overview', href: '/vendor-dashboard', icon: Grid2x2 },
+  { label: 'Orders', href: '/vendor-dashboard/orders', icon: ListOrdered },
+  { label: 'Menu', href: '/vendor-dashboard/menu', icon: UtensilsCrossed },
+  { label: 'Store', href: '/vendor-dashboard/store', icon: Store },
+  { label: 'Earnings', href: '/vendor-dashboard/earnings', icon: CircleDollarSign },
 ]
 
-function NavButton({
-  item,
-  active,
-  onNavigate,
-}: {
-  item: SidebarItem
-  active?: boolean
-  onNavigate: () => void
-}) {
+const SECONDARY_ITEMS: SidebarItem[] = [
+  { label: 'Reviews', href: '/vendor-dashboard/reviews', icon: Star },
+  { label: 'Support', href: '/vendor-dashboard/support', icon: LifeBuoy },
+]
+
+function isActive(pathname: string, href: string) {
+  return href === '/vendor-dashboard' ? pathname === href : pathname.startsWith(href)
+}
+
+function NavItem({ item, pathname, pending, onNavigate }: { item: SidebarItem; pathname: string; pending: number; onNavigate: () => void }) {
   const Icon = item.icon
-  const content = (
-    <span
-      className={`group flex items-start gap-3 rounded-2xl border px-3 py-3 transition-all ${active ? 'border-[rgba(245,166,35,0.38)] bg-[rgba(245,166,35,0.10)] shadow-[0_0_0_1px_rgba(245,166,35,0.08)]' : 'border-white/8 bg-white/[0.03] hover:border-white/14 hover:bg-white/[0.055]'}`}
-    >
-      <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${active ? 'border-[rgba(245,166,35,0.28)] bg-[rgba(245,166,35,0.16)] text-[#F5A623]' : 'border-white/8 bg-white/[0.04] text-white/80'}`}>
-        <Icon size={17} strokeWidth={1.8} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-white">{item.label}</span>
-        <span className="mt-0.5 block text-[11px] leading-relaxed text-white/42">{item.desc}</span>
-      </span>
-      <span className="mt-0.5 text-white/28 transition-transform group-hover:translate-x-0.5">
-        <ArrowUpRight size={15} />
-      </span>
-    </span>
-  )
-
-  if (item.href) {
-    return (
-      <Link href={item.href} onClick={onNavigate} className="block">
-        {content}
-      </Link>
-    )
-  }
-
+  const active = isActive(pathname, item.href)
   return (
-    <button type="button" onClick={onNavigate} className="block w-full text-left">
-      <div
-        onClick={() => {
-          if (item.scrollToId) {
-            document.getElementById(item.scrollToId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }
-          onNavigate()
-        }}
-      >
-        {content}
-      </div>
-    </button>
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      className={`flex min-h-12 items-center gap-3 rounded-2xl border px-3 transition ${active ? 'border-[#F5A623]/30 bg-[#F5A623]/10 text-white' : 'border-transparent text-white/58 hover:border-white/8 hover:bg-white/[0.04] hover:text-white'}`}
+    >
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-[#F5A623]/15 text-[#F5A623]' : 'bg-white/[0.035] text-white/60'}`}>
+        <Icon size={17} strokeWidth={1.9} />
+      </span>
+      <span className="flex-1 text-sm font-semibold">{item.label}</span>
+      {item.label === 'Orders' && pending > 0 && (
+        <span className="min-w-6 rounded-full bg-[#F5A623] px-2 py-0.5 text-center text-[11px] font-bold text-black">{pending}</span>
+      )}
+    </Link>
   )
 }
 
@@ -103,106 +75,96 @@ export function VendorDashboardSidebar({
   className?: string
 }) {
   const pathname = usePathname()
-  const router = useRouter()
-  const activePath = pathname
 
   const shell = (
-    <aside
-      className={`flex h-full w-[18.75rem] flex-col border-r border-white/8 bg-black/70 backdrop-blur-xl ${className}`}
-      style={{
-        background:
-          'linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.025) 22%, rgba(255,255,255,0.02) 100%), rgba(8,8,9,0.92)',
-      }}
-    >
-      <div className="flex items-center justify-between gap-3 px-5 pt-[calc(1rem+env(safe-area-inset-top))] pb-4">
-        <Link href="/vendor-dashboard" className="flex items-center gap-3" onClick={onClose}>
-          <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-[1.1rem] border border-white/10 bg-white/5">
-            {vendor?.logo_url ? (
-              <Image src={vendor.logo_url} alt="" fill className="object-cover" />
-            ) : (
-              <span className="text-sm font-semibold text-[#F5A623]">{initials(vendor?.shop_name)}</span>
-            )}
+    <aside className={`flex h-full w-[17rem] flex-col border-r border-white/8 bg-[#0b0b0d]/95 backdrop-blur-xl ${className}`}>
+      <div className="flex items-center justify-between gap-3 px-4 pb-4 pt-[calc(1rem+env(safe-area-inset-top))]">
+        <Link href="/vendor-dashboard" className="flex min-w-0 items-center gap-3" onClick={onClose}>
+          <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+            {vendor?.logo_url ? <Image src={vendor.logo_url} alt="" fill className="object-cover" /> : <span className="text-sm font-semibold text-[#F5A623]">{initials(vendor?.shop_name)}</span>}
           </span>
           <span className="min-w-0">
-            <span className="block text-lg font-semibold tracking-[-0.03em] text-white">LumeX</span>
-            <span className="block truncate text-xs text-white/45">{vendor?.shop_name ?? 'Vendor workspace'}</span>
+            <span className="block text-base font-semibold tracking-[-0.02em] text-white">LumeX Vendor</span>
+            <span className="block truncate text-xs text-white/42">{vendor?.shop_name ?? 'Loading…'}</span>
           </span>
         </Link>
-        <button
-          type="button"
-          onClick={() => {
-            if (open) onClose()
-            else router.push('/vendor-dashboard')
-          }}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
-          aria-label="Close navigation"
-        >
+        <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 lg:hidden" aria-label="Close navigation">
           <X size={18} />
         </button>
       </div>
 
-      <div className="px-5 pb-4">
-        <div className="rounded-[1.35rem] border border-white/8 bg-[rgba(255,255,255,0.04)] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
+      <div className="px-4 pb-4">
+        <div className="rounded-2xl border border-white/8 bg-white/[0.035] p-3.5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-white/40">Store</p>
-              <p className="mt-1 text-base font-semibold text-white">{vendor?.shop_name ?? 'Loading…'}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">Kitchen</p>
+              <p className="mt-1 text-sm font-semibold text-white">{counts.active > 0 ? `${counts.active} active` : 'All caught up'}</p>
             </div>
-            <Badge color={vendor?.status === 'OPEN' ? 'var(--lx-green)' : vendor?.status === 'BUSY' ? 'var(--color-amber)' : 'rgba(255,255,255,0.45)'}>
-              {vendor?.status ?? 'OPEN'}
-            </Badge>
+            <Badge color={vendor?.status === 'OPEN' ? 'var(--lx-green)' : vendor?.status === 'BUSY' ? 'var(--color-amber)' : 'rgba(255,255,255,0.45)'}>{vendor?.status ?? 'OPEN'}</Badge>
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-2.5">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-white/38">Queue</p>
-              <p className="mt-1 text-sm font-semibold text-white">{counts.active}</p>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-2.5">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-white/38">Open</p>
-              <p className="mt-1 text-sm font-semibold text-white">{formatClock(vendor?.opening_time ?? null)}</p>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-2.5">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-white/38">Ready</p>
-              <p className="mt-1 text-sm font-semibold text-white">{counts.ready}</p>
-            </div>
+          <div className="mt-3 grid grid-cols-3 divide-x divide-white/8 rounded-xl bg-black/20 py-2 text-center">
+            <MiniCount label="New" value={counts.pending} />
+            <MiniCount label="Prep" value={counts.prep} />
+            <MiniCount label="Ready" value={counts.ready} />
           </div>
         </div>
       </div>
 
-      <div className="px-5 pb-4">
-        <p className="px-2 pb-2 text-[11px] uppercase tracking-[0.2em] text-white/36">Quick actions</p>
-        <div className="grid grid-cols-2 gap-2">
-          <Link href="/feed-v2/create" className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3 text-left transition hover:border-white/14 hover:bg-white/[0.055]" onClick={onClose}>
-            <p className="text-sm font-semibold text-white">Post</p>
-            <p className="mt-0.5 text-[11px] text-white/40">Feed or story</p>
-          </Link>
-          <Link href="/vendor-dashboard/support" className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3 text-left transition hover:border-white/14 hover:bg-white/[0.055]" onClick={onClose}>
-            <p className="text-sm font-semibold text-white">Support</p>
-            <p className="mt-0.5 text-[11px] text-white/40">Order issues</p>
-          </Link>
+      <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="Vendor dashboard">
+        <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">Work</p>
+        <div className="space-y-1">
+          {PRIMARY_ITEMS.map((item) => <NavItem key={item.href} item={item} pathname={pathname} pending={counts.pending} onNavigate={onClose} />)}
         </div>
-      </div>
+        <p className="px-3 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">More</p>
+        <div className="space-y-1">
+          {SECONDARY_ITEMS.map((item) => <NavItem key={item.href} item={item} pathname={pathname} pending={counts.pending} onNavigate={onClose} />)}
+        </div>
+      </nav>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-5">
-        <div className="space-y-2">
-          <p className="px-2 pb-1 text-[11px] uppercase tracking-[0.2em] text-white/36">Navigation</p>
-          {ITEMS.map((item) => (
-            <NavButton key={item.label} item={item} active={activePath === item.href} onNavigate={onClose} />
-          ))}
-        </div>
+      <div className="border-t border-white/8 p-4">
+        <Link href="/vendor-dashboard/store" onClick={onClose} className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-white/48 transition hover:bg-white/[0.04] hover:text-white">
+          <Settings2 size={17} /> Store settings
+        </Link>
       </div>
     </aside>
   )
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/55 lg:hidden" style={{ display: open ? 'block' : 'none' }} onClick={onClose} aria-hidden="true" />
-      <div
-        className={`fixed inset-y-0 left-0 z-50 w-[18.75rem] transform transition-transform duration-300 lg:hidden ${open ? 'translate-x-0' : '-translate-x-full'}`}
-      >
-        {shell}
-      </div>
-      <div className="hidden lg:block lg:sticky lg:top-0 lg:h-dvh">{shell}</div>
+      {open && <button type="button" className="fixed inset-0 z-40 bg-black/65 backdrop-blur-sm lg:hidden" onClick={onClose} aria-label="Close navigation overlay" />}
+      <div className={`fixed inset-y-0 left-0 z-50 w-[min(88vw,17rem)] transform transition-transform duration-300 lg:hidden ${open ? 'translate-x-0' : '-translate-x-full'}`}>{shell}</div>
+      <div className="sticky top-0 hidden h-dvh lg:block">{shell}</div>
     </>
+  )
+}
+
+function MiniCount({ label, value }: { label: string; value: number }) {
+  return <div><p className="text-sm font-semibold text-white">{value}</p><p className="text-[9px] uppercase tracking-wide text-white/30">{label}</p></div>
+}
+
+export function VendorMobileBottomNav({ pending, onMore }: { pending: number; onMore: () => void }) {
+  const pathname = usePathname()
+  const items = PRIMARY_ITEMS.filter((item) => item.label !== 'Store')
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-[#09090b]/95 px-2 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-2xl lg:hidden" aria-label="Vendor quick navigation">
+      <div className="mx-auto grid max-w-lg grid-cols-5">
+        {items.map((item) => {
+          const Icon = item.icon
+          const active = isActive(pathname, item.href)
+          return (
+            <Link key={item.href} href={item.href} className={`relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold ${active ? 'text-[#F5A623]' : 'text-white/42'}`}>
+              <Icon size={19} strokeWidth={active ? 2.2 : 1.8} />
+              <span>{item.label}</span>
+              {item.label === 'Orders' && pending > 0 && <span className="absolute right-[calc(50%-19px)] top-1 min-w-4 rounded-full bg-[#F5A623] px-1 text-center text-[9px] font-bold leading-4 text-black">{pending}</span>}
+            </Link>
+          )
+        })}
+        <button type="button" onClick={onMore} className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold text-white/42" aria-label="Open more vendor tools">
+          <Menu size={19} />
+          <span>More</span>
+        </button>
+      </div>
+    </nav>
   )
 }

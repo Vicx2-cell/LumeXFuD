@@ -635,7 +635,7 @@ function PlatformOverview({ data }: { data: Financials }) {
         background: 'rgba(245,166,35,0.05)',
         border: '1px solid rgba(245,166,35,0.18)',
       }}>
-        <p className="lx-mono mb-3">Today's Platform Snapshot</p>
+        <p className="lx-mono mb-3">Today&apos;s Platform Snapshot</p>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <p className="text-xs text-white/40 mb-1">Orders today</p>

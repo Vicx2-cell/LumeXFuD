@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Menu } from 'lucide-react'
-import { VendorDashboardSidebar } from './sidebar'
+import { VendorDashboardSidebar, VendorMobileBottomNav } from './sidebar'
 import type { VendorDashboardRecentOrder, VendorDashboardSummary, VendorDashboardVendor } from './helpers'
 
 type DashboardPayload = {
@@ -56,8 +56,8 @@ export function VendorDashboardShell({ children }: { children: ReactNode }) {
 
   const active = summary?.active_orders ?? 0
   const pending = summary?.pending_orders ?? 0
-  const prep = Math.max(0, active - pending)
-  const ready = summary?.completed_today ?? 0
+  const prep = summary?.preparing_orders ?? 0
+  const ready = summary?.ready_orders ?? 0
   const payload = useMemo<DashboardPayload | null>(() => {
     if (!vendor || !summary) return null
     return {
@@ -96,6 +96,7 @@ export function VendorDashboardShell({ children }: { children: ReactNode }) {
           </div>
           {children}
         </div>
+        <VendorMobileBottomNav pending={pending} onMore={() => setOpen(true)} />
       </div>
     </VendorDashboardContext.Provider>
   )

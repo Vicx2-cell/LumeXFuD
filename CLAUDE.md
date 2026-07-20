@@ -16,7 +16,7 @@ This CLAUDE.md is the core. When implementing specific subsystems, read the matc
 • docs/vendor-ranking.md — performance scoring algorithm, visibility tiers
 • docs/gamification.md — streaks, badges, XP, leaderboard
 • docs/admin.md — admin + super admin separation
-• docs/notifications.md — every Termii WhatsApp/SMS message
+• docs/notifications.md — every Sendchamp WhatsApp/SMS message
 • docs/security.md — full security hardening + penetration testing
 • docs/database.md — complete SQL schema for every table
 When the task involves any of these areas — read the matching doc BEFORE writing code.
@@ -24,9 +24,9 @@ Tech Stack (LOCKED — DO NOT CHANGE)
 • Framework: Next.js 15.5.18 OR 16.2.6 minimum (May 2026 patches 13 CVEs — required)
 • Language: TypeScript (strict mode, never use any)
 • Database: Supabase (PostgreSQL) — RLS enabled on every table
-• Auth: Custom phone OTP via Termii + JWT in httpOnly cookie
+• Auth: Managed WhatsApp OTP via Sendchamp + JWT in httpOnly cookie
 • Payments: Paystack (Cards + Bank Transfer + USSD)
-• Notifications: Termii (WhatsApp + SMS)
+• Notifications: Sendchamp (WhatsApp + SMS)
 • Rate Limiting: Upstash Redis
 • Image Processing: sharp (server-side)
 • Phone Normalization: libphonenumber-js
@@ -136,7 +136,7 @@ components/
 lib/
  /supabase/ client.ts, server.ts, middleware.ts
  /paystack/ init.ts, webhook.ts, transfer.ts
- /termii/ sms.ts, whatsapp.ts
+ sendchamp.ts OTP, SMS, WhatsApp templates
  /upstash/ redis.ts
  money.ts toNaira, toKobo, formatPrice
  phone.ts normalizePhone (E.164)
@@ -329,8 +329,9 @@ SUPABASE_SERVICE_ROLE_KEY= # server-only, NEVER in client code
 PAYSTACK_SECRET_KEY= # sk_live_... in production
 NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY= # pk_live_...
 PAYSTACK_WEBHOOK_SECRET=
-TERMII_API_KEY=
-TERMII_SENDER_ID=LumeXFud
+SENDCHAMP_API_KEY=
+SENDCHAMP_SENDER=LumeX
+SENDCHAMP_BASE_URL=https://api.sendchamp.com/api/v1
 NEXT_PUBLIC_APP_URL= # https://lumexfud.com.ng in production
 UPSTASH_REDIS_REST_URL=
 LUMEX FUD — COMPLETE BUILD PACKAGE PAGE 14
@@ -449,7 +450,7 @@ PIN keypad:
 ## LEGACY NOTES FOR AUDITOR
 
 The old codebase was built with these systems that are now REMOVED:
-- OTP authentication via Termii (replaced by 6-digit PIN only)
+- The former notification provider is permanently removed; all OTP and phone messaging uses Sendchamp.
 - 4-digit PIN (upgraded to 6-digit)
 - Gamification XP/levels + any money rewards (daily rewards, streak/leaderboard wallet credits): still REMOVED. Do not reintroduce — money rewards would break daily wallet reconciliation.
 - Streaks + badges: RE-INTRODUCED as COSMETIC ONLY (migration 037). Order streaks (Africa/Lagos calendar days) and achievement badges, awarded by a DB trigger on the DELIVERED transition, shown on Profile, gated by the super-admin `streaks` feature flag. No XP, no levels, no money. NOT to be flagged for removal.
@@ -497,4 +498,3 @@ requires its own toggle audit trail.
 - `<LaunchCounter />` (`components/launch-counter.tsx`) — client widget mounted on the customer
   home, vendor dashboard, and rider dashboard. Renders nothing unless `enabled`.
 - `/super-admin/launch-counter` — on/off toggle + editable goal + live account counts.
-

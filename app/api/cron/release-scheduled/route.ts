@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { withCronHealth, verifyCronSecret } from '@/lib/cron-health'
 import { refundOrderPayments } from '@/lib/order-refund'
+import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { renderTemplate } from '@/lib/notify-templates'
 import { audit } from '@/lib/audit'
@@ -104,6 +105,12 @@ export async function POST(req: NextRequest) {
         if (walletOk && paystackOk) {
           await db.from('orders').update({ payment_status: 'REFUNDED', updated_at: nowIso }).eq('id', order.id)
         }
+        await emailCommittedOrderStatus(db, {
+          orderId: order.id,
+          status: walletOk && paystackOk ? 'REFUNDED' : 'CANCELLED',
+          actorType: 'system',
+          actorId: 'SYSTEM_SCHEDULED_RELEASE',
+        })
         if (customerPhone) {
           void sendWhatsAppWithFallback({
             to: customerPhone,

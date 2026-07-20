@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { settleDuePickupNoShows } from '@/lib/pickup'
 import { callPhoneMap } from '@/lib/call-phone'
+import { completedVendorSalesKobo } from '@/lib/vendor-finance'
 
 export async function GET() {
   const session = await getCurrentUser()
@@ -33,8 +34,10 @@ export async function GET() {
     .from('orders')
     .select(`
       id, order_number, status, delivery_type, delivery_address,
-      subtotal, total_amount, created_at, customer_id,
-      pickup_eta_at,
+      subtotal, created_at, customer_id,
+      pickup_eta_at, speed_target_at, promised_delivery_at,
+      vendor_estimated_prep_minutes, vendor_estimated_delivery_minutes,
+      speed_commitment_flagged_at, delay_detected_at,
       customers ( phone, name ),
       order_items ( id, name, quantity, price, notes, addons )
     `)
@@ -45,7 +48,7 @@ export async function GET() {
 
   const { data: recent } = await db
     .from('orders')
-    .select('id, order_number, status, total_amount, created_at, order_items ( name, quantity )')
+    .select('id, order_number, status, subtotal, created_at, order_items ( name, quantity )')
     .eq('vendor_id', vendor.id)
     .in('status', ['COMPLETED', 'CANCELLED', 'NO_SHOW'])
     .order('created_at', { ascending: false })
@@ -53,14 +56,14 @@ export async function GET() {
 
   const { data: todayOrders } = await db
     .from('orders')
-    .select('id, status, total_amount, preparing_at, ready_at')
+    .select('id, status, subtotal, preparing_at, ready_at')
     .eq('vendor_id', vendor.id)
     .gte('created_at', todayStart)
     .order('created_at', { ascending: false })
 
   // Customer call numbers (migration 074) — resolved non-fatally so the dashboard
   // never breaks pre-074. tel: uses the call number; wa.me uses the WhatsApp number.
-  type VOrder = { customer_id?: string | null; status?: string; total_amount?: number | null; customers?: { phone: string; call_phone?: string | null } | null }
+  type VOrder = { customer_id?: string | null; status?: string; subtotal?: number | null; customers?: { phone: string; call_phone?: string | null } | null }
   const list = (orders ?? []) as unknown as VOrder[]
   const cMap = await callPhoneMap('customers', list.map((o) => o.customer_id), db)
   for (const o of list) if (o.customers && o.customer_id) o.customers.call_phone = cMap.get(o.customer_id) ?? null
@@ -82,11 +85,11 @@ export async function GET() {
 
   const summary = {
     orders_today: todays.length,
-    revenue_today_kobo: todays
-      .filter((order) => order.status === 'COMPLETED')
-      .reduce((sum, order) => sum + (order.total_amount ?? 0), 0),
+    vendor_sales_today_kobo: completedVendorSalesKobo(todays),
     pending_orders: list.filter((order) => order.status === 'PENDING').length,
     active_orders: list.length,
+    preparing_orders: list.filter((order) => ['VENDOR_ACCEPTED', 'PREPARING'].includes(order.status ?? '')).length,
+    ready_orders: list.filter((order) => order.status === 'READY').length,
     completed_today: completedToday.length,
     avg_prep_minutes: avgPrepMinutes,
     store_status: vendor.status,

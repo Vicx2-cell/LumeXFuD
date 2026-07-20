@@ -1,7 +1,7 @@
 # Authentication System
 
 ## Overview
-Custom phone OTP via Termii + JWT in httpOnly cookie. Account required for checkout (frictionless browsing).
+Managed WhatsApp OTP via Sendchamp + JWT in an httpOnly cookie. Account required for checkout (frictionless browsing).
 
 ## Decision: Account Required (Frictionless)
 Customers must verify phone before checkout. Browsing and cart are public.
@@ -75,7 +75,7 @@ Body: { phone: string }
 3. Rate limit check: 3 sends per phone per hour (Upstash)
 4. Generate 6-digit OTP
 5. Hash and store in otp_attempts table with expires_at = now + 10 mins
-6. Send via Termii SMS
+6. Send through Sendchamp's managed WhatsApp Verification API
 7. Return { success: true, expires_in: 600 }
 8. Never reveal whether phone is existing or new (enumeration prevention)
 ```

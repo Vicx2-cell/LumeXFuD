@@ -2,6 +2,7 @@ import { createSupabaseAdmin } from './supabase/server'
 import { refundOrderPayments } from './order-refund'
 import { getControls } from './controls'
 import { sendWhatsAppWithFallback } from './notify'
+import { emailCommittedOrderStatus } from './order-status-email'
 
 // Bank-grade self-healing: a customer's money must never get stuck just because a
 // background cron didn't fire. When anyone opens an order page, we settle that ONE
@@ -71,6 +72,13 @@ export async function settleOrderIfDue(order: SettleableOrder): Promise<string |
   if (walletOk && paystackOk) {
     await db.from('orders').update({ payment_status: 'REFUNDED', updated_at: now }).eq('id', order.id)
   }
+
+  await emailCommittedOrderStatus(db, {
+    orderId: order.id,
+    status: walletOk && paystackOk ? 'REFUNDED' : 'CANCELLED',
+    actorType: 'system',
+    actorId: 'SYSTEM_SELF_HEAL',
+  })
 
   if (customerPhone) {
     void sendWhatsAppWithFallback({

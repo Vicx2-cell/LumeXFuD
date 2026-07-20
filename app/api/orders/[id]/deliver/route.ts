@@ -12,7 +12,8 @@ import { recordOrderCompletedEarnings } from '@/lib/platform-earnings'
 import { completeOrderPayout } from '@/lib/order-payout'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
-import { recordOrderStatusEvent, promoteVerifiedPlaceFromOrder } from '@/lib/location-intelligence'
+import { promoteVerifiedPlaceFromOrder } from '@/lib/location-intelligence'
+import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 import { finalizeOrderFeedAttribution } from '@/lib/feed/attribution'
 
 // POST /api/orders/[id]/deliver
@@ -198,7 +199,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
   })
 
-  void recordOrderStatusEvent(db, {
+  await emailCommittedOrderStatus(db, {
     orderId: id,
     actorType: session.role,
     actorId: session.userId ?? session.phone,
@@ -207,7 +208,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     longitude: typeof body.longitude === 'number' ? body.longitude : null,
     gpsAccuracy: typeof body.gps_accuracy === 'number' ? body.gps_accuracy : null,
     validationStatus: typeof body.latitude === 'number' && typeof body.longitude === 'number' ? 'captured' : 'not_validated',
-  }).catch(() => {})
+  })
 
   void promoteVerifiedPlaceFromOrder(db, {
     orderId: id,

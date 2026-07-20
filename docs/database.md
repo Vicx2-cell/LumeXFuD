@@ -198,7 +198,7 @@ CREATE TABLE notifications (
   template TEXT NOT NULL,
   payload JSONB,
   status TEXT NOT NULL,
-  termii_id TEXT,
+  provider_message_id TEXT,
   error TEXT,
   retry_count INT DEFAULT 0,
   sent_at TIMESTAMPTZ,

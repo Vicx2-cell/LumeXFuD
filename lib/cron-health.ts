@@ -35,6 +35,7 @@ export interface CronJob {
 const MIN = 60_000
 const HOUR = 60 * MIN
 export const CRON_JOBS: CronJob[] = [
+  { key: 'order-delay-watch',         path: '/api/cron/order-delay-watch',         schedule: '* * * * *',   label: 'Order delay watch',       description: 'Detects orders likely to miss the 25-minute target and alerts customers and operators once.', money: false, staleMs: 10 * MIN },
   { key: 'release-payments',          path: '/api/cron/release-payments',          schedule: '* * * * *',   label: 'Release payments',        description: 'Credits vendor/rider wallets after the 15-min dispute window, self-heals stranded payouts.', money: true,  staleMs: 10 * MIN },
   { key: 'vendor-auto-cancel',        path: '/api/cron/vendor-auto-cancel',        schedule: '* * * * *',   label: 'Vendor auto-cancel',      description: 'Auto-cancels + refunds orders a vendor never accepted in time.',                              money: true,  staleMs: 10 * MIN },
   { key: 'release-scheduled',         path: '/api/cron/release-scheduled',         schedule: '* * * * *',   label: 'Release scheduled orders', description: 'Releases pre-paid scheduled orders to vendors when their time arrives.',                       money: true,  staleMs: 10 * MIN },

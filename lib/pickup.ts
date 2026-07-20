@@ -4,6 +4,7 @@ import { recordOrderCompletedEarnings, recordPlatformEarning } from './platform-
 import { refundOrderPayments } from './order-refund'
 import { refundToCustomerWallet } from './customer-wallet'
 import { sendWhatsAppWithFallback } from './notify'
+import { emailCommittedOrderStatus } from './order-status-email'
 
 // ─── Pickup (Order Ahead) shared logic ───────────────────────────────────────
 // Skip-the-queue flow: pay upfront → 6-char HASHED handover code (see
@@ -214,7 +215,7 @@ export async function settleDuePickups(vendorId?: string): Promise<number> {
           .select('id')
         if (!claimed || claimed.length === 0) continue
 
-        await refundOrderPayments({
+        const { walletOk, paystackOk } = await refundOrderPayments({
           order: {
             id: o.id, order_number: o.order_number, customer_id: o.customer_id,
             total_amount: Number(o.total_amount) || 0,
@@ -222,6 +223,12 @@ export async function settleDuePickups(vendorId?: string): Promise<number> {
           },
           reason: 'Pickup not ready in time — vendor could not fulfil',
           triggeredBy: 'system:pickup-fairness',
+        })
+        await emailCommittedOrderStatus(db, {
+          orderId: o.id,
+          status: walletOk && paystackOk ? 'REFUNDED' : 'CANCELLED',
+          actorType: 'system',
+          actorId: 'system:pickup-fairness',
         })
         settled++
 

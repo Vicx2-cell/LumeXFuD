@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   payload     JSONB,
   status      TEXT NOT NULL DEFAULT 'PENDING'
                 CHECK (status IN ('PENDING','SENT','DELIVERED','READ','FAILED')),
-  termii_id   TEXT,
+  provider_message_id TEXT,
   error       TEXT,
   retry_count INT DEFAULT 0,
   sent_at     TIMESTAMPTZ,

@@ -22,6 +22,7 @@ import { estimateOrderPrepMinutes } from '@/lib/prep-time'
 import { getBusyModeThrottle } from '@/lib/busy-mode'
 import { captureCustomerLocation } from '@/lib/location-intelligence'
 import { computeDeliveryPriceEstimate, getDeliveryPricingConfig, haversineDistanceMeters } from '@/lib/delivery-pricing'
+import { sendOrderConfirmationEmail } from '@/lib/transactional-email'
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
@@ -573,10 +574,9 @@ export async function POST(req: NextRequest) {
   // Reward columns in a SEPARATE non-fatal update so an order can't fail if
   // migration 082 hasn't run (rewardApplied is 0 in that case anyway).
   if (rewardApplied > 0) {
-    db.from('orders')
+    await db.from('orders')
       .update({ reward_discount_kobo: rewardApplied, reward_credit_id: rewardCreditId })
       .eq('id', order.id)
-      .then(() => {}, () => {})
   }
 
   // Record the customer's binding place-order consent (Invariant I8) against the
@@ -626,14 +626,13 @@ export async function POST(req: NextRequest) {
   // Separate NON-fatal update (never in the main insert) so an order can't fail
   // if migration 080 hasn't run — missing columns just make this a no-op.
   if (!isPickup && (delivery_lodge || delivery_block || delivery_room)) {
-    db.from('orders')
+    await db.from('orders')
       .update({
         delivery_lodge: delivery_lodge?.trim() || null,
         delivery_block: delivery_block?.trim() || null,
         delivery_room:  delivery_room?.trim()  || null,
       })
       .eq('id', order.id)
-      .then(() => {}, () => {})
   }
 
   // Stamp the delivery GPS on the order for rider navigation. Separate, NON-fatal
@@ -720,14 +719,16 @@ export async function POST(req: NextRequest) {
     }
 
     const now = new Date().toISOString()
-    await db.from('orders').update({
+    const { data: paidOrder } = await db.from('orders').update({
       payment_method: 'WALLET',
       wallet_amount_kobo: totalAmount,
       payment_status: 'PAID',
       status: isScheduled ? 'SCHEDULED' : 'PENDING',
       ...(isScheduled ? {} : { pending_since: now, placed_at: now, order_state: 'placed' }),
       updated_at: now,
-    }).eq('id', order.id).eq('payment_status', 'PENDING')
+    }).eq('id', order.id).eq('payment_status', 'PENDING').select('id').maybeSingle()
+
+    if (paidOrder) await sendOrderConfirmationEmail(db, { orderId: order.id })
 
     if (!isScheduled) {
       await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, netTotal, appUrl)
@@ -768,7 +769,7 @@ export async function POST(req: NextRequest) {
     // time. For an immediate order: make it visible to the vendor now (mirrors the
     // charge.success webhook), stamping pending_since for the auto-cancel clock.
     const now = new Date().toISOString()
-    await db
+    const { data: paidOrder } = await db
       .from('orders')
       .update(
         isScheduled
@@ -777,6 +778,10 @@ export async function POST(req: NextRequest) {
       )
       .eq('id', order.id)
       .eq('payment_status', 'PENDING')
+      .select('id')
+      .maybeSingle()
+
+    if (paidOrder) await sendOrderConfirmationEmail(db, { orderId: order.id })
 
     if (!isScheduled) {
       await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, netTotal, appUrl)

@@ -12,6 +12,7 @@ import { verifyHandoverCode, recordWrongHandoverAttempt, HANDOVER_ATTEMPT_LIMIT 
 import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { finalizeOrderFeedAttribution } from '@/lib/feed/attribution'
+import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 
 // POST /api/orders/[id]/collect
 // The vendor hands a pickup (order ahead) order to the customer by entering the
@@ -172,6 +173,13 @@ export async function POST(
       delivery_type: order.delivery_type,
       handover_method: 'CODE',
     },
+  })
+
+  await emailCommittedOrderStatus(db, {
+    orderId: id,
+    status: 'COMPLETED',
+    actorType: session.role,
+    actorId: session.userId ?? session.phone,
   })
 
   return NextResponse.json({ success: true, status: 'COMPLETED' })

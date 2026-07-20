@@ -64,7 +64,7 @@ export default function AdminVendors() {
     setLoading(false)
   }
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+
   useEffect(() => { fetchVendors() }, [])
 
   async function doAction(vendorId: string, action: 'review' | 'schedule_inspection' | 'mark_inspected' | 'approve' | 'suspend' | 'unsuspend') {

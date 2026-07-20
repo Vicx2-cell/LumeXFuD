@@ -11,6 +11,7 @@ import {
 import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { completeOrderPayout } from '@/lib/order-payout'
 import { getPayoutsMode } from '@/lib/controls'
+import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 
 // Called every minute by Vercel cron.
 // Finds DELIVERED orders whose 15-min dispute window has passed,
@@ -294,6 +295,13 @@ export async function POST(req: NextRequest) {
       }
 
       // ── Rider wallet notification + milestone check ─────────────────────────
+      await emailCommittedOrderStatus(db, {
+        orderId: order.id,
+        status: 'COMPLETED',
+        actorType: 'system',
+        actorId: 'SYSTEM_RELEASE_PAYMENTS',
+      })
+
       if (riderAmount > 0) {
         const { data: riderRow } = await db
           .from('riders')

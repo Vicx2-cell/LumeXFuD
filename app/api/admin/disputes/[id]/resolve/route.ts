@@ -9,6 +9,7 @@ import { rateLimitGeneric } from '@/lib/rate-limit'
 import { requireStepUpForAmount } from '@/lib/step-up'
 import { audit } from '@/lib/audit'
 import { finalizeOrderFeedAttribution, reverseOrderFeedAttribution } from '@/lib/feed/attribution'
+import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 
 export async function POST(
   req: NextRequest,
@@ -91,12 +92,13 @@ export async function POST(
     })
   }
 
-  await db.from('orders').update({
+  const { data: transitioned } = await db.from('orders').update({
     status:         newStatus,
     order_state:    parsed.data.resolution === 'REFUND' ? 'cancelled' : 'delivered',
     payment_status: parsed.data.resolution === 'REFUND' ? 'REFUNDED' : undefined,
     updated_at:     now,
-  }).eq('id', id)
+  }).eq('id', id).eq('status', 'DISPUTED').select('id').maybeSingle()
+  if (!transitioned) return NextResponse.json({ error: 'Order was already resolved' }, { status: 409 })
 
   await db.from('disputes').update({
     status:      parsed.data.resolution === 'REFUND' ? 'RESOLVED_REFUND' : 'RESOLVED_NO_ACTION',
@@ -142,6 +144,13 @@ export async function POST(
     old_value: { status: 'DISPUTED' },
     new_value: { status: newStatus, notes: parsed.data.notes },
     ip_address: req.headers.get('x-forwarded-for') ?? undefined,
+  })
+
+  await emailCommittedOrderStatus(db, {
+    orderId: id,
+    status: newStatus,
+    actorType: session.role,
+    actorId: session.userId ?? session.phone,
   })
 
   return NextResponse.json({ success: true, new_status: newStatus })

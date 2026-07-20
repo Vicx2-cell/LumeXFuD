@@ -1,71 +1,23 @@
-# Termii Notifications (WhatsApp + SMS)
+# Sendchamp Notifications (WhatsApp + SMS)
 
 ## Configuration
-- **WhatsApp**: Primary channel for most notifications (cheaper, richer media)
-- **SMS**: Used exclusively for OTP (universal reach, faster delivery for critical auth)
-- **Sender ID**: `LumeXFud` (must be pre-approved by Termii)
 
-## Notification Service Pattern
+- **OTP**: Sendchamp managed WhatsApp Verification API
+- **Notifications**: Approved Sendchamp WhatsApp template when configured
+- **Fallback**: Sendchamp SMS when the WhatsApp template is unavailable
+- **Sender ID**: `LumeX` (must be approved in Sendchamp)
+
+All user-facing phone notifications go through `lib/notify.ts`. OTP creation and
+confirmation go directly through `lib/sendchamp.ts`. Both paths use the
+server-only `SENDCHAMP_API_KEY`; the key must never be exposed to the browser.
 
 ```typescript
-// lib/termii/index.ts
-import { normalizePhone } from '../phone'; // E.164 normalization
-import { db } from '../supabase/client'; // Or server client, depending on context
-import { termiiClient } from './init'; // Initialized Termii client
+import { sendWhatsAppWithFallback } from '@/lib/notify'
 
-interface NotificationParams {
-  to: string;
-  channel?: 'whatsapp' | 'sms' | 'push';
-  template: string;
-  payload: Record<string, any>;
-  user_id: string; // ID of the recipient user
-  user_type: 'CUSTOMER' | 'VENDOR' | 'RIDER' | 'ADMIN' | 'SUPER_ADMIN';
-}
-
-// Placeholder for template rendering logic
-function renderTemplate(template: string, payload: Record<string, any>): string {
-  // In a real app, this would use a proper templating engine
-  let message = template;
-  for (const key in payload) {
-    message = message.replace(new RegExp(`{${key}}`, 'g'), payload[key]);
-  }
-  return message;
-}
-
-export async function sendNotification({
-  to, channel = 'whatsapp', template, payload, user_id, user_type
-}: NotificationParams) {
-  const phone = normalizePhone(to);
-
-  try {
-    const result = await termiiClient.send({ to: phone, message: renderTemplate(template, payload), channel });
-
-    await db.notifications.insert({
-      user_id,
-      user_type,
-      channel,
-      template,
-      payload,
-      status: 'SENT',
-      termii_id: result.message_id,
-      sent_at: new Date().toISOString()
-    });
-
-    return result;
-  } catch (err: any) {
-    await db.notifications.insert({
-      user_id,
-      user_type,
-      channel,
-      template,
-      payload,
-      status: 'FAILED',
-      error: err.message,
-      created_at: new Date().toISOString()
-    });
-    throw err;
-  }
-}
+await sendWhatsAppWithFallback({
+  to: phone,
+  message: renderTemplate(template, payload),
+})
 ```
 
 ## Complete Template List
@@ -326,7 +278,7 @@ CREATE TABLE notifications (
   template TEXT NOT NULL,
   payload JSONB,
   status TEXT NOT NULL CHECK (status IN ('PENDING','SENT','DELIVERED','READ','FAILED')),
-  termii_id TEXT,
+  provider_message_id TEXT,
   error TEXT,
   retry_count INT DEFAULT 0,
   sent_at TIMESTAMPTZ,
@@ -402,18 +354,18 @@ Message: "Your rider {{rider_name}} assigned! 📍 {{eta}} mins away. {{vehicle}
 - Subscription reminders (3 days before due date)
 - Reorder suggestions (Thursdays at 5pm)
 
-## Termii Integration
+## Sendchamp Integration
 
 ### API Configuration
-- Use Termii Send WhatsApp endpoint for primary channel
-- Fallback to SMS endpoint if WhatsApp fails
+- Use an approved Sendchamp WhatsApp template for the primary notification channel
+- Fall back to Sendchamp SMS if WhatsApp fails or is not configured
 - Max 160 chars for SMS, up to 1000 for WhatsApp
 - Rate limit: 100 msgs/min per account
 
 ### Sending Flow
 ```
 1. Create notification record with status PENDING
-2. Call Termii WhatsApp API
+2. Call Sendchamp WhatsApp API
 3. Get message_id from response
 4. Update notification with message_id and status SENT
 5. Poll for delivery status (via webhook if supported)

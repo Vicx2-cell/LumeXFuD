@@ -58,10 +58,6 @@ export interface WalletTransaction {
   created_at: string
 }
 
-function addHours(date: Date, hours: number): Date {
-  return new Date(date.getTime() + hours * 3_600_000)
-}
-
 // ─── Hold policy ──────────────────────────────────────────────────────────────
 // Every completed order credits the rider + vendor as a HOLD (locked) before it
 // becomes withdrawable. The hold is short — long blanket holds just delay people

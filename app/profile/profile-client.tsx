@@ -74,6 +74,7 @@ export function ProfileClient({
 }) {
   const features = useFeatures()
   const [name, setName] = useState(profile?.name ?? '')
+  const [email, setEmail] = useState(profile?.email ?? '')
   const [hostel, setHostel] = useState(profile?.hostel ?? '')
   const [room, setRoom] = useState(profile?.room_number ?? '')
   const [saving, setSaving] = useState(false)
@@ -223,7 +224,12 @@ export function ProfileClient({
       const res = await fetch('/api/auth/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), hostel: hostel.trim(), room_number: room.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          ...(email.trim() ? { email: email.trim() } : {}),
+          hostel: hostel.trim(),
+          room_number: room.trim(),
+        }),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({})) as { error?: string }
@@ -441,6 +447,19 @@ export function ProfileClient({
               autoCapitalize="words"
               className="lx-field w-full px-4 py-3 text-sm outline-none"
             />
+          </div>
+          <div>
+            <label className="block text-xs text-white/50 mb-1.5">Email address</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+              autoCapitalize="none"
+              className="lx-field w-full px-4 py-3 text-sm outline-none"
+            />
+            {!profile?.email && <p className="mt-1.5 text-xs text-white/35">Add an email for order updates and a welcome note.</p>}
           </div>
           <div>
             <label className="block text-xs text-white/50 mb-1.5">Hostel / Hall</label>

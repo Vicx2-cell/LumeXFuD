@@ -319,7 +319,7 @@ Content-Security-Policy:
   style-src 'self' 'unsafe-inline';
   img-src 'self' https:;
   font-src 'self';
-  connect-src 'self' https://api.paystack.co https://termii.com;
+  connect-src 'self' https://api.paystack.co https://api.sendchamp.com;
   frame-ancestors 'none';
 ```
 

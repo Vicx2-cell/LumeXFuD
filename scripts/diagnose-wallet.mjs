@@ -38,8 +38,6 @@ console.log(`\n=== PENDING HOLD TXNS (${(holds ?? []).length}) ===`)
 console.log(`  due now (should have released) = ${due}   still in hold (future) = ${future}   null release_at = ${noRelease}`)
 
 // 4. Orders stuck mid-payout
-const { data: deliv } = await db.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'DELIVERED').eq('wallet_released', false)
-const { data: compUnreleased } = await db.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'COMPLETED').eq('wallet_released', false)
 // counts come back on the response; re-query with count
 const delivCount = (await db.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'DELIVERED').eq('wallet_released', false)).count
 const compCount = (await db.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'COMPLETED').eq('wallet_released', false)).count

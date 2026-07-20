@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     })
 
     return NextResponse.json({ recovery_code: newRecoveryCode })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 }

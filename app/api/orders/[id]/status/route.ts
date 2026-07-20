@@ -14,7 +14,8 @@ import { getFeature } from '@/lib/features'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
-import { recordOrderStatusEvent, promoteVerifiedPlaceFromOrder } from '@/lib/location-intelligence'
+import { promoteVerifiedPlaceFromOrder } from '@/lib/location-intelligence'
+import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 import { finalizeOrderFeedAttribution, reverseOrderFeedAttribution } from '@/lib/feed/attribution'
 import {
   MAX_READY_EXTENSION_COUNT,
@@ -26,6 +27,7 @@ import {
   promisedReadyAt,
 } from '@/lib/order-state'
 import type { OrderStatus } from '@/types'
+import { deliveryPromiseAt, estimateNeedsReason, speedTargetAt } from '@/lib/order-speed'
 
 // Whitelist: [from, to, allowed roles]
 const TRANSITIONS: Array<[OrderStatus, OrderStatus, string[]]> = [
@@ -90,7 +92,7 @@ export async function PATCH(
 
   const { data: order, error } = await db
     .from('orders')
-    .select('id, order_number, status, delivery_type, vendor_id, customer_id, rider_id, guest_phone, total_amount, subtotal, rider_delivery_cut, tip_amount, platform_markup, platform_delivery_cut, placed_at, pending_since, prep_time_minutes, promised_ready_at, promised_ready_extension_count, city_id, delivery_address, delivery_lodge, delivery_block, delivery_room, delivery_latitude, delivery_longitude')
+    .select('id, order_number, status, delivery_type, vendor_id, customer_id, rider_id, guest_phone, total_amount, subtotal, rider_delivery_cut, tip_amount, platform_markup, platform_delivery_cut, placed_at, pending_since, prep_time_minutes, promised_ready_at, promised_delivery_at, promised_ready_extension_count, city_id, delivery_address, delivery_lodge, delivery_block, delivery_room, delivery_latitude, delivery_longitude')
     .eq('id', id)
     .single()
 
@@ -110,6 +112,17 @@ export async function PATCH(
       : order.customer_id
     if (!ownerId || ownerId !== session.userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  }
+
+  if (newStatus === 'VENDOR_ACCEPTED') {
+    const prep = parsed.data.estimated_prep_minutes
+    const delivery = order.delivery_type === 'PICKUP' ? 0 : parsed.data.estimated_delivery_minutes
+    if (prep === undefined || delivery === undefined) {
+      return NextResponse.json({ error: 'Choose preparation and delivery estimates before accepting this order', code: 'ESTIMATE_REQUIRED' }, { status: 400 })
+    }
+    if (estimateNeedsReason(prep, delivery) && !parsed.data.estimate_reason) {
+      return NextResponse.json({ error: 'Give a reason when the total estimate exceeds 30 minutes', code: 'ESTIMATE_REASON_REQUIRED' }, { status: 400 })
     }
   }
 
@@ -140,11 +153,16 @@ export async function PATCH(
       extensionMinutes,
       paidLiveAt(order as { placed_at?: string | null; pending_since?: string | null }),
     ).toISOString()
+    const currentDeliveryPromise = order.promised_delivery_at ? new Date(order.promised_delivery_at as string) : null
+    const nextDeliveryPromise = currentDeliveryPromise && !Number.isNaN(currentDeliveryPromise.getTime())
+      ? new Date(currentDeliveryPromise.getTime() + extensionMinutes * 60_000).toISOString()
+      : null
     const now = new Date().toISOString()
     const { data: extended } = await db
       .from('orders')
       .update({
         promised_ready_at: nextPromised,
+        ...(nextDeliveryPromise ? { promised_delivery_at: nextDeliveryPromise } : {}),
         promised_ready_extended_at: now,
         promised_ready_extension_count: extensionCount + 1,
         updated_at: now,
@@ -234,11 +252,22 @@ export async function PATCH(
   if (orderState) updateData.order_state = orderState
   if (timestampField) updateData[timestampField] = now
   if (newStatus === 'VENDOR_ACCEPTED') {
+    const prepMinutes = parsed.data.estimated_prep_minutes!
+    const deliveryMinutes = order.delivery_type === 'PICKUP' ? 0 : parsed.data.estimated_delivery_minutes!
+    const acceptedAt = new Date(now)
+    const placedAt = paidLiveAt(order as { placed_at?: string | null; pending_since?: string | null }) ?? acceptedAt
+    const flagged = estimateNeedsReason(prepMinutes, deliveryMinutes)
     updateData.promised_ready_at = promisedReadyAt(
-      new Date(now),
-      order.prep_time_minutes as number | null,
-      paidLiveAt(order as { placed_at?: string | null; pending_since?: string | null }),
+      acceptedAt,
+      prepMinutes,
+      placedAt,
     ).toISOString()
+    updateData.vendor_estimated_prep_minutes = prepMinutes
+    updateData.vendor_estimated_delivery_minutes = deliveryMinutes
+    updateData.vendor_estimate_reason = parsed.data.estimate_reason ?? null
+    updateData.speed_target_at = speedTargetAt(placedAt).toISOString()
+    updateData.promised_delivery_at = deliveryPromiseAt(acceptedAt, prepMinutes, deliveryMinutes).toISOString()
+    updateData.speed_commitment_flagged_at = flagged ? now : null
   }
 
   // When DELIVERED: set 15-min auto-complete window
@@ -342,10 +371,16 @@ export async function PATCH(
       to_status: newStatus,
       status_changed_at: now,
       delivery_type: order.delivery_type,
+      ...(newStatus === 'VENDOR_ACCEPTED' ? {
+        estimated_prep_minutes: parsed.data.estimated_prep_minutes,
+        estimated_delivery_minutes: order.delivery_type === 'PICKUP' ? 0 : parsed.data.estimated_delivery_minutes,
+        estimate_reason: parsed.data.estimate_reason ?? null,
+        speed_commitment_flagged: estimateNeedsReason(parsed.data.estimated_prep_minutes!, order.delivery_type === 'PICKUP' ? 0 : parsed.data.estimated_delivery_minutes!),
+      } : {}),
     },
   })
 
-  void recordOrderStatusEvent(db, {
+  await emailCommittedOrderStatus(db, {
     orderId: id,
     actorType: session.role,
     actorId: session.userId ?? session.phone,
@@ -354,7 +389,7 @@ export async function PATCH(
     longitude: parsed.data.longitude ?? null,
     gpsAccuracy: parsed.data.gps_accuracy ?? null,
     validationStatus: parsed.data.latitude != null && parsed.data.longitude != null ? 'captured' : 'not_validated',
-  }).catch(() => {})
+  })
 
   if (newStatus === 'COMPLETED' && order.delivery_type !== 'PICKUP') {
     void promoteVerifiedPlaceFromOrder(db, {

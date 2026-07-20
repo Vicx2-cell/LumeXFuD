@@ -3,5 +3,7 @@ scripts
 docs
 *.bak
 *.log
+site.tar
+site.zip
 .git
 .next

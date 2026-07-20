@@ -65,6 +65,7 @@ export async function SiteFooter() {
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/8 pt-3 -mb-1">
           <Link href="/" className="inline-flex items-center min-h-[44px] py-1.5 hover:text-white/70 transition-colors">Home</Link>
+          <Link href="/faq" className="inline-flex items-center min-h-[44px] py-1.5 hover:text-white/70 transition-colors">Help Center</Link>
           <Link href="/contact" className="inline-flex items-center min-h-[44px] py-1.5 hover:text-white/70 transition-colors">Contact</Link>
           <Link href="/refunds" className="inline-flex items-center min-h-[44px] py-1.5 hover:text-white/70 transition-colors">Refunds &amp; Cancellations</Link>
           <Link href="/terms" className="inline-flex items-center min-h-[44px] py-1.5 hover:text-white/70 transition-colors">Terms</Link>

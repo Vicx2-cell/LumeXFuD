@@ -9,6 +9,7 @@ import { renderTemplate } from '@/lib/notify-templates'
 import { recordPlatformEarning } from '@/lib/platform-earnings'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { requireStepUpForAmount } from '@/lib/step-up'
+import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser()
@@ -112,7 +113,20 @@ export async function POST(req: NextRequest) {
 
   // Full refund → flip the order workflow status too (parity with prior behaviour).
   if (row.fully_refunded) {
-    await db.from('orders').update({ status: 'REFUNDED', order_state: 'cancelled', updated_at: new Date().toISOString() }).eq('id', order.id)
+    const { data: transitioned } = await db.from('orders')
+      .update({ status: 'REFUNDED', order_state: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('id', order.id)
+      .neq('status', 'REFUNDED')
+      .select('id')
+      .maybeSingle()
+    if (transitioned) {
+      await emailCommittedOrderStatus(db, {
+        orderId: order.id as string,
+        status: 'REFUNDED',
+        actorType: session.role,
+        actorId: session.userId ?? session.phone,
+      })
+    }
   }
 
   // Record as platform cost (fire-and-forget)

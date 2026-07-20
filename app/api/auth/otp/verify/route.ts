@@ -8,6 +8,7 @@ import { confirmOtp } from '@/lib/sendchamp'
 
 // Sendchamp's confirm can be slow from Vercel's region - give it headroom.
 export const maxDuration = 30
+export const runtime = 'nodejs'
 
 const schema = z.object({
   phone: z.string().min(7).max(20),

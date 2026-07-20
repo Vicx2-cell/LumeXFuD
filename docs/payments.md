@@ -72,12 +72,12 @@ This is the most security-critical endpoint in the app.
 ```
 CASE 'charge.success':
   - UPDATE order: payment_status='SUCCESS', status='PENDING' (vendor needs to accept)
-  - Send Termii WhatsApp to vendor: "New order #XXX! Accept in 5 mins."
+  - Send Sendchamp WhatsApp to vendor: "New order #XXX! Accept in 5 mins."
   - Set vendor 5-min auto-cancel timer (cron picks this up)
 
 CASE 'charge.failed':
   - UPDATE order: payment_status='FAILED', status='CANCELLED'
-  - Send Termii to customer: "Payment didn't go through. Your cart is saved — try again?"
+  - Send Sendchamp notification to customer: "Payment didn't go through. Your cart is saved — try again?"
 
 CASE 'transfer.success':
   - Find wallet_transaction by paystack_transfer_code

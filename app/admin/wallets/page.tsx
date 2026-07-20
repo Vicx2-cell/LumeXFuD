@@ -92,7 +92,7 @@ export default function AdminWalletsPage() {
     setLoading(false)
   }, [router, typeFilter, frozenFilter, search])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [])
 
   async function freezeWallet(row: WalletRow) {

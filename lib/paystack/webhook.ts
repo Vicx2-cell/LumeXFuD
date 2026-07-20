@@ -9,6 +9,7 @@ import { refundTransaction } from './transfer'
 import { verifyPaystackTransaction } from './init'
 import { processPremiumOrBoostWebhook } from './billing'
 import { recordSecurityEvent } from '../security-events'
+import { sendOrderConfirmationEmail } from '../transactional-email'
 
 // Naira for a refund notification, derived from the canonical kobo column.
 // Guards against NaN: a missing/garbled amount renders ₦0, never "NaN".
@@ -224,6 +225,8 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
         .single()
 
       if (error || !order) break
+
+      await sendOrderConfirmationEmail(db, { orderId: order.id as string })
 
       // Scheduled orders are handed to the vendor later by the release cron.
       if (releaseInFuture) break

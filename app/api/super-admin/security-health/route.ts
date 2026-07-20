@@ -10,7 +10,7 @@ export const maxDuration = 30
 
 // GET /api/super-admin/security-health — super-admin only. Runs the read-only
 // security self-audit on demand and returns each check + the overall posture.
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

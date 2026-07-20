@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json({ recovery_code: newRecoveryCode, redirect_path: user.role === 'customer' ? '/' : user.role === 'vendor' ? '/vendor-dashboard' : user.role === 'rider' ? '/rider' : user.role === 'admin' ? '/admin' : '/super-admin' })
     res.cookies.set(sessionCookieName(), token, setCookieOptions(user.role))
     return res
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 }

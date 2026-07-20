@@ -6,6 +6,7 @@ import { rateLimitGeneric } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 import { isBankVerified, BANK_GATE_MESSAGE } from '@/lib/wallet'
 import { recordSecurityEvent } from '@/lib/security-events'
+import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 
 const acceptInput = z.object({ order_id: z.string().uuid() })
 
@@ -109,6 +110,13 @@ export async function POST(
       to_status: 'RIDER_ASSIGNED',
       status_changed_at: now,
     },
+  })
+
+  await emailCommittedOrderStatus(db, {
+    orderId: parsed.data.order_id,
+    status: 'RIDER_ASSIGNED',
+    actorType: session.role,
+    actorId: session.userId ?? session.phone,
   })
 
   return NextResponse.json({ success: true, order_number: updated.order_number })

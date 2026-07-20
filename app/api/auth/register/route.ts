@@ -13,6 +13,7 @@ import { isPhoneBlocked } from '@/lib/blocklist'
 import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
 import { buildPublicDisplayName, buildPublicHandleCandidates, chooseAvailablePublicHandle } from '@/lib/social-profile'
 import { autoFollowOfficialAccount } from '@/lib/feed/official-follow'
+import { sendWelcomeEmail } from '@/lib/transactional-email'
 
 export async function POST(req: NextRequest) {
   try {
@@ -171,6 +172,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unable to create public profile' }, { status: 500 })
     }
     await autoFollowOfficialAccount(String(createdProfile.id), db)
+
+    // The account and its public profile are now durable. Email is best-effort
+    // and has its own permanent idempotency record, so it can never roll back signup.
+    await sendWelcomeEmail(db, { customerId: user.id, email, name: data.name })
 
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
     const userAgent = req.headers.get('user-agent') ?? undefined

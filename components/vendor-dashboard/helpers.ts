@@ -24,9 +24,14 @@ export interface VendorDashboardOrder {
   delivery_type: 'BIKE' | 'DOOR' | 'PICKUP'
   delivery_address: string
   subtotal?: number | null
-  total_amount: number
   created_at: string
   pickup_eta_at: string | null
+  speed_target_at?: string | null
+  promised_delivery_at?: string | null
+  vendor_estimated_prep_minutes?: number | null
+  vendor_estimated_delivery_minutes?: number | null
+  speed_commitment_flagged_at?: string | null
+  delay_detected_at?: string | null
   customer_id?: string | null
   customers: VendorDashboardCustomer | null
   order_items: VendorDashboardOrderItem[]
@@ -68,9 +73,11 @@ export interface VendorDashboardReviewSummary {
 
 export interface VendorDashboardSummary {
   orders_today: number
-  revenue_today_kobo: number
+  vendor_sales_today_kobo: number
   pending_orders: number
   active_orders: number
+  preparing_orders: number
+  ready_orders: number
   completed_today: number
   avg_prep_minutes: number | null
   store_status: VendorDashboardStatus
@@ -80,7 +87,7 @@ export interface VendorDashboardRecentOrder {
   id: string
   order_number: string
   status: string
-  total_amount: number
+  subtotal: number
   created_at: string
   order_items?: Array<{
     name: string

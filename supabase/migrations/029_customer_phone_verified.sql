@@ -2,7 +2,7 @@
 -- LumeX Fud — Migration 029: customers.phone_verified stamp
 -- ============================================================
 -- Supports the phone_verification feature flag (super-admin Feature Toggles).
--- While OTP delivery (Termii) is unavailable a super admin can turn the flag
+-- While OTP delivery (Sendchamp) is unavailable a super admin can turn the flag
 -- OFF so onboarding isn't blocked; accounts created in that window have an
 -- UNVERIFIED phone. Without a marker they'd be indistinguishable from verified
 -- accounts, so the "bring OTP back later" plan couldn't force re-verification

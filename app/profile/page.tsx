@@ -20,7 +20,7 @@ export default async function ProfilePage() {
   if (session.role === 'customer') {
     const { data: customer } = await db
       .from('customers')
-      .select('id, name, phone, hostel, room_number, dispute_count, login_pin_hash, avatar_url')
+      .select('id, name, email, phone, hostel, room_number, dispute_count, login_pin_hash, avatar_url')
       .eq('phone', session.phone)
       .single()
 
@@ -96,6 +96,7 @@ export default async function ProfilePage() {
 export interface CustomerProfile {
   id: string
   name: string | null
+  email: string | null
   phone: string
   hostel: string | null
   room_number: string | null

@@ -12,6 +12,7 @@ import { verifySocialPending, SOCIAL_PENDING_COOKIE, shortCookieOptions } from '
 import { isPhoneBlocked } from '@/lib/blocklist'
 import { buildPublicDisplayName, buildPublicHandleCandidates, chooseAvailablePublicHandle } from '@/lib/social-profile'
 import { autoFollowOfficialAccount } from '@/lib/feed/official-follow'
+import { sendWelcomeEmail, shouldSendWelcomeForEmailChange } from '@/lib/transactional-email'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Enter your name').max(80),
@@ -141,12 +142,12 @@ export async function POST(req: NextRequest) {
     // They proved BOTH the phone (OTP) and the Google identity, so linking is safe.
     const { data: byPhone } = await db
       .from('customers')
-      .select('id, google_sub, email, suspended_until, suspend_reason')
+      .select('id, google_sub, email, name, welcome_email_sent_at, suspended_until, suspend_reason')
       .eq('phone', normalizedPhone)
       .is('deleted_at', null)
       .maybeSingle()
     const existing = byPhone as
-      | { id: string; google_sub?: string | null; email?: string | null; suspended_until?: string | null; suspend_reason?: string | null }
+      | { id: string; google_sub?: string | null; email?: string | null; name?: string | null; welcome_email_sent_at?: string | null; suspended_until?: string | null; suspend_reason?: string | null }
       | null
 
     if (existing) {
@@ -173,8 +174,17 @@ export async function POST(req: NextRequest) {
         updates.email = emailToStore
         updates.email_verified = pending.emailVerified
       }
+      let emailWasAdded = false
       if (Object.keys(updates).length > 0) {
-        await db.from('customers').update(updates).eq('id', existing.id)
+        const { error: updateError } = await db.from('customers').update(updates).eq('id', existing.id)
+        emailWasAdded = !updateError && !existing.email && !!emailToStore
+      }
+      if (emailWasAdded && shouldSendWelcomeForEmailChange({
+        previousEmail: existing.email,
+        nextEmail: emailToStore,
+        welcomeEmailSentAt: existing.welcome_email_sent_at,
+      })) {
+        await sendWelcomeEmail(db, { customerId: existing.id, email: emailToStore, name: existing.name })
       }
 
       const { token } = await createSession(existing.id, normalizedPhone, role, ipAddress, userAgent)
@@ -227,6 +237,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unable to create public profile' }, { status: 500 })
     }
     await autoFollowOfficialAccount(String(createdProfile.id), db)
+
+    if (emailToStore) {
+      await sendWelcomeEmail(db, { customerId: user.id, email: emailToStore, name })
+    }
 
     const { token } = await createSession(user.id, normalizedPhone, role, ipAddress, userAgent)
     const res = NextResponse.json({ role, redirect_path: getRoleRedirect(role) })

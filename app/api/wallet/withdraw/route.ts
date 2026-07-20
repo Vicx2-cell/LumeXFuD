@@ -13,8 +13,6 @@ import { z } from 'zod'
 import type { WalletBalance } from '@/lib/wallet'
 import crypto from 'crypto'
 
-const MIN_KOBO   = 50_000   // ₦500
-const MAX_KOBO   = 2_500_000 // ₦25,000
 const DAILY_LIMIT_KOBO  = 5_000_000  // ₦50,000
 const WEEKLY_LIMIT_KOBO = 20_000_000 // ₦200,000
 

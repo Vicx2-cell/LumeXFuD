@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     let normalized: string
     try {
       normalized = normalizePhone(phone)
-    } catch (err) {
+    } catch {
       return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 })
     }
 
@@ -75,8 +75,6 @@ export async function POST(req: NextRequest) {
 
     const tempPin = generateTempPin()
     const pinHash = await hashSecret(tempPin)
-    const now = new Date().toISOString()
-
     const insert = {
       owner_name,
       business_name: shop_name,
@@ -128,7 +126,7 @@ export async function POST(req: NextRequest) {
     // Burn the phone-verified cookie — single use, so the next vendor must verify afresh.
     res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
     return res
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 }

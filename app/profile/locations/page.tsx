@@ -85,7 +85,7 @@ export default function ProfileLocationsPage() {
     setLoading(false)
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void load() }, [])
 
   async function captureCurrent() {

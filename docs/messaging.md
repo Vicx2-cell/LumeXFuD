@@ -30,7 +30,7 @@ Supabase Realtime channel: `order-messages-{order_id}`
 Subscribe on: order status page, vendor dashboard, rider dashboard
 
 ## WhatsApp Fallback
-If unread after 5 minutes → send Termii WhatsApp:
+If unread after 5 minutes → send a Sendchamp WhatsApp notification:
 - **To vendor**: "New message from customer on order #LXF-2026-XXXXXX: [preview]"
 - **To customer**: "Your vendor sent a message: [preview]. Reply: [link]"
 - **To rider**: "Customer sent a message: [preview]"
