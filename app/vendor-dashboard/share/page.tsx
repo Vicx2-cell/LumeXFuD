@@ -19,8 +19,8 @@ export default function ShareStorePage() {
   }, [])
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://lumexfud.com.ng'
-  const publicPath = vendor?.slug ? vendorPath(vendor.slug) : (vendor ? `/vendor/${vendor.id}` : '')
-  const url = vendor ? `${origin}${publicPath}` : ''
+  const orderUrl = vendor ? `${origin}/vendor/${vendor.id}` : ''
+  const publicUrl = vendor?.slug ? `${origin}${vendorPath(vendor.slug)}` : ''
   const shop = vendor?.shop_name ?? 'our kitchen'
 
   function copy(text: string, id: string) {
@@ -34,10 +34,11 @@ export default function ShareStorePage() {
   }
 
   const captions: Array<{ id: string; label: string; text: string }> = vendor ? [
-    { id: 'link', label: 'Public link', text: url },
-    { id: 'whatsapp', label: 'WhatsApp', text: `Order from ${shop} on LumeX!\nFresh food, delivered to your hostel. Tap to see the menu and order:\n${url}` },
-    { id: 'status', label: 'WhatsApp / IG status', text: `Hungry? Order from ${shop} now - delivered on campus.\n${url}` },
-    { id: 'bio', label: 'Instagram / TikTok bio', text: `Order online: ${url}` },
+    { id: 'order', label: 'Order link', text: orderUrl },
+    { id: 'whatsapp', label: 'WhatsApp', text: `Order from ${shop} on LumeX!\nFresh food, delivered to your hostel. Tap to see the menu and order:\n${orderUrl}` },
+    { id: 'status', label: 'WhatsApp / IG status', text: `Hungry? Order from ${shop} now - delivered on campus.\n${orderUrl}` },
+    { id: 'bio', label: 'Instagram / TikTok bio', text: `Order online: ${orderUrl}` },
+    ...(publicUrl ? [{ id: 'profile', label: 'Public profile', text: publicUrl }] : []),
   ] : []
 
   return (

@@ -18,10 +18,11 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - First product-commerce improvement committed: group orders preserve add-on selections through seed, shared basket display, cart handoff, checkout totals, and split-share math.
 - Second product-commerce improvement implemented: direct `/group/[code]` menu adds now support a mobile bottom-sheet add-on picker.
 - Third product-commerce improvement implemented: guest delivery checkout with Paystack callback access tokens.
+- Fourth product-commerce improvement implemented: vendor share tools now lead with the direct order link instead of the content-first SEO profile.
 
 ## Baseline
 
 - Worktree at loop start appeared clean except Git config ignore permission warnings.
 - Project uses Next.js 16.2.6, React 19.2.4, Vitest, Supabase, and Sentry.
 - Baseline typecheck script is absent in `package.json`.
-- Focused tests, lint, and build passed for group-order and guest-checkout slices.
+- Focused tests, lint, and build passed for group-order, guest-checkout, and storefront-share slices.

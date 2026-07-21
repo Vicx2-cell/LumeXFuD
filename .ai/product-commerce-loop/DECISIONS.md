@@ -10,3 +10,4 @@
 - Keep the direct group-page add-on picker as the next focused UX slice rather than overexpanding this commit.
 - Guest checkout is delivery-only and Paystack-only for now; account-bound wallet, pickup, group orders, rewards, ratings, and chat remain authenticated.
 - Store only `guest_access_token_hash`; raw guest tokens live in the Paystack callback URL and are never persisted.
+- Keep the SEO profile link available as a secondary vendor share asset, but make direct ordering the default copy target.

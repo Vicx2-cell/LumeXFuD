@@ -12,3 +12,4 @@
 - Direct add from `/group/[code]` previously added the base item only. It now opens a mobile bottom sheet for add-on selection before posting to the validated API.
 - Guest checkout was schema-ready (`orders.guest_phone`) but disabled by an early `/api/orders` authentication gate and by the order page redirecting every unauthenticated viewer.
 - Guest order tracking requires a non-enumerable access token because order numbers are sequential.
+- Vendor share page preferred `/uturu/vendor/[slug]`, a content-first SEO page. For commerce sharing, the primary link should land directly on `/vendor/[id]` where the live menu/cart flow starts.

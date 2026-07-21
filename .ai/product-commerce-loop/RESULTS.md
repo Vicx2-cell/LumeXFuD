@@ -13,4 +13,7 @@
 - Committed as `238c138 Add group order add-on picker`.
 - Implemented secure guest delivery checkout with hashed order access token and token-aware order tracking.
 - Verification passed for guest checkout slice: lint, focused tests, and production build.
-- Third commit pending.
+- Committed as `e3a17c5 Add secure guest checkout`.
+- Implemented direct-order vendor share links with secondary public profile link.
+- Verification passed for storefront-share slice: build and lint.
+- Fourth commit pending.
