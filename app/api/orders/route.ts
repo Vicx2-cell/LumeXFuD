@@ -789,13 +789,16 @@ export async function POST(req: NextRequest) {
     // Per-member food (server-side prices), then split fees+tip: each pays their
     // food + an equal share of (delivery+platform); the host absorbs the rounding
     // remainder + the tip.
-    const { data: goItemsRaw } = await db.from('group_order_items').select('contributor_id, menu_item_id, quantity').eq('group_order_id', linkedGroupId)
-    const goItems = (goItemsRaw ?? []) as Array<{ contributor_id: string; menu_item_id: string; quantity: number }>
+    const { data: goItemsRaw } = await db.from('group_order_items').select('contributor_id, menu_item_id, quantity, addons').eq('group_order_id', linkedGroupId)
+    const goItems = (goItemsRaw ?? []) as Array<{ contributor_id: string; menu_item_id: string; quantity: number; addons?: Array<{ price_kobo?: number }> | null }>
     const giIds = Array.from(new Set(goItems.map((r) => r.menu_item_id)))
     const { data: giMenu } = await db.from('menu_items').select('id, price_kobo').in('id', giIds)
     const priceMap = new Map((giMenu ?? []).map((m) => [(m as { id: string }).id, Number((m as { price_kobo: number }).price_kobo)]))
     const foodBy = new Map<string, number>()
-    for (const r of goItems) foodBy.set(r.contributor_id, (foodBy.get(r.contributor_id) ?? 0) + (priceMap.get(r.menu_item_id) ?? 0) * r.quantity)
+    for (const r of goItems) {
+      const addonKobo = (Array.isArray(r.addons) ? r.addons : []).reduce((sum, addon) => sum + (Number(addon.price_kobo) || 0), 0)
+      foodBy.set(r.contributor_id, (foodBy.get(r.contributor_id) ?? 0) + ((priceMap.get(r.menu_item_id) ?? 0) + addonKobo) * r.quantity)
+    }
     // The host always participates (pays fees + tip even if they added no food).
     if (customerId && !foodBy.has(customerId)) foodBy.set(customerId, 0)
 

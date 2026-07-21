@@ -5,6 +5,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { getFeature } from '@/lib/features'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { normalizeGroupOrderAddons } from '@/lib/group-order-addons'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,6 +28,7 @@ const addSchema = z.object({
   menu_item_id: z.string().uuid(),
   quantity: z.number().int().positive().max(20),
   notes: z.string().max(200).optional(),
+  addons: z.array(z.string().uuid()).max(20).optional().default([]),
 }).strict()
 
 // POST /api/group-order/[code]/items — a logged-in customer adds their item.
@@ -56,6 +58,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
   const item = mi as { id: string; is_available: boolean } | null
   if (!item || !item.is_available) return NextResponse.json({ error: 'That item is not available.' }, { status: 400 })
 
+  let addons: ReturnType<typeof normalizeGroupOrderAddons> = []
+  if (parsed.data.addons.length > 0) {
+    const uniqueAddonIds = Array.from(new Set(parsed.data.addons))
+    const { data: addonRows } = await db.from('menu_item_addons')
+      .select('id, menu_item_id, name, price_kobo, is_available')
+      .in('id', uniqueAddonIds)
+      .is('deleted_at', null)
+    const addonMap = new Map((addonRows ?? []).map((row) => {
+      const addon = row as { id: string; menu_item_id: string; name: string; price_kobo: number; is_available: boolean }
+      return [addon.id, addon]
+    }))
+    addons = normalizeGroupOrderAddons(uniqueAddonIds.map((id) => {
+      const addon = addonMap.get(id)
+      return addon && addon.menu_item_id === parsed.data.menu_item_id && addon.is_available
+        ? { id: addon.id, name: addon.name, price_kobo: addon.price_kobo }
+        : null
+    }))
+    if (addons.length !== uniqueAddonIds.length) {
+      return NextResponse.json({ error: 'One or more add-ons are invalid or unavailable.' }, { status: 400 })
+    }
+  }
+
   if (!(await getFeature('group_orders'))) {
     return NextResponse.json({ error: 'Group ordering is currently unavailable.' }, { status: 503 })
   }
@@ -78,6 +102,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
     menu_item_id: parsed.data.menu_item_id,
     quantity: parsed.data.quantity,
     notes: parsed.data.notes ?? null,
+    addons,
   })
   if (error) return NextResponse.json({ error: 'Could not add item' }, { status: 500 })
 

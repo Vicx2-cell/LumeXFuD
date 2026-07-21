@@ -264,8 +264,7 @@ export default function CartPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vendor_id: cart.vendor_id,
-          // v1 group orders carry base items only (no add-ons yet).
-          items: cart.items.map((i) => ({ menu_item_id: i.menu_item_id, quantity: i.quantity, notes: i.special_instructions })),
+          items: cart.items.map((i) => ({ menu_item_id: i.menu_item_id, quantity: i.quantity, notes: i.special_instructions, addons: i.addons.map((addon) => addon.id) })),
         }),
       })
       const d = await res.json()

@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useCart, cartLineKey, type CartItem } from '@/components/cart-context'
 import { useFeatures } from '@/lib/use-features'
+import { groupOrderAddonLabel, groupOrderLineTotalKobo, type GroupOrderAddonSnapshot } from '@/lib/group-order-addons'
 
-interface GItem { id: string; contributor_id: string; contributor_name: string; quantity: number; notes: string | null; menu_item_id: string; name: string; price_kobo: number; mine: boolean }
-interface MenuItem { id: string; name: string; price_kobo: number; category: string }
+interface GItem { id: string; contributor_id: string; contributor_name: string; quantity: number; notes: string | null; menu_item_id: string; name: string; price_kobo: number; addons: GroupOrderAddonSnapshot[]; mine: boolean }
+interface MenuItem { id: string; name: string; price_kobo: number; category: string; addons: GroupOrderAddonSnapshot[] }
 interface GroupData { code: string; group_order_id: string; status: string; expires_at: string; is_host: boolean; host_id: string; split_enabled: boolean; funded: Record<string, boolean>; my_balance_kobo: number; my_food_kobo: number; vendor: { id: string; name: string }; items: GItem[]; menu: MenuItem[] }
 
 interface Person { id: string; name: string; total: number; count: number; mine: boolean }
@@ -14,7 +15,7 @@ function groupByPerson(items: GItem[]): Person[] {
   const m = new Map<string, Person>()
   for (const it of items) {
     const e = m.get(it.contributor_id) ?? { id: it.contributor_id, name: it.contributor_name, total: 0, count: 0, mine: false }
-    e.total += it.price_kobo * it.quantity
+    e.total += groupOrderLineTotalKobo(it)
     e.count += it.quantity
     e.mine = e.mine || it.mine
     m.set(it.contributor_id, e)
@@ -83,7 +84,7 @@ export default function GroupOrderPage() {
     // Optimistic: show it instantly, then reconcile with the server silently.
     const m = data?.menu.find((x) => x.id === menu_item_id)
     if (data && m) {
-      setData({ ...data, items: [...data.items, { id: `tmp-${menu_item_id}-${now}`, contributor_id: 'me', contributor_name: 'You', quantity: 1, notes: null, menu_item_id, name: m.name, price_kobo: m.price_kobo, mine: true }] })
+      setData({ ...data, items: [...data.items, { id: `tmp-${menu_item_id}-${now}`, contributor_id: 'me', contributor_name: 'You', quantity: 1, notes: null, menu_item_id, name: m.name, price_kobo: m.price_kobo, addons: [], mine: true }] })
     }
     try {
       const res = await fetch(`/api/group-order/${code}/items`, {
@@ -157,15 +158,15 @@ export default function GroupOrderPage() {
       const unfunded = contribIds.filter((id) => id !== data.host_id && data.funded[id] === false)
       if (unfunded.length && !window.confirm(`${unfunded.length} friend(s) haven't put money in their LumeX wallet yet, so YOU'll pay their share now (they can pay you back). Continue?`)) return
     }
-    // Merge everyone's items by menu item (v1 has no add-ons) and hand the combined
+    // Merge everyone's items by menu item + add-on set and hand the combined
     // basket to the normal cart/checkout — the host pays the whole bill there, so
     // it reuses the existing order + payment flow exactly.
     const lines = new Map<string, CartItem>()
     for (const it of data.items) {
-      const key = cartLineKey(it.menu_item_id, [])
+      const key = cartLineKey(it.menu_item_id, it.addons)
       const existing = lines.get(key)
       if (existing) existing.quantity = Math.min(existing.quantity + it.quantity, 20)
-      else lines.set(key, { id: key, menu_item_id: it.menu_item_id, name: it.name, price_kobo: it.price_kobo, quantity: Math.min(it.quantity, 20), addons: [] })
+      else lines.set(key, { id: key, menu_item_id: it.menu_item_id, name: it.name, price_kobo: it.price_kobo, quantity: Math.min(it.quantity, 20), addons: it.addons })
     }
     if (lines.size === 0) { setError('Add some items first.'); return }
     // Tell the cart this checkout finalizes a group order, so /api/orders links it
@@ -197,7 +198,7 @@ export default function GroupOrderPage() {
   )
   if (!data) return null
 
-  const total = data.items.reduce((s, i) => s + i.price_kobo * i.quantity, 0)
+  const total = data.items.reduce((s, i) => s + groupOrderLineTotalKobo(i), 0)
   const closesIn = remainingLabel(data.expires_at, now)
   const expired = closesIn === 'closed'
   const people = groupByPerson(data.items)
@@ -301,7 +302,8 @@ export default function GroupOrderPage() {
               <div key={it.id} className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm text-white truncate">{it.quantity}× {it.name}</p>
-                  <p className="text-[11px] text-white/40">{it.contributor_name}{it.mine ? ' (you)' : ''} · {naira(it.price_kobo * it.quantity)}</p>
+                  <p className="text-[11px] text-white/40">{it.contributor_name}{it.mine ? ' (you)' : ''} · {naira(groupOrderLineTotalKobo(it))}</p>
+                  {it.addons.length > 0 && <p className="text-[11px] text-white/35">{groupOrderAddonLabel(it.addons)}</p>}
                 </div>
                 {(it.mine || data.is_host) && (
                   <button onClick={() => removeItem(it.id)} disabled={busyId === it.id}
@@ -324,7 +326,7 @@ export default function GroupOrderPage() {
           <div key={m.id} className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#111113] px-4 py-3">
             <div className="min-w-0">
               <p className="text-sm text-white truncate">{m.name}</p>
-              <p className="text-[11px] text-white/40">{naira(m.price_kobo)}</p>
+              <p className="text-[11px] text-white/40">{naira(m.price_kobo)}{m.addons.length > 0 ? ` · ${m.addons.length} add-on${m.addons.length === 1 ? '' : 's'}` : ''}</p>
             </div>
             <button onClick={() => addItem(m.id)} disabled={busyId === m.id || expired}
               className="shrink-0 rounded-lg px-4 text-xs font-semibold text-black disabled:opacity-50" style={{ background: '#F5A623', minHeight: 44 }}>

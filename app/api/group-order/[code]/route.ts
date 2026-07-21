@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { groupOrderLineTotalKobo, normalizeGroupOrderAddons } from '@/lib/group-order-addons'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -48,16 +49,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
 
   const [{ data: vendor }, { data: menu }, { data: items }] = await Promise.all([
     db.from('vendors').select('id, name').eq('id', group.vendor_id).maybeSingle(),
-    db.from('menu_items').select('id, name, price_kobo, category').eq('vendor_id', group.vendor_id).eq('is_available', true).is('deleted_at', null).order('display_order', { ascending: true }),
+    db.from('menu_items').select('id, name, price_kobo, category, menu_item_addons(id, name, price_kobo, is_available, display_order)').eq('vendor_id', group.vendor_id).eq('is_available', true).is('deleted_at', null).order('display_order', { ascending: true }),
     db.from('group_order_items')
-      .select('id, contributor_id, contributor_name, quantity, notes, menu_item_id, menu_items(name, price_kobo)')
+      .select('id, contributor_id, contributor_name, quantity, notes, addons, menu_item_id, menu_items(name, price_kobo)')
       .eq('group_order_id', group.id)
       .order('created_at', { ascending: true }),
   ])
 
   const v = vendor as { id: string; name: string | null } | null
   const itemRows = (items ?? []).map((r) => {
-    const row = r as unknown as { id: string; contributor_id: string; contributor_name: string | null; quantity: number; notes: string | null; menu_item_id: string; menu_items: { name: string; price_kobo: number } | null }
+    const row = r as unknown as { id: string; contributor_id: string; contributor_name: string | null; quantity: number; notes: string | null; addons: unknown; menu_item_id: string; menu_items: { name: string; price_kobo: number } | null }
+    const addons = normalizeGroupOrderAddons(row.addons)
     return {
       id: row.id,
       contributor_id: row.contributor_id,
@@ -67,6 +69,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
       menu_item_id: row.menu_item_id,
       name: row.menu_items?.name ?? 'Item',
       price_kobo: row.menu_items?.price_kobo ?? 0,
+      addons,
       mine: row.contributor_id === myId,
     }
   })
@@ -74,7 +77,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
   // Wallet coverage: can each member's wallet cover their FOOD so far? (Fees are
   // added at checkout; this is the readiness indicator + top-up prompt driver.)
   const foodByPerson = new Map<string, number>()
-  for (const r of itemRows) foodByPerson.set(r.contributor_id, (foodByPerson.get(r.contributor_id) ?? 0) + r.price_kobo * r.quantity)
+  for (const r of itemRows) foodByPerson.set(r.contributor_id, (foodByPerson.get(r.contributor_id) ?? 0) + groupOrderLineTotalKobo(r))
   const contribIds = Array.from(foodByPerson.keys())
   const funded: Record<string, boolean> = {}
   let myBalanceKobo = 0
@@ -105,8 +108,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
     vendor: { id: group.vendor_id, name: v?.name ?? 'Vendor' },
     items: itemRows,
     menu: (menu ?? []).map((m) => {
-      const row = m as unknown as { id: string; name: string; price_kobo: number; category: string }
-      return { id: row.id, name: row.name, price_kobo: row.price_kobo, category: row.category }
+      const row = m as unknown as { id: string; name: string; price_kobo: number; category: string; menu_item_addons?: Array<{ id: string; name: string; price_kobo: number; is_available: boolean; display_order: number }> }
+      return {
+        id: row.id,
+        name: row.name,
+        price_kobo: row.price_kobo,
+        category: row.category,
+        addons: (row.menu_item_addons ?? [])
+          .filter((addon) => addon.is_available)
+          .sort((a, b) => a.display_order - b.display_order)
+          .map((addon) => ({ id: addon.id, name: addon.name, price_kobo: addon.price_kobo })),
+      }
     }),
   })
 }

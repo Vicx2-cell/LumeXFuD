@@ -6,6 +6,7 @@ import { generateGroupCode } from '@/lib/group-order'
 import { getFeature } from '@/lib/features'
 import { trackFeature } from '@/lib/usage'
 import { rateLimitGeneric } from '@/lib/rate-limit'
+import { normalizeGroupOrderAddons } from '@/lib/group-order-addons'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,7 @@ const schema = z.object({
     menu_item_id: z.string().uuid(),
     quantity: z.number().int().positive().max(20),
     notes: z.string().max(200).optional(),
+    addons: z.array(z.string().uuid()).max(20).optional().default([]),
   })).max(50).optional(),
 }).strict()
 
@@ -49,15 +51,43 @@ export async function POST(req: NextRequest) {
   if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
 
   // Validate any seed items belong to this vendor + are available (server-side).
-  let seedRows: Array<{ menu_item_id: string; quantity: number; notes: string | null }> = []
+  let seedRows: Array<{ menu_item_id: string; quantity: number; notes: string | null; addons: ReturnType<typeof normalizeGroupOrderAddons> }> = []
   if (parsed.data.items && parsed.data.items.length > 0) {
     const ids = parsed.data.items.map((i) => i.menu_item_id)
     const { data: menu } = await db.from('menu_items')
       .select('id, is_available').in('id', ids).eq('vendor_id', v.id).is('deleted_at', null)
     const ok = new Set((menu ?? []).filter((m) => (m as { is_available: boolean }).is_available).map((m) => (m as { id: string }).id))
+    const addonIds = Array.from(new Set(parsed.data.items.flatMap((i) => i.addons ?? [])))
+    const addonMap = new Map<string, { id: string; menu_item_id: string; name: string; price_kobo: number; is_available: boolean }>()
+    if (addonIds.length > 0) {
+      const { data: addons } = await db.from('menu_item_addons')
+        .select('id, menu_item_id, name, price_kobo, is_available')
+        .in('id', addonIds)
+        .is('deleted_at', null)
+      for (const addon of (addons ?? []) as Array<{ id: string; menu_item_id: string; name: string; price_kobo: number; is_available: boolean }>) {
+        addonMap.set(addon.id, addon)
+      }
+    }
     seedRows = parsed.data.items
       .filter((i) => ok.has(i.menu_item_id))
-      .map((i) => ({ menu_item_id: i.menu_item_id, quantity: i.quantity, notes: i.notes ?? null }))
+      .map((i) => ({
+        menu_item_id: i.menu_item_id,
+        quantity: i.quantity,
+        notes: i.notes ?? null,
+        addons: normalizeGroupOrderAddons((i.addons ?? []).map((addonId) => {
+          const addon = addonMap.get(addonId)
+          return addon && addon.menu_item_id === i.menu_item_id && addon.is_available
+            ? { id: addon.id, name: addon.name, price_kobo: addon.price_kobo }
+            : null
+        })),
+      }))
+    const requestedValidAddons = parsed.data.items
+      .filter((i) => ok.has(i.menu_item_id))
+      .reduce((sum, item) => sum + new Set(item.addons ?? []).size, 0)
+    const acceptedAddons = seedRows.reduce((sum, item) => sum + item.addons.length, 0)
+    if (acceptedAddons !== requestedValidAddons) {
+      return NextResponse.json({ error: 'One or more add-ons are invalid or unavailable.' }, { status: 400 })
+    }
   }
 
   // Insert the group, retrying once on the rare code collision.
@@ -85,6 +115,7 @@ export async function POST(req: NextRequest) {
       menu_item_id: r.menu_item_id,
       quantity: r.quantity,
       notes: r.notes,
+      addons: r.addons,
     })))
   }
 

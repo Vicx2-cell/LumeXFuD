@@ -47,7 +47,7 @@ export async function notifyGroupOrderPlaced(
     const [{ data: vendor }, { data: host }, { data: items }, { data: ord }] = await Promise.all([
       db.from('vendors').select('name').eq('id', group.vendor_id).maybeSingle(),
       db.from('customers').select('name').eq('id', group.host_customer_id).maybeSingle(),
-      db.from('group_order_items').select('contributor_id, contributor_name, quantity, menu_items(name, price_kobo)').eq('group_order_id', opts.groupOrderId),
+      db.from('group_order_items').select('contributor_id, contributor_name, quantity, addons, menu_items(name, price_kobo)').eq('group_order_id', opts.groupOrderId),
       db.from('orders').select('id, delivery_fee, platform_markup').eq('paystack_reference', opts.orderNumber).maybeSingle(),
     ])
     const vendorName = (vendor as { name: string | null } | null)?.name ?? 'the vendor'
@@ -146,7 +146,7 @@ export async function notifyGroupSplitPaid(
     const [{ data: vendor }, { data: custs }, { data: items }] = await Promise.all([
       db.from('vendors').select('name').eq('id', vendorId).maybeSingle(),
       db.from('customers').select('id, phone').in('id', Object.keys(opts.shareByCid)),
-      db.from('group_order_items').select('contributor_id, quantity, menu_items(name)').eq('group_order_id', opts.groupOrderId),
+      db.from('group_order_items').select('contributor_id, quantity, addons, menu_items(name)').eq('group_order_id', opts.groupOrderId),
     ])
     const vendorName = (vendor as { name: string | null } | null)?.name ?? 'the vendor'
     const itemsBy = new Map<string, string[]>()
