@@ -6,6 +6,8 @@ import { normalizePhone, safeNormalizePhone } from '@/lib/phone'
 import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { isPhoneBlocked } from '@/lib/blocklist'
+import { recordSecurityEvent } from '@/lib/security-events'
+import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 
 // Suspend / unsuspend ANY single account (customer, vendor or rider).
 // Suspension is orthogonal to the vendor/rider `is_active` approval flag — it
@@ -69,27 +71,30 @@ const postInput = z.object({
 })
 
 export async function POST(req: NextRequest) {
+  const requestContext = createRequestContext(req.headers)
+  const json = <T,>(body: T, init?: ResponseInit) =>
+    applyRequestContext(NextResponse.json(body, init), requestContext)
   const { err, session } = await authAdmin()
-  if (err || !session) return err!
+  if (err || !session) return applyRequestContext(err!, requestContext)
 
   const rl = await rateLimitGeneric(`admin-suspend:${session.phone}`, 30, 60)
-  if (!rl.success) return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 })
+  if (!rl.success) return json({ error: 'Too many requests. Slow down.' }, { status: 429 })
 
   let body: unknown
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid body' }, { status: 400 }) }
+  try { body = await req.json() } catch { return json({ error: 'Invalid body' }, { status: 400 }) }
   const parsed = postInput.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  if (!parsed.success) return json({ error: 'Invalid input' }, { status: 400 })
 
   let phone: string
-  try { phone = normalizePhone(parsed.data.phone) } catch { return NextResponse.json({ error: 'Enter a valid phone number' }, { status: 400 }) }
+  try { phone = normalizePhone(parsed.data.phone) } catch { return json({ error: 'Enter a valid phone number' }, { status: 400 }) }
 
   const db = createSupabaseAdmin()
   const found = await lookup(db, phone)
-  if (!found) return NextResponse.json({ error: 'No account found for that number' }, { status: 404 })
+  if (!found) return json({ error: 'No account found for that number' }, { status: 404 })
 
   // Never let an admin suspend a super-admin / the platform owner via this tool.
   if (found.role === 'customer' && phone === safeNormalizePhone(process.env.SUPER_ADMIN_PHONE)) {
-    return NextResponse.json({ error: 'That account cannot be suspended here' }, { status: 403 })
+    return json({ error: 'That account cannot be suspended here' }, { status: 403 })
   }
 
   const suspend = parsed.data.action === 'suspend'
@@ -107,7 +112,7 @@ export async function POST(req: NextRequest) {
     update.status = suspend ? 'CLOSED' : 'OPEN'
   }
   const { error: upErr } = await db.from(found.table).update(update).eq('id', found.id)
-  if (upErr) return NextResponse.json({ error: 'Could not update the account' }, { status: 500 })
+  if (upErr) return json({ error: 'Could not update the account' }, { status: 500 })
 
   await audit({
     actor_id: session.phone,
@@ -119,5 +124,24 @@ export async function POST(req: NextRequest) {
     ip_address: req.headers.get('x-forwarded-for') ?? undefined,
   })
 
-  return NextResponse.json({ success: true, role: found.role, name: found.name, suspended: suspend })
+  await recordSecurityEvent({
+    eventType: suspend ? 'account_restricted' : 'account_restriction_lifted',
+    severity: suspend ? 'warn' : 'info',
+    surface: 'admin_account_restriction',
+    actorId: session.userId,
+    actorRole: session.role,
+    sessionId: session.sessionId,
+    ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined,
+    userAgent: req.headers.get('user-agent') ?? undefined,
+    requestId: requestContext.requestId,
+    correlationId: requestContext.correlationId,
+    route: req.nextUrl.pathname,
+    method: req.method,
+    resourceType: found.role,
+    resourceId: found.id,
+    outcome: suspend ? 'restricted_sessions_revoked' : 'restriction_lifted',
+    detail: { role: found.role, mechanism: 'database_trigger' },
+  })
+
+  return json({ success: true, role: found.role, name: found.name, suspended: suspend })
 }

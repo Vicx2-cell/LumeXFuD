@@ -19,15 +19,17 @@ export async function isPhoneBlocked(phone: string): Promise<boolean> {
 
 export async function blockPhone(phone: string, reason: string | null, blockedBy: string): Promise<void> {
   const db = createSupabaseAdmin()
-  await db.from('blocked_phones').upsert(
+  const { error } = await db.from('blocked_phones').upsert(
     { phone, reason, blocked_by: blockedBy, created_at: new Date().toISOString() },
     { onConflict: 'phone' },
   )
+  if (error) throw new Error('Could not persist phone block')
 }
 
 export async function unblockPhone(phone: string): Promise<void> {
   const db = createSupabaseAdmin()
-  await db.from('blocked_phones').delete().eq('phone', phone)
+  const { error } = await db.from('blocked_phones').delete().eq('phone', phone)
+  if (error) throw new Error('Could not remove phone block')
 }
 
 export interface BlockedRow { phone: string; reason: string | null; blocked_by: string | null; created_at: string }

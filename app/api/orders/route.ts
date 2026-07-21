@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
+import { ACCOUNT_RESTRICTION_MESSAGE } from '@/lib/account-restriction'
 import { getCurrentUser } from '@/lib/session'
 import { createOrderInput } from '@/lib/validators'
 import { generateOrderNumber } from '@/lib/order-number'
@@ -337,7 +338,7 @@ export async function POST(req: NextRequest) {
 
   const { data: c } = await db
     .from('customers')
-    .select('id, phone, suspended_until, suspend_reason')
+    .select('id, phone, suspended_until')
     .eq('phone', session.phone)
     .single()
 
@@ -345,11 +346,7 @@ export async function POST(req: NextRequest) {
   // indefinite suspension; degrades gracefully if migration 046 hasn't run.)
   const suspendedUntil = (c as { suspended_until?: string | null } | null)?.suspended_until
   if (suspendedUntil && new Date(suspendedUntil).getTime() > Date.now()) {
-    const reason = (c as { suspend_reason?: string | null } | null)?.suspend_reason
-    return NextResponse.json(
-      { error: reason ? `Your account is suspended: ${reason}` : 'Your account is suspended. Contact support.' },
-      { status: 403 },
-    )
+    return NextResponse.json({ error: ACCOUNT_RESTRICTION_MESSAGE }, { status: 403 })
   }
 
   const customerId: string | null = c?.id ?? null

@@ -12,6 +12,7 @@ import { signMfaPending, MFA_COOKIE, shortCookie } from '@/lib/webauthn'
 import { getFeature } from '@/lib/features'
 import { isLockedDown } from '@/lib/controls'
 import { normalizeEmail } from '@/lib/email/send-email'
+import { ACCOUNT_RESTRICTION_MESSAGE } from '@/lib/account-restriction'
 
 const LOCKOUT_MINUTES = 30
 
@@ -150,11 +151,11 @@ export async function POST(req: NextRequest) {
 
     // Suspended account? Block login for any role. Degrades gracefully if
     // migration 046 hasn't run (the select errors → no block).
-    const { data: susp } = await db.from(user.table).select('suspended_until, suspend_reason').eq('id', user.user.id).maybeSingle()
-    const su = susp as { suspended_until?: string | null; suspend_reason?: string | null } | null
+    const { data: susp } = await db.from(user.table).select('suspended_until').eq('id', user.user.id).maybeSingle()
+    const su = susp as { suspended_until?: string | null } | null
     if (su?.suspended_until && new Date(su.suspended_until).getTime() > Date.now()) {
       return NextResponse.json(
-        { error: su.suspend_reason ? `Account suspended: ${su.suspend_reason}` : 'Your account has been suspended. Contact support.' },
+        { error: ACCOUNT_RESTRICTION_MESSAGE },
         { status: 403 },
       )
     }

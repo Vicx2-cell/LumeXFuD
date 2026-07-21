@@ -6,6 +6,8 @@ import { normalizePhone, safeNormalizePhone } from '@/lib/phone'
 import { audit, superAudit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { blockPhone, unblockPhone, isPhoneBlocked, listBlocked } from '@/lib/blocklist'
+import { recordSecurityEvent } from '@/lib/security-events'
+import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -59,19 +61,22 @@ const postInput = z.object({
 })
 
 export async function POST(req: NextRequest) {
+  const requestContext = createRequestContext(req.headers)
+  const json = <T,>(body: T, init?: ResponseInit) =>
+    applyRequestContext(NextResponse.json(body, init), requestContext)
   const { err, session } = await requireSuperAdmin()
-  if (err || !session) return err!
+  if (err || !session) return applyRequestContext(err!, requestContext)
 
   const rl = await rateLimitGeneric(`admin-block:${session.userId ?? session.phone}`, 30, 60)
-  if (!rl.success) return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 })
+  if (!rl.success) return json({ error: 'Too many requests. Slow down.' }, { status: 429 })
 
   let body: unknown
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid body' }, { status: 400 }) }
+  try { body = await req.json() } catch { return json({ error: 'Invalid body' }, { status: 400 }) }
   const parsed = postInput.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  if (!parsed.success) return json({ error: 'Invalid input' }, { status: 400 })
 
   let phone: string
-  try { phone = normalizePhone(parsed.data.phone) } catch { return NextResponse.json({ error: 'Enter a valid phone number' }, { status: 400 }) }
+  try { phone = normalizePhone(parsed.data.phone) } catch { return json({ error: 'Enter a valid phone number' }, { status: 400 }) }
 
   // Never let the platform owner / operational admin numbers be banned via this tool.
   const privileged = new Set<string>()
@@ -81,7 +86,7 @@ export async function POST(req: NextRequest) {
     const n = safeNormalizePhone(raw); if (n) privileged.add(n)
   }
   if (privileged.has(phone)) {
-    return NextResponse.json({ error: 'That number cannot be banned.' }, { status: 403 })
+    return json({ error: 'That number cannot be banned.' }, { status: 403 })
   }
 
   const db = createSupabaseAdmin()
@@ -90,26 +95,32 @@ export async function POST(req: NextRequest) {
   const reason = parsed.data.reason ?? null
   const now = new Date().toISOString()
 
-  if (ban) {
-    await blockPhone(phone, reason, session.phone)
-    // Suspend EVERY account on this number so they're locked out immediately.
-    for (const acct of found) {
-      await db.from(acct.table).update({
-        suspended_until: INDEFINITE,
-        suspend_reason: reason ?? 'Account banned',
-        updated_at: now,
-      }).eq('id', acct.id)
+  try {
+    if (ban) {
+      await blockPhone(phone, reason, session.phone)
+      // The suspension trigger revokes every account's sessions transactionally.
+      for (const acct of found) {
+        const { error } = await db.from(acct.table).update({
+          suspended_until: INDEFINITE,
+          suspend_reason: reason ?? 'Account banned',
+          updated_at: now,
+        }).eq('id', acct.id)
+        if (error) throw new Error('Account restriction failed')
+      }
+    } else {
+      await unblockPhone(phone)
+      // Lifting a restriction never revives sessions; the user must log in again.
+      for (const acct of found) {
+        const { error } = await db.from(acct.table).update({
+          suspended_until: null,
+          suspend_reason: null,
+          updated_at: now,
+        }).eq('id', acct.id)
+        if (error) throw new Error('Account reinstatement failed')
+      }
     }
-  } else {
-    await unblockPhone(phone)
-    // Lift the suspension on every account so the number is fully reinstated.
-    for (const acct of found) {
-      await db.from(acct.table).update({
-        suspended_until: null,
-        suspend_reason: null,
-        updated_at: now,
-      }).eq('id', acct.id)
-    }
+  } catch {
+    return json({ error: 'Could not update every affected account' }, { status: 500 })
   }
 
   const roles = found.map((f) => f.role)
@@ -125,5 +136,24 @@ export async function POST(req: NextRequest) {
   await audit(auditEntry)
   await superAudit(auditEntry)
 
-  return NextResponse.json({ success: true, blocked: await isPhoneBlocked(phone), had_account: found.length > 0, roles })
+  await recordSecurityEvent({
+    eventType: ban ? 'account_restricted' : 'account_restriction_lifted',
+    severity: ban ? 'critical' : 'info',
+    surface: 'super_admin_phone_block',
+    actorId: session.userId,
+    actorRole: session.role,
+    sessionId: session.sessionId,
+    ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined,
+    userAgent: req.headers.get('user-agent') ?? undefined,
+    requestId: requestContext.requestId,
+    correlationId: requestContext.correlationId,
+    route: req.nextUrl.pathname,
+    method: req.method,
+    resourceType: 'accounts',
+    resourceId: found[0]?.id,
+    outcome: ban ? 'blocked_sessions_revoked' : 'block_lifted',
+    detail: { affectedAccounts: found.length, roles, mechanism: 'database_trigger' },
+  })
+
+  return json({ success: true, blocked: await isPhoneBlocked(phone), had_account: found.length > 0, roles })
 }

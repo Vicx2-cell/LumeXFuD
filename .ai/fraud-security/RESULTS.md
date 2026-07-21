@@ -13,3 +13,11 @@
 - Added structured OTP send, verify, failure, cooldown, and throttle evidence with request/correlation IDs.
 - Added a seven-category risk evaluator with graduated actions and false-positive protections; it contains no permanent-ban action.
 - Added regression and bypass tests covering provider-call prevention, proof-cookie boundaries, identifier injection, and proportional response.
+
+## FS-004 complete
+
+- Added database triggers that revoke active sessions in the same transaction as customer, vendor, or rider suspension.
+- Ensured reinstatement requires a fresh login and never resurrects revoked sessions.
+- Added structured, request-correlated restriction/lift events to admin suspension and block actions.
+- Made blocklist and per-account mutation failures visible rather than silently returning success.
+- Replaced reason-revealing restriction responses with one generic message across login, social auth, web ordering, and WhatsApp ordering.

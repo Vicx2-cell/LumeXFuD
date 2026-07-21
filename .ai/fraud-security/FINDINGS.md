@@ -18,6 +18,12 @@ Security events had severities but no common category scoring or proportional ac
 
 Status: foundational repair complete. `lib/risk-engine.ts` evaluates authentication, authorization, payment, order-abuse, device/session, bot, and admin signals with explicit false-positive caps and graduated actions. Persistence and automatic execution of higher containment actions remain future tasks.
 
+## FS-004 - HIGH - Suspension did not revoke already-issued sessions
+
+Suspension and phone-block routes updated account rows, while `getCurrentUser()` only checked the sessions table. Existing sessions therefore remained valid until expiry. Blocklist writes and per-account updates also ignored returned database errors, so an operator could receive a success response after an incomplete restriction. Several user-facing paths interpolated the stored suspension reason.
+
+Status: repaired. Migration 134 adds transactional suspension triggers for customers, vendors, and riders that revoke every active session. Reinstatement does not revive sessions. Blocklist/account update failures now fail the operation visibly. Restriction events are structured and request-correlated, while all current user-facing paths reuse one generic message and no longer select the internal reason.
+
 ## Scoped inventory observed
 
 - Authentication/session paths: `lib/session.ts`, `lib/pin-auth.ts`, `lib/rate-limit.ts`, `proxy.ts`, and `app/api/auth/**`.

@@ -14,6 +14,7 @@ import { buildPublicDisplayName, buildPublicHandleCandidates, chooseAvailablePub
 import { autoFollowOfficialAccount } from '@/lib/feed/official-follow'
 import { sendWelcomeEmail, shouldSendWelcomeForEmailChange } from '@/lib/transactional-email'
 import { normalizeEmail } from '@/lib/email/send-email'
+import { ACCOUNT_RESTRICTION_MESSAGE } from '@/lib/account-restriction'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Enter your name').max(80),
@@ -143,12 +144,12 @@ export async function POST(req: NextRequest) {
     // They proved BOTH the phone (OTP) and the Google identity, so linking is safe.
     const { data: byPhone } = await db
       .from('customers')
-      .select('id, google_sub, email, name, welcome_email_sent_at, suspended_until, suspend_reason')
+      .select('id, google_sub, email, name, welcome_email_sent_at, suspended_until')
       .eq('phone', normalizedPhone)
       .is('deleted_at', null)
       .maybeSingle()
     const existing = byPhone as
-      | { id: string; google_sub?: string | null; email?: string | null; name?: string | null; welcome_email_sent_at?: string | null; suspended_until?: string | null; suspend_reason?: string | null }
+      | { id: string; google_sub?: string | null; email?: string | null; name?: string | null; welcome_email_sent_at?: string | null; suspended_until?: string | null }
       | null
 
     if (existing) {
@@ -168,7 +169,7 @@ export async function POST(req: NextRequest) {
       }
       if (existing.suspended_until && new Date(existing.suspended_until).getTime() > Date.now()) {
         return NextResponse.json(
-          { error: existing.suspend_reason ? `Account suspended: ${existing.suspend_reason}` : 'Your account has been suspended. Contact support.' },
+          { error: ACCOUNT_RESTRICTION_MESSAGE },
           { status: 403 },
         )
       }

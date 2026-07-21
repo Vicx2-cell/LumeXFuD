@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createSupabaseAdmin } from './supabase/server'
+import { ACCOUNT_RESTRICTION_MESSAGE } from './account-restriction'
 import { normalizePhone, safeNormalizePhone } from './phone'
 import { detectRole } from './session'
 import { generateOrderNumber } from './order-number'
@@ -207,13 +208,13 @@ function feesText(p: NonNullable<Awaited<ReturnType<typeof loadPricing>>>): stri
 }
 
 // ─── Identity helpers ─────────────────────────────────────────────────────────
-type CustomerRow = { id: string; name: string | null; email: string | null; default_delivery_address: string | null; suspended_until: string | null; suspend_reason: string | null }
+type CustomerRow = { id: string; name: string | null; email: string | null; default_delivery_address: string | null; suspended_until: string | null }
 
 async function resolveCustomer(db: DB, phone: string): Promise<CustomerRow | null> {
   const canonical = normalizePhone(phone)
   const { data } = await db
     .from('customers')
-    .select('id, name, email, default_delivery_address, suspended_until, suspend_reason')
+    .select('id, name, email, default_delivery_address, suspended_until')
     .eq('phone', canonical)
     .is('deleted_at', null)
     .maybeSingle()
@@ -866,7 +867,7 @@ async function placeOrder(db: DB, phone: string, conv: Conversation, waMessageId
     return
   }
   if (customer.suspended_until && new Date(customer.suspended_until).getTime() > Date.now()) {
-    await outText(db, phone, customer.suspend_reason ? `Your account is suspended: ${customer.suspend_reason}` : 'Your account is suspended. Please contact support.')
+    await outText(db, phone, ACCOUNT_RESTRICTION_MESSAGE)
     return
   }
 

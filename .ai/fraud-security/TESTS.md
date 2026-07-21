@@ -26,3 +26,12 @@
 - PASS: one OTP velocity signal can rate-limit but cannot restrict or freeze.
 - PASS: corroborated payment and authorization signals produce graduated containment actions.
 - PASS: 233 focused/authorization tests, TypeScript, and targeted ESLint.
+
+## FS-004 verification
+
+- PASS: customer, vendor, and rider suspension revokes all active sessions in embedded PostgreSQL.
+- PASS: lifting a restriction does not revive a revoked session.
+- PASS: generic restriction message exposes no device, fingerprint, location, rule, or score detail.
+- PASS: PIN login, social completion, order creation, and WhatsApp ordering share the same message and do not select `suspend_reason`.
+- PASS: block/unblock persistence errors reject instead of reporting success.
+- PASS: 223 focused/revocation/authorization tests, TypeScript, and targeted ESLint.
