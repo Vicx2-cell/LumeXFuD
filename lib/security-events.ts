@@ -21,6 +21,7 @@ export type SecurityEventType =
   | 'order_risk_evaluated' | 'order_idempotency_replay' | 'order_intent_mismatch'
   | 'order_idempotency_invalid'
   | 'stale_rider_access' | 'rider_assignment_rejected'
+  | 'suspicious_admin_access'
 
 export interface SecurityEventInput {
   eventType: SecurityEventType

@@ -55,3 +55,10 @@
 - Bound rider status transitions, delivery completion, wrong-code counters, and optional proof writes to the current assignment at mutation time.
 - Preserved payout and handover-code secrecy while rejecting replay, reassignment, and wrong-role races.
 - Added request-correlated stale-rider and assignment-rejection evidence suitable for incident timelines.
+
+## FS-010 complete
+
+- Added a narrow privileged-API proxy gate without changing ordinary API JSON/login behavior.
+- Centralized evidence for missing, invalid, revoked, and wrong-role privileged access attempts.
+- Enforced route-policy super-only aliases before handlers while retaining handler defense in depth.
+- Compared only lawful same-session IP/user-agent indicators and kept those changes observe-only with explicit accuracy limits.

@@ -85,3 +85,12 @@
 - PASS: stale wrong-code guesses cannot increment or lock the replacement rider's handover code.
 - PASS: proof upload rechecks assignment/status and removes the just-uploaded orphan when the claim is lost.
 - PASS: no security event contains the raw handover code.
+
+## FS-010 verification
+
+- PASS (1.14s Vitest duration; 13.2s command with TypeScript): focused privileged proxy, admin risk, proxy revocation, authz, and route-policy tests (5 files, 20 tests), followed by `npx.cmd tsc --noEmit`.
+- PASS (5.49s Vitest duration; 7.4s command): broader admin risk/proxy/authz/security-event/incident/restriction/session/admin-route tests (11 files, 46 tests).
+- PASS: missing, invalid/revoked, wrong-role, ordinary-admin-to-super, and trailing-slash alias probes return JSON 401/403 with request-correlated evidence.
+- PASS: admin/block, admin/wallet-adjust, feature flags, stats, and WhatsApp remain super-only at the proxy and handler layers.
+- PASS: changed IP and user-agent indicators together remain observe-only and explicitly do not prove identity.
+- PASS: one wrong-role signal cannot recommend a financial freeze.

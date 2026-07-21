@@ -9,4 +9,5 @@
 7. **COMPLETE - FS-007:** cumulative refund velocity/value and split-refund evidence, provider/reservation failure evidence, proportionate incident escalation, and request correlation.
 8. **COMPLETE - FS-008:** order manipulation/fake-order evidence, customer-only boundary, bounded idempotency keys, and payload-bound replay.
 9. **COMPLETE - FS-009:** atomic rider acceptance and assignment-bound status, handover, wrong-code, and proof-photo writes with stale-access evidence.
-10. **READY - FS-010+:** privileged access, multi-account, lawful location, and remaining console/false-positive gaps.
+10. **COMPLETE - FS-010:** privileged API denial evidence, super-only alias enforcement, session indicator change evidence, and false-positive-safe admin risk signals.
+11. **READY - FS-011+:** multi-account, lawful location, and remaining console/false-positive gaps.

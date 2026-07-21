@@ -54,6 +54,12 @@ Delivery and status routes checked the assigned rider in one read, then updated 
 
 Status: repaired. Rider acceptance now locks and updates both rows in one service-role RPC. Rider status/delivery mutations recheck `rider_id` in the write predicate, wrong-code counting locks only the expected assigned rider's picked-up order, and proof uploads are assignment/status-bound with orphan cleanup. Every stale/rejected outcome records request-correlated evidence; raw handover codes are never recorded.
 
+## FS-010 - HIGH - Most privileged-route denials were silent
+
+The API proxy deliberately excluded all APIs, and 53 admin/super-admin handlers used inline role checks. Only four routes used the central evidence-emitting gate. Missing, invalid, revoked, customer/vendor/rider, and ordinary-admin probes against most privileged APIs therefore produced no common request-correlated evidence. Session IP/user-agent data already captured at login was not compared on privileged access.
+
+Status: repaired. The proxy now narrowly matches admin, super-admin, refund, and wallet-freeze APIs, returns JSON rather than redirects, rechecks revocation, enforces super-only aliases, and records all missing/invalid/wrong-role denials. Authorized session network/user-agent changes produce observe-only evidence with an explicit no-identity-proof warning. They never block, revoke, freeze, or accuse by themselves.
+
 ## Scoped inventory observed
 
 - Authentication/session paths: `lib/session.ts`, `lib/pin-auth.ts`, `lib/rate-limit.ts`, `proxy.ts`, and `app/api/auth/**`.

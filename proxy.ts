@@ -4,6 +4,7 @@ import { createSupabaseAdmin } from './lib/supabase/server'
 import { sessionCookieName } from './lib/session-cookie'
 import { recordSecurityEvent } from './lib/security-events'
 import { applyRequestContext, createRequestContext } from './lib/request-context'
+import { evaluateAdminAccessRisk, privilegedApiRoles } from './lib/admin-access-risk'
 
 const PROTECTED: Array<{ pattern: RegExp; roles: string[] }> = [
   { pattern: /^\/home(\/|$)/,          roles: ['customer', 'admin', 'super_admin'] },
@@ -128,6 +129,81 @@ export async function proxy(req: NextRequest) {
   }
   const next = () => withCsp(NextResponse.next({ request: { headers: requestHeaders } }))
   const redirect = (url: URL) => withCsp(NextResponse.redirect(url))
+  const apiJson = (body: unknown, status: number) => withCsp(NextResponse.json(body, { status }))
+
+  // Privileged APIs are the narrow exception to the general API exclusion. This
+  // produces one request-correlated denial trail while route handlers retain
+  // their own authorization checks as defense in depth.
+  const privilegedRoles = privilegedApiRoles(pathname)
+  if (privilegedRoles) {
+    const token = req.cookies.get(sessionCookieName())?.value
+    if (!token) {
+      await recordSecurityEvent({
+        eventType: 'authz_deny', severity: 'warn', surface: 'privileged_api',
+        ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim(),
+        userAgent: req.headers.get('user-agent'), requestId: requestContext.requestId,
+        correlationId: requestContext.correlationId, route: pathname, method: req.method,
+        outcome: 'missing_session', detail: { required_roles: privilegedRoles },
+      })
+      return apiJson({ error: 'Unauthorized' }, 401)
+    }
+    const session = await verifySessionToken(token)
+    if (!session || !(await isSessionLive(session.sessionId))) {
+      await recordSecurityEvent({
+        eventType: 'auth_fail', severity: 'warn', surface: 'privileged_api',
+        actorId: session?.userId, actorRole: session?.role, sessionId: session?.sessionId,
+        ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim(),
+        userAgent: req.headers.get('user-agent'), requestId: requestContext.requestId,
+        correlationId: requestContext.correlationId, route: pathname, method: req.method,
+        outcome: 'invalid_or_revoked_session',
+      })
+      const res = apiJson({ error: 'Unauthorized' }, 401)
+      res.cookies.delete(sessionCookieName())
+      return res
+    }
+    if (!privilegedRoles.includes(session.role)) {
+      const risk = evaluateAdminAccessRisk({ wrongRole: true })
+      await recordSecurityEvent({
+        eventType: 'suspicious_admin_access', severity: 'critical', surface: 'privileged_api',
+        actorId: session.userId, actorRole: session.role, sessionId: session.sessionId,
+        ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim(),
+        userAgent: req.headers.get('user-agent'), requestId: requestContext.requestId,
+        correlationId: requestContext.correlationId, route: pathname, method: req.method,
+        outcome: 'wrong_role', detail: {
+          required_roles: privilegedRoles, score: risk.score,
+          triggered_rules: risk.triggeredRules, actions: risk.actions,
+        },
+      })
+      return apiJson({ error: 'Forbidden' }, 403)
+    }
+
+    // Network and browser indicators captured for this same session are weak
+    // context only. A mismatch never proves identity and never blocks by itself.
+    try {
+      const db = createSupabaseAdmin()
+      const { data: stored } = await db.from('sessions').select('ip_address, user_agent')
+        .eq('id', session.sessionId).maybeSingle()
+      const currentIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
+      const currentUa = req.headers.get('user-agent') ?? null
+      const sessionIpChanged = Boolean(stored?.ip_address && currentIp && stored.ip_address !== currentIp)
+      const userAgentChanged = Boolean(stored?.user_agent && currentUa && stored.user_agent !== currentUa)
+      if (sessionIpChanged || userAgentChanged) {
+        const risk = evaluateAdminAccessRisk({ sessionIpChanged, userAgentChanged })
+        await recordSecurityEvent({
+          eventType: 'suspicious_admin_access', severity: 'info', surface: 'privileged_api',
+          actorId: session.userId, actorRole: session.role, sessionId: session.sessionId,
+          ip: currentIp, userAgent: currentUa, requestId: requestContext.requestId,
+          correlationId: requestContext.correlationId, route: pathname, method: req.method,
+          outcome: 'session_indicator_changed', detail: {
+            session_ip_changed: sessionIpChanged, user_agent_changed: userAgentChanged,
+            score: risk.score, triggered_rules: risk.triggeredRules, actions: risk.actions,
+            warning: 'Network and user-agent indicators do not prove identity.',
+          },
+        })
+      }
+    } catch { /* evidence-only indicator read must not break authorized work */ }
+    return next()
+  }
 
   // /auth/setup is always accessible to authenticated users — don't intercept
   if (pathname.startsWith('/auth')) return next()
@@ -228,5 +304,10 @@ export const config = {
   // CSP only matters for document responses, so dropping it on /api is harmless.
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico|api|icons|manifest.json|sw.js).*)',
+    '/api/admin/:path*',
+    '/api/super-admin/:path*',
+    '/api/paystack/refund',
+    '/api/wallet/freeze',
+    '/api/wallet/unfreeze',
   ],
 }
