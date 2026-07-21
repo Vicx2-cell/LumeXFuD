@@ -102,6 +102,16 @@ describe('createOrderInput — other field bounds + defaults', () => {
       expect(res.data.payment_method).toBe('PAYSTACK')
     }
   })
+
+  it('accepts explicit guest terms acknowledgement as part of guest checkout payloads', () => {
+    const res = createOrderInput.safeParse(order({
+      guest_name: 'Ada Student',
+      guest_phone: '+2348012345678',
+      guest_terms_accepted: true,
+    }))
+    expect(res.success).toBe(true)
+    if (res.success) expect(res.data.guest_terms_accepted).toBe(true)
+  })
 })
 
 describe('menuAddonInput — name (1..60) + price_naira (0..100000)', () => {

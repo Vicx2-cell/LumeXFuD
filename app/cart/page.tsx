@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Timer, Users } from 'lucide-react'
 import Image from 'next/image'
@@ -85,6 +85,7 @@ export default function CartPage() {
   const [guestName,        setGuestName]        = useState('')
   const [guestPhone,       setGuestPhone]       = useState('')
   const [removedLine,      setRemovedLine]      = useState<{ vendor_id: string; vendor_name: string; item: CartItem } | null>(null)
+  const checkoutAttemptKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' })
@@ -330,6 +331,11 @@ export default function CartPage() {
       if (guestPhone.trim().length < 7) { setError('Enter your WhatsApp phone number'); return }
     }
     setError(''); setLoading(true)
+    if (!checkoutAttemptKeyRef.current) {
+      checkoutAttemptKeyRef.current = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    }
     if (campaignId && cart.vendor_id) {
       trackCampaignEvent({
         campaignId,
@@ -347,11 +353,15 @@ export default function CartPage() {
     try {
       const res = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'idempotency-key': checkoutAttemptKeyRef.current,
+        },
         body: JSON.stringify({
           vendor_id:             cart.vendor_id,
           guest_name:            authChecked && isGuest ? guestName.trim() : undefined,
           guest_phone:           authChecked && isGuest ? guestPhone.trim() : undefined,
+          guest_terms_accepted:  authChecked && isGuest ? orderAgree : undefined,
           items:                 cart.items.map((i) => ({
             menu_item_id:          i.menu_item_id,
             quantity:              i.quantity,
@@ -390,6 +400,7 @@ export default function CartPage() {
       }
 
       if (!res.ok) {
+        checkoutAttemptKeyRef.current = null
         if (res.status === 401) { router.push('/auth?next=/cart'); return }
         setError(data.error ?? 'Failed to create order')
         return
@@ -912,7 +923,8 @@ export default function CartPage() {
                 className="mt-0.5 w-4 h-4 shrink-0 accent-amber-400"
               />
               <span className="text-xs text-white/60 leading-relaxed">
-                I agree to the <a href="/terms" target="_blank" className="text-[#F5A623]">Terms</a> and {' '}
+                I agree to the <a href="/terms" target="_blank" className="text-[#F5A623]">Terms</a>, {' '}
+                <a href="/privacy" target="_blank" className="text-[#F5A623]">Privacy Policy</a>, and {' '}
                 <a href="/refunds" target="_blank" className="text-[#F5A623]">Refund &amp; Cancellation Policy</a>. I can cancel for a full refund before the vendor accepts; once accepted it can’t be cancelled. I can report a problem within 24 hours of delivery.
               </span>
             </label>

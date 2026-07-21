@@ -2,12 +2,11 @@
 
 ## In Progress
 
-- [ ] Commit the verified `/store/[slug]` storefront improvement.
-- [ ] Inspect next Phase A-D gap after commerce storefront routing.
+- [ ] Commit the verified guest checkout acknowledgement/idempotency improvement.
+- [ ] Inspect remaining Phase A-D gaps.
 
 ## Pending
 
-- [ ] Complete guest checkout verification gaps that are ready locally.
 - [ ] Run boundary verification for the active four phases.
 
 ## Done
@@ -24,5 +23,8 @@
 - [x] Added focused cart reducer regression tests.
 - [x] Added `/store/[slug]` commerce-first vendor storefront route.
 - [x] Added storefront slug normalization and reserved-word tests.
+- [x] Added explicit guest terms/privacy acknowledgement enforcement.
+- [x] Added cart checkout idempotency key for repeated submission and network retry.
+- [x] Added focused guest checkout contract tests.
 - [x] Added focused group-order add-on helper tests.
 - [x] Ran lint and focused tests for first slice.

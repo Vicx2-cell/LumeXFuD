@@ -17,6 +17,7 @@ export const createOrderInput = z.object({
   vendor_id: z.string().uuid(),
   guest_name: z.string().trim().min(2).max(80).optional(),
   guest_phone: z.string().trim().min(7).max(20).optional(),
+  guest_terms_accepted: z.boolean().optional(),
   items: z.array(
     z.object({
       menu_item_id: z.string().uuid(),

@@ -17,3 +17,5 @@
 - Implement `/store/[slug]` as a commerce entry point that reuses the existing live vendor order page instead of cloning menu/cart/checkout behavior.
 - Keep `/uturu/vendor/[slug]` available as the content/SEO profile; `/store/[slug]` is the shareable ordering storefront.
 - Reject reserved platform words for storefront slugs at the route-helper layer and rely on the existing vendor visibility filter for inactive, suspended, or deleted vendors.
+- Treat guest checkout as identified ordering, not anonymous ordering: guests must provide name, phone, and explicit terms/privacy acknowledgement.
+- Reuse the existing order idempotency header contract from the cart and keep the same key across connection errors; clear it after server validation failures so corrected payloads can retry cleanly.

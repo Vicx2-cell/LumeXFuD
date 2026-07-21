@@ -28,4 +28,8 @@
 - Implemented commerce storefront route `/store/[slug]`: resolves normalized vendor slugs to active vendors, rejects reserved words, produces vendor-specific metadata, and reuses the existing live `/vendor/[id]` ordering surface.
 - Added focused storefront slug tests for normalization, Unicode/punctuation, malformed encodings, reserved words, and canonical `/store` paths.
 - Verification passed: focused storefront/cart tests, lint, and production build.
-- Commit pending for storefront route slice.
+- Committed as `6c68967 Add commerce storefront route`.
+- Implemented guest checkout acknowledgement and retry slice: cart sends a stable `idempotency-key`, guests explicitly send terms/privacy acknowledgement, and `/api/orders` rejects guest checkout without it.
+- Added focused guest checkout contract tests and validator coverage.
+- Verification passed: focused guest/validator tests, lint, and production build.
+- Commit pending for guest checkout slice.

@@ -17,9 +17,13 @@
 - Passed after storefront route change: `npm.cmd test -- --run test/storefront.test.ts test/cart-context.test.ts`.
 - Passed after storefront route change: `npm.cmd run lint`.
 - Passed after storefront route change: `npm.cmd run build`.
+- Passed after guest checkout contract change: `npm.cmd test -- --run test/guest-checkout-contract.test.ts lib/validators.test.ts`.
+- Passed after guest checkout contract change: `npm.cmd run lint`.
+- Passed after guest checkout contract change: `npm.cmd run build`.
 
 ## Added During Loop
 
 - `test/group-order-addons.test.ts`
 - `test/cart-context.test.ts`
 - `test/storefront.test.ts`
+- `test/guest-checkout-contract.test.ts`

@@ -23,3 +23,6 @@
 - There was no `/store/{vendor-slug}` route. Existing live ordering is `/vendor/[id]`, while `/uturu/vendor/[slug]` is a separate content/SEO profile.
 - Vendor slugs are backed by migration `089_vendor_slug.sql`, which normalizes and deduplicates database slugs, but the commerce route still needed local guards for reserved platform words and malformed shared URLs.
 - The new `/store/[slug]` route resolves only active, non-deleted, non-suspended vendors and delegates rendering to the existing `/vendor/[id]` page so menu, add-ons, cart, checkout, payment, dispatch, and order systems remain canonical.
+- Guest checkout already had hashed high-entropy tracking tokens, guest name/phone, normalized phone, rate limits, idempotent order creation, Paystack callback token return, and token-aware order tracking from `e3a17c5`.
+- Guest checkout UI required delivery terms before checkout, but the API did not receive or enforce an explicit guest terms/privacy acknowledgement.
+- Cart checkout did not send the existing `idempotency-key` header, so the server-side idempotency machinery could not protect ordinary client retries from the cart surface.

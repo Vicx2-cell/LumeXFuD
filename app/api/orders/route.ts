@@ -53,6 +53,9 @@ export async function POST(req: NextRequest) {
     if (!parsed.data.guest_phone || !parsed.data.guest_name) {
       return json({ error: 'Authentication required' }, { status: 401 })
     }
+    if (parsed.data.guest_terms_accepted !== true) {
+      return json({ error: 'Please accept the Terms and Privacy Policy to continue as a guest.' }, { status: 400 })
+    }
     try {
       guestPhone = normalizePhone(parsed.data.guest_phone)
     } catch {
