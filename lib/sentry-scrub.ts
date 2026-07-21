@@ -133,4 +133,11 @@ export function scrubEvent<T extends Event>(event: T): T {
  * ingestion key (it cannot read project data), so exposing it to the client is
  * safe and standard. Never hardcoded — always read from the environment.
  */
-export const SENTRY_DSN = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN
+export function normalizeSentryDsn(value: string | undefined): string | undefined {
+  const normalized = value?.replace(/^\uFEFF/, '').trim()
+  return normalized || undefined
+}
+
+export const SENTRY_DSN = normalizeSentryDsn(
+  process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN,
+)

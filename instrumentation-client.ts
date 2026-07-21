@@ -3,9 +3,9 @@
 // comes from NEXT_PUBLIC_SENTRY_DSN (a DSN is a write-only ingestion key — safe
 // to expose). Never hardcoded.
 import * as Sentry from '@sentry/nextjs'
-import { scrubEvent } from '@/lib/sentry-scrub'
+import { normalizeSentryDsn, scrubEvent } from '@/lib/sentry-scrub'
 
-const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN
+const dsn = normalizeSentryDsn(process.env.NEXT_PUBLIC_SENTRY_DSN)
 
 Sentry.init({
   dsn,
