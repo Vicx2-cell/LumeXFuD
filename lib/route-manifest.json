@@ -1,9 +1,31 @@
 {
-  "generated_at": "2026-06-12T23:21:35.060Z",
-  "count": 92,
+  "generated_at": "2026-07-21T21:40:39.519Z",
+  "count": 236,
   "routes": [
     {
       "path": "/api/admin/audit",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/block",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/contact-cases/[id]",
+      "dynamic": true,
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/admin/customer-locations",
       "dynamic": false,
       "methods": [
         "GET"
@@ -31,10 +53,71 @@
       ]
     },
     {
+      "path": "/api/admin/disputes/[id]/messages",
+      "dynamic": true,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "path": "/api/admin/disputes/[id]/resolve",
       "dynamic": true,
       "methods": [
         "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/email-operations",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/face",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/feature-flags",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/kyc/queue",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/live",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/lodges",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/lodges/[id]",
+      "dynamic": true,
+      "methods": [
+        "PATCH",
+        "DELETE"
       ]
     },
     {
@@ -49,6 +132,20 @@
       "dynamic": false,
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/reviews",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/reviews/[id]",
+      "dynamic": true,
+      "methods": [
+        "DELETE"
       ]
     },
     {
@@ -70,6 +167,29 @@
       "path": "/api/admin/riders/create",
       "dynamic": false,
       "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/stats",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/support-notes",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/suspend",
+      "dynamic": false,
+      "methods": [
+        "GET",
         "POST"
       ]
     },
@@ -96,7 +216,42 @@
       ]
     },
     {
+      "path": "/api/admin/vendors/[id]/inspection",
+      "dynamic": true,
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
       "path": "/api/admin/vendors/create",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/verified-places",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/admin/verified-places/[id]",
+      "dynamic": true,
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/admin/verify-receipt",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/wallet-adjust",
       "dynamic": false,
       "methods": [
         "POST"
@@ -110,10 +265,45 @@
       ]
     },
     {
+      "path": "/api/admin/whatsapp",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/ai/menu-digitize",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/announcement",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/applications",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "path": "/api/auth/account",
       "dynamic": false,
       "methods": [
-        "DELETE",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/auth/bank/status",
+      "dynamic": false,
+      "methods": [
         "GET"
       ]
     },
@@ -122,6 +312,41 @@
       "dynamic": false,
       "methods": [
         "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/email/send",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/email/verify",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/export",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/auth/face",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/face/status",
+      "dynamic": false,
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -146,6 +371,20 @@
       ]
     },
     {
+      "path": "/api/auth/google/callback",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/auth/google/start",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "path": "/api/auth/login",
       "dynamic": false,
       "methods": [
@@ -163,7 +402,29 @@
       "path": "/api/auth/me",
       "dynamic": false,
       "methods": [
-        "GET"
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/auth/otp/send",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/otp/verify",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/pin/reset",
+      "dynamic": false,
+      "methods": [
+        "POST"
       ]
     },
     {
@@ -181,20 +442,6 @@
       ]
     },
     {
-      "path": "/api/auth/register/send-code",
-      "dynamic": false,
-      "methods": [
-        "POST"
-      ]
-    },
-    {
-      "path": "/api/auth/register/verify-code",
-      "dynamic": false,
-      "methods": [
-        "POST"
-      ]
-    },
-    {
       "path": "/api/auth/remove-pin",
       "dynamic": false,
       "methods": [
@@ -206,6 +453,29 @@
       "dynamic": false,
       "methods": [
         "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/social/complete",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/tiktok/callback",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/auth/tiktok/start",
+      "dynamic": false,
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -237,6 +507,28 @@
       ]
     },
     {
+      "path": "/api/boosts",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/campaign/track",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/campus-partners",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
       "path": "/api/chow-ai",
       "dynamic": false,
       "methods": [
@@ -244,9 +536,32 @@
       ]
     },
     {
+      "path": "/api/contact",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/cron/official-feed",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/cron/order-delay-watch",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
       "path": "/api/cron/recalculate-vendor-scores",
       "dynamic": false,
       "methods": [
+        "GET",
         "POST"
       ]
     },
@@ -254,6 +569,15 @@
       "path": "/api/cron/release-payments",
       "dynamic": false,
       "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/cron/release-scheduled",
+      "dynamic": false,
+      "methods": [
+        "GET",
         "POST"
       ]
     },
@@ -261,6 +585,7 @@
       "path": "/api/cron/reset-daily-limits",
       "dynamic": false,
       "methods": [
+        "GET",
         "POST"
       ]
     },
@@ -268,6 +593,7 @@
       "path": "/api/cron/reset-weekly-leaderboard",
       "dynamic": false,
       "methods": [
+        "GET",
         "POST"
       ]
     },
@@ -283,6 +609,7 @@
       "path": "/api/cron/subscription-check",
       "dynamic": false,
       "methods": [
+        "GET",
         "POST"
       ]
     },
@@ -290,6 +617,7 @@
       "path": "/api/cron/vendor-auto-cancel",
       "dynamic": false,
       "methods": [
+        "GET",
         "POST"
       ]
     },
@@ -297,6 +625,7 @@
       "path": "/api/cron/wallet-reconciliation",
       "dynamic": false,
       "methods": [
+        "GET",
         "POST"
       ]
     },
@@ -304,6 +633,15 @@
       "path": "/api/cron/wallet-release-held",
       "dynamic": false,
       "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/cron/wallet-sweep",
+      "dynamic": false,
+      "methods": [
+        "GET",
         "POST"
       ]
     },
@@ -329,10 +667,369 @@
       ]
     },
     {
+      "path": "/api/customer/addresses",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/customer/favorites",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/customer/locations",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/customer/locations/[id]",
+      "dynamic": true,
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/customer/places",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/customer/places/[id]",
+      "dynamic": true,
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/customer/places/[id]/use",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/customer/places/photo",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/delivery-locations",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/dev/qa/customer-session",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "path": "/api/features",
       "dynamic": false,
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "path": "/api/feed",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/feed/cleanup/diagnostics",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/feed/drafts",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/events",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/[id]",
+      "dynamic": true,
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/[id]/archive",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/[id]/bookmark",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/[id]/feedback",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/[id]/like",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/[id]/quote",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/[id]/reply",
+      "dynamic": true,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/[id]/report",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/[id]/repost",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/[id]/restore",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/[id]/retry-processing",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/bulk-archive",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/bulk-delete",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/posts/bulk-restore",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/profiles/[profileId]/block",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/profiles/[profileId]/follow",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/profiles/[profileId]/mute",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/stale-suggestions",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/feed/stories",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/uploads",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/feed/video-quota",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/feed/videos",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/feed/watch",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/forecast/hotspots",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/forecast/vendor",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/group-order/[code]",
+      "dynamic": true,
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/group-order/[code]/cancel",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/group-order/[code]/items",
+      "dynamic": true,
+      "methods": [
+        "POST",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/group-order/create",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/group-order/mine",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/launch-counter",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/lodges",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/lumi",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/lumi/badge",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/lumi/confirm",
+      "dynamic": false,
+      "methods": [
+        "POST"
       ]
     },
     {
@@ -342,6 +1039,21 @@
         "GET",
         "PATCH",
         "DELETE"
+      ]
+    },
+    {
+      "path": "/api/notifications",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/order-communications/unread",
+      "dynamic": false,
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -359,6 +1071,13 @@
       ]
     },
     {
+      "path": "/api/orders/[id]/collect",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "path": "/api/orders/[id]/confirm",
       "dynamic": true,
       "methods": [
@@ -366,7 +1085,57 @@
       ]
     },
     {
+      "path": "/api/orders/[id]/deliver",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/orders/[id]/delivery-photo",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "path": "/api/orders/[id]/dispute",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/orders/[id]/handover-code",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/orders/[id]/messages",
+      "dynamic": true,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/orders/[id]/messages/read",
+      "dynamic": true,
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/orders/[id]/messages/stream",
+      "dynamic": true,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/orders/[id]/rate",
       "dynamic": true,
       "methods": [
         "POST"
@@ -384,6 +1153,13 @@
       "dynamic": true,
       "methods": [
         "PATCH"
+      ]
+    },
+    {
+      "path": "/api/orders/estimate",
+      "dynamic": false,
+      "methods": [
+        "POST"
       ]
     },
     {
@@ -408,6 +1184,65 @@
       ]
     },
     {
+      "path": "/api/premium/plans",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/premium/status",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/premium/subscribe",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/profile/image",
+      "dynamic": false,
+      "methods": [
+        "POST",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/push/subscribe",
+      "dynamic": false,
+      "methods": [
+        "POST",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/referrals",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/rewards",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/rewards/surprise/[id]/open",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "path": "/api/rider-ai",
       "dynamic": false,
       "methods": [
@@ -416,6 +1251,13 @@
     },
     {
       "path": "/api/rider/orders",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/rider/reviews",
       "dynamic": false,
       "methods": [
         "GET"
@@ -443,6 +1285,80 @@
       ]
     },
     {
+      "path": "/api/sponsor-wallet/receipt",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/sponsor-wallet/topup",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/streak/nudge",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/study/ingest",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/super-admin/announcement",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/super-admin/campus-partners",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/super-admin/consent",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/super-admin/controls",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/super-admin/cron-health",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/super-admin/cron-run",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "path": "/api/super-admin/earnings",
       "dynamic": false,
       "methods": [
@@ -457,7 +1373,30 @@
       ]
     },
     {
+      "path": "/api/super-admin/feature-usage",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "path": "/api/super-admin/features",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/super-admin/feed-reports",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/super-admin/feed-stories",
       "dynamic": false,
       "methods": [
         "GET",
@@ -472,11 +1411,89 @@
       ]
     },
     {
-      "path": "/api/super-admin/pricing",
+      "path": "/api/super-admin/lockdown",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/super-admin/official-feed",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH",
+        "POST",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/super-admin/payments",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/super-admin/premium",
       "dynamic": false,
       "methods": [
         "GET",
         "PATCH"
+      ]
+    },
+    {
+      "path": "/api/super-admin/pricing",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/super-admin/revoke-sessions",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/super-admin/rewards",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/super-admin/security-health",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/super-admin/security-incidents",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/super-admin/security-incidents/[id]",
+      "dynamic": true,
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/super-admin/security-incidents/[id]/export",
+      "dynamic": true,
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -567,6 +1584,13 @@
       ]
     },
     {
+      "path": "/api/vendor/reviews",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "path": "/api/vendors",
       "dynamic": false,
       "methods": [
@@ -581,7 +1605,28 @@
       ]
     },
     {
+      "path": "/api/vendors/[id]/hours",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/vendors/[id]/location",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "path": "/api/vendors/[id]/pause",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/vendors/[id]/pickup-settings",
       "dynamic": true,
       "methods": [
         "POST"
@@ -654,6 +1699,21 @@
       "path": "/api/wallet/withdraw",
       "dynamic": false,
       "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/webhooks/resend",
+      "dynamic": false,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/whatsapp",
+      "dynamic": false,
+      "methods": [
+        "GET",
         "POST"
       ]
     }
