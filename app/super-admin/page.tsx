@@ -32,6 +32,13 @@ const actions = [
     highlight: true,
   },
   {
+    href: '/super-admin/incidents',
+    label: 'Security Incidents',
+    desc: 'Cases, timelines, evidence holds, and containment',
+    icon: svg(<><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/></>),
+    highlight: true,
+  },
+  {
     href: '/super-admin/controls',
     label: 'Controls',
     desc: 'Kill switches, maintenance, hours, notifications',
@@ -158,7 +165,7 @@ const GROUPS = [
   {
     title: 'Platform health',
     description: 'Watch the system, jobs, incidents, and human support handoffs.',
-    hrefs: ['/super-admin/sentinel', '/super-admin/cron', '/super-admin/security', '/super-admin/whatsapp'],
+    hrefs: ['/super-admin/sentinel', '/super-admin/cron', '/super-admin/security', '/super-admin/incidents', '/super-admin/whatsapp'],
   },
   {
     title: 'Controls and growth',

@@ -35,3 +35,12 @@
 - PASS: PIN login, social completion, order creation, and WhatsApp ordering share the same message and do not select `suspend_reason`.
 - PASS: block/unblock persistence errors reject instead of reporting success.
 - PASS: 223 focused/revocation/authorization tests, TypeScript, and targeted ESLint.
+
+## FS-005 verification
+
+- PASS: incident, timeline, evidence-hold, and append-only custody schema checks.
+- PASS: incident and export routes are super-admin-only and present in route-policy coverage.
+- PASS: new tables enable RLS and deny anon/authenticated table access.
+- PASS: default console masks account/session/resource identifiers, coarsens IP indicators, hides user-agent detail, and removes precise coordinates.
+- PASS: evidence export is SHA-256 hashed, records custody, separates facts/inferences, requires human authorization, and contains no external-send call.
+- PASS: 230 incident/authorization/RLS/redaction/evidence tests, TypeScript, and targeted ESLint.

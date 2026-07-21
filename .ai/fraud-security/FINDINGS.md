@@ -24,6 +24,12 @@ Suspension and phone-block routes updated account rows, while `getCurrentUser()`
 
 Status: repaired. Migration 134 adds transactional suspension triggers for customers, vendors, and riders that revoke every active session. Reinstatement does not revive sessions. Blocklist/account update failures now fail the operation visibly. Restriction events are structured and request-correlated, while all current user-facing paths reuse one generic message and no longer select the internal reason.
 
+## FS-005 - HIGH - No security incident, evidence-hold, or custody system
+
+The immutable security-event spine had no case grouping, factual incident timeline, evidence hold, access history, integrity display, or human-review evidence package. Existing Security Health UI covered configuration posture only.
+
+Status: repaired with a scoped foundation. Migration 135 adds incidents, immutable event links, evidence holds, and append-only custody with atomic case creation. A super-admin-only API and console show severity, confidence, classification, associated account indicator, masked session/network/device indicators, approximate-location warnings, orders/payments, rules, containment, timeline, and live chain integrity. Explicit exports include hashes, facts separated from inferences, custody, deployment commit, and a no-automatic-submission declaration.
+
 ## Scoped inventory observed
 
 - Authentication/session paths: `lib/session.ts`, `lib/pin-auth.ts`, `lib/rate-limit.ts`, `proxy.ts`, and `app/api/auth/**`.

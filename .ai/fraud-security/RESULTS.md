@@ -21,3 +21,10 @@
 - Added structured, request-correlated restriction/lift events to admin suspension and block actions.
 - Made blocklist and per-account mutation failures visible rather than silently returning success.
 - Replaced reason-revealing restriction responses with one generic message across login, social auth, web ordering, and WhatsApp ordering.
+
+## FS-005 complete
+
+- Added durable incident cases, factual event timelines, evidence holds, and append-only custody.
+- Added atomic incident creation from a preserved security event.
+- Added a super-admin-only incident API and console with masked indicators and explicit accuracy warnings.
+- Added a hashed JSON evidence package for human review; export is custody-logged and never automatically submitted or transmitted.
