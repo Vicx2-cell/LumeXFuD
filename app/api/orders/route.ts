@@ -27,16 +27,40 @@ import { sendOrderConfirmationEmail } from '@/lib/transactional-email'
 import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { evaluateOrderCreationRisk, hashOrderDestination, hashOrderIntent, normalizeIdempotencyKey } from '@/lib/order-fraud'
+import { createGuestOrderToken, hashGuestOrderToken } from '@/lib/guest-order-access'
+import { normalizePhone } from '@/lib/phone'
 
 export async function POST(req: NextRequest) {
   const context = createRequestContext(req.headers)
   const json = <T,>(body: T, init?: ResponseInit) => applyRequestContext(NextResponse.json(body, init), context)
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
   const session = await getCurrentUser()
-  if (!session) {
-    return json({ error: 'Authentication required' }, { status: 401 })
+
+  let body: Record<string, unknown>
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
-  if (session.role !== 'customer') {
+
+  const parsed = createOrderInput.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid order data', details: parsed.error.flatten() }, { status: 400 })
+  }
+
+  let guestPhone: string | null = null
+  if (!session) {
+    if (!parsed.data.guest_phone || !parsed.data.guest_name) {
+      return json({ error: 'Authentication required' }, { status: 401 })
+    }
+    try {
+      guestPhone = normalizePhone(parsed.data.guest_phone)
+    } catch {
+      return json({ error: 'Enter a valid phone number for WhatsApp updates.' }, { status: 400 })
+    }
+  }
+
+  if (session && session.role !== 'customer') {
     await recordSecurityEvent({
       eventType: 'authz_deny', severity: 'warn', surface: 'order_creation',
       actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
@@ -63,11 +87,14 @@ export async function POST(req: NextRequest) {
 
   // Rate limit: each order create spins up a Paystack transaction — cap bursts
   // per user (15 / 5 min) to stop checkout spam. No-ops if Upstash is unset.
-  const rl = await rateLimitGeneric(`order:create:${session.userId ?? session.phone}`, 15, 300, true)
+  const actorKey = session?.userId ?? session?.phone ?? guestPhone ?? ip ?? 'guest'
+  const actorRole = session?.role ?? 'guest'
+  const actorSessionId = session?.sessionId
+  const rl = await rateLimitGeneric(`order:create:${actorKey}`, 15, 300, true)
   if (!rl.success) {
     await recordSecurityEvent({
       eventType: 'ratelimit_hit', severity: 'warn', surface: 'order_creation',
-      actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+      actorId: actorKey, actorRole, sessionId: actorSessionId,
       ip, requestId: context.requestId, correlationId: context.correlationId,
       route: req.nextUrl.pathname, method: req.method, outcome: 'account_rate_limited',
       detail: { rule: 'order_account_velocity' },
@@ -81,7 +108,7 @@ export async function POST(req: NextRequest) {
     if (!networkRl.success) {
       await recordSecurityEvent({
         eventType: 'ratelimit_hit', severity: 'warn', surface: 'order_creation',
-        actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+        actorId: actorKey, actorRole, sessionId: actorSessionId,
         ip, requestId: context.requestId, correlationId: context.correlationId,
         route: req.nextUrl.pathname, method: req.method, outcome: 'network_rate_limited',
         detail: { rule: 'order_shared_network_velocity' },
@@ -90,24 +117,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let body: Record<string, unknown>
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
-  }
-
-  const parsed = createOrderInput.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid order data', details: parsed.error.flatten() }, { status: 400 })
-  }
-
-  const { vendor_id, items, delivery_type, delivery_address, city_id, zone_id, delivery_lodge, delivery_block, delivery_room, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate, apply_reward, campaign_id } = parsed.data
+  const { vendor_id, items, delivery_type, delivery_address, city_id, zone_id, delivery_lodge, delivery_block, delivery_room, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate, apply_reward, campaign_id, guest_name } = parsed.data
+  const isGuest = !session
   const isScheduled = !!scheduled_for
   const isPickup = delivery_type === 'PICKUP'
   const hasCoords = typeof delivery_latitude === 'number' && typeof delivery_longitude === 'number'
   const db = createSupabaseAdmin()
   const campaignQuery = campaign_id ? `?campaign=${encodeURIComponent(campaign_id)}` : ''
+
+  if (isGuest && (isPickup || group_order_id || payment_method !== 'PAYSTACK' || apply_reward === true)) {
+    return json({ error: 'Guest checkout supports delivery paid by card or transfer only.' }, { status: 400 })
+  }
 
   // ── Pickup (order ahead) gates ──────────────────────────────────────────────
   // Master switch + no scheduling/group/coords for the first version (keeps the
@@ -374,11 +394,13 @@ export async function POST(req: NextRequest) {
   // Generate order number
   const orderNumber = await generateOrderNumber()
 
-  const { data: c } = await db
-    .from('customers')
-    .select('id, phone, suspended_until')
-    .eq('phone', session.phone)
-    .single()
+  const { data: c } = session
+    ? await db
+      .from('customers')
+      .select('id, phone, suspended_until')
+      .eq('phone', session.phone)
+      .single()
+    : { data: null }
 
   // Suspended account → can't place orders. (suspended_until far in the future =
   // indefinite suspension; degrades gracefully if migration 046 hasn't run.)
@@ -401,11 +423,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const customerPhone = session.phone
+  const customerPhone = session?.phone ?? guestPhone!
   // Paystack validates the email's TLD — ".fud" is not a real TLD and is
   // rejected ("Invalid Email Address Passed"), which fails EVERY order. Use the
   // platform's real domain so the placeholder address always passes.
-  const customerEmail = `${session.phone.replace('+', '')}@lumexfud.com.ng`
+  const customerEmail = `${customerPhone.replace('+', '')}@lumexfud.com.ng`
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lumexfud.com.ng'
 
@@ -419,7 +441,7 @@ export async function POST(req: NextRequest) {
   if (suppliedIdempotencyKey !== null && normalizedIdempotencyKey === null) {
     await recordSecurityEvent({
       eventType: 'order_idempotency_invalid', severity: 'warn', surface: 'order_creation',
-      actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+      actorId: actorKey, actorRole, sessionId: actorSessionId,
       ip, requestId: context.requestId, correlationId: context.correlationId,
       route: req.nextUrl.pathname, method: req.method, outcome: 'invalid_key_format',
       detail: { supplied_length: suppliedIdempotencyKey.length },
@@ -442,8 +464,8 @@ export async function POST(req: NextRequest) {
   if (creationRisk.triggeredRules.length) {
     await recordSecurityEvent({
       eventType: 'order_risk_evaluated', severity: creationRisk.score >= 45 ? 'warn' : 'info',
-      surface: 'order_creation', actorId: session.userId ?? session.phone,
-      actorRole: session.role, sessionId: session.sessionId, ip,
+      surface: 'order_creation', actorId: actorKey,
+      actorRole, sessionId: actorSessionId, ip,
       requestId: context.requestId, correlationId: context.correlationId,
       route: req.nextUrl.pathname, method: req.method, outcome: 'evaluated',
       detail: {
@@ -490,9 +512,13 @@ export async function POST(req: NextRequest) {
     subtotalKobo: subtotal, totalKobo: totalAmount,
   })
 
+  const guestAccessToken = isGuest ? createGuestOrderToken() : null
   const orderInsert: Record<string, unknown> = {
     order_number: orderNumber,
     customer_id: customerId,
+    guest_phone: guestPhone,
+    guest_name: isGuest ? guest_name : null,
+    guest_access_token_hash: guestAccessToken ? hashGuestOrderToken(guestAccessToken) : null,
     vendor_id,
     city_id: pricingConfig.cityId ?? (vendor as { city_id?: string | null }).city_id ?? null,
     zone_id: pricingConfig.zoneId ?? (vendor as { zone_id?: string | null }).zone_id ?? null,
@@ -563,7 +589,7 @@ export async function POST(req: NextRequest) {
       if (existing && existing.customer_id !== customerId) {
         await recordSecurityEvent({
           eventType: 'order_intent_mismatch', severity: 'critical', surface: 'order_creation',
-          actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+          actorId: actorKey, actorRole, sessionId: actorSessionId,
           ip, requestId: context.requestId, correlationId: context.correlationId,
           route: req.nextUrl.pathname, method: req.method, outcome: 'owner_mismatch',
           detail: { rule: 'order_idempotency_owner_mismatch' },
@@ -577,7 +603,7 @@ export async function POST(req: NextRequest) {
         })
         await recordSecurityEvent({
           eventType: 'order_intent_mismatch', severity: 'critical', surface: 'order_creation',
-          actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+          actorId: actorKey, actorRole, sessionId: actorSessionId,
           ip, requestId: context.requestId, correlationId: context.correlationId,
           route: req.nextUrl.pathname, method: req.method, outcome: 'payload_mismatch',
           resourceType: 'order', resourceId: existing.order_number,
@@ -588,7 +614,7 @@ export async function POST(req: NextRequest) {
       if (existing?.paystack_authorization_url) {
         await recordSecurityEvent({
           eventType: 'order_idempotency_replay', severity: 'info', surface: 'order_creation',
-          actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+          actorId: actorKey, actorRole, sessionId: actorSessionId,
           ip, requestId: context.requestId, correlationId: context.correlationId,
           route: req.nextUrl.pathname, method: req.method, outcome: 'safe_replay',
           resourceType: 'order', resourceId: existing.order_number,
@@ -927,7 +953,7 @@ export async function POST(req: NextRequest) {
       email: customerEmail,
       amount: paystackAmount,
       reference: orderNumber,
-      callback_url: `${appUrl}/order/${orderNumber}${campaignQuery}`,
+      callback_url: `${appUrl}/order/${orderNumber}${guestAccessToken ? `?guest=${guestAccessToken}${campaign_id ? `&campaign=${encodeURIComponent(campaign_id)}` : ''}` : campaignQuery}`,
       metadata: {
         order_number: orderNumber,
         customer_phone: customerPhone,
@@ -956,6 +982,7 @@ export async function POST(req: NextRequest) {
     order_number: orderNumber,
     authorization_url: paystackResult.authorization_url,
     access_code: paystackResult.access_code,
+    guest_access_token: guestAccessToken ?? undefined,
   })
 }
 

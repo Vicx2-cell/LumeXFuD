@@ -6,6 +6,7 @@ import { BottomNav } from '@/components/nav-bottom'
 import { OrderStatusClient } from './order-status-client'
 import { settleOrderIfDue, type SettleableOrder } from '@/lib/order-settle'
 import { callPhoneMap } from '@/lib/call-phone'
+import { hashGuestOrderToken, isValidGuestOrderToken } from '@/lib/guest-order-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,10 +15,10 @@ export default async function OrderPage({
   searchParams,
 }: {
   params: Promise<{ orderNumber: string }>
-  searchParams?: Promise<{ campaign?: string }>
+  searchParams?: Promise<{ campaign?: string; guest?: string }>
 }) {
   const { orderNumber } = await params
-  const search = ((await (searchParams ?? Promise.resolve({})).catch(() => ({}))) as { campaign?: string })
+  const search = ((await (searchParams ?? Promise.resolve({})).catch(() => ({}))) as { campaign?: string; guest?: string })
   const session = await getCurrentUser()
 
   const db = createSupabaseAdmin()
@@ -32,7 +33,7 @@ export default async function OrderPage({
       picked_up_at, delivered_at, completed_at, cancelled_at, created_at,
       pickup_eta_at, collected_at, no_show_at, delivery_photo_url,
       rider_auto_release_at, scheduled_for, pending_since, wallet_amount_kobo, paystack_reference,
-      customer_id, guest_phone, vendor_id, rider_id,
+      customer_id, guest_phone, guest_access_token_hash, vendor_id, rider_id,
       vendors ( shop_name, prep_time_minutes ),
       riders ( full_name, phone, avatar_url ),
       order_items ( id, name, price, quantity, subtotal, addons )
@@ -73,24 +74,29 @@ export default async function OrderPage({
   // enumerable, so this page must bind the viewer to THIS order — not merely
   // require any session. Previously a guest order rendered to anyone, and any
   // vendor/rider session could read any order by number; both are closed here.
-  if (!session) {
-    // No public view, even for legacy guest orders — log in and prove ownership.
+  const guestToken = isValidGuestOrderToken(search.guest) ? search.guest : null
+  const guestTokenHash = guestToken ? hashGuestOrderToken(guestToken) : null
+  const guestAuthorized = !!guestTokenHash && !!order.guest_phone && (order as { guest_access_token_hash?: string | null }).guest_access_token_hash === guestTokenHash
+
+  if (!session && !guestAuthorized) {
     redirect(`/auth?next=/order/${orderNumber}`)
   }
 
   let authorized = false
-  if (session.role === 'admin' || session.role === 'super_admin') {
+  if (guestAuthorized) {
+    authorized = true
+  } else if (session?.role === 'admin' || session?.role === 'super_admin') {
     authorized = true // staff act across all orders
-  } else if (session.role === 'customer') {
+  } else if (session?.role === 'customer') {
     const { data: customer } = await db
       .from('customers')
       .select('id')
       .eq('phone', session.phone)
       .single()
     authorized = !!customer && customer.id === order.customer_id
-  } else if (session.role === 'vendor') {
+  } else if (session?.role === 'vendor') {
     authorized = !!session.userId && session.userId === order.vendor_id
-  } else if (session.role === 'rider') {
+  } else if (session?.role === 'rider') {
     authorized = !!session.userId && session.userId === order.rider_id
   }
 
@@ -101,7 +107,7 @@ export default async function OrderPage({
   // the prompt without an extra round-trip.
   const reviewsEnabled = await getFeature('reviews')
   let alreadyRated = false
-  if (reviewsEnabled && session.role === 'customer') {
+  if (reviewsEnabled && session?.role === 'customer') {
     const { data: existingRating } = await db
       .from('ratings')
       .select('id')
@@ -109,7 +115,7 @@ export default async function OrderPage({
       .maybeSingle()
     alreadyRated = !!existingRating
   }
-  const canRate = reviewsEnabled && session.role === 'customer'
+  const canRate = reviewsEnabled && session?.role === 'customer'
 
   // Is the assigned rider fully KYC-verified? (one tiny marker check)
   let riderVerified = false
@@ -139,7 +145,7 @@ export default async function OrderPage({
         riderVerified={riderVerified}
         pickupHoldMinutes={pickupHoldMinutes}
         campaignId={search?.campaign ?? ''}
-        chatActor={session.role === 'customer' && session.userId
+        chatActor={session?.role === 'customer' && session.userId
           ? { id: session.userId, type: 'CUSTOMER' }
           : null}
       />

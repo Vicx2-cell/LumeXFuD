@@ -10,4 +10,7 @@
 - Committed as `7576ddb Preserve group order add-ons`.
 - Implemented direct group-page add-on picker.
 - Verification passed for picker slice: lint, focused tests, and production build.
-- Second commit pending.
+- Committed as `238c138 Add group order add-on picker`.
+- Implemented secure guest delivery checkout with hashed order access token and token-aware order tracking.
+- Verification passed for guest checkout slice: lint, focused tests, and production build.
+- Third commit pending.

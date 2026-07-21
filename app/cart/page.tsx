@@ -78,8 +78,18 @@ export default function CartPage() {
   const [gpsBusy,          setGpsBusy]          = useState(false)
   const [gpsMessage,       setGpsMessage]       = useState('')
   const [campaignId,       setCampaignId]       = useState('')
+  const [authChecked,      setAuthChecked]      = useState(false)
+  const [isGuest,          setIsGuest]          = useState(false)
+  const [guestName,        setGuestName]        = useState('')
+  const [guestPhone,       setGuestPhone]       = useState('')
 
   useEffect(() => {
+    fetch('/api/auth/me', { cache: 'no-store' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d: { role?: string } | null) => setIsGuest(d?.role !== 'customer'))
+      .catch(() => setIsGuest(true))
+      .finally(() => setAuthChecked(true))
+
     fetch('/api/settings/fees')
       .then((r) => r.ok ? r.json() : null)
       .then((d: { bike_delivery_fee_kobo: number; door_delivery_fee_kobo: number; platform_markup_kobo: number; topup_bonus_percent?: number; hours_open?: string; hours_close?: string } | null) => {
@@ -287,6 +297,10 @@ export default function CartPage() {
     if (!isPickup && scheduleOn && !scheduleAt) { setError('Pick a date and time for your scheduled order'); return }
     if (isPickup && !pickupAgree) { setError('Please accept the pickup collection terms to continue'); return }
     if (!isPickup && !orderAgree) { setError('Please accept the Terms and Refund Policy to continue'); return }
+    if (authChecked && isGuest) {
+      if (guestName.trim().length < 2) { setError('Enter your name for the order'); return }
+      if (guestPhone.trim().length < 7) { setError('Enter your WhatsApp phone number'); return }
+    }
     setError(''); setLoading(true)
     if (campaignId && cart.vendor_id) {
       trackCampaignEvent({
@@ -308,6 +322,8 @@ export default function CartPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vendor_id:             cart.vendor_id,
+          guest_name:            authChecked && isGuest ? guestName.trim() : undefined,
+          guest_phone:           authChecked && isGuest ? guestPhone.trim() : undefined,
           items:                 cart.items.map((i) => ({
             menu_item_id:          i.menu_item_id,
             quantity:              i.quantity,
@@ -630,6 +646,20 @@ export default function CartPage() {
             row is gated on it, so Paystack is never hidden (card must always work). */}
         {!walletLoading && (
           <CartSection title="Checkout" subtitle="Pick how you want to pay and confirm the final breakdown.">
+            {authChecked && isGuest && (
+              <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-white/55">Name</label>
+                    <input value={guestName} onChange={(e) => setGuestName(e.target.value.slice(0, 80))} className="lx-field w-full px-3 py-2.5 text-sm outline-none" autoComplete="name" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-white/55">WhatsApp phone</label>
+                    <input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value.slice(0, 20))} className="lx-field w-full px-3 py-2.5 text-sm outline-none" inputMode="tel" autoComplete="tel" />
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="glass-thin overflow-hidden rounded-2xl">
               {/* Wallet choice — only when the customer wallet feature is enabled */}
               {features.customer_wallet_enabled === true && (
