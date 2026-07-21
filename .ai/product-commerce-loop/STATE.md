@@ -3,7 +3,7 @@
 Date: 2026-07-21
 Branch: audit/production-readiness
 Starting commit: 13e22e6 Add admin rider reassignment
-Latest verified commit before this slice: bc9eaa9 Require guest checkout acknowledgement
+Latest verified commit before this slice: 7f9b5d7 Repair phase boundary verification
 
 ## Scope
 
@@ -24,6 +24,7 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - Storefront slice implemented and pending commit: `/store/[slug]` now resolves active vendor slugs into the existing live vendor ordering page with vendor-specific metadata and reserved/normalized slug guards.
 - Guest checkout slice implemented and pending commit: guest order creation now requires explicit terms/privacy acknowledgement and the cart sends a stable idempotency key for checkout retries.
 - Boundary verification repair implemented and pending commit: central route policy now classifies the existing admin operational routes and health endpoint, and order chat actor binding remains customer-only while satisfying the regression test.
+- Final local state update pending commit: worktree is clean after `7f9b5d7`; Playwright is installed but there is no configured browser spec suite or seeded live vendor fixture for the requested product-sheet viewport walkthrough.
 
 ## Baseline
 
@@ -35,3 +36,4 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - Storefront slice verification passed: focused storefront/cart tests, lint, and production build.
 - Guest checkout slice verification passed: focused guest/validator tests, lint, and production build.
 - Phase boundary verification passed after repair: full Vitest suite, focused access-control rerun, lint, and production build.
+- Browser viewport verification remains human/data blocked in this environment: no Playwright config/specs and no known seeded active vendor/menu/add-on/cart fixture.

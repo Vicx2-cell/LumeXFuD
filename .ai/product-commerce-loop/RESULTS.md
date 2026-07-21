@@ -35,4 +35,6 @@
 - Committed as `bc9eaa9 Require guest checkout acknowledgement`.
 - Repaired phase-boundary verification failures by classifying existing admin operational routes and `/api/health` in `ROUTE_POLICY`, and preserving the customer-only chat actor guard in order tracking.
 - Verification passed: targeted failing tests, isolated access-control suite, final full suite, lint, and production build.
-- Commit pending for phase-boundary repair slice.
+- Committed as `7f9b5d7 Repair phase boundary verification`.
+- Checked browser-test tooling: Playwright 1.60.0 is installed, but live viewport walkthroughs remain blocked by absence of configured browser specs and seeded active vendor/menu/add-on fixtures in local state.
+- Final loop-state update pending commit.

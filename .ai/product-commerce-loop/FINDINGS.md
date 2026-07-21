@@ -29,3 +29,4 @@
 - Phase-boundary full suite initially exposed existing route-policy coverage gaps for `admin/orders/[id]/emergency-cancel`, `admin/orders/[id]/reassign-rider`, `admin/support-notes`, and `health`.
 - Phase-boundary full suite also exposed a source-level regression test that expected the customer chat actor guard without optional chaining; the runtime guard was kept customer-only and null-safe.
 - One full-suite run timed out on `GET admin/feature-flags -> 403 for customer`; the isolated access-control suite passed all 221 tests, and the subsequent full suite passed all 859 tests.
+- `npx.cmd playwright --version` reports Playwright 1.60.0, but the repository has no Playwright config/spec files and local durable state does not identify a seeded active vendor/menu/add-on fixture for real viewport walkthroughs.

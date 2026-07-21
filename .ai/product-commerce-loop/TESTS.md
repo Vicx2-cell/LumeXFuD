@@ -27,6 +27,8 @@
 - Passed final full suite: `npm.cmd test` with 126 files and 859 tests.
 - Passed after boundary repair: `npm.cmd run lint`.
 - Passed after boundary repair: `npm.cmd run build`.
+- Checked browser-test tooling: `npx.cmd playwright --version` returned `Version 1.60.0`.
+- Not run: live viewport walkthroughs for product configuration because no Playwright harness or seeded active vendor fixture is available in the repository state.
 
 ## Added During Loop
 

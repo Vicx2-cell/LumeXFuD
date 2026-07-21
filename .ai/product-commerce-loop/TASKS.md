@@ -2,12 +2,11 @@
 
 ## In Progress
 
-- [ ] Commit the verified phase-boundary repair.
-- [ ] Inspect remaining Phase A-D gaps.
+- [ ] Commit final loop-state update.
 
 ## Pending
 
-- [ ] Decide whether browser viewport verification is possible in this local environment.
+- [ ] Browser viewport walkthrough at 320, 360, 375, 390, 412, 768, and desktop once a seeded active vendor/menu/add-on fixture or test harness is available.
 
 ## Done
 
@@ -27,5 +26,7 @@
 - [x] Added cart checkout idempotency key for repeated submission and network retry.
 - [x] Added focused guest checkout contract tests.
 - [x] Ran phase-boundary full test suite and repaired discovered route-policy/chat regression failures.
+- [x] Committed the phase-boundary repair.
+- [x] Checked local browser-test capability: Playwright package is installed, but no app Playwright config/specs or seeded commerce fixture is present.
 - [x] Added focused group-order add-on helper tests.
 - [x] Ran lint and focused tests for first slice.
