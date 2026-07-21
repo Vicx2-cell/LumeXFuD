@@ -34,6 +34,15 @@ type AuthNameRow = {
   pin_reset_pending?: boolean | null
 }
 
+type SessionSubjectRow = {
+  id?: string | null
+  phone?: string | null
+  is_active?: boolean | null
+  role?: string | null
+  suspended_until?: string | null
+  deleted_at?: string | null
+}
+
 const SESSION_DURATIONS: Record<SessionRole, number> = {
   customer:   24 * 60 * 60,
   vendor:      8 * 60 * 60,
@@ -158,6 +167,10 @@ export async function createSession(
   const db = createSupabaseAdmin()
   const expiresAt = new Date(Date.now() + SESSION_DURATIONS[role] * 1000).toISOString()
 
+  if (!(await canIssueSession(db, userId, phone, role))) {
+    throw new Error('Account is not eligible for session issuance')
+  }
+
   const { data, error } = await db
     .from('sessions')
     .insert({
@@ -212,6 +225,76 @@ export async function createSession(
 
   const token = await signSessionToken({ sessionId, userId, phone, role, name, pin_reset_pending: pinResetPending })
   return { token, sessionId }
+}
+
+function notSuspended(row: SessionSubjectRow | null): boolean {
+  if (!row) return false
+  if (row.deleted_at) return false
+  if (!row.suspended_until) return true
+  return new Date(row.suspended_until).getTime() <= Date.now()
+}
+
+function envPhoneMatches(role: Extract<SessionRole, 'admin' | 'super_admin'>, phone: string): boolean {
+  const envPhone = role === 'super_admin'
+    ? safeNormalizePhone(process.env.SUPER_ADMIN_PHONE)
+    : safeNormalizePhone(process.env.ADMIN_PHONE)
+  return Boolean(envPhone && envPhone === phone)
+}
+
+async function canIssueSession(
+  db: ReturnType<typeof createSupabaseAdmin>,
+  userId: string,
+  phone: string,
+  role: SessionRole,
+): Promise<boolean> {
+  try {
+    if (role === 'customer') {
+      const { data } = await db
+        .from('customers')
+        .select('id, phone, suspended_until, deleted_at')
+        .eq('id', userId)
+        .eq('phone', phone)
+        .maybeSingle()
+      return notSuspended(data as SessionSubjectRow | null)
+    }
+
+    if (role === 'vendor' || role === 'rider') {
+      const table = role === 'vendor' ? 'vendors' : 'riders'
+      const { data } = await db
+        .from(table)
+        .select('id, phone, is_active, suspended_until, deleted_at')
+        .eq('id', userId)
+        .eq('phone', phone)
+        .maybeSingle()
+      const row = data as SessionSubjectRow | null
+      return notSuspended(row) && row?.is_active === true
+    }
+
+    const { data: adminRow } = await db
+      .from('admins')
+      .select('id, phone, role, is_active')
+      .eq('id', userId)
+      .eq('phone', phone)
+      .maybeSingle()
+    const admin = adminRow as SessionSubjectRow | null
+    if (admin?.is_active === true && admin.role === role) return true
+
+    // Legacy env-provisioned admin/super-admin accounts may live in customers.
+    // They are valid only for the exact configured privileged phone.
+    if (envPhoneMatches(role, phone)) {
+      const { data: customerRow } = await db
+        .from('customers')
+        .select('id, phone, suspended_until, deleted_at')
+        .eq('id', userId)
+        .eq('phone', phone)
+        .maybeSingle()
+      return notSuspended(customerRow as SessionSubjectRow | null)
+    }
+
+    return false
+  } catch {
+    return false
+  }
 }
 
 export function setCookieOptions(role: SessionRole) {

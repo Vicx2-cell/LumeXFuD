@@ -132,3 +132,10 @@
 - No failure occurred in the isolated full suite, so no deterministic, timing-sensitive, or environmental defect remained to rerun or classify.
 - The earlier concurrent-load 758/759 checkpoint is not a full pass and is superseded by this serialized 807/807 result.
 - PASS: ancestry checks confirmed all six pre-existing loop commits remain intact: `fddff21`, `355ccd1`, `383dc8c`, `df09a57`, `44f9967`, and `4c10bd1`.
+
+## FS-014 red-team checkpoint
+
+- PASS: `npm.cmd test -- --run test/account-restriction.test.ts` completed in 11.9s command time / 8.57s Vitest duration: 1 file, 9/9 tests passed.
+- PASS: `npm.cmd test -- --run test/refund-webhook-target.test.ts test/refund-naira.test.ts test/webhook-idempotency.test.ts` completed in 10.6s command time / 7.15s Vitest duration: 3 files, 12/12 tests passed.
+- PASS: `npm.cmd test -- --run test/account-restriction.test.ts test/proxy-revocation.test.ts test/access-control.test.ts test/webhook-route.test.ts test/webhook-and-exposure.test.ts test/webhook-idempotency.test.ts test/refund-risk.test.ts test/refund-naira.test.ts test/refund-webhook-target.test.ts test/order-fraud.test.ts test/order-fraud-route.test.ts test/stale-rider-access.test.ts test/security-incidents.test.ts test/security-incident-case-route.test.ts test/security-events.test.ts` completed in 17.0s command time / 14.14s Vitest duration: 15 files, 283/283 tests passed.
+- PASS: `npx.cmd tsc --noEmit` passed after the session-boundary repair and again after the refund-webhook repair.

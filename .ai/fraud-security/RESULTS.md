@@ -90,3 +90,10 @@
 - Complete test suite passed 807/807 independently after the build exited.
 - All original and subsequent fraud/security commits remain in branch history; no unrelated user work was modified.
 - No deployment, real-money action, external evidence disclosure, or automatic EFCC submission was performed.
+
+## FS-014 red-team checkpoint
+
+- Repaired a session-minting bypass by enforcing role/phone/active/suspension eligibility in `createSession()` and at the `sessions` table insert boundary.
+- Repaired partial-refund webhook replay/misclassification by targeting a single refund row and preserving provider refund references when Paystack returns them.
+- Added regression tests for suspended/inactive/wrong-role session minting and ambiguous partial-refund webhook events.
+- Verification passed for targeted tests, a broader 283-test fraud/security set, and TypeScript. Production build and complete suite were not rerun for this checkpoint yet.

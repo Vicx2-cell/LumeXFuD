@@ -71,7 +71,17 @@ export async function initiateTransfer(params: TransferParams): Promise<string> 
   return json.data.transfer_code
 }
 
-export async function refundTransaction(reference: string, amount?: number): Promise<void> {
+export interface RefundTransactionResult {
+  providerReference?: string
+}
+
+function pickRefundReference(json: unknown): string | undefined {
+  const data = (json as { data?: Record<string, unknown> } | null)?.data
+  const ref = data?.refund_reference ?? data?.reference ?? data?.id
+  return typeof ref === 'string' && ref.trim() ? ref.trim() : undefined
+}
+
+export async function refundTransaction(reference: string, amount?: number): Promise<RefundTransactionResult> {
   const secret = process.env.PAYSTACK_SECRET_KEY
   if (!secret) throw new Error('PAYSTACK_SECRET_KEY not set')
 
@@ -92,4 +102,7 @@ export async function refundTransaction(reference: string, amount?: number): Pro
     const text = await res.text()
     throw new Error(`Refund failed (${res.status}): ${text.slice(0, 300)}`)
   }
+
+  const json = await res.json().catch(() => null)
+  return { providerReference: pickRefundReference(json) }
 }

@@ -85,3 +85,15 @@ Status: repaired. Incident creation now atomically preserves bounded order/payme
 - Security evidence: `lib/security-events.ts`, migration 085, `lib/audit.ts`, security-event tests.
 - Payment/order fraud surfaces: Paystack webhook/refund routes, server-side order totals, handover/delivery routes, refund and ledger helpers.
 - Admin investigation surfaces: super-admin sentinel/security health/audit routes; no complete incident-case console was found.
+
+## FS-014 - HIGH - Session issuance trusted pre-checks instead of the final minting boundary
+
+`createSession()` inserted directly into `sessions` after route-specific checks. Several flows issue sessions after multi-step proof cookies or recovery paths, so a restriction, inactive vendor/rider/admin state, or future caller mistake between the earlier check and the final insert could still create a live bearer token. The sessions table also had no subject-integrity trigger, so a direct service-role insert could mint a session for an ineligible subject.
+
+Status: repaired. `createSession()` now fails closed unless the subject still matches the requested role, phone, active state, deletion state, and suspension state. Migration 140 adds a sessions-table trigger that rejects suspended, inactive, wrong-phone, and wrong-role inserts at the database boundary. Tests reproduce direct minting attempts for suspended customers and inactive vendor/rider/admin subjects, plus wrong-phone and wrong-role substitution.
+
+## FS-014 - HIGH - Refund webhooks could mass-update partial refunds sharing one transaction
+
+`refund.processed` and `refund.failed` updated `refunds` by `paystack_transaction_reference` only. Multiple partial refunds for one Paystack charge share that transaction reference, so one provider event could mark every processing partial refund completed or failed, creating false ledger state and incorrect customer notifications.
+
+Status: repaired. Paystack refund initiation now preserves the provider refund reference when available. Refund webhook handling selects exactly one processing refund by provider refund reference, then by unique amount, then only by single-row fallback. Ambiguous events are not applied and instead emit `webhook_reject` evidence for human review.

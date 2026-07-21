@@ -168,7 +168,12 @@ export async function POST(req: NextRequest) {
 
   // External money movement AFTER the ledger reservation; compensate on failure.
   try {
-    await refundTransaction(order.paystack_reference as string, refundAmount)
+    const providerRefund = await refundTransaction(order.paystack_reference as string, refundAmount)
+    if (providerRefund.providerReference) {
+      await db.from('refunds')
+        .update({ paystack_refund_reference: providerRefund.providerReference })
+        .eq('id', row.refund_id)
+    }
   } catch (err) {
     console.error('[paystack/refund] Paystack refund failed, compensating:', err)
     const { error: compErr } = await db.rpc('fail_order_refund', {

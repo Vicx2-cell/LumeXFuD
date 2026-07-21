@@ -116,8 +116,10 @@ export async function refundOrderPayments(params: {
   // Skipped entirely for wallet-only orders (paystackPortion === 0), so we never
   // fire a Paystack refund against a charge that doesn't exist.
   if (paystackPortion > 0 && order.paystack_reference) {
+    let providerRefundReference: string | undefined
     try {
-      await refundTransaction(order.paystack_reference, paystackPortion)
+      const providerRefund = await refundTransaction(order.paystack_reference, paystackPortion)
+      providerRefundReference = providerRefund.providerReference
     } catch (err) {
       paystackOk = false
       console.error(`[order-refund] Paystack refund failed for order ${order.id}:`, err)
@@ -130,6 +132,7 @@ export async function refundOrderPayments(params: {
       reason,
       status:                         paystackOk ? 'PROCESSING' : 'NEEDS_ATTENTION',
       triggered_by:                   triggeredBy,
+      paystack_refund_reference:      providerRefundReference,
     })
 
     // Only the cash that actually leaves Paystack is a platform cost. The wallet

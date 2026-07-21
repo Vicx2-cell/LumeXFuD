@@ -33,6 +33,42 @@ export interface PaystackWebhookPayload {
   data: Record<string, unknown>
 }
 
+export interface RefundWebhookCandidate {
+  id: string
+  paystack_refund_reference: string | null
+  amount_kobo: number | null
+  created_at?: string | null
+}
+
+export function refundWebhookAmountKobo(data: Record<string, unknown>): number | null {
+  const raw = data.amount ?? data.refund_amount ?? data.refunded_amount
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+export function chooseRefundWebhookTarget(
+  rows: RefundWebhookCandidate[],
+  data: Record<string, unknown>,
+): { refundId: string | null; ambiguous: boolean; reason?: string } {
+  const refundRef = String(data.refund_reference ?? data.reference ?? data.id ?? '').trim()
+  if (refundRef) {
+    const exact = rows.filter((row) => row.paystack_refund_reference === refundRef)
+    if (exact.length === 1) return { refundId: exact[0].id, ambiguous: false }
+    if (exact.length > 1) return { refundId: null, ambiguous: true, reason: 'duplicate_provider_reference' }
+  }
+
+  const amountKobo = refundWebhookAmountKobo(data)
+  if (amountKobo != null) {
+    const byAmount = rows.filter((row) => Number(row.amount_kobo) === amountKobo)
+    if (byAmount.length === 1) return { refundId: byAmount[0].id, ambiguous: false }
+    if (byAmount.length > 1) return { refundId: null, ambiguous: true, reason: 'amount_matches_multiple_refunds' }
+  }
+
+  if (rows.length === 1) return { refundId: rows[0].id, ambiguous: false }
+  if (rows.length > 1) return { refundId: null, ambiguous: true, reason: 'multiple_processing_refunds' }
+  return { refundId: null, ambiguous: false, reason: 'no_processing_refund' }
+}
+
 export async function processWebhookAsync(payload: PaystackWebhookPayload): Promise<void> {
   const { event, data } = payload
   const db = createSupabaseAdmin()
@@ -389,18 +425,37 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
     }
 
     case 'refund.processed': {
-      const refundRef = (data.refund_reference as string) ?? (data.id as string) ?? ''
       const orderRef = (data.transaction_reference as string) ?? ''
+      const { data: candidates } = await db.from('refunds')
+        .select('id, paystack_refund_reference, amount_kobo, created_at')
+        .eq('paystack_transaction_reference', orderRef)
+        .eq('status', 'PROCESSING')
+        .order('created_at', { ascending: true })
+      const chosen = chooseRefundWebhookTarget((candidates ?? []) as RefundWebhookCandidate[], data)
+      if (!chosen.refundId) {
+        await recordSecurityEvent({
+          eventType: 'webhook_reject', severity: chosen.ambiguous ? 'critical' : 'warn', surface: 'paystack_webhook',
+          outcome: 'refund_event_not_applied',
+          detail: { reason: chosen.reason, transaction_reference: orderRef },
+        })
+        break
+      }
+      const providerRefundReference = String(data.refund_reference ?? data.reference ?? data.id ?? '').trim()
+      const completedUpdate: Record<string, unknown> = {
+        status: 'COMPLETED',
+        completed_at: new Date().toISOString(),
+      }
+      if (providerRefundReference) completedUpdate.paystack_refund_reference = providerRefundReference
       await db
         .from('refunds')
-        .update({ status: 'COMPLETED', completed_at: new Date().toISOString() })
-        .eq('paystack_transaction_reference', orderRef)
+        .update(completedUpdate)
+        .eq('id', chosen.refundId)
 
       // Notify customer
       const { data: refund } = await db
         .from('refunds')
         .select('order_id, amount_kobo')
-        .eq('paystack_transaction_reference', orderRef)
+        .eq('id', chosen.refundId)
         .single()
 
       if (refund) {
@@ -427,16 +482,35 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
           }
         }
       }
-      void refundRef // used for idempotency upstream
       break
     }
 
     case 'refund.failed': {
       const orderRef = (data.transaction_reference as string) ?? ''
+      const { data: candidates } = await db.from('refunds')
+        .select('id, paystack_refund_reference, amount_kobo, created_at')
+        .eq('paystack_transaction_reference', orderRef)
+        .eq('status', 'PROCESSING')
+        .order('created_at', { ascending: true })
+      const chosen = chooseRefundWebhookTarget((candidates ?? []) as RefundWebhookCandidate[], data)
+      if (!chosen.refundId) {
+        await recordSecurityEvent({
+          eventType: 'webhook_reject', severity: chosen.ambiguous ? 'critical' : 'warn', surface: 'paystack_webhook',
+          outcome: 'refund_event_not_applied',
+          detail: { reason: chosen.reason, transaction_reference: orderRef },
+        })
+        break
+      }
+      const providerRefundReference = String(data.refund_reference ?? data.reference ?? data.id ?? '').trim()
+      const failedUpdate: Record<string, unknown> = {
+        status: 'FAILED',
+        failure_reason: (data.reason as string) ?? 'Unknown',
+      }
+      if (providerRefundReference) failedUpdate.paystack_refund_reference = providerRefundReference
       await db
         .from('refunds')
-        .update({ status: 'FAILED', failure_reason: (data.reason as string) ?? 'Unknown' })
-        .eq('paystack_transaction_reference', orderRef)
+        .update(failedUpdate)
+        .eq('id', chosen.refundId)
 
       // Alert admin
       const adminPhone = process.env.ADMIN_PHONE
