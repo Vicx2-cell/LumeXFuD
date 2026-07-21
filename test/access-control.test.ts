@@ -94,6 +94,7 @@ const ENTRIES: Entry[] = [
   { path: 'app/api/admin/audit/route', method: 'GET', allow: A_S },
   { path: 'app/api/admin/dashboard/route', method: 'GET', allow: A_S },
   { path: 'app/api/admin/orders/route', method: 'GET', allow: A_S },
+  { path: 'app/api/admin/orders/[id]/emergency-cancel/route', method: 'POST', allow: A_S },
   { path: 'app/api/admin/support-notes/route', method: 'GET', allow: A_S },
   { path: 'app/api/admin/support-notes/route', method: 'POST', allow: A_S },
   { path: 'app/api/admin/disputes/route', method: 'GET', allow: A_S },
