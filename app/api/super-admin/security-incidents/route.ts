@@ -15,6 +15,12 @@ const createInput = z.object({
   account_role: z.string().trim().max(40).optional(),
   triggered_rules: z.array(z.string().trim().min(1).max(100)).max(50).default([]),
   containment_actions: z.array(z.string().trim().min(1).max(100)).max(50).default([]),
+  affected_orders: z.array(z.string().trim().min(1).max(200)).max(50).default([]),
+  affected_payments: z.array(z.string().trim().min(1).max(200)).max(50).default([]),
+  approximate_location: z.object({
+    label: z.string().trim().min(1).max(120),
+    accuracy_m: z.number().finite().min(100).max(100_000).optional(),
+  }).optional(),
   evidence_hold: z.boolean().default(false),
   hold_reason: z.string().trim().min(3).max(300).optional(),
   recommended_action: z.string().trim().max(500).optional(),
@@ -74,12 +80,14 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return json({ error: 'Invalid incident facts' }, { status: 400 })
   const incidentId = `LXSI-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
   const db = createSupabaseAdmin()
-  const { data, error } = await db.rpc('create_security_incident', {
+  const { data, error } = await db.rpc('create_security_incident_v2', {
     p_incident_id: incidentId, p_event_id: parsed.data.event_id,
     p_actor_id: session.userId ?? session.phone, p_severity: parsed.data.severity,
     p_confidence: parsed.data.confidence, p_classification: parsed.data.classification,
     p_account_id: parsed.data.account_id ?? null, p_account_role: parsed.data.account_role ?? null,
+    p_orders: parsed.data.affected_orders, p_payments: parsed.data.affected_payments,
     p_rules: parsed.data.triggered_rules, p_actions: parsed.data.containment_actions,
+    p_location: parsed.data.approximate_location ?? null,
     p_evidence_hold: parsed.data.evidence_hold, p_hold_reason: parsed.data.hold_reason ?? null,
     p_recommended_action: parsed.data.recommended_action ?? null, p_request_id: context.requestId,
   })

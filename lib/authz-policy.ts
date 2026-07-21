@@ -32,7 +32,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'super-admin/premium', 'super-admin/campus-partners', 'super-admin/official-feed',
     'super-admin/payments', 'super-admin/feed-reports', 'super-admin/feed-stories',
     'super-admin/revoke-sessions', 'super-admin/rewards', 'super-admin/security-health',
-    'super-admin/security-incidents', 'super-admin/security-incidents/[id]/export',
+    'super-admin/security-incidents', 'super-admin/security-incidents/[id]', 'super-admin/security-incidents/[id]/export',
     'super-admin/sentinel', 'super-admin/settings', 'super-admin/super-audit',
     'super-admin/team/create', 'super-admin/users/[id]/force-reset-pin', 'super-admin/withdraw',
     'admin/whatsapp',

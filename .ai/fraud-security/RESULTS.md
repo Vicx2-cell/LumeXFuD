@@ -76,3 +76,10 @@
 - Added accuracy-aware expected-location and implausible-travel rules with observe-only enforcement.
 - Rounded investigative coordinates and explicitly warned that location does not prove identity or presence.
 - Prevented low-accuracy, distant, missing, generic-completion, and invalid coordinates from influencing verified places.
+
+## FS-013 complete
+
+- Added complete incident creation for affected order, payment, containment, rule, hold, and lawful approximate-location facts.
+- Added super-admin-only factual case transitions backed by a structured event, immutable timeline link, and append-only custody record.
+- Added reversible false-positive and resolution handling that preserves evidence and never changes account or financial restrictions automatically.
+- Added incident-console human-review controls plus wrong-role, bypass, failure, and evidence-preservation regression tests.

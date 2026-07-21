@@ -40,16 +40,41 @@ export default function SecurityIncidentsPage() {
   const [timeline, setTimeline] = useState<TimelineRow[]>([])
   const [integrity, setIntegrity] = useState('UNKNOWN')
   const [error, setError] = useState('')
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [pending, setPending] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetch('/api/super-admin/security-incidents', { cache: 'no-store' })
+  const loadIncidents = () => fetch('/api/super-admin/security-incidents', { cache: 'no-store' })
       .then(async (res) => ({ ok: res.ok, data: await res.json() }))
       .then(({ ok, data }) => {
         if (!ok) throw new Error(data.error ?? 'Could not load incidents')
         setIncidents(data.incidents ?? []); setTimeline(data.timeline ?? []); setIntegrity(data.evidence_integrity ?? 'UNKNOWN')
       })
       .catch((err: Error) => setError(err.message))
-  }, [])
+
+  useEffect(() => { void loadIncidents() }, [])
+
+  async function updateStatus(incident: Incident, status: 'INVESTIGATING' | 'CONTAINED' | 'RESOLVED' | 'FALSE_POSITIVE') {
+    const factualNote = notes[incident.id]?.trim()
+    if (!factualNote || factualNote.length < 3) {
+      setError('Enter a factual review note before changing case status.')
+      return
+    }
+    setPending(incident.id); setError('')
+    try {
+      const res = await fetch(`/api/super-admin/security-incidents/${incident.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, factual_note: factualNote }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Could not update incident')
+      setNotes((current) => ({ ...current, [incident.id]: '' }))
+      await loadIncidents()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update incident')
+    } finally {
+      setPending(null)
+    }
+  }
 
   return (
     <div className="lx-page lx-console px-5 py-10 overflow-hidden">
@@ -81,6 +106,22 @@ export default function SecurityIncidentsPage() {
                 <p>Next: {incident.recommended_action ?? 'human triage'}</p>
               </div>
               {incident.approximate_location && <p className="mt-3 text-xs text-white/45">Approximate location: {incident.approximate_location.label ?? 'unknown'}{incident.approximate_location.accuracy_m ? ` (±${incident.approximate_location.accuracy_m}m)` : ''}. {incident.location_accuracy_warning}</p>}
+              <div className="mt-4 rounded-xl border border-white/10 p-3">
+                <label className="text-xs font-semibold uppercase tracking-wide text-white/50" htmlFor={`note-${incident.id}`}>Human review note</label>
+                <textarea id={`note-${incident.id}`} value={notes[incident.id] ?? ''}
+                  onChange={(event) => setNotes((current) => ({ ...current, [incident.id]: event.target.value }))}
+                  maxLength={500} rows={2} placeholder="Record factual grounds for the status change"
+                  className="mt-2 w-full rounded-lg border border-white/10 bg-black/20 p-2 text-sm text-white" />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(['INVESTIGATING', 'CONTAINED', 'RESOLVED', 'FALSE_POSITIVE'] as const).map((status) =>
+                    <button key={status} type="button" disabled={pending === incident.id}
+                      onClick={() => void updateStatus(incident, status)}
+                      className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/65 disabled:opacity-40">
+                      {status.replace('_', ' ')}
+                    </button>)}
+                </div>
+                <p className="mt-2 text-xs text-white/35">Status changes preserve the evidence timeline. Marking false-positive does not delete evidence or automatically change account restrictions.</p>
+              </div>
               <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-white/50">Factual timeline</h3>
               <div className="mt-2 space-y-2">
                 {events.map((row) => <div key={row.security_events?.id ?? row.factual_note} className="rounded-lg bg-black/20 p-3 text-xs text-white/60">

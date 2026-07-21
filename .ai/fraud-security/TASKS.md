@@ -12,4 +12,5 @@
 10. **COMPLETE - FS-010:** privileged API denial evidence, super-only alias enforcement, session indicator change evidence, and false-positive-safe admin risk signals.
 11. **COMPLETE - FS-011:** privacy-minimized referral multi-account correlation and reversible reward manual review.
 12. **COMPLETE - FS-012:** lawful accuracy-aware handover location, implausible-travel evidence, and verified-place poisoning prevention.
-13. **READY - FS-013:** remaining false-positive protections and incident-console gaps.
+13. **COMPLETE - FS-013:** complete incident facts, append-only human case transitions, false-positive handling, and case-console controls.
+14. **READY - FINAL:** isolated production build and complete test-suite verification.

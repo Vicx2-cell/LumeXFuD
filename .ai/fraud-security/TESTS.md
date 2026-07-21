@@ -115,3 +115,12 @@
 - PASS: event coordinates are rounded and carry the no-identity/no-presence warning.
 - PASS: only <=250m-accuracy, within-radius rider handover can promote a verified place; generic completion cannot.
 - PASS: location signals are evaluated after the assignment-bound handover claim and never block valid-code completion or release funds independently.
+
+## FS-013 verification
+
+- PASS (1.01s Vitest duration; 12.1s command with TypeScript): focused incident lifecycle, authorization coverage, and privileged proxy tests (4 files, 20 tests), followed by `npx.cmd tsc --noEmit`.
+- PASS (6.87s Vitest duration; 9.4s command): broader incident, refund, order, rider, admin, multi-account, location, restriction, revocation, risk, event, and replay tests (20 files, 90 tests).
+- PASS: anonymous and ordinary-admin case updates are denied before any case RPC.
+- PASS: unsupported status, missing factual note, missing evidence event, missing case, and transaction failure do not report success.
+- PASS: affected order/payment evidence is preserved by automatic refund cases and manual case creation supports bounded approximate-location facts.
+- PASS: false-positive status appends timeline and custody records; it cannot delete evidence, lift restrictions, revive sessions, unfreeze wallets, or assert innocence/guilt automatically.

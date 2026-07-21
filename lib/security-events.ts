@@ -24,6 +24,7 @@ export type SecurityEventType =
   | 'suspicious_admin_access'
   | 'multi_account_indicator'
   | 'location_inconsistency'
+  | 'incident_status_changed'
 
 export interface SecurityEventInput {
   eventType: SecurityEventType

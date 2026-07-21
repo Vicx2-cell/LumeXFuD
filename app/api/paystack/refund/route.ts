@@ -124,12 +124,14 @@ export async function POST(req: NextRequest) {
   })
   if (eventId && risk.actions.includes('create_evidence_hold')) {
     const incidentId = `LXSI-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
-    const { error: incidentError } = await db.rpc('create_security_incident', {
+    const { error: incidentError } = await db.rpc('create_security_incident_v2', {
       p_incident_id: incidentId, p_event_id: eventId,
       p_actor_id: session.userId ?? session.phone, p_severity: risk.score >= 90 ? 'critical' : 'high',
       p_confidence: risk.confidence, p_classification: 'refund_abuse_indicator',
       p_account_id: order.customer_id as string, p_account_role: 'customer',
+      p_orders: [order.id], p_payments: [order.paystack_reference],
       p_rules: risk.triggeredRules, p_actions: risk.actions,
+      p_location: null,
       p_evidence_hold: true, p_hold_reason: 'Corroborated cumulative refund-risk indicators',
       p_recommended_action: 'Human review required; indicators do not prove fraud.',
       p_request_id: context.requestId,

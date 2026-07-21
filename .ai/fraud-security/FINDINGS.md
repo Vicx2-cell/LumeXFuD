@@ -72,6 +72,12 @@ Rider handover coordinates and GPS accuracy were already legitimate delivery fie
 
 Status: repaired. The verified handover path now validates finite coordinates, calculates distance from the customer's delivery pin, compares a rider's prior lawful status location for implausible travel, stores accuracy/distance/validation facts, and emits only observe-mode location evidence. Missing or >250m accuracy cannot become an inconsistency claim. Security detail rounds coordinates to roughly 100m and carries a no-identity/no-presence warning. Only accurate, nearby rider handovers promote places; the generic completion path no longer promotes unvalidated coordinates. A valid code still completes delivery regardless of location signal.
 
+## FS-013 - HIGH - Incident facts and false-positive lifecycle were display-only
+
+The console schema displayed affected orders, payments, approximate location, containment, and case status, but both incident-creation callers used an RPC that could not populate the first three fields. There was also no authorized route or console action to move a case into investigation, containment, resolution, or false-positive review. Operators could export evidence but could not preserve the factual grounds for a case decision in its immutable timeline.
+
+Status: repaired. Incident creation now atomically preserves bounded order/payment arrays and warning-labelled approximate location. A super-admin-only case route requires a factual note, first preserves a correlated security event, then atomically changes status, appends the event/note, and records custody. False-positive review never deletes evidence or automatically changes restrictions, sessions, or financial state. The console exposes the human-review controls and retains all existing masked indicators.
+
 ## Scoped inventory observed
 
 - Authentication/session paths: `lib/session.ts`, `lib/pin-auth.ts`, `lib/rate-limit.ts`, `proxy.ts`, and `app/api/auth/**`.
