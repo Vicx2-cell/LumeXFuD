@@ -151,3 +151,13 @@
 - PASS: `npm.cmd test -- --run test/account-restriction.test.ts test/proxy-revocation.test.ts test/access-control.test.ts` completed in 16.6s command time / 12.79s Vitest duration: 3 files, 226/226 tests passed.
 - PASS: `npm.cmd test -- --run test/csrf-origin.test.ts test/account-restriction.test.ts test/proxy-revocation.test.ts test/access-control.test.ts test/webhook-route.test.ts test/webhook-and-exposure.test.ts test/webhook-idempotency.test.ts test/refund-risk.test.ts test/refund-naira.test.ts test/refund-webhook-target.test.ts test/order-fraud.test.ts test/order-fraud-route.test.ts test/stale-rider-access.test.ts test/security-incidents.test.ts test/security-incident-case-route.test.ts test/security-events.test.ts` completed in 23.6s command time / 20.49s Vitest duration: 16 files, 287/287 tests passed.
 - PASS: `npx.cmd tsc --noEmit` passed.
+
+## FS-017 final red-team verification
+
+- PASS: `git status --short` showed no tracked or untracked worktree changes before final verification.
+- PASS: `git log --oneline -12` confirmed the latest red-team repair commits remain intact: `42da661`, `3469335`, and `5af7d53`, followed by the existing fraud/security loop commits.
+- PASS: focused route-policy/RLS/webhook/privileged-access sweep passed: `npm.cmd test -- --run test/authz-coverage.test.ts test/rls-coverage.test.ts test/webhook-route.test.ts test/webhook-and-exposure.test.ts test/privileged-api-proxy.test.ts test/access-control.test.ts test/security-events-db.test.ts` completed with 7 files and 238/238 tests passing.
+- PASS: local cron-route static inspection confirmed each `app/api/cron/**/route.ts` imports and checks `verifyCronSecret`; no external scanner or cloud service was invoked.
+- PASS: `npm.cmd run build` ran by itself and completed in 125.93s with exit code 0. Next.js 16.2.6 compiled successfully, completed TypeScript, and generated 150/150 static pages.
+- PASS: after the build process exited, `npm.cmd test` ran by itself and completed in 46.67s command time / 44.50s Vitest duration with 115/115 files and 818/818 tests passing.
+- No full-suite failure occurred, so no deterministic, timing-sensitive, flaky, or environmental failure remained to classify or rerun.

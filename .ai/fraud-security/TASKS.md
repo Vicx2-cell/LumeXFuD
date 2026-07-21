@@ -16,4 +16,5 @@
 14. **COMPLETE - FINAL:** isolated production build and complete test-suite verification.
 15. **COMPLETE - FS-014:** red-team bypass repair for final session issuance eligibility and partial-refund webhook row targeting.
 16. **COMPLETE - FS-015:** cross-site GET protection for incident custody and evidence export side effects.
-17. **READY TO COMMIT - FS-016:** revoke stale sessions on vendor/rider/admin deactivation, phone change, and admin role change.
+17. **COMPLETE - FS-016:** revoke stale sessions on vendor/rider/admin deactivation, phone change, and admin role change.
+18. **COMPLETE - FS-017:** final local red-team sweep and isolated production-build/full-suite verification.

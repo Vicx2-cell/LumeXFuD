@@ -109,3 +109,11 @@
 - Repaired stale-session survival after vendor/rider deactivation and admin deactivation, demotion, or phone change with transactional revocation triggers.
 - Added embedded-PostgreSQL regression coverage proving vendor, rider, and super-admin sessions become unusable after deactivation/demotion.
 - Verification passed for targeted revocation/authz tests, a broader 287-test fraud/security set, and TypeScript. Production build and complete suite were not rerun for this checkpoint yet.
+
+## FS-017 final red-team verification
+
+- Final local route-policy/RLS/webhook/privileged-access sweep passed with 238/238 targeted tests.
+- Static cron-route review confirmed all cron API routes require `verifyCronSecret`.
+- Production build passed independently in 125.93s.
+- Complete test suite passed independently after the build exited: 115/115 files and 818/818 tests in 46.67s command time / 44.50s Vitest duration.
+- No external scanners, cloud services, production deployment, real-money actions, or automatic evidence disclosures were performed.

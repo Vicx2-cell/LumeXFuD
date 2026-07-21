@@ -109,3 +109,9 @@ Status: repaired. Incident list and export routes now require same-origin browse
 Suspension revokes customer/vendor/rider sessions, and FS-014 blocks new session creation for inactive subjects. However, deactivation through `is_active=false`, admin role changes, and phone changes did not revoke already-issued vendor, rider, or admin sessions. Any route that forgot to re-check active state could therefore accept a stale token after the operator was disabled or demoted.
 
 Status: repaired. Migration 141 revokes active sessions transactionally when vendor/rider accounts are deactivated, when customer/vendor/rider/admin phone changes, and when admin accounts are deactivated or change role. Regression tests prove active vendor, rider, and super-admin sessions are revoked after deactivation/demotion.
+
+## FS-017 - Final local red-team sweep
+
+After FS-014 through FS-016 repairs, local static review and existing security coverage were re-run against route authorization classification, RLS coverage, webhook route behavior, privileged API proxy enforcement, cron authorization, evidence export provenance, and session revocation. No additional reproducible bypass was verified with the allowed local-only methods.
+
+Status: complete for ready local tasks. Production deployment, production migration application, external review, and human policy/architecture decisions remain outside this loop.
