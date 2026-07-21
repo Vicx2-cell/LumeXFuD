@@ -5,6 +5,9 @@ import { normalizePhone } from '@/lib/phone'
 import { rateLimitOtpVerify } from '@/lib/rate-limit'
 import { signPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { confirmOtp } from '@/lib/sendchamp'
+import { recordSecurityEvent } from '@/lib/security-events'
+import { evaluateRisk } from '@/lib/risk-engine'
+import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 
 // Sendchamp's confirm can be slow from Vercel's region - give it headroom.
 export const maxDuration = 30
@@ -32,37 +35,68 @@ function getRedis(): Redis {
 // purpose chosen at send time). /api/auth/register consumes the signup cookie;
 // /api/auth/pin/reset consumes the reset cookie.
 export async function POST(req: NextRequest) {
+  const requestContext = createRequestContext(req.headers)
+  const json = <T,>(body: T, init?: ResponseInit) =>
+    applyRequestContext(NextResponse.json(body, init), requestContext)
+  const eventContext = {
+    ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown',
+    userAgent: req.headers.get('user-agent') ?? undefined,
+    requestId: requestContext.requestId,
+    correlationId: requestContext.correlationId,
+    route: req.nextUrl.pathname,
+    method: req.method,
+  }
   try {
     let body: unknown
-    try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid request' }, { status: 400 }) }
+    try { body = await req.json() } catch { return json({ error: 'Invalid request' }, { status: 400 }) }
     const parsed = schema.safeParse(body)
-    if (!parsed.success) return NextResponse.json({ error: 'Enter the 6-digit code' }, { status: 400 })
+    if (!parsed.success) return json({ error: 'Enter the 6-digit code' }, { status: 400 })
 
     let phone: string
     try { phone = normalizePhone(parsed.data.phone) } catch {
-      return NextResponse.json({ error: 'Enter a valid phone number' }, { status: 400 })
+      return json({ error: 'Enter a valid phone number' }, { status: 400 })
     }
 
     // 5 verify attempts per phone / 15 min (rule #10).
     const rl = await rateLimitOtpVerify(phone)
     if (!rl.success) {
-      return NextResponse.json({ error: 'Too many attempts. Please wait and try again.' }, { status: 429 })
+      const risk = evaluateRisk([{
+        code: 'otp_verify_velocity', category: 'authentication', weight: 40,
+        confidence: 0.9, strength: 'moderate',
+      }])
+      await recordSecurityEvent({
+        eventType: 'ratelimit_hit', severity: 'warn', surface: 'otp_verify',
+        ...eventContext, outcome: 'rate_limited', detail: { risk },
+      })
+      return json({ error: 'Too many attempts. Please wait and try again.' }, { status: 429 })
     }
 
     let redis: Redis
     try { redis = getRedis() } catch {
-      return NextResponse.json({ error: 'Verification is temporarily unavailable. Try again later.' }, { status: 503 })
+      return json({ error: 'Verification is temporarily unavailable. Try again later.' }, { status: 503 })
     }
 
     const refKey = `otp_ref:${phone}`
     const stored = await redis.get<StoredRef>(refKey)
     if (!stored?.reference) {
-      return NextResponse.json({ error: 'Code expired or not found. Request a new one.' }, { status: 400 })
+      await recordSecurityEvent({
+        eventType: 'otp_fail', severity: 'warn', surface: 'otp_verify',
+        ...eventContext, outcome: 'rejected', detail: { reason: 'reference_missing' },
+      })
+      return json({ error: 'Code expired or not found. Request a new one.' }, { status: 400 })
     }
 
     const result = await confirmOtp(stored.reference, parsed.data.code)
     if (!result.ok) {
-      return NextResponse.json({ error: 'Incorrect or expired code. Please try again.' }, { status: 400 })
+      const risk = evaluateRisk([{
+        code: 'otp_verification_failed', category: 'authentication', weight: 12,
+        confidence: 0.6, strength: 'weak',
+      }])
+      await recordSecurityEvent({
+        eventType: 'otp_fail', severity: 'warn', surface: 'otp_verify',
+        ...eventContext, outcome: 'rejected', detail: { reason: 'invalid_or_expired', risk },
+      })
+      return json({ error: 'Incorrect or expired code. Please try again.' }, { status: 400 })
     }
 
     // Burn the reference so a code can't be reused.
@@ -71,9 +105,13 @@ export async function POST(req: NextRequest) {
     const token = await signPhoneVerified(phone, stored.purpose)
     const res = NextResponse.json({ verified: true, purpose: stored.purpose })
     res.cookies.set(PHONE_VERIFIED_COOKIE, token, verifiedCookieOptions())
-    return res
+    await recordSecurityEvent({
+      eventType: 'otp_verified', severity: 'info', surface: 'otp_verify',
+      ...eventContext, outcome: 'verified', detail: { purpose: stored.purpose },
+    })
+    return applyRequestContext(res, requestContext)
   } catch (error) {
     console.error('[otp/verify] unexpected error', error)
-    return NextResponse.json({ error: 'Verification is temporarily unavailable. Try again later.' }, { status: 500 })
+    return json({ error: 'Verification is temporarily unavailable. Try again later.' }, { status: 500 })
   }
 }

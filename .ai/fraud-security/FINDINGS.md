@@ -6,6 +6,18 @@ Migration 085 hashes event type, severity, actor ID/role, surface, and detail, b
 
 Status: repaired. Migration 133 preserves verification of existing v1 rows and binds all new incident metadata into a v2 integrity payload. The verifier detects changes to protected session/IP metadata.
 
+## FS-002 - HIGH - OTP hourly limiter existed but was not enforced
+
+`rateLimitOtpSend()` defines a fail-closed per-phone provider-cost limit, but the OTP send route never called it. The route relied only on a 60-second Redis cooldown, emitted no structured send/verify/rate-limit events, and did not attach request/correlation IDs to API responses. Repeated sends over time and distributed phone targeting therefore lacked the intended cap and incident evidence.
+
+Status: repaired. OTP send now applies per-phone and campus-NAT-safe per-network limits before provider traffic, records send/failure/cooldown/verification outcomes without phone numbers or OTP values, and returns server-generated request/correlation IDs.
+
+## FS-003 - MEDIUM - No category-based risk evaluator
+
+Security events had severities but no common category scoring or proportional action calculation.
+
+Status: foundational repair complete. `lib/risk-engine.ts` evaluates authentication, authorization, payment, order-abuse, device/session, bot, and admin signals with explicit false-positive caps and graduated actions. Persistence and automatic execution of higher containment actions remain future tasks.
+
 ## Scoped inventory observed
 
 - Authentication/session paths: `lib/session.ts`, `lib/pin-auth.ts`, `lib/rate-limit.ts`, `proxy.ts`, and `app/api/auth/**`.
