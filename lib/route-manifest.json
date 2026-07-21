@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-07-21T21:40:39.519Z",
-  "count": 236,
+  "generated_at": "2026-07-21T21:44:10.925Z",
+  "count": 237,
   "routes": [
     {
       "path": "/api/admin/audit",
@@ -992,6 +992,13 @@
     },
     {
       "path": "/api/group-order/mine",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/health",
       "dynamic": false,
       "methods": [
         "GET"
