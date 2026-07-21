@@ -1,4 +1,5 @@
 import type { LumiResponse } from './types'
+import { EMAIL_IDENTITIES } from '../email/identities'
 
 const SECURITY_PATTERNS = [
   /\b(?:password|passcode|pin|otp|secret|api[ -]?key|access token|refresh token|private key)\b/i,
@@ -132,7 +133,7 @@ const KNOWLEDGE: Array<{ pattern: RegExp; answer: string }> = [
   { pattern: /\b(?:how (?:do|can) i pay|payment methods?|cash on delivery)\b/i, answer: 'In the LumeX app, customers pay digitally through Paystack or the LumeX Wallet. Never share your PIN, OTP, full card number or bank password in chat.' },
   { pattern: /\b(?:refund|dispute) (?:policy|window|rules?)\b|\bhow (?:do|can) i report (?:an )?order problem\b/i, answer: 'You can raise an order dispute within 24 hours of delivery. An admin reviews the evidence before any refund decision.' },
   { pattern: /\bhow (?:do|can) i become (?:a )?(?:vendor|rider)\b/i, answer: 'Vendor and rider accounts use an application and verification process. Open the relevant application page or contact LumeX support for onboarding.' },
-  { pattern: /\b(?:support email|contact support|how (?:do|can) i contact lumex)\b/i, answer: 'You can contact LumeX support at hello@lumexfud.com.ng.' },
+  { pattern: /\b(?:support email|contact support|how (?:do|can) i contact lumex)\b/i, answer: `For order, payment, delivery, refund or account help, contact ${EMAIL_IDENTITIES.support.address}. For a general enquiry, use ${EMAIL_IDENTITIES.hello.address}.` },
   { pattern: /\bcapital of nigeria\b/i, answer: 'The capital of Nigeria is Abuja.' },
   { pattern: /\bcapital of abia(?: state)?\b/i, answer: 'The capital of Abia State is Umuahia.' },
   { pattern: /\bwhat is photosynthesis\b/i, answer: 'Photosynthesis is the process plants use to turn light, water and carbon dioxide into stored chemical energy, releasing oxygen.' },

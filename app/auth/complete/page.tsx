@@ -138,14 +138,14 @@ export default function CompleteSignupPage() {
 
   if (!ready) {
     return (
-      <main className="min-h-dvh flex items-center justify-center px-5" style={{ background: '#0A0A0B' }}>
+      <main className="lx-page min-h-dvh flex items-center justify-center px-5">
         <p className="text-sm text-white/40">Loading…</p>
       </main>
     )
   }
 
   return (
-    <main className="min-h-dvh flex items-start sm:items-center justify-center px-5 py-10 sm:py-12" style={{ background: '#0A0A0B', paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
+    <main className="lx-page min-h-dvh flex items-start sm:items-center justify-center px-5 py-10 sm:py-12" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
       <div className="w-full max-w-md space-y-6">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <h1 className="text-2xl font-semibold text-white">Almost there</h1>

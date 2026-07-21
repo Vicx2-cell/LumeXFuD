@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFeatures } from '@/lib/use-features'
 import PhoneVerifyInline from '@/components/auth/PhoneVerifyInline'
+import EmailVerifyInline from '@/components/auth/EmailVerifyInline'
 import { PageHeader } from '@/components/ui/page-header'
 import { GlassSheen } from '@/components/fx'
 
@@ -26,6 +27,7 @@ export default function NewVendorPage() {
   const [form, setForm] = useState({
     owner_name: '',
     shop_name: '',
+    email: '',
     phone: '+234',
     call_phone: '',
     category: 'Other',
@@ -36,16 +38,18 @@ export default function NewVendorPage() {
   const [success, setSuccess] = useState<SuccessData | null>(null)
   const [copied, setCopied] = useState(false)
   const [phoneVerified, setPhoneVerified] = useState(false)
+  const [emailVerified, setEmailVerified] = useState(false)
 
   const set = (k: keyof typeof form, v: string) => {
     setForm((f) => ({ ...f, [k]: v }))
     setError('')
     // The verified cookie is bound to a specific number — changing it invalidates it.
     if (k === 'phone') setPhoneVerified(false)
+    if (k === 'email') setEmailVerified(false)
   }
 
   const handleSubmit = async () => {
-    if (!form.owner_name.trim() || !form.shop_name.trim() || form.phone.length < 13) {
+    if (!form.owner_name.trim() || !form.shop_name.trim() || !form.email.trim() || form.phone.length < 13) {
       setError('Please fill in all required fields.')
       return
     }
@@ -53,6 +57,7 @@ export default function NewVendorPage() {
       setError('Verify the vendor’s phone number first.')
       return
     }
+    if (!emailVerified) { setError('Verify the vendor email address first.'); return }
     setLoading(true)
     try {
       const res = await fetch('/api/admin/vendors/create', {
@@ -170,6 +175,11 @@ export default function NewVendorPage() {
             />
           </Field>
 
+          <Field label="Email address">
+            <input value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="vendor@example.com" type="email" autoComplete="email" required className={inputCls} />
+          </Field>
+          <EmailVerifyInline email={form.email} purpose="admin_create" verified={emailVerified} onVerified={() => setEmailVerified(true)} />
+
           <Field label="WhatsApp number (+234) — for messages & login">
             <input
               value={form.phone}
@@ -225,7 +235,7 @@ export default function NewVendorPage() {
 
           <button
             onClick={handleSubmit}
-            disabled={loading || (verificationRequired && !phoneVerified)}
+            disabled={loading || (verificationRequired && !phoneVerified) || !emailVerified}
             className="lx-btn-amber w-full py-4 text-sm disabled:opacity-50"
             style={{ minHeight: 52 }}
           >

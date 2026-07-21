@@ -1,7 +1,8 @@
 import 'server-only'
 
 import type { createSupabaseAdmin } from './supabase/server'
-import { normalizeEmail, sendTransactionalEmail, type EmailSendResult } from './email'
+import { normalizeEmail, sendEmail, type EmailSendResult } from './email/send-email'
+import type { EmailWorkflow } from './email/identities'
 import {
   isCustomerEmailStatus,
   renderDelayedOrderEmail,
@@ -12,7 +13,7 @@ import {
 
 type DB = ReturnType<typeof createSupabaseAdmin>
 type EmailKind = 'WELCOME' | 'ORDER_CONFIRMATION' | 'ORDER_OUT_FOR_DELIVERY' | 'ORDER_DELIVERED' | 'ORDER_DELAYED'
-export type TransactionalEmailResult = EmailSendResult | { status: 'skipped'; reason: 'already_processed' | 'no_recipient' | 'irrelevant_status' | 'event_claim_failed' | 'order_not_found' }
+export type TransactionalEmailResult = EmailSendResult | { status: 'skipped'; reason: 'already_processed' | 'no_recipient' | 'email_unverified' | 'irrelevant_status' | 'event_claim_failed' | 'order_not_found' }
 
 export function shouldSendWelcomeForEmailChange(input: {
   previousEmail?: string | null
@@ -25,7 +26,7 @@ export function shouldSendWelcomeForEmailChange(input: {
 function appBaseUrl(): string {
   const fallback = 'https://lumexfud.com.ng'
   try {
-    const url = new URL(process.env.NEXT_PUBLIC_APP_URL ?? fallback)
+    const url = new URL(process.env.APP_BASE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? fallback)
     const trusted = url.protocol === 'https:' && (url.hostname === 'lumexfud.com.ng' || url.hostname.endsWith('.lumexfud.com.ng'))
     return trusted ? url.origin : fallback
   } catch {
@@ -50,33 +51,37 @@ async function finishEvent(db: DB, eventId: string, result: EmailSendResult): Pr
   await db.rpc('finish_transactional_email_event', {
     p_event_id: eventId,
     p_status: status,
-    p_resend_id: result.status === 'sent' ? result.id : null,
-    p_error_code: result.status === 'failed' ? result.code : result.status === 'skipped' ? result.reason : null,
+    p_resend_id: result.providerMessageId,
+    p_error_code: result.errorCode,
   })
 }
 
-async function deliver(db: DB, input: { eventKey: string; kind: EmailKind; recipient: string; subject: string; text: string; html: string }): Promise<TransactionalEmailResult> {
+async function deliver(db: DB, input: { eventKey: string; kind: EmailKind; workflow: EmailWorkflow; recipient: string; subject: string; text: string; html: string }): Promise<TransactionalEmailResult> {
   const recipient = normalizeEmail(input.recipient)
   if (!recipient) return { status: 'skipped', reason: 'no_recipient' }
   const claim = await claimEvent(db, input.eventKey, input.kind, recipient)
-  if (claim === 'failed') return { status: 'failed', code: 'event_claim_failed' }
+  if (claim === 'failed') return { status: 'skipped', reason: 'event_claim_failed' }
   if (claim === 'processed') return { status: 'skipped', reason: 'already_processed' }
-  const result = await sendTransactionalEmail({
+  const result = await sendEmail({
+    workflow: input.workflow,
     to: recipient,
     subject: input.subject,
     text: input.text,
     html: input.html,
     idempotencyKey: claim.idempotencyKey,
+    eventId: claim.id,
   })
   await finishEvent(db, claim.id, result).catch(() => {})
   return result
 }
 
 async function sendWelcomeEmailInternal(db: DB, input: { customerId: string; email?: string | null; name?: string | null }): Promise<TransactionalEmailResult> {
+  const { data: customer } = await db.from('customers').select('email_verified').eq('id', input.customerId).maybeSingle()
+  if (customer?.email_verified !== true) return { status: 'skipped', reason: 'email_unverified' }
   const email = normalizeEmail(input.email)
   if (!email) return { status: 'skipped', reason: 'no_recipient' }
   const template = renderWelcomeEmail({ name: input.name, exploreUrl: appBaseUrl() })
-  const result = await deliver(db, { eventKey: `welcome:${input.customerId}`, kind: 'WELCOME', recipient: email, ...template })
+  const result = await deliver(db, { eventKey: `welcome:${input.customerId}`, kind: 'WELCOME', workflow: 'customer_welcome', recipient: email, ...template })
   if (result.status === 'sent') {
     await db.from('customers').update({ welcome_email_sent_at: new Date().toISOString() }).eq('id', input.customerId).is('welcome_email_sent_at', null)
   }
@@ -87,12 +92,13 @@ async function sendOrderConfirmationEmailInternal(db: DB, input: { orderId: stri
   const { data: order } = await db.from('orders').select('id, order_number, customer_id, vendor_id, subtotal, delivery_fee, platform_markup, tip_amount, reward_discount_kobo, total_amount, payment_status, delivery_type, delivery_address, delivery_lodge, delivery_block').eq('id', input.orderId).eq('payment_status', 'PAID').maybeSingle()
   if (!order?.customer_id) return { status: 'skipped', reason: 'order_not_found' }
   const [{ data: customer }, { data: vendor }, { data: items }] = await Promise.all([
-    db.from('customers').select('email, name').eq('id', order.customer_id).maybeSingle(),
+    db.from('customers').select('email, name, email_verified').eq('id', order.customer_id).maybeSingle(),
     db.from('vendors').select('shop_name').eq('id', order.vendor_id).maybeSingle(),
     db.from('order_items').select('name, quantity, subtotal').eq('order_id', order.id),
   ])
   const recipient = normalizeEmail(customer?.email)
   if (!recipient) return { status: 'skipped', reason: 'no_recipient' }
+  if (customer?.email_verified !== true) return { status: 'skipped', reason: 'email_unverified' }
   const vendorName = String(vendor?.shop_name ?? 'your vendor')
   const deliveryMethod = order.delivery_type === 'PICKUP' ? 'Campus pickup' : order.delivery_type === 'BIKE' ? 'Bike delivery' : 'Door delivery'
   const location = order.delivery_type === 'PICKUP'
@@ -114,7 +120,7 @@ async function sendOrderConfirmationEmailInternal(db: DB, input: { orderId: stri
     deliveryLocation: location,
     orderUrl: `${appBaseUrl()}/order/${encodeURIComponent(String(order.order_number))}`,
   })
-  return deliver(db, { eventKey: `order-confirmation:${order.id}`, kind: 'ORDER_CONFIRMATION', recipient, ...template })
+  return deliver(db, { eventKey: `order-confirmation:${order.id}`, kind: 'ORDER_CONFIRMATION', workflow: 'order_confirmation', recipient, ...template })
 }
 
 async function sendOrderStatusEmailInternal(db: DB, input: { orderId: string; newStatus: string; statusEventId: string }): Promise<TransactionalEmailResult> {
@@ -122,11 +128,12 @@ async function sendOrderStatusEmailInternal(db: DB, input: { orderId: string; ne
   const { data: order } = await db.from('orders').select('id, order_number, customer_id, vendor_id').eq('id', input.orderId).maybeSingle()
   if (!order?.customer_id) return { status: 'skipped', reason: 'order_not_found' }
   const [{ data: customer }, { data: vendor }] = await Promise.all([
-    db.from('customers').select('email, name').eq('id', order.customer_id).maybeSingle(),
+    db.from('customers').select('email, name, email_verified').eq('id', order.customer_id).maybeSingle(),
     db.from('vendors').select('shop_name').eq('id', order.vendor_id).maybeSingle(),
   ])
   const recipient = normalizeEmail(customer?.email)
   if (!recipient) return { status: 'skipped', reason: 'no_recipient' }
+  if (customer?.email_verified !== true) return { status: 'skipped', reason: 'email_unverified' }
   const template = renderOrderStatusEmail({
     customerName: customer?.name,
     orderNumber: String(order.order_number),
@@ -138,6 +145,7 @@ async function sendOrderStatusEmailInternal(db: DB, input: { orderId: string; ne
   return deliver(db, {
     eventKey: delivered ? `order-delivered:${input.orderId}` : `order-out-for-delivery:${input.orderId}`,
     kind: delivered ? 'ORDER_DELIVERED' : 'ORDER_OUT_FOR_DELIVERY',
+    workflow: 'delivery_status',
     recipient,
     ...template,
   })
@@ -147,11 +155,12 @@ async function sendDelayedOrderEmailInternal(db: DB, input: { orderId: string; p
   const { data: order } = await db.from('orders').select('id, order_number, customer_id, vendor_id').eq('id', input.orderId).maybeSingle()
   if (!order?.customer_id) return { status: 'skipped', reason: 'order_not_found' }
   const [{ data: customer }, { data: vendor }] = await Promise.all([
-    db.from('customers').select('email, name').eq('id', order.customer_id).maybeSingle(),
+    db.from('customers').select('email, name, email_verified').eq('id', order.customer_id).maybeSingle(),
     db.from('vendors').select('shop_name').eq('id', order.vendor_id).maybeSingle(),
   ])
   const recipient = normalizeEmail(customer?.email)
   if (!recipient) return { status: 'skipped', reason: 'no_recipient' }
+  if (customer?.email_verified !== true) return { status: 'skipped', reason: 'email_unverified' }
   const template = renderDelayedOrderEmail({
     customerName: customer?.name,
     orderNumber: String(order.order_number),
@@ -159,14 +168,14 @@ async function sendDelayedOrderEmailInternal(db: DB, input: { orderId: string; p
     projectedDeliveryAt: input.projectedDeliveryAt,
     orderUrl: `${appBaseUrl()}/order/${encodeURIComponent(String(order.order_number))}`,
   })
-  return deliver(db, { eventKey: `order-delayed:${order.id}`, kind: 'ORDER_DELAYED', recipient, ...template })
+  return deliver(db, { eventKey: `order-delayed:${order.id}`, kind: 'ORDER_DELAYED', workflow: 'delivery_status', recipient, ...template })
 }
 
 export async function sendWelcomeEmail(db: DB, input: { customerId: string; email?: string | null; name?: string | null }): Promise<TransactionalEmailResult> {
   try {
     return await sendWelcomeEmailInternal(db, input)
   } catch {
-    return { status: 'failed', code: 'welcome_email_error' }
+    return { ok: false, status: 'failed', workflow: 'customer_welcome', providerMessageId: null, attempts: 0, errorCode: 'welcome_email_error', retryable: false }
   }
 }
 
@@ -174,7 +183,7 @@ export async function sendOrderConfirmationEmail(db: DB, input: { orderId: strin
   try {
     return await sendOrderConfirmationEmailInternal(db, input)
   } catch {
-    return { status: 'failed', code: 'order_confirmation_email_error' }
+    return { ok: false, status: 'failed', workflow: 'order_confirmation', providerMessageId: null, attempts: 0, errorCode: 'order_confirmation_email_error', retryable: false }
   }
 }
 
@@ -182,7 +191,7 @@ export async function sendOrderStatusEmail(db: DB, input: { orderId: string; new
   try {
     return await sendOrderStatusEmailInternal(db, input)
   } catch {
-    return { status: 'failed', code: 'order_status_email_error' }
+    return { ok: false, status: 'failed', workflow: 'delivery_status', providerMessageId: null, attempts: 0, errorCode: 'order_status_email_error', retryable: false }
   }
 }
 
@@ -190,6 +199,6 @@ export async function sendDelayedOrderEmail(db: DB, input: { orderId: string; pr
   try {
     return await sendDelayedOrderEmailInternal(db, input)
   } catch {
-    return { status: 'failed', code: 'order_delayed_email_error' }
+    return { ok: false, status: 'failed', workflow: 'delivery_status', providerMessageId: null, attempts: 0, errorCode: 'order_delayed_email_error', retryable: false }
   }
 }

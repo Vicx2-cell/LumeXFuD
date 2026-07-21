@@ -66,7 +66,7 @@ export default function SponsorPage() {
 
   if (features.sponsor_topup === false) {
     return (
-      <div className="min-h-dvh flex items-center justify-center px-5" style={{ background: '#0A0A0B' }}>
+      <div className="lx-page min-h-dvh flex items-center justify-center px-5">
         <p className="text-white/60 text-sm text-center max-w-xs">Topping up a student’s wallet isn’t available right now. Please check back later.</p>
       </div>
     )
@@ -91,7 +91,7 @@ export default function SponsorPage() {
 
   if (done) {
     return (
-      <div className="min-h-dvh flex items-center justify-center px-5" style={{ background: '#0A0A0B' }}>
+      <div className="lx-page min-h-dvh flex items-center justify-center px-5">
         <div className="w-full max-w-md rounded-3xl border border-green-500/30 bg-green-500/10 p-8">
           <div className="text-center">
             <div className="text-4xl mb-3">✅</div>
@@ -131,7 +131,7 @@ export default function SponsorPage() {
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-5 py-12" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page min-h-dvh flex items-center justify-center px-5 py-12">
       <div className="w-full max-w-md space-y-5">
         <div className="text-center">
           <h1 className="text-2xl font-bold" style={{ background: 'linear-gradient(135deg,#fff,#F5A623)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>

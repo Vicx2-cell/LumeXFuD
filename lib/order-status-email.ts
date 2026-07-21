@@ -36,6 +36,6 @@ export async function emailCommittedOrderStatus(db: DB, input: {
   try {
     return await sendOrderStatusEmail(db, { orderId: input.orderId, newStatus: input.status, statusEventId })
   } catch {
-    return { status: 'failed', code: 'status_email_error' }
+    return { ok: false, status: 'failed', workflow: 'delivery_status', providerMessageId: null, attempts: 0, errorCode: 'status_email_error', retryable: false }
   }
 }

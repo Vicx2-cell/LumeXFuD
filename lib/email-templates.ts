@@ -1,7 +1,9 @@
 import { formatPrice } from './money'
+import { EMAIL_IDENTITIES } from './email/identities'
 
 const BRAND = '#F28C28'
 const INK = '#241A12'
+const SUPPORT_EMAIL = EMAIL_IDENTITIES.support.address
 
 function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -94,7 +96,7 @@ export function renderOrderConfirmationEmail(input: OrderConfirmationTemplateInp
     `Total: ${formatPrice(input.total)}`, '',
     `Payment: ${input.paymentStatus}`, `Method: ${input.deliveryMethod}`,
     `Location: ${input.deliveryLocation}`, '', `Track your order here: ${input.orderUrl}`, '',
-    'We’ll keep you updated.', '', 'Cheers,', 'Chibuike', 'LumeX Fud',
+    'We’ll keep you updated.', '', 'LumeX Fud', `Questions? Reply to ${SUPPORT_EMAIL}.`,
   ].join('\n')
   const rows = input.items.length
     ? input.items.map((item) => `<tr><td style="padding:9px 0;border-bottom:1px solid #F3E4D2">${item.quantity} × ${escapeHtml(item.name)}</td><td align="right" style="padding:9px 0;border-bottom:1px solid #F3E4D2">${formatPrice(item.subtotal)}</td></tr>`).join('')
@@ -115,7 +117,7 @@ export function renderOrderConfirmationEmail(input: OrderConfirmationTemplateInp
     <div style="margin-top:20px;padding:15px;background:#FFF8EF;border-radius:12px;font-size:14px"><strong>${escapeHtml(input.paymentStatus)}</strong><br>${escapeHtml(input.deliveryMethod)} · ${escapeHtml(input.deliveryLocation)}</div>
     ${button('Track your order', input.orderUrl)}
     <p style="margin:22px 0 0">We’ll keep you updated.</p>
-    <p style="margin:18px 0 0">Cheers,<br><strong>Chibuike</strong><br>LumeX Fud</p>`)
+    <p style="margin:18px 0 0"><strong>LumeX Fud</strong><br>Questions? Reply to ${SUPPORT_EMAIL}.</p>`)
   return { subject, text, html }
 }
 
@@ -176,14 +178,14 @@ export function renderDeliveredEmail(input: {
 }) {
   const name = firstName(input.customerName)
   const subject = 'Delivered - how was your order?'
-  const text = [`Hey ${name},`, '', `Order ${input.orderNumber} has been delivered.`, '', 'I hope it arrived just right. A quick rating helps us keep vendors and riders accountable, and makes the next order better.', '', `Rate your order: ${input.orderUrl}`, '', 'Cheers,', 'Chibuike', 'LumeX Fud'].join('\n')
+  const text = [`Hey ${name},`, '', `Order ${input.orderNumber} has been delivered.`, '', 'We hope it arrived just right. A quick rating helps us keep vendors and riders accountable, and makes the next order better.', '', `Rate your order: ${input.orderUrl}`, '', 'LumeX Fud', `Questions? Reply to ${SUPPORT_EMAIL}.`].join('\n')
   const html = layout('Your order has been delivered.', `
     <p style="margin:0 0 8px">Hey ${escapeHtml(name)},</p>
     <h1 style="margin:0 0 12px;font-size:25px;line-height:1.25">Delivered. How did we do?</h1>
-    <p style="margin:0 0 14px">I hope your order arrived just right. A quick rating helps us keep vendors and riders accountable, and makes the next order better.</p>
+    <p style="margin:0 0 14px">We hope your order arrived just right. A quick rating helps us keep vendors and riders accountable, and makes the next order better.</p>
     <p style="margin:0;color:#806B58">${escapeHtml(input.orderNumber)}</p>
     ${button('Rate your order', input.orderUrl)}
-    <p style="margin:20px 0 0">Cheers,<br><strong>Chibuike</strong><br>LumeX Fud</p>`)
+    <p style="margin:20px 0 0"><strong>LumeX Fud</strong><br>Questions? Reply to ${SUPPORT_EMAIL}.</p>`)
   return { subject, text, html }
 }
 
@@ -201,14 +203,14 @@ export function renderDelayedOrderEmail(input: {
     : null
   const etaLine = eta ? `Our latest estimate is ${eta}.` : 'We are working to get it moving again as quickly as possible.'
   const subject = `A quick update on order ${input.orderNumber}`
-  const text = [`Hey ${name},`, '', `Your order is taking longer than it should. ${etaLine}`, '', 'We are watching it closely and pushing the team to get it to you safely, without wasting another minute.', '', `Track your order: ${input.orderUrl}`, '', 'Sorry about the wait,', 'Chibuike', 'LumeX Fud'].join('\n')
+  const text = [`Hey ${name},`, '', `Your order is taking longer than it should. ${etaLine}`, '', 'We are watching it closely and pushing the team to get it to you safely, without wasting another minute.', '', `Track your order: ${input.orderUrl}`, '', 'Sorry about the wait,', 'LumeX Fud', `Questions? Reply to ${SUPPORT_EMAIL}.`].join('\n')
   const html = layout('Your order is taking longer than planned.', `
     <p style="margin:0 0 8px">Hey ${escapeHtml(name)},</p>
     <h1 style="margin:0 0 12px;font-size:25px;line-height:1.25">A quick, honest update.</h1>
     <p style="margin:0 0 14px">Your order is taking longer than it should. ${escapeHtml(etaLine)}</p>
     <p style="margin:0">We are watching it closely and pushing the team to get it to you safely, without wasting another minute.</p>
     ${button('Track your order', input.orderUrl)}
-    <p style="margin:20px 0 0">Sorry about the wait,<br><strong>Chibuike</strong><br>LumeX Fud</p>`)
+    <p style="margin:20px 0 0">Sorry about the wait,<br><strong>LumeX Fud</strong><br>Questions? Reply to ${SUPPORT_EMAIL}.</p>`)
   return { subject, text, html }
 }
 

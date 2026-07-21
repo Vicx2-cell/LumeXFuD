@@ -45,7 +45,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'admin/riders/[id]', 'admin/riders/create', 'admin/suspend',
     'admin/users/[id]/reset-pin', 'admin/vendors', 'admin/vendors/[id]',
     'admin/vendors/create', 'admin/vendors/[id]/inspection', 'admin/verify-receipt', 'admin/wallets',
-    'admin/customer-locations', 'admin/verified-places', 'admin/verified-places/[id]',
+    'admin/customer-locations', 'admin/verified-places', 'admin/verified-places/[id]', 'admin/email-operations', 'admin/contact-cases/[id]',
     'wallet/freeze', 'wallet/unfreeze', 'paystack/refund',
   ], role(A_S)),
 
@@ -113,7 +113,8 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'auth/face/status', 'auth/forgot-pin/get-questions', 'auth/forgot-pin/recovery-code',
     'auth/forgot-pin/security-answers', 'auth/google/callback', 'auth/google/start',
     'auth/tiktok/start', 'auth/tiktok/callback',
-    'auth/login', 'auth/logout', 'auth/me', 'auth/otp/send', 'auth/otp/verify',
+    'auth/login', 'auth/logout', 'auth/me', 'auth/email/send', 'auth/email/verify',
+    'auth/otp/send', 'auth/otp/verify',
     'auth/pin/reset', 'auth/regenerate-recovery-code', 'auth/register', 'auth/remove-pin',
     'auth/setup', 'auth/social/complete', 'auth/webauthn/login-options',
     'auth/webauthn/login-verify', 'auth/webauthn/register-options', 'auth/webauthn/register-verify',
@@ -130,9 +131,10 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   ], { kind: 'cron' }),
 
   'paystack/webhook': { kind: 'webhook' },
+  'webhooks/resend': { kind: 'webhook' },
   'whatsapp': { kind: 'webhook' },
 
-  ...map(['announcement', 'applications', 'delivery-locations', 'features', 'vendors', 'vendors/[id]', 'lodges', 'settings/fees', 'orders/estimate'],
+  ...map(['announcement', 'applications', 'contact', 'delivery-locations', 'features', 'vendors', 'vendors/[id]', 'lodges', 'settings/fees', 'orders/estimate'],
     { kind: 'public' }),
 }
 

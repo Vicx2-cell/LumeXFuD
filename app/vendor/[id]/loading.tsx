@@ -3,7 +3,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 // Instant vendor-menu skeleton.
 export default function VendorLoading() {
   return (
-    <div className="min-h-dvh pb-24" style={{ background: '#0A0A0B' }}>
+    <main className="lx-page min-h-dvh pb-24" aria-busy="true">
+      <span className="sr-only" role="status">Loading menu</span>
       <div className="h-40 w-full animate-pulse" style={{ background: 'rgba(255,255,255,0.06)' }} />
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
         <Skeleton className="h-6 w-48" />
@@ -18,6 +19,6 @@ export default function VendorLoading() {
           </div>
         ))}
       </div>
-    </div>
+    </main>
   )
 }

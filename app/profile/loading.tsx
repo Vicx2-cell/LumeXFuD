@@ -3,9 +3,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 // Instant profile skeleton — appears the moment the tab is tapped.
 export default function ProfileLoading() {
   return (
-    <div className="min-h-dvh pb-24" style={{ background: '#0A0A0B' }}>
-      <div className="sticky top-0 z-40 px-4 py-3 border-b border-white/8" style={{ background: '#0A0A0B' }}>
-        <div className="max-w-lg mx-auto h-6 w-28 rounded-md animate-pulse" style={{ background: 'rgba(255,255,255,0.08)' }} />
+    <main className="lx-page min-h-dvh pb-24" aria-busy="true">
+      <span className="sr-only" role="status">Loading profile</span>
+      <div className="lx-topbar sticky top-0 z-40 px-4 py-3">
+        <div className="mx-auto max-w-lg"><Skeleton className="h-6 w-28 rounded-md" /></div>
       </div>
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
         <div className="flex items-center gap-4">
@@ -24,6 +25,6 @@ export default function ProfileLoading() {
           <Skeleton key={i} className="h-14 w-full rounded-xl" />
         ))}
       </div>
-    </div>
+    </main>
   )
 }

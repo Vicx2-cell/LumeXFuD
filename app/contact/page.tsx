@@ -1,6 +1,8 @@
 import { getControls } from '@/lib/controls'
 import { formatHoursRange } from '@/lib/hours'
-import { SiteFooter, SUPPORT_EMAIL, BRAND, OPERATOR } from '@/components/site-footer'
+import { SiteFooter, GENERAL_EMAIL, SUPPORT_EMAIL, BRAND, OPERATOR } from '@/components/site-footer'
+import { EMAIL_IDENTITIES } from '@/lib/email/identities'
+import { ContactForm } from './contact-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,10 +15,10 @@ export default async function ContactPage() {
   const waDigits = phone.replace(/[^\d]/g, '')
 
   return (
-    <main style={{ background: '#0A0A0B' }}>
+    <main className="lx-page">
       <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 3rem)' }}>
-        <h1 className="text-2xl font-bold mb-2 text-white">Contact &amp; support</h1>
-        <p className="text-sm text-white/40 mb-8">We’re here to help with orders, payments and refunds.</p>
+        <h1 className="text-2xl font-bold mb-2 text-white">Contact LumeX Fud</h1>
+        <p className="text-sm text-white/40 mb-8">Choose what you need so it reaches the responsible team.</p>
 
         <div className="space-y-8 text-base leading-relaxed text-white/70 [overflow-wrap:anywhere]">
           <section>
@@ -25,12 +27,17 @@ export default async function ContactPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-white mb-2">Reach us</h2>
+            <h2 className="text-base font-semibold text-white mb-2">Direct contacts</h2>
             <ul className="space-y-2">
               <li>
-                <span className="text-white/45">Support email: </span>
+                <span className="text-white/45">General: </span>
+                <a href={`mailto:${GENERAL_EMAIL}`} className="text-[#F5A623] break-words">{GENERAL_EMAIL}</a>
+              </li>
+              <li>
+                <span className="text-white/45">Orders, payments, delivery and account support: </span>
                 <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#F5A623] break-words">{SUPPORT_EMAIL}</a>
               </li>
+              {(['careers', 'partners', 'security', 'press', 'legal'] as const).map((key) => <li key={key}><span className="capitalize text-white/45">{key}: </span><a className="text-[#F5A623] break-words" href={`mailto:${EMAIL_IDENTITIES[key].address}`}>{EMAIL_IDENTITIES[key].address}</a></li>)}
               {phone ? (
                 <>
                   <li>
@@ -48,6 +55,12 @@ export default async function ContactPage() {
               <li><span className="text-white/45">Hours: </span><span className="text-white">{hoursLabel} daily</span></li>
               <li><span className="text-white/45">Location: </span><span className="text-white">Abia State University (ABSU) campus, Uturu, Abia State, Nigeria</span></li>
             </ul>
+          </section>
+
+          <section>
+            <h2 className="text-base font-semibold text-white mb-2">Send a routed request</h2>
+            <p className="mb-4 text-sm text-white/55">Your request is saved first, assigned a reference and queue, then acknowledged by the correct department.</p>
+            <ContactForm />
           </section>
 
           <section>

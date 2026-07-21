@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import Link from 'next/link'
+import Image from 'next/image'
+import { ChevronLeft, ChevronRight, ReceiptText } from 'lucide-react'
 import { BottomNav } from '@/components/nav-bottom'
 import { BackButton } from '@/components/back-button'
 import { formatPrice, formatDate } from '@/lib/money'
@@ -10,6 +12,7 @@ import { ReorderButton } from '@/components/reorder-button'
 import { CancelOrderButton } from '@/components/cancel-order-button'
 import { VerifiedBadge } from '@/components/verified-badge'
 import { Badge } from '@/components/ui/badge'
+import { EmptyState } from '@/components/ui/empty-state'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,12 +32,12 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: '#F5A623',
-  COMPLETED: '#22c55e',
-  DELIVERED: '#F5A623',
-  CANCELLED: '#ef4444',
-  REFUNDED: '#8b5cf6',
-  DISPUTED: '#f97316',
+  SCHEDULED: 'var(--color-amber)',
+  COMPLETED: 'var(--lx-green)',
+  DELIVERED: 'var(--color-amber)',
+  CANCELLED: 'var(--lx-red)',
+  REFUNDED: 'var(--lx-violet)',
+  DISPUTED: 'var(--lx-warn)',
 }
 
 export default async function OrdersPage({
@@ -83,33 +86,32 @@ export default async function OrdersPage({
   return (
     <main className="lx-page pb-24">
       <div className="lx-topbar sticky top-0 z-40 px-4 py-3">
-        <div className="max-w-lg mx-auto flex items-center gap-3">
+        <div className="mx-auto flex max-w-5xl items-center gap-3">
           <BackButton />
-          <h1 className="font-semibold text-base">Your orders</h1>
+          <div>
+            <h1 className="text-base font-semibold">Your orders</h1>
+            <p className="text-xs text-[var(--lx-text-muted)]">Track active orders or order your favourites again</p>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-3 lx-stagger">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
         {view === 'error' ? (
-          <div className="text-center py-20">
-            <p className="text-5xl mb-4">⚠️</p>
-            <p className="font-semibold text-lg">Couldn&apos;t load your orders</p>
-            <p className="text-sm text-white/40 mt-1">Something went wrong on our end. Your orders are safe — please try again.</p>
-            <Link href="/orders" className="lx-btn-amber inline-block mt-6 px-6 py-3">
-              Try again
-            </Link>
-          </div>
+          <EmptyState
+            icon={<ReceiptText size={22} />}
+            title="Couldn't load your orders"
+            description="Something went wrong on our end. Your orders are safe—please try again."
+            action={<Link href="/orders" className="lx-btn-amber inline-flex min-h-11 items-center px-6 py-3 text-sm">Try again</Link>}
+          />
         ) : view === 'empty' ? (
-          <div className="text-center py-20 px-6">
-            <p className="text-5xl mb-4">🍽️</p>
-            <p className="font-semibold text-lg">No orders yet</p>
-            <p className="text-sm text-white/55 mt-1.5 max-w-xs mx-auto">Your first order is just a few taps away — find something delicious from a campus vendor.</p>
-            <Link href="/" className="lx-btn-amber inline-block mt-6 px-6 py-3.5">
-              Browse vendors
-            </Link>
-          </div>
+          <EmptyState
+            icon={<ReceiptText size={22} />}
+            title="No orders yet"
+            description="Your first order is just a few taps away—find something delicious from a campus vendor."
+            action={<Link href="/" className="lx-btn-amber inline-flex min-h-11 items-center px-6 py-3 text-sm">Browse vendors</Link>}
+          />
         ) : (
-          orders!.map((order) => {
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lx-stagger">{orders!.map((order) => {
             const vendorRaw = order.vendors
             const vendor = (Array.isArray(vendorRaw) ? vendorRaw[0] : vendorRaw) as { shop_name: string; logo_url: string | null } | null
             const statusColor = STATUS_COLORS[order.status as string] ?? 'rgba(255,255,255,0.4)'
@@ -118,10 +120,13 @@ export default async function OrdersPage({
               <Link
                 key={order.id as string}
                 href={`/order/${order.order_number}`}
-                className="lx-tap glass-thin block rounded-2xl p-4"
+                className="lx-tap lx-surface block p-5"
               >
-                <div className="flex justify-between items-start">
-                  <div>
+                <div className="flex items-start gap-3">
+                  <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--lx-border)] bg-[var(--lx-surface-2)] text-[var(--color-amber)]">
+                    {vendor?.logo_url ? <Image src={vendor.logo_url} alt="" fill className="object-cover" sizes="44px" /> : <ReceiptText size={18} aria-hidden="true" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
                     <p className="font-semibold text-sm flex items-center gap-1.5">
                       {vendor?.shop_name ?? 'Unknown vendor'}
                       {order.vendor_id && verifiedVendors.has(order.vendor_id as string) && <VerifiedBadge kind="vendor" />}
@@ -132,11 +137,14 @@ export default async function OrdersPage({
                     {STATUS_LABELS[order.status as string] ?? order.status as string}
                   </Badge>
                 </div>
-                <div className="flex items-center justify-between mt-3">
-                  <p className="text-sm text-white/60">
+                <div className="mt-4 flex items-end justify-between border-t border-[var(--lx-border)] pt-4">
+                  <div>
+                  <p className="text-[11px] text-[var(--lx-text-faint)]">{order.delivery_type === 'PICKUP' ? 'Pickup' : 'Delivery'}</p>
+                  <p className="mt-1 text-sm text-[var(--lx-text-muted)]">
                     {formatDate(order.created_at as string)}
                   </p>
-                  <p className="font-semibold text-sm">{formatPrice(order.total_amount as number)}</p>
+                  </div>
+                  <p className="text-base font-semibold tabular-nums">{formatPrice(order.total_amount as number)}</p>
                 </div>
                 {(order.status === 'COMPLETED' || order.status === 'CANCELLED') && (
                   <div className="mt-3 border-t border-white/5 pt-3">
@@ -153,7 +161,7 @@ export default async function OrdersPage({
                 )}
               </Link>
             )
-          })
+          })}</div>
         )}
 
         {/* Pagination */}
@@ -162,10 +170,9 @@ export default async function OrdersPage({
             {page > 1 && (
               <Link
                 href={`/orders?page=${page - 1}`}
-                className="px-4 py-2 rounded-xl text-sm"
-                style={{ background: 'rgba(255,255,255,0.07)' }}
+                className="lx-btn-secondary inline-flex min-h-11 items-center gap-1 px-4 py-2 text-sm"
               >
-                ← Previous
+                <ChevronLeft size={15} aria-hidden="true" /> Previous
               </Link>
             )}
             <span className="px-4 py-2 text-sm text-white/40">
@@ -174,10 +181,9 @@ export default async function OrdersPage({
             {page < totalPages && (
               <Link
                 href={`/orders?page=${page + 1}`}
-                className="px-4 py-2 rounded-xl text-sm"
-                style={{ background: 'rgba(255,255,255,0.07)' }}
+                className="lx-btn-secondary inline-flex min-h-11 items-center gap-1 px-4 py-2 text-sm"
               >
-                Next →
+                Next <ChevronRight size={15} aria-hidden="true" />
               </Link>
             )}
           </div>

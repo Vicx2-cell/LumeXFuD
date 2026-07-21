@@ -14,6 +14,7 @@ import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
 import { buildPublicDisplayName, buildPublicHandleCandidates, chooseAvailablePublicHandle } from '@/lib/social-profile'
 import { autoFollowOfficialAccount } from '@/lib/feed/official-follow'
 import { sendWelcomeEmail } from '@/lib/transactional-email'
+import { EMAIL_VERIFIED_COOKIE, emailVerifiedCookieOptions, verifyEmailVerified } from '@/lib/email-verify'
 
 export async function POST(req: NextRequest) {
   try {
@@ -89,6 +90,10 @@ export async function POST(req: NextRequest) {
 
     const db = createSupabaseAdmin()
     const email = data.email.trim().toLowerCase()
+    const emailVerified = await verifyEmailVerified(req.cookies.get(EMAIL_VERIFIED_COOKIE)?.value, email, 'signup')
+    if (!emailVerified) {
+      return NextResponse.json({ error: 'Please verify your email address first.', email_unverified: true }, { status: 403 })
+    }
     const { data: existingEmail } = await db
       .from('customers')
       .select('id')
@@ -132,7 +137,8 @@ export async function POST(req: NextRequest) {
       phone: normalizedPhone,
       name: data.name,
       email,
-      email_verified: false,
+      email_verified: true,
+      email_verified_at: new Date().toISOString(),
       default_delivery_address: data.default_delivery_address,
       // Stamp whether the phone was actually proven. FALSE means the account was
       // created while phone_verification was off (OTP down) — flag it for
@@ -213,6 +219,7 @@ export async function POST(req: NextRequest) {
     res.cookies.set(sessionCookieName(), token, setCookieOptions(role))
     // Burn the phone-verified cookie — single use.
     res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
+    res.cookies.set(EMAIL_VERIFIED_COOKIE, '', emailVerifiedCookieOptions(0))
     return res
   } catch (error) {
     if (error instanceof ZodError) {

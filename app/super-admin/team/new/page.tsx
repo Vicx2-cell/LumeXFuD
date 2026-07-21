@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFeatures } from '@/lib/use-features'
 import PhoneVerifyInline from '@/components/auth/PhoneVerifyInline'
+import EmailVerifyInline from '@/components/auth/EmailVerifyInline'
 import { PageHeader } from '@/components/ui/page-header'
 import { GlassSheen } from '@/components/fx'
 
@@ -20,22 +21,24 @@ export default function NewAdminPage() {
   // while OTP delivery is down. Defaults to required until flags load.
   const features = useFeatures()
   const verificationRequired = features.phone_verification !== false
-  const [form, setForm] = useState({ name: '', phone: '+234' })
+  const [form, setForm] = useState({ name: '', email: '', phone: '+234' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState<SuccessData | null>(null)
   const [copied, setCopied] = useState(false)
   const [phoneVerified, setPhoneVerified] = useState(false)
+  const [emailVerified, setEmailVerified] = useState(false)
 
   const set = (k: keyof typeof form, v: string) => {
     setForm((f) => ({ ...f, [k]: v }))
     setError('')
     // The verified cookie is bound to a specific number — changing it invalidates it.
     if (k === 'phone') setPhoneVerified(false)
+    if (k === 'email') setEmailVerified(false)
   }
 
   const handleSubmit = async () => {
-    if (!form.name.trim() || form.phone.length < 13) {
+    if (!form.name.trim() || !form.email.trim() || form.phone.length < 13) {
       setError('Please fill in all required fields.')
       return
     }
@@ -43,6 +46,7 @@ export default function NewAdminPage() {
       setError('Verify the admin’s phone number first.')
       return
     }
+    if (!emailVerified) { setError('Verify the admin email address first.'); return }
     setLoading(true)
     try {
       const res = await fetch('/api/super-admin/team/create', {
@@ -148,6 +152,12 @@ export default function NewAdminPage() {
           </label>
 
           <label className="block">
+            <span className="mb-2 block lx-mono">Email address</span>
+            <input value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="admin@example.com" type="email" autoComplete="email" required className={inputCls} />
+          </label>
+          <EmailVerifyInline email={form.email} purpose="admin_create" verified={emailVerified} onVerified={() => setEmailVerified(true)} />
+
+          <label className="block">
             <span className="mb-2 block lx-mono">WhatsApp number (+234)</span>
             <input
               value={form.phone}
@@ -174,7 +184,7 @@ export default function NewAdminPage() {
 
           <button
             onClick={handleSubmit}
-            disabled={loading || (verificationRequired && !phoneVerified)}
+            disabled={loading || (verificationRequired && !phoneVerified) || !emailVerified}
             className="lx-btn-amber w-full py-4 text-sm disabled:opacity-50"
             style={{ minHeight: 52 }}
           >

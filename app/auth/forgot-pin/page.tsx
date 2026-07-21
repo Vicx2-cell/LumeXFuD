@@ -198,8 +198,8 @@ export default function ForgotPinPage() {
 
   return (
     <div
-      className="min-h-dvh flex items-start sm:items-center justify-center px-5 py-10 sm:py-12"
-      style={{ background: '#0A0A0B', paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
+      className="lx-page min-h-dvh flex items-start sm:items-center justify-center px-5 py-10 sm:py-12"
+      style={{ backgroundColor: 'var(--color-bg)', paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
     >
       <div className="w-full max-w-xl space-y-6">
         {/* Header */}

@@ -10,6 +10,7 @@ import { BackButton } from '@/components/back-button'
 import { useFeatures } from '@/lib/use-features'
 import GoogleButton from '@/components/auth/GoogleButton'
 import { readJsonResponse } from '@/lib/http'
+import EmailVerifyInline from '@/components/auth/EmailVerifyInline'
 
 const initialForm = {
   name: '',
@@ -70,6 +71,7 @@ export default function RegisterPage() {
   const [vBusy, setVBusy] = useState(false)
   const [vError, setVError] = useState('')
   const [vNote, setVNote] = useState('')
+  const [emailVerified, setEmailVerified] = useState(false)
 
   // Prefill the phone when arriving from the login screen's "not registered"
   // prompt (/auth/register?phone=+234...). Client-only — avoids needing a
@@ -91,6 +93,7 @@ export default function RegisterPage() {
       setVError('')
       setVNote('')
     }
+    if (field === 'email') setEmailVerified(false)
   }
 
   const sendCode = async () => {
@@ -140,6 +143,10 @@ export default function RegisterPage() {
     setError('')
     if (verificationRequired && !phoneVerified) {
       setError('Please verify your phone number first.')
+      return
+    }
+    if (!emailVerified) {
+      setError('Please verify your email address first.')
       return
     }
     const pinErr = pinStrengthError(form.pin)
@@ -202,7 +209,7 @@ export default function RegisterPage() {
 
   if (recoveryCode) {
     return (
-      <div className="min-h-dvh flex items-center justify-center px-5 py-12" style={{ background: '#0A0A0B' }}>
+      <div className="lx-page min-h-dvh flex items-center justify-center px-5 py-12">
         <div className="w-full max-w-lg space-y-6">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
             <h1 className="text-2xl font-semibold text-white">Account created</h1>
@@ -244,7 +251,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-dvh flex items-start sm:items-center justify-center px-5 py-10 sm:py-12" style={{ background: '#0A0A0B', paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
+    <div className="lx-page min-h-dvh flex items-start sm:items-center justify-center px-5 py-10 sm:py-12" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
       <div className="w-full max-w-lg space-y-6">
         <BackButton fallback="/auth" />
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
@@ -289,7 +296,6 @@ export default function RegisterPage() {
               autoCapitalize="words"
             />
           </label>
-
           <label className="block text-sm text-white/70">
             <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">WhatsApp number — for messages</span>
             <span className="mb-2 block text-xs text-white/40">Required. We send your login code here, and vendors/riders message you on WhatsApp. Use a number with WhatsApp.</span>
@@ -316,6 +322,7 @@ export default function RegisterPage() {
               spellCheck={false}
             />
           </label>
+          <EmailVerifyInline email={form.email} purpose="signup" verified={emailVerified} onVerified={() => setEmailVerified(true)} />
 
           {/* Phone ownership verification — hidden when a super admin disables
               the phone_verification flag (OTP delivery down). */}

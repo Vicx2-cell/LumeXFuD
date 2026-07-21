@@ -13,6 +13,7 @@ import { isPhoneBlocked } from '@/lib/blocklist'
 import { buildPublicDisplayName, buildPublicHandleCandidates, chooseAvailablePublicHandle } from '@/lib/social-profile'
 import { autoFollowOfficialAccount } from '@/lib/feed/official-follow'
 import { sendWelcomeEmail, shouldSendWelcomeForEmailChange } from '@/lib/transactional-email'
+import { normalizeEmail } from '@/lib/email/send-email'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Enter your name').max(80),
@@ -116,16 +117,16 @@ export async function POST(req: NextRequest) {
     // The Google email may already belong to another account — let the partial
     // unique index guard it, but only attach the email when it's free so a
     // collision can't block sign-up.
-    let emailToStore: string | null = pending.email
-    if (emailToStore) {
-      const { data: emailOwner } = await db
-        .from('customers')
-        .select('id')
-        .ilike('email', emailToStore)
-        .is('deleted_at', null)
-        .maybeSingle()
-      if (emailOwner) emailToStore = null // already linked elsewhere — don't duplicate
+    const emailToStore = normalizeEmail(pending.email)
+    if (!emailToStore || !pending.emailVerified) {
+      return NextResponse.json({ error: 'A verified email address is required to create or link an account.' }, { status: 400 })
     }
+    const { data: emailOwner } = await db
+      .from('customers')
+      .select('id')
+      .ilike('email', emailToStore)
+      .is('deleted_at', null)
+      .maybeSingle()
 
     if (username) {
       const { data: takenHandle } = await db
@@ -151,6 +152,9 @@ export async function POST(req: NextRequest) {
       | null
 
     if (existing) {
+      if (emailOwner && emailOwner.id !== existing.id) {
+        return NextResponse.json({ error: 'This email is already registered to another account.' }, { status: 409 })
+      }
       // Linking Google to an EXISTING account is only safe when the user proved
       // they own this phone via OTP just now (verificationEnforced ⇒ the
       // phone_verified cookie was already validated above). If phone
@@ -170,14 +174,14 @@ export async function POST(req: NextRequest) {
       }
       const updates: Record<string, unknown> = {}
       if (!existing.google_sub) updates.google_sub = pending.sub
-      if (!existing.email && emailToStore) {
+      if (!existing.email) {
         updates.email = emailToStore
         updates.email_verified = pending.emailVerified
       }
       let emailWasAdded = false
       if (Object.keys(updates).length > 0) {
         const { error: updateError } = await db.from('customers').update(updates).eq('id', existing.id)
-        emailWasAdded = !updateError && !existing.email && !!emailToStore
+        emailWasAdded = !updateError && !existing.email
       }
       if (emailWasAdded && shouldSendWelcomeForEmailChange({
         previousEmail: existing.email,
@@ -196,6 +200,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Brand-new account. ──
+    if (emailOwner) {
+      return NextResponse.json({ error: 'This email is already registered. Sign in to the existing account instead.' }, { status: 409 })
+    }
     const { data: user, error } = await db
       .from('customers')
       .insert({
@@ -204,7 +211,7 @@ export async function POST(req: NextRequest) {
         default_delivery_address,
         phone_verified: verificationEnforced,
         email: emailToStore,
-        email_verified: emailToStore ? pending.emailVerified : false,
+        email_verified: true,
         google_sub: pending.sub,
         // No login PIN: Google IS their sign-in. They can add a phone+PIN login
         // later from the profile if they want one.

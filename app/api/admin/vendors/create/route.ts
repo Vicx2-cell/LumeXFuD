@@ -9,10 +9,12 @@ import { audit } from '@/lib/audit'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { isPhoneBlocked } from '@/lib/blocklist'
 import { z } from 'zod'
+import { EMAIL_VERIFIED_COOKIE, emailVerifiedCookieOptions, verifyEmailVerified } from '@/lib/email-verify'
 
 const createVendorInput = z.object({
   owner_name:        z.string().min(1).max(100),
   shop_name:         z.string().min(1).max(100),
+  email:             z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
   phone:             z.string().min(7).max(20),
   call_phone:        z.string().min(7).max(20).optional(),
   category:          z.string().min(1).max(50).optional(),
@@ -38,7 +40,10 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: 'Missing or invalid required fields' }, { status: 400 })
     }
-    const { owner_name, shop_name, phone, call_phone, category, merchant_category, subscription_tier, id_verified, site_inspected } = parsed.data
+    const { owner_name, shop_name, email, phone, call_phone, category, merchant_category, subscription_tier, id_verified, site_inspected } = parsed.data
+    if (!await verifyEmailVerified(req.cookies.get(EMAIL_VERIFIED_COOKIE)?.value, email, 'admin_create')) {
+      return NextResponse.json({ error: 'Verify the vendor email address first.', email_unverified: true }, { status: 403 })
+    }
 
     let normalized: string
     try {
@@ -72,6 +77,8 @@ export async function POST(req: NextRequest) {
     const db = createSupabaseAdmin()
     const { data: existing } = await db.from('vendors').select('id').eq('phone', normalized).maybeSingle()
     if (existing) return NextResponse.json({ error: 'Vendor phone already exists' }, { status: 409 })
+    const { data: existingEmail } = await db.from('vendors').select('id').ilike('email', email).maybeSingle()
+    if (existingEmail) return NextResponse.json({ error: 'Vendor email already exists' }, { status: 409 })
 
     const tempPin = generateTempPin()
     const pinHash = await hashSecret(tempPin)
@@ -83,6 +90,9 @@ export async function POST(req: NextRequest) {
       // schema dropped: `name` and `owner_phone`. Populate them from the new
       // fields so inserts don't fail with 23502.
       name: shop_name,
+      email,
+      email_verified: true,
+      email_verified_at: new Date().toISOString(),
       phone: normalized,
       owner_phone: normalized,
       category: category ?? 'Other',
@@ -125,6 +135,7 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json({ success: true, temp_pin: tempPin, vendor_name: shop_name, phone: normalized, whatsapp_message: message })
     // Burn the phone-verified cookie — single use, so the next vendor must verify afresh.
     res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
+    res.cookies.set(EMAIL_VERIFIED_COOKIE, '', emailVerifiedCookieOptions(0))
     return res
   } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })

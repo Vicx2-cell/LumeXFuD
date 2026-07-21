@@ -1,5 +1,6 @@
 import webpush from 'web-push'
 import { createSupabaseAdmin } from './supabase/server'
+import { EMAIL_IDENTITIES } from './email/identities'
 
 // Web Push (VAPID). Real browser push so vendors/riders get the new-order alert
 // even when the tab/PWA is closed — the difference between a 2-minute and a
@@ -16,7 +17,7 @@ function ensureConfigured(): boolean {
   const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
   const priv = process.env.VAPID_PRIVATE_KEY
   if (!pub || !priv) return false
-  const subject = process.env.VAPID_SUBJECT || 'mailto:hello@lumexfud.com.ng'
+  const subject = process.env.VAPID_SUBJECT || `mailto:${EMAIL_IDENTITIES.hello.address}`
   webpush.setVapidDetails(subject, pub, priv)
   configured = true
   return true

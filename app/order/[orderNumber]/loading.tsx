@@ -3,8 +3,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 // Instant order-tracking skeleton — appears the moment the order is opened.
 export default function OrderLoading() {
   return (
-    <div className="min-h-dvh pb-24" style={{ background: '#0A0A0B' }}>
-      <div className="sticky top-0 z-40 px-4 py-3 border-b border-white/8" style={{ background: '#0A0A0B' }}>
+    <main className="lx-page min-h-dvh pb-24" aria-busy="true">
+      <span className="sr-only" role="status">Loading order details</span>
+      <div className="lx-topbar sticky top-0 z-40 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <div className="h-9 w-9 rounded-full animate-pulse" style={{ background: 'rgba(255,255,255,0.08)' }} />
           <div className="h-6 w-40 rounded-md animate-pulse" style={{ background: 'rgba(255,255,255,0.08)' }} />
@@ -28,6 +29,6 @@ export default function OrderLoading() {
           </div>
         ))}
       </div>
-    </div>
+    </main>
   )
 }

@@ -9,6 +9,11 @@ import { kbSystemPrompt, isEscalation } from './whatsapp-kb'
 import { composeDeliveryAddress } from './delivery-address'
 import { sendText, sendButtons, sendList, type WARow } from './whatsapp'
 import { getDeliveryZonePricing, getMinimumOrderKobo } from './delivery-zones'
+import { normalizeEmail } from './email/send-email'
+import { sendEmail } from './email/send-email'
+import { renderEmailVerification } from './email/templates'
+import { checkEmailCode, clearEmailCode, generateEmailCode, storeEmailCode } from './email-verify'
+import crypto from 'crypto'
 
 // ─── The WhatsApp bot "brain" ────────────────────────────────────────────────
 // Per inbound message:
@@ -50,6 +55,7 @@ type Cart = {
   next?: 'order' | 'reorder' // action to run after onboarding completes
   apply?: Apply
   skipped?: string[] // reorder: items dropped because unavailable
+  pendingEmail?: string // held only until the address owner enters the email code
 }
 
 type Conversation = {
@@ -201,25 +207,21 @@ function feesText(p: NonNullable<Awaited<ReturnType<typeof loadPricing>>>): stri
 }
 
 // ─── Identity helpers ─────────────────────────────────────────────────────────
-type CustomerRow = { id: string; name: string | null; default_delivery_address: string | null; suspended_until: string | null; suspend_reason: string | null }
+type CustomerRow = { id: string; name: string | null; email: string | null; default_delivery_address: string | null; suspended_until: string | null; suspend_reason: string | null }
 
 async function resolveCustomer(db: DB, phone: string): Promise<CustomerRow | null> {
   const canonical = normalizePhone(phone)
   const { data } = await db
     .from('customers')
-    .select('id, name, default_delivery_address, suspended_until, suspend_reason')
+    .select('id, name, email, default_delivery_address, suspended_until, suspend_reason')
     .eq('phone', canonical)
     .is('deleted_at', null)
     .maybeSingle()
   return (data as CustomerRow) ?? null
 }
 
-/** Provision a customer row if missing (the phone is the Meta-verified identity). */
+/** Resolve an existing customer. Account creation happens only after email capture. */
 async function ensureCustomer(db: DB, phone: string): Promise<CustomerRow | null> {
-  const existing = await resolveCustomer(db, phone)
-  if (existing) return existing
-  const canonical = normalizePhone(phone)
-  await db.from('customers').insert({ phone: canonical }).then(() => {}, () => {})
   return resolveCustomer(db, phone)
 }
 
@@ -379,6 +381,29 @@ async function handleCustomerFlow(db: DB, phone: string, conv: Conversation, rol
     }
 
     // Onboarding ----------------------------------------------------------------
+    case 'ONBOARD_EMAIL':
+      if (msg.text) {
+        const email = normalizeEmail(msg.text)
+        if (email) {
+          await startWhatsAppEmailVerification(db, phone, conv, email)
+          return
+        }
+      }
+      await outText(db, phone, 'Enter a valid email address to continue. We use it for receipts and important account messages.')
+      return
+    case 'ONBOARD_EMAIL_CODE':
+      if (!msg.text || !/^\d{6}$/.test(msg.text.trim())) {
+        await outText(db, phone, 'Enter the 6-digit code sent to your email, or type menu to cancel.')
+        return
+      }
+      {
+        const pendingEmail = conv.cart.pendingEmail
+        if (!pendingEmail) { await saveCart(db, phone, { items: [], next: conv.cart.next }, 'ONBOARD_EMAIL'); await outText(db, phone, 'Enter your email address again.'); return }
+        const checked = await checkEmailCode(pendingEmail, 'signup', msg.text.trim())
+        if (checked !== 'ok') { await outText(db, phone, checked === 'too_many' ? 'Too many incorrect attempts. Enter your email again to request a new code.' : 'That code is incorrect or expired. Enter the latest 6-digit code.'); return }
+        await saveOnboardEmail(db, phone, conv, pendingEmail)
+        return
+      }
     case 'ONBOARD_NAME':
       if (msg.text && msg.text.trim().length >= 2) {
         await saveOnboardName(db, phone, conv, msg.text.trim())
@@ -453,15 +478,65 @@ async function handleCustomerFlow(db: DB, phone: string, conv: Conversation, rol
 // ─── Onboarding ───────────────────────────────────────────────────────────────
 async function ensureOnboardedThen(db: DB, phone: string, next: 'order' | 'reorder'): Promise<void> {
   const customer = await ensureCustomer(db, phone)
-  if (customer?.name?.trim()) {
+  if (customer?.email && customer.name?.trim()) {
     // Known customer → run the action directly.
     if (next === 'reorder') return reorderLast(db, phone, customer)
     return startOrdering(db, phone)
   }
-  // New customer → short onboarding (name, then delivery location), remembering
-  // what they wanted so we resume it afterwards.
+  if (!customer?.email) {
+    await saveCart(db, phone, { items: [], next }, 'ONBOARD_EMAIL')
+    await outText(db, phone, 'Welcome to LumeX Fud 👋 What email address should we use for your receipts and account messages?')
+    return
+  }
+  // Email is present; capture the remaining profile details.
   await saveCart(db, phone, { items: [], next }, 'ONBOARD_NAME')
   await outText(db, phone, 'Welcome to LumeX Fud 👋 First time here — what name should we put on your orders?')
+}
+
+async function saveOnboardEmail(db: DB, phone: string, conv: Conversation, email: string): Promise<void> {
+  const canonical = normalizePhone(phone)
+  const current = await resolveCustomer(db, phone)
+  const { data: owner } = await db.from('customers').select('id').ilike('email', email).is('deleted_at', null).maybeSingle()
+  if (owner && owner.id !== current?.id) {
+    await outText(db, phone, 'That email is already linked to another account. Enter a different email or use the web app to sign in.')
+    return
+  }
+  if (current) {
+    const { error } = await db.from('customers').update({ email, email_verified: true, email_verified_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', current.id)
+    if (error) { await outText(db, phone, 'We could not save that email right now. Please try again.'); return }
+    if (current.name?.trim()) {
+      if (conv.cart.next === 'reorder') return reorderLast(db, phone, { ...current, email })
+      return startOrdering(db, phone)
+    }
+  } else {
+    const { error } = await db.from('customers').insert({ phone: canonical, email, email_verified: true, email_verified_at: new Date().toISOString() })
+    if (error) { await outText(db, phone, 'We could not create your account right now. Please try again.'); return }
+  }
+  await saveCart(db, phone, conv.cart, 'ONBOARD_NAME')
+  await outText(db, phone, 'Thanks. What name should we put on your orders? (Just your first name is fine.)')
+}
+
+async function startWhatsAppEmailVerification(db: DB, phone: string, conv: Conversation, email: string): Promise<void> {
+  const current = await resolveCustomer(db, phone)
+  const { data: owner } = await db.from('customers').select('id').ilike('email', email).is('deleted_at', null).maybeSingle()
+  if (owner && owner.id !== current?.id) { await outText(db, phone, 'That email is already linked to another account. Enter a different email.'); return }
+  const code = generateEmailCode()
+  try {
+    await storeEmailCode(email, 'signup', code)
+    const template = renderEmailVerification({ code })
+    const eventId = crypto.randomUUID()
+    const result = await sendEmail({ workflow: 'email_verification', to: email, eventId, idempotencyKey: `email-verification/${eventId}`, ...template })
+    if (result.status !== 'sent') {
+      await clearEmailCode(email, 'signup')
+      await outText(db, phone, 'We could not send the email code right now. Please try again shortly.')
+      return
+    }
+  } catch {
+    await outText(db, phone, 'Email verification is temporarily unavailable. Please try again shortly.')
+    return
+  }
+  await saveCart(db, phone, { ...conv.cart, pendingEmail: email }, 'ONBOARD_EMAIL_CODE')
+  await outText(db, phone, 'We sent a 6-digit code to that email. Reply with the code to confirm you own the address.')
 }
 
 async function saveOnboardName(db: DB, phone: string, conv: Conversation, name: string): Promise<void> {

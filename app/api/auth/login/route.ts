@@ -11,6 +11,7 @@ import { rateLimitPinLogin } from '@/lib/rate-limit'
 import { signMfaPending, MFA_COOKIE, shortCookie } from '@/lib/webauthn'
 import { getFeature } from '@/lib/features'
 import { isLockedDown } from '@/lib/controls'
+import { normalizeEmail } from '@/lib/email/send-email'
 
 const LOCKOUT_MINUTES = 30
 
@@ -27,6 +28,8 @@ async function ensureSuperAdminBootstrap(phone: string, pin: string) {
   // doesn't block the super-admin bootstrap.
   if (phone !== safeNormalizePhone(process.env.SUPER_ADMIN_PHONE)) return null
   if (pin !== SUPER_ADMIN_DEFAULT_PIN) return null
+  const bootstrapEmail = normalizeEmail(process.env.SUPER_ADMIN_EMAIL)
+  if (!bootstrapEmail) return null
   const db = createSupabaseAdmin()
   // Explicit auth columns only — never select('*') (would pull bcrypt hashes
   // into memory needlessly).
@@ -37,6 +40,9 @@ async function ensureSuperAdminBootstrap(phone: string, pin: string) {
   const { data: user, error } = await db.from('customers').insert({
     phone,
     name: 'Super Admin',
+    email: bootstrapEmail,
+    email_verified: true,
+    email_verified_at: new Date().toISOString(),
     login_pin_hash: pinHash,
     pin_attempts: 0,
     pin_locked_until: null,

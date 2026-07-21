@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { transport } = vi.hoisted(() => ({ transport: vi.fn() }))
 
-vi.mock('./email', async (importOriginal) => {
-  const original = await importOriginal<typeof import('./email')>()
-  return { ...original, sendTransactionalEmail: transport }
+vi.mock('./email/send-email', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./email/send-email')>()
+  return { ...original, sendEmail: transport }
 })
 
 import {
@@ -65,7 +65,7 @@ class FakeDb {
 
 function emailDb(): FakeDb {
   const db = new FakeDb()
-  db.tables.customers.push({ id: 'customer-1', email: 'ada@example.com', name: 'Ada Nwosu', welcome_email_sent_at: null })
+  db.tables.customers.push({ id: 'customer-1', email: 'ada@example.com', email_verified: true, name: 'Ada Nwosu', welcome_email_sent_at: null })
   db.tables.vendors.push({ id: 'vendor-1', shop_name: 'Mama K’s Kitchen' })
   db.tables.orders.push({
     id: 'order-1', order_number: 'LXF-2026-000001', customer_id: 'customer-1', vendor_id: 'vendor-1',
@@ -82,7 +82,7 @@ type ServiceDb = Parameters<typeof sendWelcomeEmail>[0]
 describe('transactional email behavior', () => {
   beforeEach(() => {
     transport.mockReset()
-    transport.mockResolvedValue({ status: 'sent', id: 'resend-1' })
+    transport.mockImplementation(async (input) => ({ ok: true, status: 'sent', workflow: input.workflow, providerMessageId: 'resend-1', attempts: 1, errorCode: null, retryable: false }))
   })
 
   it('sends one welcome email for a new signup with a valid email', async () => {
@@ -98,6 +98,16 @@ describe('transactional email behavior', () => {
   it('sends no welcome email when signup has no valid email', async () => {
     const result = await sendWelcomeEmail(emailDb() as unknown as ServiceDb, { customerId: 'customer-1', email: null, name: null })
     expect(result).toEqual({ status: 'skipped', reason: 'no_recipient' })
+    expect(transport).not.toHaveBeenCalled()
+  })
+
+  it('does not send account or order mail to an unverified address', async () => {
+    const db = emailDb()
+    db.tables.customers[0].email_verified = false
+    const welcome = await sendWelcomeEmail(db as unknown as ServiceDb, { customerId: 'customer-1', email: 'ada@example.com', name: 'Ada' })
+    const order = await sendOrderConfirmationEmail(db as unknown as ServiceDb, { orderId: 'order-1' })
+    expect(welcome).toEqual({ status: 'skipped', reason: 'email_unverified' })
+    expect(order).toEqual({ status: 'skipped', reason: 'email_unverified' })
     expect(transport).not.toHaveBeenCalled()
   })
 
@@ -151,10 +161,10 @@ describe('transactional email behavior', () => {
   })
 
   it('returns a failure without throwing or undoing the claimed business event', async () => {
-    transport.mockResolvedValueOnce({ status: 'failed', code: 'transport_error' })
+    transport.mockImplementationOnce(async (input) => ({ ok: false, status: 'failed', workflow: input.workflow, providerMessageId: null, attempts: 3, errorCode: 'transport_error', retryable: true }))
     const db = emailDb()
     const result = await sendOrderConfirmationEmail(db as unknown as ServiceDb, { orderId: 'order-1' })
-    expect(result).toEqual({ status: 'failed', code: 'transport_error' })
+    expect(result).toMatchObject({ status: 'failed', errorCode: 'transport_error' })
     expect(db.tables.orders[0].payment_status).toBe('PAID')
     expect([...db.events.values()][0].status).toBe('FAILED')
   })

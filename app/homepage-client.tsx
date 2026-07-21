@@ -4,6 +4,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { Heart, Search, UtensilsCrossed } from 'lucide-react'
 import { PremiumImage } from '@/components/fx'
 import type { VendorData } from './home/page'
 import { vendorTrustBadges } from '@/lib/vendor-trust'
@@ -119,9 +120,9 @@ export function HomepageClient({
   }, [vendors, search, category, favOnly, favorites])
 
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-5">
       {locations.length > 0 && (
-        <div className="lx-surface px-3.5 py-2.5">
+        <div className="lx-surface p-4 sm:p-5">
           <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wide text-white/40">Delivery area</p>
@@ -162,11 +163,9 @@ export function HomepageClient({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search vendors..."
-          className="lx-field w-full px-4 py-3 pl-10 text-sm outline-none"
+          className="lx-field min-h-13 w-full px-4 py-3 pl-11 text-sm outline-none"
         />
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--lx-text-faint)]" size={17} aria-hidden="true" />
       </div>
 
       {/* Category chips + Favourites filter (one-tap re-order shortcut) */}
@@ -178,7 +177,7 @@ export function HomepageClient({
             className="shrink-0 px-4 py-2 text-sm"
             style={{ minHeight: 44 }}
           >
-            ❤️ Favourites
+            <Heart size={14} fill={favOnly ? 'currentColor' : 'none'} aria-hidden="true" /> Favourites
           </Pill>
         )}
         {CATEGORIES.map((cat) => (
@@ -200,21 +199,21 @@ export function HomepageClient({
           {[1, 2, 3].map((i) => <div key={i} className="lx-skeleton h-[124px]" style={{ borderRadius: 20 }} />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-white/30 text-4xl mb-3">🍽️</p>
-          <p className="text-white/50 text-sm">No vendors match your search.</p>
-          <p className="text-white/30 text-xs mt-1">Try a different name or category.</p>
+        <div className="lx-surface py-16 text-center">
+          <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--lx-border)] bg-[var(--lx-surface-2)] text-[var(--color-amber)]" aria-hidden="true"><UtensilsCrossed size={22} /></span>
+          <p className="text-sm font-semibold text-[var(--lx-text)]">No vendors match your search</p>
+          <p className="mt-1 text-xs text-[var(--lx-text-muted)]">Try a different name or category.</p>
         </div>
       ) : (
         <div>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-white/90">Vendors in your zone</h2>
+              <h2 className="text-base font-semibold text-[var(--lx-text)]">Vendors in your zone</h2>
               <p className="mt-0.5 text-xs text-white/40">Compare nearby options at a glance</p>
             </div>
             <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-xs text-white/55 tabular-nums">{filtered.length}</span>
           </div>
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {filtered.map((vendor) => (
               <VendorCard
                 key={vendor.id}
@@ -294,23 +293,23 @@ function VendorCard({
           metadata: { vendor_name: vendor.shop_name },
         })
       }}
-      className="lx-tap glass-thin grid min-h-[124px] grid-cols-[106px_minmax(0,1fr)] overflow-hidden rounded-2xl sm:grid-cols-[118px_minmax(0,1fr)]"
+      className="lx-tap glass-thin grid min-h-[142px] grid-cols-[118px_minmax(0,1fr)] overflow-hidden rounded-2xl sm:grid-cols-[132px_minmax(0,1fr)]"
       style={{ opacity: unavailable ? 0.72 : 1 }}>
       {/* Photo */}
-      <div className="relative min-h-[124px] bg-white/5">
+      <div className="relative min-h-[142px] bg-white/5">
         {vendor.shop_photo_url ? (
           <PremiumImage
             src={vendor.shop_photo_url}
             alt={vendor.shop_name}
             fill
-            sizes="118px"
+            sizes="132px"
             frameClassName="absolute inset-0"
             className="object-cover"
             style={unavailable ? { filter: 'grayscale(1)' } : undefined}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <span className="text-4xl opacity-20">🍽️</span>
+            <UtensilsCrossed size={30} className="text-[var(--lx-text-faint)]" aria-hidden="true" />
           </div>
         )}
 
@@ -357,7 +356,7 @@ function VendorCard({
       </div>
 
       {/* Info */}
-      <div className="flex min-w-0 flex-col justify-center p-3">
+      <div className="flex min-w-0 flex-col justify-center p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-1.5">

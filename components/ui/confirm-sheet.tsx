@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useEffect, useId, useRef } from 'react'
 
 interface ConfirmSheetProps {
   open: boolean
@@ -26,13 +26,23 @@ interface ConfirmSheetProps {
 export function ConfirmSheet({
   open, title, body, confirmLabel, loadingLabel, danger, loading, error, onConfirm, onCancel,
 }: ConfirmSheetProps) {
+  const titleId = useId()
+  const panelRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onCancel() }
     document.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const frame = window.requestAnimationFrame(() => panelRef.current?.focus())
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+      previousFocus?.focus()
+    }
   }, [open, loading, onCancel])
 
   if (!open) return null
@@ -43,9 +53,12 @@ export function ConfirmSheet({
       onClick={() => { if (!loading) onCancel() }}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
+        aria-busy={loading || undefined}
+        tabIndex={-1}
         className="lx-sheet w-full sm:max-w-sm"
         onClick={(e) => e.stopPropagation()}
       >
@@ -54,11 +67,12 @@ export function ConfirmSheet({
           style={{ background: 'var(--lx-surface-solid)', boxShadow: '0 -8px 40px rgba(0,0,0,0.5)' }}
         >
           <div className="w-10 h-1 rounded-full bg-white/15 mx-auto mb-4 sm:hidden" aria-hidden="true" />
-          <h3 className="text-lg font-bold text-white">{title}</h3>
+          <h3 id={titleId} className="text-lg font-bold text-white">{title}</h3>
           <div className="text-sm text-white/60 mt-1.5 leading-relaxed">{body}</div>
           {error && <p className="text-sm mt-3" style={{ color: 'var(--lx-danger)' }}>{error}</p>}
           <div className="flex flex-col gap-2 mt-5">
             <button
+              type="button"
               onClick={onConfirm}
               disabled={loading}
               className="w-full rounded-xl py-3.5 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-70 transition-opacity"
@@ -68,6 +82,7 @@ export function ConfirmSheet({
               {loading ? (loadingLabel ?? 'Working…') : confirmLabel}
             </button>
             <button
+              type="button"
               onClick={onCancel}
               disabled={loading}
               className="w-full rounded-xl py-3 text-sm font-medium text-white/70 disabled:opacity-50"

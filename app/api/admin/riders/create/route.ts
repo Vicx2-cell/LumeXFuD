@@ -9,9 +9,11 @@ import { audit } from '@/lib/audit'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { isPhoneBlocked } from '@/lib/blocklist'
 import { z } from 'zod'
+import { EMAIL_VERIFIED_COOKIE, emailVerifiedCookieOptions, verifyEmailVerified } from '@/lib/email-verify'
 
 const createRiderInput = z.object({
   full_name:         z.string().min(1).max(100).transform((s) => s.trim()),
+  email:             z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
   phone:             z.string().min(7).max(20),
   call_phone:        z.string().min(7).max(20).optional(),
   id_verified:       z.boolean().optional(),
@@ -34,7 +36,10 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: 'Missing or invalid required fields' }, { status: 400 })
     }
-    const { full_name, phone, call_phone, id_verified, vehicle_inspected } = parsed.data
+    const { full_name, email, phone, call_phone, id_verified, vehicle_inspected } = parsed.data
+    if (!await verifyEmailVerified(req.cookies.get(EMAIL_VERIFIED_COOKIE)?.value, email, 'admin_create')) {
+      return NextResponse.json({ error: 'Verify the rider email address first.', email_unverified: true }, { status: 403 })
+    }
 
     let normalized: string
     try {
@@ -67,6 +72,8 @@ export async function POST(req: NextRequest) {
     const db = createSupabaseAdmin()
     const { data: existing } = await db.from('riders').select('id').eq('phone', normalized).maybeSingle()
     if (existing) return NextResponse.json({ error: 'Rider phone already exists' }, { status: 409 })
+    const { data: existingEmail } = await db.from('riders').select('id').ilike('email', email).maybeSingle()
+    if (existingEmail) return NextResponse.json({ error: 'Rider email already exists' }, { status: 409 })
 
     const tempPin = generateTempPin()
     const pinHash = await hashSecret(tempPin)
@@ -74,6 +81,9 @@ export async function POST(req: NextRequest) {
       full_name,
       // Legacy NOT NULL column in the live DB (from 000_sync) — mirror full_name.
       name: full_name,
+      email,
+      email_verified: true,
+      email_verified_at: new Date().toISOString(),
       phone: normalized,
       login_pin_hash: pinHash,
       pin_reset_pending: true,
@@ -110,6 +120,7 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json({ success: true, temp_pin: tempPin, full_name, phone: normalized, whatsapp_message: message })
     // Burn the phone-verified cookie — single use, so the next rider must verify afresh.
     res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
+    res.cookies.set(EMAIL_VERIFIED_COOKIE, '', emailVerifiedCookieOptions(0))
     return res
   } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })

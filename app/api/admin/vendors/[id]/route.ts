@@ -6,6 +6,8 @@ import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { nextVendorReviewState, vendorReadyForApproval } from '@/lib/onboarding'
 import { createOfficialEventCollection, getOfficialAreaSettingByScope } from '@/lib/feed/official-scheduler'
+import { renderApplicationEmail } from '@/lib/email/templates'
+import { deliverWorkflowEmail } from '@/lib/email/workflow-email'
 
 const updateInput = z.object({
   action: z.enum(['review', 'schedule_inspection', 'mark_inspected', 'approve', 'reject', 'suspend', 'unsuspend', 'activate_premium']),
@@ -131,6 +133,21 @@ export async function PATCH(
   }
 
   await db.from('vendors').update(updates).eq('id', id)
+
+  if (['review', 'schedule_inspection', 'mark_inspected', 'approve', 'reject'].includes(parsed.data.action)) {
+    const applicationStatus = parsed.data.action === 'approve' ? 'approved' : parsed.data.action === 'reject' ? 'rejected' : parsed.data.action === 'schedule_inspection' ? 'inspection_scheduled' : parsed.data.action === 'mark_inspected' ? 'shop_inspected' : 'under_review'
+    const { data: application } = await db.from('vendor_applications').update({ status: applicationStatus, rejection_reason: parsed.data.action === 'reject' ? parsed.data.reason ?? null : undefined, updated_at: now }).eq('vendor_id', id).select('id, email, owner_name, reference_number').maybeSingle()
+    if (application?.email && application.reference_number && ['approve', 'reject'].includes(parsed.data.action)) {
+      const workflow = parsed.data.action === 'approve' ? 'application_approved' : 'application_rejected'
+      const template = renderApplicationEmail({ workflow, name: application.owner_name, kind: 'vendor', reference: application.reference_number, actionUrl: `${process.env.APP_BASE_URL ?? 'https://lumexfud.com.ng'}/auth`, reason: parsed.data.reason })
+      const notice = await deliverWorkflowEmail(db, { eventKey: `${workflow}:vendor:${application.id}`, eventKind: parsed.data.action === 'approve' ? 'APPLICATION_APPROVED' : 'APPLICATION_REJECTED', workflow, recipient: application.email, initiatedBy: 'admin', ...template })
+      if (notice.status === 'sent') await db.from('vendor_applications').update({ applicant_notified_at: now }).eq('id', application.id)
+      if (parsed.data.action === 'approve') {
+        const welcome = renderApplicationEmail({ workflow: 'vendor_welcome', name: application.owner_name, kind: 'vendor', reference: application.reference_number, actionUrl: `${process.env.APP_BASE_URL ?? 'https://lumexfud.com.ng'}/auth` })
+        await deliverWorkflowEmail(db, { eventKey: `vendor-welcome:${application.id}`, eventKind: 'VENDOR_WELCOME', workflow: 'vendor_welcome', recipient: application.email, initiatedBy: 'admin', ...welcome })
+      }
+    }
+  }
 
   await audit({
     actor_id: session.phone,

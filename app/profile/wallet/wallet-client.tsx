@@ -193,7 +193,7 @@ export default function CustomerWalletClient() {
     sign === '+' ? 'text-green-400' : sign === '-' ? 'text-red-400' : 'text-white/60'
 
   return (
-    <main className="min-h-dvh pb-28" style={{ background: '#0A0A0B', color: '#fff' }}>
+    <main className="lx-page min-h-dvh pb-28 text-[var(--lx-text)]">
       {/* Toast */}
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl text-sm font-medium shadow-xl max-w-xs text-center"

@@ -3,12 +3,12 @@
 // on the server — so a tap opens immediately instead of freezing the old screen.
 export default function Loading() {
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center gap-4" style={{ background: '#0A0A0B' }}>
+    <main className="lx-page flex min-h-dvh flex-col items-center justify-center gap-4" aria-busy="true">
       <div
-        className="w-10 h-10 rounded-full animate-spin"
-        style={{ border: '3px solid rgba(245,166,35,0.25)', borderTopColor: '#F5A623' }}
+        className="lx-spinner h-10 w-10"
+        aria-hidden="true"
       />
-      <p className="text-xs tracking-widest uppercase text-white/30">Loading…</p>
-    </div>
+      <p className="text-xs uppercase tracking-widest text-[var(--lx-text-faint)]" role="status">Loading…</p>
+    </main>
   )
 }

@@ -1,8 +1,8 @@
 import crypto from 'node:crypto'
 import dynamicImport from 'next/dynamic'
 import { Suspense } from 'react'
+import { UserRound, WalletCards } from 'lucide-react'
 import { BottomNav } from '@/components/nav-bottom'
-import { BackButton } from '@/components/back-button'
 import { BrandLogo } from '@/components/brand-logo'
 import { getFeature } from '@/lib/features'
 import { getCurrentUser } from '@/lib/session'
@@ -189,42 +189,42 @@ export default async function CustomerHomePage() {
     <main className="lx-page pb-24">
       <SmoothScroll />
       <div className="lx-topbar sticky top-0 z-40 px-4 py-3">
-        <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
-            <BackButton />
             <BrandLogo size={34} rounded={10} />
             <div className="min-w-0">
-              <span className="text-xs text-white/40">{greeting} 👋</span>
-              <h1 className="text-sm sm:text-base font-semibold leading-tight lx-foodie-text truncate">What are you eating today?</h1>
+              <span className="text-xs text-[var(--lx-text-muted)]">{greeting}</span>
+              <p className="truncate text-sm font-semibold leading-tight text-[var(--lx-text)]">LumeX Fud</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {walletOn && (
               <a
                 href="/profile/wallet"
-                className="lx-card-amber-strong h-11 px-3 rounded-full flex items-center gap-1.5"
+                className="lx-card-amber-strong flex h-11 w-11 items-center justify-center rounded-full"
                 aria-label="Wallet"
               >
-                <span className="text-sm" aria-hidden="true">💰</span>
-                <span className="lx-amber text-xs font-semibold">Wallet</span>
+                <WalletCards size={18} className="lx-amber" aria-hidden="true" />
               </a>
             )}
             <NotificationBell />
             <a
               href="/profile"
-              className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--lx-border)] bg-[var(--lx-surface)] text-[var(--lx-text-muted)] hover:text-[var(--lx-text)]"
               aria-label="Profile"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+              <UserRound size={18} aria-hidden="true" />
             </a>
           </div>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-4">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <div className="mb-5 max-w-2xl">
+        <p className="lx-mono mb-2 text-[var(--color-amber)]">Restaurants near you</p>
+        <h1 className="text-2xl font-bold leading-tight text-[var(--lx-text)] sm:text-3xl">What are you eating today?</h1>
+        <p className="mt-2 text-sm leading-relaxed text-[var(--lx-text-muted)]">Browse what&apos;s open, compare prep times, and order from trusted campus kitchens.</p>
+      </div>
       <Suspense fallback={<SkeletonGrid />}>
         <HomepageClient
           initialVendors={vendors as VendorData[]}
@@ -243,7 +243,7 @@ export default async function CustomerHomePage() {
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-1 gap-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {[1, 2, 3].map((i) => <VendorCardSkeleton key={i} />)}
     </div>
   )

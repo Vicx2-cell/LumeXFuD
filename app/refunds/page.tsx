@@ -18,7 +18,7 @@ export default async function RefundsPage() {
   const door = pricing?.doorFee ?? 0
 
   return (
-    <main style={{ background: '#0A0A0B' }}>
+    <main className="lx-page">
       <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 3rem)' }}>
         <h1 className="text-2xl font-bold mb-2 text-white">Refund &amp; Cancellation Policy</h1>
         <p className="text-sm text-white/40 mb-8">Last updated: June 2026</p>

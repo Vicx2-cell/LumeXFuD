@@ -20,6 +20,8 @@
   --lx-border: rgba(255,255,255,0.08);
   --lx-border-strong: rgba(255,255,255,0.14);
   --lx-shadow: 0 8px 32px rgba(0,0,0,0.40);
+  --lx-nav-bg: rgba(10,10,11,0.95);
+  --lx-focus-offset: #0A0A0B;
 
   /* Display face (set on <html> by next/font in layout.tsx). The literal stack
      is the fallback for the brief window before the woff2 swaps in. */
@@ -82,6 +84,8 @@ html, body {
   --lx-border: rgba(20,18,14,0.10);
   --lx-border-strong: rgba(20,18,14,0.16);
   --lx-shadow: 0 8px 28px rgba(60,50,30,0.10);
+  --lx-nav-bg: rgba(255,255,255,0.94);
+  --lx-focus-offset: #F6F4EF;
 }
 
 /* Block the first-paint flash: ThemeProvider writes the saved choice before
@@ -325,10 +329,13 @@ h1, h2, h3, h4, .lx-display {
   border: 1px solid rgba(255,255,255,0.04);
 }
 .glass-thin {
-  background: rgba(255,255,255,0.05);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent 48%),
+    rgba(255,255,255,0.045);
   backdrop-filter: blur(14px) saturate(180%);
   -webkit-backdrop-filter: blur(14px) saturate(180%);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.055), 0 12px 32px -22px rgba(0,0,0,0.8);
 }
 .glass {
   background: rgba(255,255,255,0.07);
@@ -499,6 +506,7 @@ a:active,
 .lx-topbar {
   background: rgba(10,10,11,0.85);
   border-bottom: 1px solid var(--color-border);
+  box-shadow: 0 10px 28px -24px rgba(0,0,0,0.9);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
 }
@@ -509,8 +517,13 @@ a:active,
   border: 1px solid rgba(255,255,255,0.10);
   color: #fff;
   border-radius: 12px;
+  transition: background var(--lx-dur-fast) ease, border-color var(--lx-dur-fast) ease, box-shadow var(--lx-dur-fast) ease;
 }
 .lx-field::placeholder { color: rgba(255,255,255,0.35); }
+.lx-field:hover { background: rgba(255,255,255,0.065); border-color: rgba(255,255,255,0.16); }
+.lx-field:focus { background: rgba(255,255,255,0.07); border-color: rgba(245,166,35,0.55); }
+:root[data-theme="light"] .lx-field:hover { background: rgba(20,18,14,0.065); border-color: rgba(20,18,14,0.18); }
+:root[data-theme="light"] .lx-field:focus { background: rgba(20,18,14,0.045); border-color: rgba(245,166,35,0.65); }
 
 /* Segmented pill / toggle button (the 40× active?:inactive conditional).
    Drive with data-active="true|false" and an optional data-variant. */
@@ -525,6 +538,9 @@ a:active,
 }
 .lx-pill[data-active="true"] {
   background: var(--color-amber); color: #0A0A0B; border-color: var(--color-amber);
+}
+@media (hover: hover) {
+  .lx-pill:not([data-active="true"]):hover { background: rgba(255,255,255,0.1); color: var(--lx-text); border-color: var(--lx-border-strong); }
 }
 .lx-pill[data-active="true"][data-variant="safe"]   { background: var(--lx-green); border-color: var(--lx-green); }
 .lx-pill[data-active="true"][data-variant="danger"]  { background: var(--lx-red);   border-color: var(--lx-red); }
@@ -670,7 +686,7 @@ a:active,
    ============================================================ */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-amber);
+  box-shadow: 0 0 0 2px var(--lx-focus-offset), 0 0 0 4px var(--color-amber);
   border-radius: 12px;
 }
 
@@ -1353,7 +1369,7 @@ html.lenis, html.lenis body { height: auto; }
 }
 .lx-ph-title {
   font-family: var(--font-display); font-weight: 700; letter-spacing: -0.03em;
-  font-size: clamp(1.7rem, 5vw, 2.3rem); line-height: 1.04; color: #fafafa;
+  font-size: clamp(1.7rem, 5vw, 2.3rem); line-height: 1.04; color: var(--lx-text);
 }
 .lx-ph-sub { font-size: 0.9rem; color: var(--lx-text-muted); margin-top: 0.4rem; max-width: 40rem; }
 
@@ -1380,7 +1396,7 @@ a.lx-statcard:hover { border-color: rgba(245,166,35,0.3); background: rgba(255,2
 }
 .lx-kpi-value {
   font-family: var(--font-display); font-weight: 600; line-height: 1; letter-spacing: -0.02em;
-  font-size: clamp(1.85rem, 5vw, 2.4rem); color: #fafafa;
+  font-size: clamp(1.85rem, 5vw, 2.4rem); color: var(--lx-text);
   font-variant-numeric: tabular-nums;
 }
 .lx-kpi-sub { font-size: 0.74rem; color: var(--lx-text-faint); margin-top: 0.5rem; line-height: 1.3; }

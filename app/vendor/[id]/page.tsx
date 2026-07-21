@@ -129,7 +129,7 @@ export default async function VendorPage({
 
   return (
     <main className="lx-page feed-dark pb-32">
-      <div className="mx-auto max-w-3xl px-4 pt-4">
+      <div className="mx-auto max-w-5xl px-4 pt-4 sm:px-6 lg:px-8">
         <VendorProfileHeader
           vendorId={vendor.id}
           shopName={vendor.shop_name}

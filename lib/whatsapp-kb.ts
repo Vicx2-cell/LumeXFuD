@@ -1,4 +1,5 @@
 import 'server-only'
+import { EMAIL_IDENTITIES } from './email/identities'
 
 // ─── LumeX Fud — verified knowledge base for the WhatsApp AI assistant ───────
 // The bot's free-text answers are grounded ONLY in the facts below. The system
@@ -49,7 +50,8 @@ LumeX Fud is a campus food-delivery platform for Abia State University (ABSU), U
 
 # Support
 - For anything account-specific, an order problem, a refund, or anything not covered above, a human team member helps.
-- Official support email: hello@lumexfud.com.ng`
+- General enquiries: ${EMAIL_IDENTITIES.hello.address}
+- Order, payment, delivery, refund and account support: ${EMAIL_IDENTITIES.support.address}`
 
 /**
  * Build the system prompt. `audience` tailors the framing; `liveFees` is a short

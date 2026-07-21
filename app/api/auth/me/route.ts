@@ -4,6 +4,7 @@ import { sessionCookieName } from '@/lib/session-cookie'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { normalizeEmail } from '@/lib/email'
 import { sendWelcomeEmail, shouldSendWelcomeForEmailChange } from '@/lib/transactional-email'
+import { EMAIL_VERIFIED_COOKIE, emailVerifiedCookieOptions, verifyEmailVerified } from '@/lib/email-verify'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,7 @@ async function getUserDetails(phone: string, role: SessionRole) {
   if (role === 'vendor') {
     const { data } = await db
       .from('vendors')
-      .select('id, phone, slug, shop_name, owner_name, status, is_active')
+      .select('id, phone, email, slug, shop_name, owner_name, status, is_active')
       .eq('phone', phone)
       .is('deleted_at', null)
       .single()
@@ -31,7 +32,7 @@ async function getUserDetails(phone: string, role: SessionRole) {
   if (role === 'rider') {
     const { data } = await db
       .from('riders')
-      .select('id, phone, full_name, status, is_active')
+      .select('id, phone, email, full_name, status, is_active')
       .eq('phone', phone)
       .is('deleted_at', null)
       .single()
@@ -40,7 +41,7 @@ async function getUserDetails(phone: string, role: SessionRole) {
   if (role === 'admin' || role === 'super_admin') {
     const { data } = await db
       .from('admins')
-      .select('id, phone, name, role')
+      .select('id, phone, email, name, role')
       .eq('phone', phone)
       .single()
     return data
@@ -116,13 +117,19 @@ export async function PATCH(req: NextRequest) {
     .maybeSingle()
   if (!existing) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  const update: Record<string, string | null> = {}
+  const update: Record<string, string | boolean | null> = {}
   if (typeof body.name === 'string') update.name = body.name.trim().slice(0, 80) || null
   if (typeof body.hostel === 'string') update.hostel = body.hostel.trim().slice(0, 120) || null
   if (typeof body.room_number === 'string') update.room_number = body.room_number.trim().slice(0, 40) || null
   if (body.email !== undefined) {
     const email = normalizeEmail(body.email)
     if (!email) return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 })
+    if (email !== normalizeEmail(existing.email)) {
+      const verified = await verifyEmailVerified(req.cookies.get(EMAIL_VERIFIED_COOKIE)?.value, email, 'account_change')
+      if (!verified) return NextResponse.json({ error: 'Verify the new email address first.', email_unverified: true }, { status: 403 })
+      update.email_verified = true
+      update.email_verified_at = new Date().toISOString()
+    }
     update.email = email
   }
 
@@ -141,15 +148,17 @@ export async function PATCH(req: NextRequest) {
 
   if (shouldSendWelcomeForEmailChange({
     previousEmail: existing.email,
-    nextEmail: update.email,
+    nextEmail: typeof update.email === 'string' ? update.email : undefined,
     welcomeEmailSentAt: existing.welcome_email_sent_at,
   })) {
     await sendWelcomeEmail(db, {
       customerId: existing.id,
-      email: update.email,
-      name: update.name ?? existing.name,
+      email: typeof update.email === 'string' ? update.email : undefined,
+      name: typeof update.name === 'string' ? update.name : existing.name,
     })
   }
 
-  return NextResponse.json({ ok: true })
+  const response = NextResponse.json({ ok: true })
+  response.cookies.set(EMAIL_VERIFIED_COOKIE, '', emailVerifiedCookieOptions(0))
+  return response
 }

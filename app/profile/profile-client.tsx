@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { ChevronRight, MapPin, MessageCircle, WalletCards } from 'lucide-react'
 import { ConfirmSheet } from '@/components/ui/confirm-sheet'
 import { BackButton } from '@/components/back-button'
 import { FaceIdSetup } from '@/components/face-id-setup'
@@ -10,6 +11,7 @@ import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { RewardsCard } from '@/components/rewards-card'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useFeatures } from '@/lib/use-features'
+import EmailVerifyInline from '@/components/auth/EmailVerifyInline'
 import { CountUp } from '@/components/fx'
 import type { CustomerProfile, StreakData, BadgeItem } from './page'
 
@@ -75,11 +77,13 @@ export function ProfileClient({
   const features = useFeatures()
   const [name, setName] = useState(profile?.name ?? '')
   const [email, setEmail] = useState(profile?.email ?? '')
+  const [emailVerified, setEmailVerified] = useState(true)
   const [hostel, setHostel] = useState(profile?.hostel ?? '')
   const [room, setRoom] = useState(profile?.room_number ?? '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const emailChanged = email.trim().toLowerCase() !== (profile?.email ?? '').trim().toLowerCase()
   const [openBadge, setOpenBadge] = useState<string | null>(null)
   // Lumi's warm, AI-generated explanation of the tapped badge (cached server-side).
   // One result per badge; text === null means "fetched, but no Lumi line" (AI off
@@ -219,6 +223,10 @@ export function ProfileClient({
   }
 
   async function handleSave() {
+    if (emailChanged && !emailVerified) {
+      setSaveError('Verify the new email address before saving.')
+      return
+    }
     setSaving(true); setSaveError('')
     try {
       const res = await fetch('/api/auth/me', {
@@ -289,13 +297,16 @@ export function ProfileClient({
   return (
     <>
       <div className="sticky top-0 z-40 glass-thin px-4 py-3" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
-        <div className="max-w-lg mx-auto flex items-center gap-3">
+        <div className="mx-auto flex max-w-3xl items-center gap-3">
           <BackButton />
-          <h1 className="font-semibold">Profile</h1>
+          <div>
+            <h1 className="font-semibold">Profile</h1>
+            <p className="text-xs text-[var(--lx-text-muted)]">Account, preferences, and security</p>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-5 space-y-5 lx-enter">
+      <div className="mx-auto max-w-3xl space-y-5 px-4 py-6 sm:px-6 lx-enter">
         {/* Profile picture */}
         <div className="flex flex-col items-center pt-1">
           <ProfileImageUpload slot="avatar" shape="circle" current={profile?.avatar_url ?? null} deletable />
@@ -304,34 +315,32 @@ export function ProfileClient({
         </div>
 
         {/* LumeX Wallet — primary entry point. Hidden when the customer wallet is off. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {features.customer_wallet_enabled === true && (
         <Link
           href="/profile/wallet"
           className="lx-card-amber lx-tap flex items-center gap-3 rounded-2xl p-4"
         >
-          <span className="text-2xl">💰</span>
+          <span className="lx-icon-badge flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><WalletCards size={20} aria-hidden="true" /></span>
           <div className="flex-1 min-w-0">
             <p className="lx-amber font-semibold">LumeX Wallet</p>
             <p className="text-xs text-white/50">Load money, get 1% bonus, checkout faster</p>
           </div>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
+          <ChevronRight size={18} className="text-[var(--lx-text-faint)]" aria-hidden="true" />
         </Link>
         )}
         <Link
           href="/profile/locations"
           className="lx-tap flex items-center gap-3 rounded-2xl p-4 glass-thin"
         >
-          <span className="text-2xl">🛰️</span>
+          <span className="lx-icon-badge flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><MapPin size={20} aria-hidden="true" /></span>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-white">Locations</p>
             <p className="text-xs text-white/50">Capture your current pin and keep it ready for checkout</p>
           </div>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
+          <ChevronRight size={18} className="text-[var(--lx-text-faint)]" aria-hidden="true" />
         </Link>
+        </div>
 
         {/* Appearance — light / dark / auto (customer-facing only) */}
         <div className="glass-thin rounded-2xl p-4 space-y-3">
@@ -453,13 +462,14 @@ export function ProfileClient({
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); setEmailVerified(false) }}
               placeholder="you@example.com"
               autoComplete="email"
               autoCapitalize="none"
               className="lx-field w-full px-4 py-3 text-sm outline-none"
             />
             {!profile?.email && <p className="mt-1.5 text-xs text-white/35">Add an email for order updates and a welcome note.</p>}
+            {emailChanged && <div className="mt-3"><EmailVerifyInline email={email} purpose="account_change" verified={emailVerified} onVerified={() => setEmailVerified(true)} /></div>}
           </div>
           <div>
             <label className="block text-xs text-white/50 mb-1.5">Hostel / Hall</label>
@@ -586,7 +596,7 @@ export function ProfileClient({
               className="flex items-center gap-3 rounded-xl p-3 transition-colors"
               style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)' }}
             >
-              <span className="text-xl" aria-hidden="true">💬</span>
+              <span className="lx-icon-badge flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"><MessageCircle size={18} aria-hidden="true" /></span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-white">Chat on WhatsApp</p>
                 <p className="text-xs text-white/50 tabular-nums">{supportPhone}</p>

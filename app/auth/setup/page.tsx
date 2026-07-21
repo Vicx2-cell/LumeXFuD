@@ -87,7 +87,7 @@ export default function SetupPage() {
 
   if (recoveryCode) {
     return (
-      <div className="min-h-dvh flex items-center justify-center px-5 py-12" style={{ background: '#0A0A0B' }}>
+      <div className="lx-page min-h-dvh flex items-center justify-center px-5 py-12">
         <div className="w-full max-w-lg space-y-6">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
             <h1 className="text-2xl font-semibold text-white">{opts.optional ? 'Login PIN added' : 'Setup complete'}</h1>
@@ -112,7 +112,7 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="min-h-dvh flex items-start sm:items-center justify-center px-5 py-10 sm:py-12" style={{ background: '#0A0A0B', paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
+    <div className="lx-page min-h-dvh flex items-start sm:items-center justify-center px-5 py-10 sm:py-12" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
       <div className="w-full max-w-lg space-y-6">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <h1 className="text-2xl font-semibold text-white">{opts.optional ? 'Add a login PIN' : 'Set your permanent PIN'}</h1>

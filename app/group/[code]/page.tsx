@@ -362,7 +362,7 @@ export default function GroupOrderPage() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh px-5 py-10" style={{ background: '#0A0A0B' }}>
+    <div className="lx-page min-h-dvh px-5 py-10">
       <div className="mx-auto max-w-md">{children}</div>
     </div>
   )

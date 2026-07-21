@@ -3,6 +3,7 @@ import { loadCampusPartnerSummary } from '@/lib/campus-partners'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { CampusPartnersClient } from './campus-partners-client'
+import { EMAIL_IDENTITIES } from '@/lib/email/identities'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,7 @@ export default async function CampusPartnersPage() {
           badge="Performance"
           back={false}
         />
+        <p className="text-sm text-white/55">Institution, restaurant or strategic partnership enquiries: <a className="text-[#F5A623]" href={`mailto:${EMAIL_IDENTITIES.partners.address}`}>{EMAIL_IDENTITIES.partners.address}</a></p>
         <CampusPartnersClient summary={summary} />
       </div>
     </main>

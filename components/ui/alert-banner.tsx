@@ -50,7 +50,7 @@ export function AlertBanner({ open, title, message, onDismiss, autoHideMs = 6500
         <button
           type="button"
           onClick={onDismiss}
-          className="shrink-0 text-red-200/70 hover:text-red-100 transition-colors"
+          className="-m-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-red-200/70 hover:bg-white/5 hover:text-red-100 transition-colors"
           aria-label="Dismiss alert"
         >
           <X size={16} />

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getFeature } from '@/lib/features'
@@ -7,6 +8,9 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { verifyPhoneVerified, PHONE_VERIFIED_COOKIE, verifiedCookieOptions } from '@/lib/phone-verify'
 import { audit } from '@/lib/audit'
 import { loadAdminRecipients, notifyFeedRecipients } from '@/lib/feed/notifications'
+import { renderApplicationEmail } from '@/lib/email/templates'
+import { deliverWorkflowEmail } from '@/lib/email/workflow-email'
+import { EMAIL_VERIFIED_COOKIE, emailVerifiedCookieOptions, verifyEmailVerified } from '@/lib/email-verify'
 
 export const runtime = 'nodejs'
 
@@ -15,6 +19,7 @@ const businessRegistrationStatus = z.enum(['cac_registered', 'cac_in_progress', 
 const applicationInput = z.object({
   kind: z.enum(['vendor', 'rider']),
   phone: z.string().trim().min(7).max(20),
+  email: z.string().trim().email().max(254),
   name: z.string().trim().min(2).max(100).optional(),
   owner_name: z.string().trim().min(2).max(100).optional(),
   full_name: z.string().trim().min(2).max(100).optional(),
@@ -117,7 +122,7 @@ export async function POST(req: NextRequest) {
   }
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
-  const rl = await rateLimitGeneric(`partner-applications:${ip}`, 10, 3600)
+  const rl = await rateLimitGeneric(`partner-applications:${ip}`, 10, 3600, true)
   if (!rl.success) {
     return NextResponse.json({ error: 'Too many application attempts. Please try again later.' }, { status: 429 })
   }
@@ -151,12 +156,20 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date().toISOString()
+  const reference = `LXF-${parsed.data.kind === 'vendor' ? 'VND' : 'RDR'}-${now.slice(0, 10).replaceAll('-', '')}-${randomUUID().slice(0, 8).toUpperCase()}`
+  const applicantEmail = parsed.data.email.toLowerCase()
+  const emailVerified = await verifyEmailVerified(req.cookies.get(EMAIL_VERIFIED_COOKIE)?.value, applicantEmail, 'application')
+  if (!emailVerified) {
+    return NextResponse.json({ error: 'Verify this email address before submitting the application.' }, { status: 403 })
+  }
 
   if (parsed.data.kind === 'vendor') {
     const { data: existingVendor } = await db.from('vendors').select('id').eq('phone', phone).maybeSingle()
     if (existingVendor) {
       return NextResponse.json({ error: 'A vendor already exists with this number.' }, { status: 409 })
     }
+    const { data: existingVendorEmail } = await db.from('vendors').select('id').ilike('email', applicantEmail).maybeSingle()
+    if (existingVendorEmail) return NextResponse.json({ error: 'A vendor already exists with this email.' }, { status: 409 })
 
     const owner_name = parsed.data.owner_name ?? parsed.data.name ?? ''
     const business_name = parsed.data.business_name ?? ''
@@ -179,6 +192,10 @@ export async function POST(req: NextRequest) {
       .from('vendor_applications')
       .insert({
         whatsapp_number: phone,
+        email: applicantEmail,
+        email_verified: true,
+        email_verified_at: now,
+        reference_number: reference,
         whatsapp_verified: verificationRequired,
         business_name,
         owner_name,
@@ -196,6 +213,7 @@ export async function POST(req: NextRequest) {
             : 'Vendor says CAC is not yet registered.',
         review_notes: reviewFlags.length > 0 ? reviewFlags.join(' ') : null,
         status: 'application_submitted',
+        escalation_due_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       })
       .select('id')
       .single()
@@ -208,6 +226,9 @@ export async function POST(req: NextRequest) {
       .from('vendors')
       .insert({
         phone,
+        email: applicantEmail,
+        email_verified: true,
+        email_verified_at: now,
         shop_name: business_name,
         business_name,
         owner_name,
@@ -253,14 +274,22 @@ export async function POST(req: NextRequest) {
       tag: `vendor-application-${application.id}`,
     })
 
+    const template = renderApplicationEmail({ workflow: 'application_received', name: owner_name, kind: 'vendor', reference, actionUrl: `${process.env.APP_BASE_URL ?? 'https://lumexfud.com.ng'}/apply/vendor` })
+    const delivery = await deliverWorkflowEmail(db, { eventKey: `application-received:vendor:${application.id}`, eventKind: 'APPLICATION_RECEIVED', workflow: 'application_received', recipient: applicantEmail, ...template })
+    const acknowledgementStatus = delivery.status === 'sent' ? 'sent' : delivery.status === 'failed' ? 'failed' : 'skipped'
+    await db.from('vendor_applications').update({ acknowledgement_status: acknowledgementStatus, acknowledgement_sent_at: delivery.status === 'sent' ? now : null, updated_at: now }).eq('id', application.id)
+
     const res = NextResponse.json({
       success: true,
       kind: 'vendor',
       application_id: application.id,
+      reference,
+      acknowledgement_status: acknowledgementStatus,
       vendor_id: vendor.id,
       message: 'Application Submitted. Thank you for applying to become a LumeX Fud vendor. Our team will review your application within 3-7 business days. We will contact you through your verified WhatsApp number if we need more information.',
     })
     res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
+    res.cookies.set(EMAIL_VERIFIED_COOKIE, '', emailVerifiedCookieOptions(0))
     return res
   }
 
@@ -268,10 +297,16 @@ export async function POST(req: NextRequest) {
   if (existingRider) {
     return NextResponse.json({ error: 'A rider already exists with this number.' }, { status: 409 })
   }
+  const { data: existingRiderEmail } = await db.from('riders').select('id').ilike('email', applicantEmail).maybeSingle()
+  if (existingRiderEmail) return NextResponse.json({ error: 'A rider already exists with this email.' }, { status: 409 })
 
   const full_name = parsed.data.full_name ?? parsed.data.name ?? ''
   const riderApplication = {
     whatsapp_number: phone,
+    email: applicantEmail,
+    email_verified: true,
+    email_verified_at: now,
+    reference_number: reference,
     whatsapp_verified: verificationRequired,
     full_name,
     date_of_birth: parsed.data.date_of_birth ?? null,
@@ -284,6 +319,7 @@ export async function POST(req: NextRequest) {
     vehicle_photo_url: parsed.data.vehicle_photo_url ?? null,
     plate_number: parsed.data.plate_number ?? null,
     status: 'application_submitted',
+    escalation_due_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
   }
 
   const { data: application, error: appError } = await db
@@ -300,6 +336,9 @@ export async function POST(req: NextRequest) {
     .from('riders')
     .insert({
       phone,
+      email: applicantEmail,
+      email_verified: true,
+      email_verified_at: now,
       full_name,
       whatsapp_verified: verificationRequired,
       nin: parsed.data.nin ?? null,
@@ -334,13 +373,21 @@ export async function POST(req: NextRequest) {
     ip_address: ip,
   })
 
+  const template = renderApplicationEmail({ workflow: 'application_received', name: full_name, kind: 'rider', reference, actionUrl: `${process.env.APP_BASE_URL ?? 'https://lumexfud.com.ng'}/apply/rider` })
+  const delivery = await deliverWorkflowEmail(db, { eventKey: `application-received:rider:${application.id}`, eventKind: 'APPLICATION_RECEIVED', workflow: 'application_received', recipient: applicantEmail, ...template })
+  const acknowledgementStatus = delivery.status === 'sent' ? 'sent' : delivery.status === 'failed' ? 'failed' : 'skipped'
+  await db.from('rider_applications').update({ acknowledgement_status: acknowledgementStatus, acknowledgement_sent_at: delivery.status === 'sent' ? now : null, updated_at: now }).eq('id', application.id)
+
   const res = NextResponse.json({
     success: true,
     kind: 'rider',
     application_id: application.id,
+    reference,
+    acknowledgement_status: acknowledgementStatus,
     rider_id: rider.id,
     message: 'Application Submitted. Thank you for applying to become a LumeX Fud rider. Our team will review your application within 3-7 business days. We will contact you through your verified WhatsApp number if we need more information.',
   })
   res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
+  res.cookies.set(EMAIL_VERIFIED_COOKIE, '', emailVerifiedCookieOptions(0))
   return res
 }

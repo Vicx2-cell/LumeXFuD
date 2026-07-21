@@ -269,8 +269,8 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
 
       {/* Sticky header */}
       <div className="sticky top-0 z-40 glass-thin" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => router.back()} className="w-9 h-9 flex items-center justify-center rounded-full transition-transform active:scale-90" style={{ background: 'rgba(255,255,255,0.08)' }} aria-label="Go back">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <button type="button" onClick={() => router.back()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/70 transition-transform hover:bg-white/10 hover:text-white active:scale-90" aria-label="Go back">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
           <div className="flex-1 min-w-0">
@@ -302,7 +302,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
         {/* Logged-out visitors (e.g. arrived via the vendor's share link): one tap
             to create an account, and they come right back to this page. */}
         {loggedOut && (
-          <div className="lx-card-amber mx-4 mb-2 rounded-xl px-4 py-3">
+          <div className="lx-card-amber mx-auto mb-2 max-w-5xl rounded-xl px-4 py-3">
             <p className="text-sm text-white/85 mb-2">Order to your hostel — you’ll come right back to this page.</p>
             <div className="flex gap-2">
               <a href={`/auth/register?next=${vendorNext}`} className="lx-btn-amber flex-1 text-center py-2 rounded-lg text-sm">Create account</a>
@@ -311,7 +311,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
           </div>
         )}
 
-        <div className="flex gap-2 overflow-x-auto px-4 pb-3 scrollbar-none">
+        <div className="mx-auto flex max-w-5xl gap-2 overflow-x-auto px-4 pb-3 scrollbar-none sm:px-6 lg:px-8">
           {CATEGORIES.map((cat) => (
             <Pill key={cat} active={activeCategory === cat} onClick={() => setActiveCategory(cat)} className="shrink-0 px-3 py-1.5 text-xs">
               {cat}
@@ -321,19 +321,27 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       </div>
 
       {/* Find this store — address, landmark, storefront photo + one-tap directions */}
-      <div className="max-w-lg mx-auto px-4 pt-3">
+      <div className="mx-auto max-w-5xl px-4 pt-4 sm:px-6 lg:px-8">
         <FindStoreCard vendor={vendor} shopName={vendor.shop_name} />
       </div>
 
       {menu.length > 10 && (
-        <div className="max-w-lg mx-auto px-4 py-3">
+        <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 lg:px-8">
           <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search menu..." aria-label="Search menu"
             className="lx-field w-full px-4 py-2.5 text-sm outline-none" />
         </div>
       )}
 
+      <div className="mx-auto flex max-w-5xl items-end justify-between gap-4 px-4 pb-1 pt-6 sm:px-6 lg:px-8">
+        <div>
+          <p className="lx-mono text-[var(--color-amber)]">Order from the kitchen</p>
+          <h2 className="mt-1 text-xl font-bold text-white">Menu</h2>
+        </div>
+        <span className="rounded-full border border-white/8 bg-white/[0.05] px-3 py-1 text-xs text-white/50 tabular-nums">{filtered.length} items</span>
+      </div>
+
       {/* Menu items */}
-      <div className="mx-auto grid max-w-lg grid-cols-2 gap-3 px-4 py-3 lx-stagger">
+      <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 px-4 py-4 sm:px-6 md:grid-cols-3 lg:grid-cols-4 lg:px-8 lx-stagger">
         {filtered.length === 0 ? (
           <div className="col-span-full px-6 py-16 text-center">
             <div className="lx-icon-badge w-16 h-16 rounded-2xl mb-4">
@@ -347,7 +355,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
             const qty = qtyForItem(item.id)
             const soldOut = !item.is_available || (item.daily_limit !== null && item.sold_today >= item.daily_limit)
             return (
-              <div key={item.id} className="glass-thin relative flex min-w-0 flex-col overflow-hidden transition-transform hover:-translate-y-0.5" style={{ opacity: soldOut ? 0.5 : 1 }}>
+              <div key={item.id} className="glass-thin relative flex min-w-0 flex-col overflow-hidden transition-transform hover:-translate-y-1 hover:border-white/15" style={{ opacity: soldOut ? 0.5 : 1 }}>
                 <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-white/5">
                   {item.image_url
                     ? <Image src={item.image_url} alt={item.name} fill className="object-cover" sizes="(max-width: 512px) 50vw, 240px" placeholder="blur" blurDataURL={FOOD_BLUR} />
@@ -382,7 +390,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       </div>
 
       {/* Reviews */}
-      <div className="max-w-lg mx-auto px-4 pt-6 pb-2">
+      <div className="mx-auto max-w-5xl px-4 pb-2 pt-8 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold">Reviews</h2>
           {vendor.total_ratings > 0 && (
@@ -425,7 +433,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       {/* Sticky cart bar — clears the bottom nav + the device safe-area inset */}
       {totalItems > 0 && cart.vendor_id === vendor.id && (
         <div className="fixed left-0 right-0 z-40 px-4 lx-enter" style={{ bottom: 'calc(72px + env(safe-area-inset-bottom))' }}>
-          <div className="max-w-lg mx-auto">
+          <div className="mx-auto max-w-5xl">
             <button onClick={() => {
               try {
                 const id = campaignId || sessionStorage.getItem('lx_campaign_id') || ''

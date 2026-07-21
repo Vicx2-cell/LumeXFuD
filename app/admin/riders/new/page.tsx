@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFeatures } from '@/lib/use-features'
 import PhoneVerifyInline from '@/components/auth/PhoneVerifyInline'
+import EmailVerifyInline from '@/components/auth/EmailVerifyInline'
 import { PageHeader } from '@/components/ui/page-header'
 import { GlassSheen } from '@/components/fx'
 
@@ -20,22 +21,24 @@ export default function NewRiderPage() {
   // while OTP delivery is down. Defaults to required until flags load.
   const features = useFeatures()
   const verificationRequired = features.phone_verification !== false
-  const [form, setForm] = useState({ full_name: '', phone: '+234', call_phone: '' })
+  const [form, setForm] = useState({ full_name: '', email: '', phone: '+234', call_phone: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState<SuccessData | null>(null)
   const [copied, setCopied] = useState(false)
   const [phoneVerified, setPhoneVerified] = useState(false)
+  const [emailVerified, setEmailVerified] = useState(false)
 
   const set = (k: keyof typeof form, v: string) => {
     setForm((f) => ({ ...f, [k]: v }))
     setError('')
     // The verified cookie is bound to a specific number — changing it invalidates it.
     if (k === 'phone') setPhoneVerified(false)
+    if (k === 'email') setEmailVerified(false)
   }
 
   const handleSubmit = async () => {
-    if (!form.full_name.trim() || form.phone.length < 13) {
+    if (!form.full_name.trim() || !form.email.trim() || form.phone.length < 13) {
       setError('Please fill in all required fields.')
       return
     }
@@ -43,6 +46,7 @@ export default function NewRiderPage() {
       setError('Verify the rider’s phone number first.')
       return
     }
+    if (!emailVerified) { setError('Verify the rider email address first.'); return }
     setLoading(true)
     try {
       const res = await fetch('/api/admin/riders/create', {
@@ -153,6 +157,12 @@ export default function NewRiderPage() {
           </label>
 
           <label className="block">
+            <span className="lx-mono mb-2 block">Email address</span>
+            <input value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="rider@example.com" type="email" autoComplete="email" required className={inputCls} />
+          </label>
+          <EmailVerifyInline email={form.email} purpose="admin_create" verified={emailVerified} onVerified={() => setEmailVerified(true)} />
+
+          <label className="block">
             <span className="lx-mono mb-2 block">WhatsApp number (+234) — for messages &amp; login</span>
             <input
               value={form.phone}
@@ -193,7 +203,7 @@ export default function NewRiderPage() {
 
           <button
             onClick={handleSubmit}
-            disabled={loading || (verificationRequired && !phoneVerified)}
+            disabled={loading || (verificationRequired && !phoneVerified) || !emailVerified}
             className="lx-btn-amber w-full py-4 text-sm disabled:opacity-50"
             style={{ minHeight: 52 }}
           >

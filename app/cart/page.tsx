@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import { ArrowLeft, Timer, Users } from 'lucide-react'
 import { useCart } from '@/components/cart-context'
 import { BottomNav } from '@/components/nav-bottom'
 import { formatPrice } from '@/lib/money'
@@ -25,7 +26,7 @@ type DeliveryEstimate = {
 
 function CartSection({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
-    <section className="lx-surface p-4 space-y-4">
+    <section className="lx-surface space-y-4 p-4 sm:p-5">
       <div>
         <h2 className="text-sm font-semibold text-white/85">{title}</h2>
         {subtitle && <p className="mt-1 text-xs text-white/45">{subtitle}</p>}
@@ -378,23 +379,21 @@ export default function CartPage() {
     <main className="lx-page pb-32 overflow-hidden">
       {/* Header */}
       <div className="sticky top-0 z-40 glass-thin px-4 py-3" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
-        <div className="max-w-lg mx-auto flex items-center gap-3">
-          <button onClick={() => router.back()} className="w-9 h-9 rounded-full flex items-center justify-center transition-transform active:scale-90" style={{ background: 'rgba(255,255,255,0.08)' }} aria-label="Go back">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
+        <div className="mx-auto flex max-w-3xl items-center gap-3">
+          <button type="button" onClick={() => router.back()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--lx-border)] bg-[var(--lx-surface)] text-[var(--lx-text-muted)] transition-transform hover:text-[var(--lx-text)] active:scale-90" aria-label="Go back">
+            <ArrowLeft size={18} aria-hidden="true" />
           </button>
           <div>
             <h1 className="font-semibold">Your cart</h1>
-            <p className="text-xs text-white/40">{cart.vendor_name}</p>
+            <p className="text-xs text-[var(--lx-text-muted)]">Review items, delivery, and payment</p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-5 lx-enter">
+      <div className="mx-auto max-w-3xl space-y-5 px-4 py-6 sm:px-6 lx-enter">
         {/* Estimated time — longest dish + delivery window */}
         <div className="lx-card-amber rounded-2xl p-3 flex items-center gap-2.5">
-          <span className="text-lg" aria-hidden="true">⏱️</span>
+          <Timer size={18} className="lx-amber shrink-0" aria-hidden="true" />
           <p className="text-sm">
             <span className="text-white/55">Estimated </span>
             <span className="lx-amber font-semibold">{prepRangeLabel(prepMinutes)}</span>
@@ -410,7 +409,7 @@ export default function CartPage() {
             disabled={groupBusy}
             className="lx-card-amber lx-amber w-full rounded-2xl py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <span aria-hidden="true">👥</span>
+            <Users size={17} aria-hidden="true" />
             {groupBusy ? 'Starting…' : 'Order with friends (split one delivery)'}
           </button>
         )}
@@ -849,7 +848,7 @@ export default function CartPage() {
       {/* Fixed pay button — sits clear of the bottom nav (64px) AND the device
           safe-area inset so the home indicator never clips it. */}
       <div className="fixed left-0 right-0 z-40 px-4 pb-2" style={{ bottom: 'calc(64px + env(safe-area-inset-bottom))' }}>
-        <div className="max-w-lg mx-auto">
+        <div className="mx-auto max-w-3xl">
           <button
             onClick={handleCheckout}
             disabled={loading || (isPickup && !pickupAgree) || (!isPickup && !orderAgree)}

@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import PhoneVerifyInline from '@/components/auth/PhoneVerifyInline'
+import EmailVerifyInline from '@/components/auth/EmailVerifyInline'
+import { EMAIL_IDENTITIES } from '@/lib/email/identities'
 
 type ApplicationKind = 'vendor' | 'rider'
 type MerchantCategory = 'restaurant' | 'supermarket' | 'pharmacy'
@@ -39,6 +41,7 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
   const isVendor = kind === 'vendor'
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('+234')
+  const [email, setEmail] = useState('')
   const [area, setArea] = useState('')
   const [businessName, setBusinessName] = useState('')
   const [merchantCategory, setMerchantCategory] = useState<MerchantCategory | ''>('')
@@ -57,8 +60,11 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
   const [dateOfBirth, setDateOfBirth] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [reference, setReference] = useState('')
+  const [acknowledgementStatus, setAcknowledgementStatus] = useState('')
   const [loading, setLoading] = useState(false)
   const [phoneVerified, setPhoneVerified] = useState(false)
+  const [emailVerified, setEmailVerified] = useState(false)
 
   const title = isVendor ? 'Apply as a vendor' : 'Apply as a rider'
   const subtitle = isVendor
@@ -77,6 +83,10 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
       setError('Verify your WhatsApp number first.')
       return
     }
+    if (!emailVerified) {
+      setError('Verify your email address first.')
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch('/api/applications', {
@@ -88,6 +98,7 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
           owner_name: isVendor ? name : undefined,
           full_name: !isVendor ? name : undefined,
           phone,
+          email,
           area,
           business_name: isVendor ? businessName : undefined,
           business_registration_status: isVendor ? businessRegistrationStatus || undefined : undefined,
@@ -109,11 +120,13 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
           date_of_birth: !isVendor ? dateOfBirth || undefined : undefined,
         }),
       })
-      const data = await res.json() as { error?: string }
+      const data = await res.json() as { error?: string; reference?: string; acknowledgement_status?: string }
       if (!res.ok) {
         setError(data.error ?? 'Could not submit your application right now.')
         return
       }
+      setReference(data.reference ?? '')
+      setAcknowledgementStatus(data.acknowledgement_status ?? 'skipped')
       setSuccess(true)
     } catch {
       setError('Network error. Please try again.')
@@ -124,7 +137,7 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
 
   if (success) {
     return (
-      <div className="min-h-dvh bg-[#0A0A0B] px-5 py-10 text-white">
+      <div className="lx-page min-h-dvh px-5 py-10 text-[var(--lx-text)]">
         <div className="mx-auto flex max-w-2xl flex-col gap-6">
           <div className="rounded-3xl border border-emerald-500/25 bg-emerald-500/10 p-6">
             <p className="text-xs uppercase tracking-[0.18em] text-emerald-300/75">Application received</p>
@@ -132,6 +145,8 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
             <p className="mt-3 text-sm leading-6 text-white/65">
               Admin will review your application, verify the required checks, and contact you on WhatsApp before activation.
             </p>
+            {reference && <p className="mt-3 text-sm text-white/75">Reference: <strong>{reference}</strong></p>}
+            <p className="mt-2 text-xs text-white/50">{acknowledgementStatus === 'sent' ? 'An acknowledgement was sent to your email.' : 'Your application is saved, but email delivery was not confirmed. Keep this reference.'}</p>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/65">
@@ -157,7 +172,7 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
   }
 
   return (
-    <div className="min-h-dvh bg-[#0A0A0B] px-5 py-10 text-white">
+    <div className="lx-page min-h-dvh px-5 py-10 text-[var(--lx-text)]">
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[0.92fr_1.08fr]">
         <section className="space-y-5">
           <Link href="/" className="inline-flex items-center gap-2 text-sm text-white/55 transition-colors hover:text-white/80">
@@ -198,6 +213,7 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
             <p className="mt-2">
               Submitting this form does not make the account live immediately. Admin still verifies identity and site or vehicle checks before approval.
             </p>
+            <p className="mt-2">Application questions: <a className="text-amber-300" href={`mailto:${EMAIL_IDENTITIES.careers.address}`}>{EMAIL_IDENTITIES.careers.address}</a></p>
           </div>
         </section>
 
@@ -226,6 +242,12 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
                 autoComplete="tel"
               />
             </label>
+
+            <label className="block text-sm text-white/75">
+              <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40">Email</span>
+              <input value={email} onChange={(event) => { setEmail(event.target.value); setEmailVerified(false); setError('') }} required type="email" maxLength={254} autoComplete="email" className="w-full rounded-2xl border border-white/10 bg-[#111113] px-4 py-3 text-base text-white outline-none focus:border-amber-400/60" placeholder="you@example.com" />
+            </label>
+            <EmailVerifyInline email={email} purpose="application" verified={emailVerified} onVerified={() => setEmailVerified(true)} />
 
             {isVendor ? (
               <>
@@ -475,10 +497,10 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={loading || !phoneVerified}
+              disabled={loading || !phoneVerified || !emailVerified}
               className="rounded-2xl bg-amber-500 px-5 py-4 text-sm font-semibold text-black disabled:opacity-50"
             >
-              {loading ? 'Submitting application...' : !phoneVerified ? 'Verify your phone to continue' : 'Submit application'}
+              {loading ? 'Submitting application...' : !phoneVerified ? 'Verify your phone to continue' : !emailVerified ? 'Verify your email to continue' : 'Submit application'}
             </button>
           </div>
         </section>

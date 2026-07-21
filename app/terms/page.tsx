@@ -2,7 +2,8 @@ import { getControls } from '@/lib/controls'
 import { formatHoursRange } from '@/lib/hours'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { formatPrice } from '@/lib/money'
-import { SiteFooter, SUPPORT_EMAIL } from '@/components/site-footer'
+import { SiteFooter } from '@/components/site-footer'
+import { EMAIL_IDENTITIES } from '@/lib/email/identities'
 import { getMinimumOrderKobo } from '@/lib/delivery-zones'
 
 export const dynamic = 'force-dynamic'
@@ -14,7 +15,7 @@ export default async function TermsPage() {
   const db = createSupabaseAdmin()
   const minOrder = (await getMinimumOrderKobo(db)) ?? 0
   return (
-    <main style={{ background: '#0A0A0B' }}>
+    <main className="lx-page">
       <div className="min-h-dvh px-5 py-12 max-w-2xl mx-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 3rem)' }}>
       <p className="text-xs text-white/35 mb-4 break-all">
         tiktok-developers-site-verification=GVw1W1ZcEYXVMbcc7pzaozQcxTytLrWv
@@ -100,7 +101,7 @@ export default async function TermsPage() {
 
         <section>
           <h2 className="text-base font-semibold text-white mb-2">10. Contact</h2>
-          <p>Questions? Email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#F5A623] break-words">{SUPPORT_EMAIL}</a> or see our <a href="/contact" className="text-[#F5A623]">Contact</a> page.</p>
+          <p>Legal or contractual questions? Email <a href={`mailto:${EMAIL_IDENTITIES.legal.address}`} className="text-[#F5A623] break-words">{EMAIL_IDENTITIES.legal.address}</a>. For operational support, see our <a href="/contact" className="text-[#F5A623]">Contact</a> page.</p>
         </section>
       </div>
       </div>

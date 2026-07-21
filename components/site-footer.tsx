@@ -2,10 +2,12 @@ import Link from 'next/link'
 import { getControls } from '@/lib/controls'
 import { formatHoursRange } from '@/lib/hours'
 import { listGuides, guidePath } from '@/lib/seo/guides'
+import { EMAIL_IDENTITIES } from '@/lib/email/identities'
 
 // Single business email shown across the site (also in /terms + /privacy). Keep
 // this in sync with the email on the Paystack business profile.
-export const SUPPORT_EMAIL = 'hello@lumexfud.com.ng'
+export const GENERAL_EMAIL = EMAIL_IDENTITIES.hello.address
+export const SUPPORT_EMAIL = EMAIL_IDENTITIES.support.address
 // Trading name (must match the Paystack profile) and the operating entity.
 export const BRAND = 'LumeX Fud'
 export const OPERATOR = 'Lumex'
@@ -35,6 +37,9 @@ export async function SiteFooter() {
 
           <div className="space-y-1.5 sm:text-right">
             <p className="text-white/55 font-medium">Contact &amp; support</p>
+            <p>
+              <a href={`mailto:${GENERAL_EMAIL}`} className="hover:text-white/80 transition-colors break-words">{GENERAL_EMAIL}</a>
+            </p>
             <p>
               <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-white/80 transition-colors break-words">{SUPPORT_EMAIL}</a>
             </p>
