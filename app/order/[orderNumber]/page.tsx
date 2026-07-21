@@ -139,6 +139,9 @@ export default async function OrderPage({
         riderVerified={riderVerified}
         pickupHoldMinutes={pickupHoldMinutes}
         campaignId={search?.campaign ?? ''}
+        chatActor={session.role === 'customer' && session.userId
+          ? { id: session.userId, type: 'CUSTOMER' }
+          : null}
       />
       <BottomNav />
     </main>

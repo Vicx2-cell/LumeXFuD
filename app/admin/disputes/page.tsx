@@ -5,6 +5,7 @@ import { formatPrice } from '@/lib/money'
 import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { GlassSheen } from '@/components/fx'
+import { OrderDisputeTranscript } from '@/components/admin/order-dispute-transcript'
 
 interface DisputeRow {
   reason: string
@@ -56,6 +57,7 @@ export default function AdminDisputes() {
   const [toast, setToast] = useState('')
   const [briefs, setBriefs] = useState<Record<string, DisputeBrief>>({})
   const [analyzing, setAnalyzing] = useState<string | null>(null)
+  const [transcriptOrder, setTranscriptOrder] = useState<{ id: string; orderNumber: string } | null>(null)
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -208,6 +210,13 @@ export default function AdminDisputes() {
                   )}
 
                   {/* Resolution actions */}
+                  <button
+                    type="button"
+                    onClick={() => setTranscriptOrder({ id: d.id, orderNumber: d.order_number })}
+                    className="mb-3 min-h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] text-sm font-medium text-white/70"
+                  >
+                    View chat transcript
+                  </button>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => resolve(d.id, 'REFUND')}
@@ -232,6 +241,13 @@ export default function AdminDisputes() {
           </div>
         )}
       </div>
+      {transcriptOrder && (
+        <OrderDisputeTranscript
+          orderId={transcriptOrder.id}
+          orderNumber={transcriptOrder.orderNumber}
+          onClose={() => setTranscriptOrder(null)}
+        />
+      )}
     </div>
   )
 }

@@ -39,7 +39,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
 
   ...map([
     'admin/audit', 'admin/dashboard', 'admin/orders', 'admin/disputes',
-    'admin/disputes/[id]/analyze', 'admin/disputes/[id]/resolve', 'admin/face',
+    'admin/disputes/[id]/analyze', 'admin/disputes/[id]/resolve', 'admin/disputes/[id]/messages', 'admin/face',
     'admin/kyc/queue', 'admin/live', 'admin/lodges', 'admin/lodges/[id]',
     'admin/pin-resets', 'admin/reviews', 'admin/reviews/[id]', 'admin/riders',
     'admin/riders/[id]', 'admin/riders/create', 'admin/suspend',
@@ -100,7 +100,10 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'group-order/[code]', 'group-order/[code]/cancel', 'group-order/[code]/items',
     'group-order/create', 'group-order/mine',
     'orders', 'orders/[id]/cancel', 'orders/[id]/reorder', 'orders/[id]/handover-code',
-    'orders/[id]/status', 'rewards', 'rewards/surprise/[id]/open', 'streak/nudge',
+    'orders/[id]/status', 'orders/[id]/messages', 'orders/[id]/messages/read',
+    'orders/[id]/messages/stream',
+    'order-communications/unread',
+    'rewards', 'rewards/surprise/[id]/open', 'streak/nudge',
     'lumi', 'lumi/confirm', 'lumi/badge', 'lumi/memory', 'chow-ai', 'push/subscribe', 'notifications',
     'study/ingest', 'sponsor-wallet/topup', 'sponsor-wallet/receipt', 'launch-counter',
   ], { kind: 'self' }),

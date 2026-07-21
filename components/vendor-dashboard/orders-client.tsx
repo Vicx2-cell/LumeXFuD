@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/money'
-import { waLink, telLink } from '@/lib/contact'
 import { GlassSheen } from '@/components/fx'
 import { Badge } from '@/components/ui/badge'
 import { AlertBanner } from '@/components/ui/alert-banner'
@@ -12,6 +11,8 @@ import { PageHeader } from '@/components/ui/page-header'
 import { STATUS_COLOR, STATUS_LABEL, type VendorDashboardOrder, type VendorDashboardRecentOrder, type VendorDashboardSummary, type VendorDashboardVendor } from './helpers'
 import { hasUsableLocation } from '@/lib/vendor-location'
 import { MapPin } from 'lucide-react'
+import { OrderChatButton, OrderChatSheet } from '@/components/order-chat'
+import { useOrderChatUnread } from '@/lib/use-order-chat-unread'
 
 interface OrderItem {
   id: string
@@ -49,6 +50,8 @@ export function VendorOrdersClient() {
   const [recentOpen, setRecentOpen] = useState(false)
   const [toast, setToast] = useState('')
   const [errorBanner, setErrorBanner] = useState<{ title: string; message: string } | null>(null)
+  const [chatOrder, setChatOrder] = useState<LiveOrder | null>(null)
+  const chatUnread = useOrderChatUnread()
   const audioCtx = useRef<AudioContext | null>(null)
   const knownIds = useRef<Set<string>>(new Set())
 
@@ -401,7 +404,7 @@ export function VendorOrdersClient() {
           ) : (
             <div className="space-y-2.5 lx-stagger">
               {active.map((order) => (
-                <OrderCard key={order.id} order={order} onUpdate={updateOrder} onCancel={cancelOrder} onCollect={collectOrder} />
+                <OrderCard key={order.id} order={order} unread={chatUnread.unreadFor(order.id, 'VENDOR_RIDER')} onUpdate={updateOrder} onCancel={cancelOrder} onCollect={collectOrder} onChat={() => setChatOrder(order)} />
               ))}
             </div>
           )}
@@ -445,6 +448,19 @@ export function VendorOrdersClient() {
             </div>
           </section>
         )}
+        {chatOrder && vendor && (
+          <OrderChatSheet
+            open
+            orderId={chatOrder.id}
+            orderNumber={chatOrder.order_number}
+            channel="VENDOR_RIDER"
+            actor={{ id: vendor.id, type: 'VENDOR' }}
+            title={`Chat with ${chatOrder.riders?.full_name?.split(' ')[0] ?? 'rider'}`}
+            participantLabels={{ RIDER: chatOrder.riders?.full_name ?? 'Rider' }}
+            onClose={() => setChatOrder(null)}
+            onUnreadChange={() => chatUnread.clearUnread(chatOrder.id, 'VENDOR_RIDER')}
+          />
+        )}
       </div>
     </div>
   )
@@ -455,11 +471,15 @@ function OrderCard({
   onUpdate,
   onCancel,
   onCollect,
+  onChat,
+  unread,
 }: {
   order: LiveOrder
   onUpdate: (id: string, status: string, commitment?: { estimated_prep_minutes: number; estimated_delivery_minutes: number; estimate_reason?: string }) => Promise<void>
   onCancel: (id: string) => Promise<void>
   onCollect: (id: string, code: string) => Promise<string | null>
+  onChat: () => void
+  unread: number
 }) {
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState(false)
@@ -557,27 +577,6 @@ function OrderCard({
             </p>
             {itemSummary && <p className="mt-1 text-white/70">{itemSummary}</p>}
           </div>
-          {order.customers?.phone && (
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-white/45">Running late? Reach the customer:</span>
-              <a
-                href={waLink(order.customers.phone, `Hi${order.customers.name ? ` ${order.customers.name.split(' ')[0]}` : ''}, your LumeX order #${order.order_number} is ready.`)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg px-2 py-1 text-[11px] font-medium"
-                style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366' }}
-              >
-                WhatsApp
-              </a>
-              <a
-                href={telLink(order.customers.call_phone ?? order.customers.phone)}
-                className="rounded-lg px-2 py-1 text-[11px] font-medium"
-                style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)' }}
-              >
-                Call
-              </a>
-            </div>
-          )}
           <p className="mb-2 text-xs text-white/50">Ask the customer for the 6-character pickup code.</p>
           <input
             inputMode="text"
@@ -633,7 +632,15 @@ function OrderCard({
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-2 px-3 pb-3 pt-1">
+      <div className="flex flex-wrap items-center justify-end gap-2 px-3 pb-3 pt-1">
+        {order.rider_id && !isPickup && (
+          <OrderChatButton
+            label="Rider chat"
+            unread={unread}
+            onClick={onChat}
+            className="mr-auto px-3 text-xs"
+          />
+        )}
         {order.status === 'PENDING' && (
           <>
             <button

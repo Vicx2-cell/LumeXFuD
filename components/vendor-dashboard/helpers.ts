@@ -33,7 +33,9 @@ export interface VendorDashboardOrder {
   speed_commitment_flagged_at?: string | null
   delay_detected_at?: string | null
   customer_id?: string | null
+  rider_id?: string | null
   customers: VendorDashboardCustomer | null
+  riders?: { full_name: string } | null
   order_items: VendorDashboardOrderItem[]
 }
 

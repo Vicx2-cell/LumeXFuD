@@ -104,9 +104,18 @@ export const ratingInput = z.object({
   rider_review: z.string().trim().max(500).optional(),
 })
 
+export const orderMessageChannel = z.enum(['CUSTOMER_RIDER', 'VENDOR_RIDER'])
+
 export const orderMessageInput = z.object({
-  message: z.string().min(1).max(500),
-})
+  channel: orderMessageChannel,
+  message: z.string().trim().min(1).max(300),
+  client_message_id: z.string().uuid(),
+}).strict()
+
+export const orderMessageReadInput = z.object({
+  channel: orderMessageChannel,
+  message_id: z.string().uuid().nullable().optional(),
+}).strict()
 
 // A fulfiller (vendor at pickup, rider at the door) enters the customer's 6-char
 // handover code. Entering the correct code is the ONLY trigger that releases the

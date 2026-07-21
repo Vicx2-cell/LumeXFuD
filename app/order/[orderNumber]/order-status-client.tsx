@@ -9,6 +9,8 @@ import { VerifiedBadge } from '@/components/verified-badge'
 import { useFeatures } from '@/lib/use-features'
 import type { OrderDetail } from './page'
 import { getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
+import { OrderChatButton, OrderChatSheet } from '@/components/order-chat'
+import { useOrderChatUnread } from '@/lib/use-order-chat-unread'
 
 const DISPUTE_REASONS = [
   'I never received my order',
@@ -56,6 +58,7 @@ export function OrderStatusClient({
   riderVerified = false,
   pickupHoldMinutes = 85,
   campaignId = '',
+  chatActor = null,
 }: {
   order: OrderDetail
   canRate?: boolean
@@ -63,12 +66,15 @@ export function OrderStatusClient({
   riderVerified?: boolean
   pickupHoldMinutes?: number
   campaignId?: string
+  chatActor?: { id: string; type: 'CUSTOMER' } | null
 }) {
   const router = useRouter()
   const features = useFeatures()
   const [order, setOrder] = useState(initialOrder)
   const [actionError, setActionError] = useState('')
   const [confirming, setConfirming] = useState(false)
+  const [showRiderChat, setShowRiderChat] = useState(false)
+  const chatUnread = useOrderChatUnread(!!chatActor)
 
   // Vendor rating
   const [rated, setRated] = useState(alreadyRated)
@@ -442,6 +448,15 @@ export function OrderStatusClient({
           </div>
         )}
 
+        {chatActor && order.rider_id && !isPickup && (
+          <OrderChatButton
+            label={`Message ${order.riders?.full_name?.split(' ')[0] ?? 'your rider'}`}
+            unread={chatUnread.unreadFor(order.id, 'CUSTOMER_RIDER')}
+            onClick={() => setShowRiderChat(true)}
+            className="w-full"
+          />
+        )}
+
         {/* Delivered celebration — a clear, satisfying "your food arrived" moment */}
         {(order.status === 'DELIVERED' || order.status === 'COMPLETED') && (
           <div className="rounded-2xl p-5 text-center lx-scale-in" style={{ background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.25)' }}>
@@ -617,6 +632,20 @@ export function OrderStatusClient({
       </div>
 
       {/* Dispute / report-a-problem modal */}
+      {chatActor && order.rider_id && !isPickup && (
+        <OrderChatSheet
+          open={showRiderChat}
+          orderId={order.id}
+          orderNumber={order.order_number}
+          channel="CUSTOMER_RIDER"
+          actor={chatActor}
+          title={`Chat with ${order.riders?.full_name?.split(' ')[0] ?? 'your rider'}`}
+          participantLabels={{ RIDER: order.riders?.full_name ?? 'Rider' }}
+          onClose={() => setShowRiderChat(false)}
+          onUnreadChange={() => chatUnread.clearUnread(order.id, 'CUSTOMER_RIDER')}
+        />
+      )}
+
       {showDispute && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => !disputeBusy && setShowDispute(false)}>
           <div className="w-full max-w-lg rounded-2xl p-5 lx-scale-in" style={{ background: '#111113', border: '1px solid rgba(255,255,255,0.1)' }} onClick={(e) => e.stopPropagation()}>

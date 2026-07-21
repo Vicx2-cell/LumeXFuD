@@ -17,9 +17,11 @@ import { DefaultAvatar } from '@/components/default-avatar'
 import { AlertBanner } from '@/components/ui/alert-banner'
 import { RoleTutorial } from '@/components/role-tutorial'
 import { useFeatures } from '@/lib/use-features'
-import { waLink } from '@/lib/contact'
 import { formatAddressForRider } from '@/lib/delivery-address'
 import { directionsUrl, hasPin } from '@/lib/maps'
+import { OrderChatButton, OrderChatSheet } from '@/components/order-chat'
+import type { OrderConversationChannel } from '@/lib/order-communication'
+import { useOrderChatUnread } from '@/lib/use-order-chat-unread'
 
 type RiderStatus = 'ONLINE' | 'OFFLINE' | 'BUSY'
 
@@ -143,6 +145,8 @@ export default function RiderDashboard() {
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [toast, setToast] = useState('')
   const [errorPopout, setErrorPopout] = useState<{ title: string; message: string } | null>(null)
+  const [chatChannel, setChatChannel] = useState<OrderConversationChannel | null>(null)
+  const chatUnread = useOrderChatUnread()
   const prevAvailableIds = useRef<Set<string>>(new Set())
 
   const showToast = (msg: string) => {
@@ -586,13 +590,8 @@ export default function RiderDashboard() {
                       <DefaultAvatar size={11} />
                     </div>
                   )}
-                  <a href={`tel:${current.customers.call_phone ?? current.customers.phone}`} className="text-amber-400">{current.customers.name ?? current.customers.phone}</a>
-                  <a
-                    href={waLink(current.customers.phone, `Hi${current.customers.name ? ' ' + current.customers.name.split(' ')[0] : ''}, I’m your LumeX rider for order #${current.order_number}. I’m on my way!`)}
-                    target="_blank" rel="noopener noreferrer"
-                    aria-label="Message customer on WhatsApp"
-                    className="ml-auto inline-flex items-center text-xs px-3.5 rounded-lg font-medium shrink-0 active:scale-95 transition-transform" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366', minHeight: 44 }}
-                  >WhatsApp</a>
+                  <a href={`tel:${current.customers.call_phone ?? current.customers.phone}`} className="min-w-0 truncate text-amber-400">{current.customers.name ?? current.customers.phone}</a>
+                  <OrderChatButton label="Chat" unread={chatUnread.unreadFor(current.id, 'CUSTOMER_RIDER')} onClick={() => setChatChannel('CUSTOMER_RIDER')} className="ml-auto px-3.5 text-xs" />
                 </div>
               )}
               {current.vendors?.phone && (
@@ -600,12 +599,7 @@ export default function RiderDashboard() {
                   <span className="text-[10px] uppercase tracking-wide text-white/35 shrink-0 w-14">Vendor</span>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/40" aria-hidden="true"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M2 7h20"/><path d="M12 22V12"/></svg>
                   <a href={`tel:${current.vendors.call_phone ?? current.vendors.phone}`} className="text-amber-400 truncate">{current.vendors.call_phone ?? current.vendors.phone}</a>
-                  <a
-                    href={waLink(current.vendors.phone, `Hi, I’m the LumeX rider for order #${current.order_number}. Is it ready for pickup?`)}
-                    target="_blank" rel="noopener noreferrer"
-                    aria-label="Message vendor on WhatsApp"
-                    className="ml-auto inline-flex items-center text-xs px-3.5 rounded-lg font-medium shrink-0 active:scale-95 transition-transform" style={{ background: 'rgba(37,211,102,0.14)', color: '#25D366', minHeight: 44 }}
-                  >WhatsApp</a>
+                  <OrderChatButton label="Chat" unread={chatUnread.unreadFor(current.id, 'VENDOR_RIDER')} onClick={() => setChatChannel('VENDOR_RIDER')} className="ml-auto px-3.5 text-xs" />
                 </div>
               )}
               <div className="flex items-center gap-2 text-sm">
@@ -631,6 +625,7 @@ export default function RiderDashboard() {
                   busy={updatingStatus}
                   onConfirm={confirmDelivery}
                   onUploadPhoto={uploadGatePhoto}
+                  onMessageCustomer={() => setChatChannel('CUSTOMER_RIDER')}
                 />
               ) : (
                 <button
@@ -658,6 +653,25 @@ export default function RiderDashboard() {
       )}
 
       {/* Hotspots — where to position before orders drop (online riders only) */}
+      {current && rider && chatChannel && (
+        <OrderChatSheet
+          open
+          orderId={current.id}
+          orderNumber={current.order_number}
+          channel={chatChannel}
+          actor={{ id: rider.id, type: 'RIDER' }}
+          title={chatChannel === 'CUSTOMER_RIDER'
+            ? `Chat with ${current.customers?.name?.split(' ')[0] ?? 'customer'}`
+            : `Chat with ${current.vendors?.shop_name ?? 'vendor'}`}
+          participantLabels={{
+            CUSTOMER: current.customers?.name ?? 'Customer',
+            VENDOR: current.vendors?.shop_name ?? 'Vendor',
+          }}
+          onClose={() => setChatChannel(null)}
+          onUnreadChange={() => chatUnread.clearUnread(current.id, chatChannel)}
+        />
+      )}
+
       {isOnline && !current && <RiderHotspots />}
 
       {/* Available orders */}
@@ -767,12 +781,13 @@ export default function RiderDashboard() {
 // OPTIONAL proof photo (never required). Shows fulfillment-only data — order id +
 // customer first name (no full phone/address/payment here) — per Invariant I5.
 function DeliverPanel({
-  order, busy, onConfirm, onUploadPhoto,
+  order, busy, onConfirm, onUploadPhoto, onMessageCustomer,
 }: {
   order: CurrentOrder
   busy: boolean
   onConfirm: (orderId: string, payload: { code?: string; leave_at_gate?: boolean }) => Promise<string | null>
   onUploadPhoto: (orderId: string, file: File) => Promise<string | null>
+  onMessageCustomer: () => void
 }) {
   const [code, setCode] = useState('')
   const [err, setErr] = useState('')
@@ -798,13 +813,6 @@ function DeliverPanel({
     if (e) setErr(e)
   }
 
-  // One-tap "I've arrived" message to the customer (no code in the text — I3). This
-  // is the rider's first move at the door, and the fallback when the customer isn't
-  // out yet: ping them on WhatsApp before anything stalls.
-  const arrivedWa = order.customers?.phone
-    ? waLink(order.customers.phone, `Hi${firstName !== 'the customer' ? ' ' + firstName : ''}, I’ve arrived with your LumeX order #${order.order_number}. Please come out to collect — or open the LumeX app and read me your collection code.`)
-    : null
-
   // Order summary the rider checks against the bag before confirming (fulfillment
   // data only — items, order id, customer first name).
   const summary = (
@@ -821,11 +829,9 @@ function DeliverPanel({
       <div className="rounded-xl p-3 mt-1" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.2)' }}>
         {summary}
         <p className="text-xs text-white/65 mb-2">📷 Leave-at-gate for <span className="font-semibold text-white/90">{firstName}</span> — drop it at the gate. A proof photo is optional.</p>
-        {arrivedWa && (
-          <a href={arrivedWa} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full mb-2 rounded-lg text-sm font-semibold active:scale-[0.98] transition-transform" style={{ background: 'rgba(37,211,102,0.16)', color: '#25D366', minHeight: 44 }}>
-            📲 Tell {firstName} you’ve arrived (WhatsApp)
-          </a>
-        )}
+        <button type="button" onClick={onMessageCustomer} className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-400/10 text-sm font-semibold text-amber-300">
+          Message {firstName}
+        </button>
         <label className="block w-full text-center py-3 mb-2 rounded-lg text-xs font-semibold cursor-pointer" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)' }}>
           {uploading ? 'Uploading…' : order.delivery_photo_url ? '✓ Photo added — retake' : 'Add proof photo (optional)'}
           <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void pickPhoto(e.target.files?.[0] ?? null)} disabled={uploading || busy} />
@@ -841,11 +847,9 @@ function DeliverPanel({
   return (
     <div className="rounded-xl p-3 mt-1" style={{ background: 'rgba(245,166,35,0.07)', border: '1px solid rgba(245,166,35,0.2)' }}>
       {summary}
-      {arrivedWa && (
-        <a href={arrivedWa} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-2.5 mb-2 rounded-lg text-xs font-semibold" style={{ background: 'rgba(37,211,102,0.16)', color: '#25D366' }}>
-          📲 Tell {firstName} you’ve arrived (WhatsApp)
-        </a>
-      )}
+      <button type="button" onClick={onMessageCustomer} className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-400/10 text-xs font-semibold text-amber-300">
+        Message {firstName}
+      </button>
       <p className="text-xs text-white/65 mb-2">🔑 Ask <span className="font-semibold text-white/90">{firstName}</span> for their 6-character delivery code (it’s in their app):</p>
       {/* Stacked (not side-by-side): the confirm button is full-width BELOW the input
           so it can never be clipped off the right edge of the card on a narrow phone. */}

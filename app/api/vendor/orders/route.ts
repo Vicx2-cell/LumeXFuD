@@ -34,11 +34,12 @@ export async function GET() {
     .from('orders')
     .select(`
       id, order_number, status, delivery_type, delivery_address,
-      subtotal, created_at, customer_id,
+      subtotal, created_at, customer_id, rider_id,
       pickup_eta_at, speed_target_at, promised_delivery_at,
       vendor_estimated_prep_minutes, vendor_estimated_delivery_minutes,
       speed_commitment_flagged_at, delay_detected_at,
       customers ( phone, name ),
+      riders ( full_name ),
       order_items ( id, name, quantity, price, notes, addons )
     `)
     .eq('vendor_id', vendor.id)
