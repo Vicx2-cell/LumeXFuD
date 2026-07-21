@@ -3,12 +3,24 @@ import { verifyHMAC } from '@/lib/security'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { processWebhookAsync, type PaystackWebhookPayload } from '@/lib/paystack/webhook'
+import { evaluateRisk } from '@/lib/risk-engine'
+import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 
 const clientIp = (req: NextRequest) => req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  const requestContext = createRequestContext(req.headers)
+  const respond = (body: unknown, status: number) => applyRequestContext(
+    body === null ? new NextResponse(null, { status }) : NextResponse.json(body, { status }),
+    requestContext,
+  )
+  const eventContext = {
+    ip: clientIp(req), userAgent: req.headers.get('user-agent') ?? undefined,
+    requestId: requestContext.requestId, correlationId: requestContext.correlationId,
+    route: req.nextUrl.pathname, method: req.method,
+  }
   // ⚠️ NEVER gate this route on a system control / kill switch (LumeX Control
   // spec). Reconciliation MUST always run — even in `maintenance`, `paused`, or
   // when payouts are `frozen` — because customers may have ALREADY paid for
@@ -39,9 +51,9 @@ export async function POST(req: NextRequest) {
     // DETECT: a forged/garbled signature is a critical security event.
     await recordSecurityEvent({
       eventType: 'webhook_reject', severity: 'critical', surface: 'paystack_webhook',
-      ip: clientIp(req), detail: { reason: 'bad_signature' },
+      ...eventContext, outcome: 'rejected', detail: { reason: 'bad_signature' },
     })
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+    return respond({ error: 'Invalid signature' }, 400)
   }
 
   // 3. Parse body
@@ -49,7 +61,7 @@ export async function POST(req: NextRequest) {
   try {
     payload = JSON.parse(rawBody) as PaystackWebhookPayload
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return respond({ error: 'Invalid JSON' }, 400)
   }
 
   const { event, data } = payload
@@ -102,7 +114,19 @@ export async function POST(req: NextRequest) {
       payload,
     })
     if (insErr) {
-      if (insErr.code === '23505') return new NextResponse(null, { status: 200 })
+      if (insErr.code === '23505') {
+        const risk = evaluateRisk([{
+          code: 'payment_webhook_duplicate', category: 'payment', weight: 12,
+          confidence: 0.5, strength: 'weak',
+        }])
+        await recordSecurityEvent({
+          eventType: 'webhook_replay', severity: 'info', surface: 'paystack_webhook',
+          ...eventContext, outcome: 'duplicate_ignored',
+          resourceType: 'paystack_event', resourceId: dedupeRef || undefined,
+          detail: { event, risk },
+        })
+        return respond(null, 200)
+      }
       // FAIL CLOSED (root-cause fix). The old code logged this and CONTINUED to
       // process — so if the idempotency key could not be recorded, the money
       // handlers ran with NO replay guard and every Paystack retry re-ran them
@@ -113,14 +137,14 @@ export async function POST(req: NextRequest) {
       console.error('[webhook] processed_webhooks insert error (NOT processing):', insErr.message)
       await recordSecurityEvent({
         eventType: 'webhook_reject', severity: 'warn', surface: 'paystack_webhook',
-        ip: clientIp(req), detail: { reason: 'dedup_record_failed', event, code: insErr.code },
+        ...eventContext, outcome: 'deferred', detail: { reason: 'dedup_record_failed', event, code: insErr.code },
       })
-      return new NextResponse(null, { status: 200 })
+      return respond(null, 200)
     }
   } catch {
     // Thrown (network) error recording the webhook — treat as already-processed
     // and let Paystack retry rather than risk double side effects this attempt.
-    return new NextResponse(null, { status: 200 })
+    return respond(null, 200)
   }
 
   // 5. Return 200 to Paystack IMMEDIATELY (within 30s requirement)
@@ -129,5 +153,5 @@ export async function POST(req: NextRequest) {
     console.error('[webhook] async processing error:', err)
   })
 
-  return new NextResponse(null, { status: 200 })
+  return respond(null, 200)
 }

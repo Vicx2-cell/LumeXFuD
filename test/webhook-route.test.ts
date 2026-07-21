@@ -69,6 +69,11 @@ describe('webhook route — signature + fail-closed dedup', () => {
     const res = await POST(webhookReq())
     expect(res.status).toBe(200)
     expect(h.processSpy).not.toHaveBeenCalled()
+    expect(res.headers.get('x-request-id')).toMatch(/^[0-9a-f-]{36}$/)
+    const ev = h.recordSpy.mock.calls[0][0] as any
+    expect(ev.eventType).toBe('webhook_replay')
+    expect(ev.outcome).toBe('duplicate_ignored')
+    expect(ev.detail.risk.actions).toEqual(['observe'])
   })
 
   it('FIRST delivery (dedup recorded) → 200 and the processor runs exactly once', async () => {

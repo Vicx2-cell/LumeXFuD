@@ -44,3 +44,10 @@
 - PASS: default console masks account/session/resource identifiers, coarsens IP indicators, hides user-agent detail, and removes precise coordinates.
 - PASS: evidence export is SHA-256 hashed, records custody, separates facts/inferences, requires human authorization, and contains no external-send call.
 - PASS: 230 incident/authorization/RLS/redaction/evidence tests, TypeScript, and targeted ESLint.
+
+## FS-006 verification
+
+- PASS: duplicate webhook still returns 200 and never invokes the money processor.
+- PASS: duplicate emits `webhook_replay` with request ID, provider resource, and observe-only risk.
+- PASS: forged signature and dedupe-storage failure remain rejected/deferred with structured evidence.
+- PASS: focused webhook/idempotency/risk tests, TypeScript, and targeted ESLint.

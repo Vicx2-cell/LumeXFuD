@@ -28,3 +28,9 @@
 - Added atomic incident creation from a preserved security event.
 - Added a super-admin-only incident API and console with masked indicators and explicit accuracy warnings.
 - Added a hashed JSON evidence package for human review; export is custody-logged and never automatically submitted or transmitted.
+
+## FS-006 complete
+
+- Preserved Paystack idempotent 200/no-op behavior while recording duplicate delivery/replay evidence.
+- Added server-generated request/correlation IDs to every webhook response and event.
+- Kept one duplicate as a weak, observe-only signal to protect against false positives from normal provider retries.

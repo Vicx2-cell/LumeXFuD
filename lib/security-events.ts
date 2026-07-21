@@ -11,7 +11,7 @@ export type SecuritySeverity = 'info' | 'warn' | 'critical'
 export type SecurityEventType =
   | 'auth_success' | 'auth_fail' | 'otp_sent' | 'otp_verified' | 'otp_fail'
   | 'account_restricted' | 'account_restriction_lifted'
-  | 'authz_deny' | 'ratelimit_hit' | 'webhook_reject'
+  | 'authz_deny' | 'ratelimit_hit' | 'webhook_reject' | 'webhook_replay'
   | 'stepup_fail' | 'ledger_anomaly' | 'handover_bruteforce' | 'ai_injection'
   | 'session_revoked' | 'rls_coverage_gap' | 'chain_tamper'
   | 'order_status_transition' | 'order_handover_completed' | 'rider_order_accepted'

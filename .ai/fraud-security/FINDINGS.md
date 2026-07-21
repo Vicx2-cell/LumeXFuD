@@ -30,6 +30,12 @@ The immutable security-event spine had no case grouping, factual incident timeli
 
 Status: repaired with a scoped foundation. Migration 135 adds incidents, immutable event links, evidence holds, and append-only custody with atomic case creation. A super-admin-only API and console show severity, confidence, classification, associated account indicator, masked session/network/device indicators, approximate-location warnings, orders/payments, rules, containment, timeline, and live chain integrity. Explicit exports include hashes, facts separated from inferences, custody, deployment commit, and a no-automatic-submission declaration.
 
+## FS-006 - MEDIUM - Duplicate Paystack webhooks were silently discarded
+
+The unique replay guard correctly prevented duplicate processing, but the `23505` branch returned 200 without evidence or request correlation. This made ordinary provider retries indistinguishable from replay patterns during investigation.
+
+Status: repaired. Duplicate deliveries remain 200/no-op, now emit a request-correlated `webhook_replay` event with a weak payment signal. A single duplicate evaluates to observe-only and cannot affect an account or financial operation.
+
 ## Scoped inventory observed
 
 - Authentication/session paths: `lib/session.ts`, `lib/pin-auth.ts`, `lib/rate-limit.ts`, `proxy.ts`, and `app/api/auth/**`.
