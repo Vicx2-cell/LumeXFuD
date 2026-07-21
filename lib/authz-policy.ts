@@ -39,7 +39,8 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   ], role(SUPER)),
 
   ...map([
-    'admin/audit', 'admin/dashboard', 'admin/orders', 'admin/disputes',
+    'admin/audit', 'admin/dashboard', 'admin/orders', 'admin/orders/[id]/emergency-cancel',
+    'admin/orders/[id]/reassign-rider', 'admin/support-notes', 'admin/disputes',
     'admin/disputes/[id]/analyze', 'admin/disputes/[id]/resolve', 'admin/disputes/[id]/messages', 'admin/face',
     'admin/kyc/queue', 'admin/live', 'admin/lodges', 'admin/lodges/[id]',
     'admin/pin-resets', 'admin/reviews', 'admin/reviews/[id]', 'admin/riders',
@@ -135,7 +136,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   'webhooks/resend': { kind: 'webhook' },
   'whatsapp': { kind: 'webhook' },
 
-  ...map(['announcement', 'applications', 'contact', 'delivery-locations', 'features', 'vendors', 'vendors/[id]', 'lodges', 'settings/fees', 'orders/estimate'],
+  ...map(['announcement', 'applications', 'contact', 'delivery-locations', 'features', 'vendors', 'vendors/[id]', 'lodges', 'settings/fees', 'orders/estimate', 'health'],
     { kind: 'public' }),
 }
 

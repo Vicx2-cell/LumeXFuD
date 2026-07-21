@@ -136,6 +136,10 @@ export default async function OrderPage({
     if (Number.isFinite(m) && m > 0) pickupHoldMinutes = m
   }
 
+  const customerChatActor = session && session.role === 'customer' && session.userId
+    ? { id: session.userId, type: 'CUSTOMER' as const }
+    : null
+
   return (
     <main className="lx-page pb-24 overflow-hidden">
       <OrderStatusClient
@@ -145,9 +149,7 @@ export default async function OrderPage({
         riderVerified={riderVerified}
         pickupHoldMinutes={pickupHoldMinutes}
         campaignId={search?.campaign ?? ''}
-        chatActor={session?.role === 'customer' && session.userId
-          ? { id: session.userId, type: 'CUSTOMER' }
-          : null}
+        chatActor={customerChatActor}
       />
       <BottomNav />
     </main>

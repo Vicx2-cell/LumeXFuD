@@ -26,3 +26,6 @@
 - Guest checkout already had hashed high-entropy tracking tokens, guest name/phone, normalized phone, rate limits, idempotent order creation, Paystack callback token return, and token-aware order tracking from `e3a17c5`.
 - Guest checkout UI required delivery terms before checkout, but the API did not receive or enforce an explicit guest terms/privacy acknowledgement.
 - Cart checkout did not send the existing `idempotency-key` header, so the server-side idempotency machinery could not protect ordinary client retries from the cart surface.
+- Phase-boundary full suite initially exposed existing route-policy coverage gaps for `admin/orders/[id]/emergency-cancel`, `admin/orders/[id]/reassign-rider`, `admin/support-notes`, and `health`.
+- Phase-boundary full suite also exposed a source-level regression test that expected the customer chat actor guard without optional chaining; the runtime guard was kept customer-only and null-safe.
+- One full-suite run timed out on `GET admin/feature-flags -> 403 for customer`; the isolated access-control suite passed all 221 tests, and the subsequent full suite passed all 859 tests.

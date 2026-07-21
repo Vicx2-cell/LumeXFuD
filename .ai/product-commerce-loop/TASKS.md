@@ -2,12 +2,12 @@
 
 ## In Progress
 
-- [ ] Commit the verified guest checkout acknowledgement/idempotency improvement.
+- [ ] Commit the verified phase-boundary repair.
 - [ ] Inspect remaining Phase A-D gaps.
 
 ## Pending
 
-- [ ] Run boundary verification for the active four phases.
+- [ ] Decide whether browser viewport verification is possible in this local environment.
 
 ## Done
 
@@ -26,5 +26,6 @@
 - [x] Added explicit guest terms/privacy acknowledgement enforcement.
 - [x] Added cart checkout idempotency key for repeated submission and network retry.
 - [x] Added focused guest checkout contract tests.
+- [x] Ran phase-boundary full test suite and repaired discovered route-policy/chat regression failures.
 - [x] Added focused group-order add-on helper tests.
 - [x] Ran lint and focused tests for first slice.

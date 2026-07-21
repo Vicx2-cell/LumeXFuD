@@ -3,7 +3,7 @@
 Date: 2026-07-21
 Branch: audit/production-readiness
 Starting commit: 13e22e6 Add admin rider reassignment
-Latest verified commit before this slice: 6c68967 Add commerce storefront route
+Latest verified commit before this slice: bc9eaa9 Require guest checkout acknowledgement
 
 ## Scope
 
@@ -23,6 +23,7 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - Current slice implemented and pending commit: normal vendor product selection now captures item notes for every item, stores item images in cart lines, and the customer cart exposes editable notes, item images, remove, and undo recovery without changing customer selections silently.
 - Storefront slice implemented and pending commit: `/store/[slug]` now resolves active vendor slugs into the existing live vendor ordering page with vendor-specific metadata and reserved/normalized slug guards.
 - Guest checkout slice implemented and pending commit: guest order creation now requires explicit terms/privacy acknowledgement and the cart sends a stable idempotency key for checkout retries.
+- Boundary verification repair implemented and pending commit: central route policy now classifies the existing admin operational routes and health endpoint, and order chat actor binding remains customer-only while satisfying the regression test.
 
 ## Baseline
 
@@ -33,3 +34,4 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - Current slice verification passed: focused cart/group tests, lint, production build, and diff whitespace check.
 - Storefront slice verification passed: focused storefront/cart tests, lint, and production build.
 - Guest checkout slice verification passed: focused guest/validator tests, lint, and production build.
+- Phase boundary verification passed after repair: full Vitest suite, focused access-control rerun, lint, and production build.

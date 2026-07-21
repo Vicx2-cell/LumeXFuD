@@ -20,6 +20,13 @@
 - Passed after guest checkout contract change: `npm.cmd test -- --run test/guest-checkout-contract.test.ts lib/validators.test.ts`.
 - Passed after guest checkout contract change: `npm.cmd run lint`.
 - Passed after guest checkout contract change: `npm.cmd run build`.
+- Initial phase-boundary `npm.cmd test` failed: missing route-policy classifications for existing admin operational routes and `/api/health`, plus source-level order chat guard assertion.
+- Passed after repair: `npm.cmd test -- --run test/authz-coverage.test.ts test/order-chat-customer.test.ts`.
+- First full-suite rerun had a timeout in `test/access-control.test.ts` for `GET admin/feature-flags -> 403 for customer`.
+- Passed isolated rerun: `npm.cmd test -- --run test/access-control.test.ts` with 221 tests.
+- Passed final full suite: `npm.cmd test` with 126 files and 859 tests.
+- Passed after boundary repair: `npm.cmd run lint`.
+- Passed after boundary repair: `npm.cmd run build`.
 
 ## Added During Loop
 

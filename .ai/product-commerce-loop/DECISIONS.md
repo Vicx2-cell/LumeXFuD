@@ -19,3 +19,5 @@
 - Reject reserved platform words for storefront slugs at the route-helper layer and rely on the existing vendor visibility filter for inactive, suspended, or deleted vendors.
 - Treat guest checkout as identified ordering, not anonymous ordering: guests must provide name, phone, and explicit terms/privacy acknowledgement.
 - Reuse the existing order idempotency header contract from the cart and keep the same key across connection errors; clear it after server validation failures so corrected payloads can retry cleanly.
+- Classify existing admin operational routes under the admin/super-admin route policy and classify `/api/health` as public so the central coverage backstop remains authoritative.
+- Keep customer order chat actor creation explicit (`session && session.role === 'customer' && session.userId`) to preserve the one-order customer-only communication guard.
