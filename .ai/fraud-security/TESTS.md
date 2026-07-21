@@ -75,3 +75,13 @@
 - PASS: oversized, short, whitespace-bearing, and malformed idempotency keys fail closed.
 - PASS: wrong-role, account-rate, shared-network-rate, owner-mismatch, payload-mismatch, and safe-replay outcomes preserve request-correlated evidence.
 - PASS: one unusual basket remains observe-only; one payload mismatch alone does not recommend a financial freeze or evidence hold.
+
+## FS-009 verification
+
+- PASS (1.69s Vitest duration; 10.5s command with TypeScript): focused stale-rider, handover, rider-chat, order-state, request-context, and security-event tests (7 files, 41 tests), followed by `npx.cmd tsc --noEmit`.
+- PASS (6.27s Vitest duration; 8.0s command): broader handover, rider/vendor/customer communication, reassignment race, lifecycle/RLS, authz, money-path, order-state, and speed tests (15 files, 73 tests).
+- PASS: concurrent accepts serialize rider/order rows and cannot leave an assigned order with an available rider.
+- PASS: status and delivery claims include the live rider ID, so reassignment during a request yields 409 and evidence rather than a state or payout transition.
+- PASS: stale wrong-code guesses cannot increment or lock the replacement rider's handover code.
+- PASS: proof upload rechecks assignment/status and removes the just-uploaded orphan when the claim is lost.
+- PASS: no security event contains the raw handover code.

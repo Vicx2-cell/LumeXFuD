@@ -28,6 +28,7 @@ import {
 } from '@/lib/order-state'
 import type { OrderStatus } from '@/types'
 import { deliveryPromiseAt, estimateNeedsReason, speedTargetAt } from '@/lib/order-speed'
+import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 
 // Whitelist: [from, to, allowed roles]
 const TRANSITIONS: Array<[OrderStatus, OrderStatus, string[]]> = [
@@ -66,6 +67,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+  const context = createRequestContext(req.headers)
+  const json = <T,>(body: T, init?: ResponseInit) => applyRequestContext(NextResponse.json(body, init), context)
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -111,7 +114,17 @@ export async function PATCH(
       : session.role === 'rider' ? order.rider_id
       : order.customer_id
     if (!ownerId || ownerId !== session.userId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      if (session.role === 'rider') {
+        await recordSecurityEvent({
+          eventType: 'stale_rider_access', severity: 'warn', surface: 'orders.status',
+          actorId: session.userId ?? null, actorRole: session.role, sessionId: session.sessionId,
+          ip: req.headers.get('x-forwarded-for'), userAgent: req.headers.get('user-agent'),
+          requestId: context.requestId, correlationId: context.correlationId,
+          route: req.nextUrl.pathname, method: req.method, resourceType: 'order', resourceId: id,
+          outcome: 'not_current_rider', detail: { requested_status: newStatus },
+        })
+      }
+      return json({ error: 'Forbidden' }, { status: 403 })
     }
   }
 
@@ -285,22 +298,34 @@ export async function PATCH(
     updateData.rider_payment_status = 'HELD'
   }
 
-  const { data: updatedRows } = await db
+  let updateQuery = db
     .from('orders')
     .update(updateData)
     .eq('id', id)
     .eq('status', currentStatus)
-    .select('id')
+  if (session.role === 'rider') updateQuery = updateQuery.eq('rider_id', session.userId!)
+  const { data: updatedRows } = await updateQuery.select('id')
 
   if (!updatedRows || updatedRows.length === 0) {
-    const { data: latest } = await db.from('orders').select('status').eq('id', id).maybeSingle()
+    const { data: latest } = await db.from('orders').select('status, rider_id').eq('id', id).maybeSingle()
     if (session.role === 'rider' && newStatus === 'PICKED_UP' && latest?.status === 'CANCELLED') {
       return NextResponse.json(
         { error: ORDER_AUTO_CANCELLED_MESSAGE, code: ORDER_AUTO_CANCELLED_CODE },
         { status: 409 },
       )
     }
-    return NextResponse.json({ error: 'Order was already updated. Refresh and try again.' }, { status: 409 })
+    if (session.role === 'rider') {
+      await recordSecurityEvent({
+        eventType: 'stale_rider_access', severity: 'warn', surface: 'orders.status',
+        actorId: session.userId ?? null, actorRole: session.role, sessionId: session.sessionId,
+        ip: req.headers.get('x-forwarded-for'), requestId: context.requestId,
+        correlationId: context.correlationId, route: req.nextUrl.pathname, method: req.method,
+        resourceType: 'order', resourceId: id,
+        outcome: latest?.rider_id !== session.userId ? 'reassigned_during_request' : 'status_race',
+        detail: { expected_status: currentStatus, requested_status: newStatus },
+      })
+    }
+    return json({ error: 'Order was already updated. Refresh and try again.' }, { status: 409 })
   }
 
   // On completion: record platform earnings, credit the vendor + rider wallets,
@@ -362,6 +387,13 @@ export async function PATCH(
     sessionId: session.sessionId,
     ip: req.headers.get('x-forwarded-for'),
     userAgent: req.headers.get('user-agent'),
+    requestId: context.requestId,
+    correlationId: context.correlationId,
+    route: req.nextUrl.pathname,
+    method: req.method,
+    resourceType: 'order',
+    resourceId: id,
+    outcome: 'transitioned',
     detail: {
       order_id: id,
       order_number: order.order_number,

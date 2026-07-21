@@ -16,7 +16,12 @@ vi.mock('@/lib/session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/session')>()),
   getCurrentUser: async () => h.session,
 }))
-vi.mock('@/lib/supabase/server', () => ({ createSupabaseAdmin: () => makeDb(h) }))
+vi.mock('@/lib/supabase/server', () => ({ createSupabaseAdmin: () => ({
+  ...makeDb(h),
+  rpc: async (name: string) => name === 'bump_assigned_rider_handover_attempts'
+    ? { data: [{ attempts: 1, locked: false, assignment_current: true }], error: null }
+    : { data: [{ attempts: 1, locked: false }], error: null },
+}) }))
 vi.mock('@/lib/features', () => ({ getFeature: async () => true }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimitGeneric: PASS_RL }))
 // Keep money/notify side-effects inert (they must NOT be reached on the failure paths).

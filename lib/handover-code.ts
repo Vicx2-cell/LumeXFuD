@@ -133,14 +133,23 @@ export async function recordWrongHandoverAttempt(
   db: ReturnType<typeof createSupabaseAdmin>,
   orderId: string,
   limit = 5,
-): Promise<{ attempts: number; locked: boolean }> {
+  expectedRiderId?: string,
+): Promise<{ attempts: number; locked: boolean; assignmentCurrent: boolean }> {
   try {
-    const { data, error } = await db.rpc('bump_handover_attempts', { p_order_id: orderId, p_limit: limit })
-    if (error || !data) return { attempts: 0, locked: false }
+    const { data, error } = expectedRiderId
+      ? await db.rpc('bump_assigned_rider_handover_attempts', {
+          p_order_id: orderId, p_rider_id: expectedRiderId, p_limit: limit,
+        })
+      : await db.rpc('bump_handover_attempts', { p_order_id: orderId, p_limit: limit })
+    if (error || !data) return { attempts: 0, locked: false, assignmentCurrent: !expectedRiderId }
     const row = Array.isArray(data) ? data[0] : data
-    return { attempts: Number(row?.attempts) || 0, locked: Boolean(row?.locked) }
+    return {
+      attempts: Number(row?.attempts) || 0,
+      locked: Boolean(row?.locked),
+      assignmentCurrent: expectedRiderId ? Boolean(row?.assignment_current) : true,
+    }
   } catch {
-    return { attempts: 0, locked: false }
+    return { attempts: 0, locked: false, assignmentCurrent: !expectedRiderId }
   }
 }
 

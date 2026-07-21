@@ -20,6 +20,7 @@ export type SecurityEventType =
   | 'refund_risk_evaluated' | 'refund_provider_failure' | 'refund_reservation_rejected'
   | 'order_risk_evaluated' | 'order_idempotency_replay' | 'order_intent_mismatch'
   | 'order_idempotency_invalid'
+  | 'stale_rider_access' | 'rider_assignment_rejected'
 
 export interface SecurityEventInput {
   eventType: SecurityEventType

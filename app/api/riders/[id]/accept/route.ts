@@ -7,6 +7,7 @@ import { audit } from '@/lib/audit'
 import { isBankVerified, BANK_GATE_MESSAGE } from '@/lib/wallet'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { emailCommittedOrderStatus } from '@/lib/order-status-email'
+import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 
 const acceptInput = z.object({ order_id: z.string().uuid() })
 
@@ -15,6 +16,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+  const context = createRequestContext(req.headers)
+  const json = <T,>(body: T, init?: ResponseInit) => applyRequestContext(NextResponse.json(body, init), context)
   const session = await getCurrentUser()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['rider', 'admin', 'super_admin'].includes(session.role)) {
@@ -57,31 +60,22 @@ export async function POST(
 
   const now = new Date().toISOString()
 
-  // Race-safe: only update if status=READY and rider_id IS NULL
-  const { data: updated, error } = await db
-    .from('orders')
-    .update({
-      rider_id: id,
-      status: 'RIDER_ASSIGNED',
-      order_state: 'ready_for_pickup',
-      rider_assigned_at: now,
-      updated_at: now,
+  const { data, error } = await db.rpc('accept_rider_order', {
+    p_rider_id: id, p_order_id: parsed.data.order_id, p_now: now,
+  })
+  const updated = (data as Array<{ success: boolean; error_code: string | null; order_number: string; vendor_id: string }> | null)?.[0]
+  if (error || !updated?.success) {
+    await recordSecurityEvent({
+      eventType: 'rider_assignment_rejected', severity: 'warn', surface: 'riders.accept',
+      actorId: session.userId ?? null, actorRole: session.role, sessionId: session.sessionId,
+      ip: req.headers.get('x-forwarded-for'), userAgent: req.headers.get('user-agent'),
+      requestId: context.requestId, correlationId: context.correlationId,
+      route: req.nextUrl.pathname, method: req.method, resourceType: 'order',
+      resourceId: parsed.data.order_id, outcome: updated?.error_code ?? 'rpc_error',
+      detail: { rider_id: id, error_code: updated?.error_code ?? 'RPC_ERROR' },
     })
-    .eq('id', parsed.data.order_id)
-    .eq('status', 'READY')
-    .is('rider_id', null)
-    .select('id, order_number, vendor_id')
-    .single()
-
-  if (error || !updated) {
-    return NextResponse.json({ error: 'Order no longer available' }, { status: 409 })
+    return json({ error: 'Order no longer available' }, { status: 409 })
   }
-
-  await db.from('riders').update({
-    status: 'BUSY',
-    active_order_id: parsed.data.order_id,
-    last_status_update_at: now,
-  }).eq('id', id)
 
   await audit({
     actor_id: session.phone,
@@ -101,6 +95,13 @@ export async function POST(
     sessionId: session.sessionId,
     ip: req.headers.get('x-forwarded-for'),
     userAgent: req.headers.get('user-agent'),
+    requestId: context.requestId,
+    correlationId: context.correlationId,
+    route: req.nextUrl.pathname,
+    method: req.method,
+    resourceType: 'order',
+    resourceId: parsed.data.order_id,
+    outcome: 'assigned',
     detail: {
       order_id: parsed.data.order_id,
       order_number: updated.order_number,
@@ -119,5 +120,5 @@ export async function POST(
     actorId: session.userId ?? session.phone,
   })
 
-  return NextResponse.json({ success: true, order_number: updated.order_number })
+  return json({ success: true, order_number: updated.order_number })
 }

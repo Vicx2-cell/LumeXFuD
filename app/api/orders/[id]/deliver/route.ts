@@ -15,6 +15,7 @@ import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
 import { promoteVerifiedPlaceFromOrder } from '@/lib/location-intelligence'
 import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 import { finalizeOrderFeedAttribution } from '@/lib/feed/attribution'
+import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 
 // POST /api/orders/[id]/deliver
 // Delivery handover (delivery_handover_v1). The DEFAULT path: the ASSIGNED rider
@@ -29,6 +30,8 @@ import { finalizeOrderFeedAttribution } from '@/lib/feed/attribution'
 // a stored hash in constant time and never read in the clear (I3).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const context = createRequestContext(req.headers)
+  const json = <T,>(body: T, init?: ResponseInit) => applyRequestContext(NextResponse.json(body, init), context)
 
   if (!(await getFeature('delivery_handover_v1'))) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -58,7 +61,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Ownership (BOLA / I5): only the assigned rider (or staff) may confirm.
   if (session.role === 'rider' && session.userId !== order.rider_id) {
-    return NextResponse.json({ error: 'Not your delivery' }, { status: 403 })
+    await recordSecurityEvent({
+      eventType: 'stale_rider_access', severity: 'warn', surface: 'orders.deliver',
+      actorId: session.userId ?? null, actorRole: session.role, sessionId: session.sessionId,
+      ip: req.headers.get('x-forwarded-for'), userAgent: req.headers.get('user-agent'),
+      requestId: context.requestId, correlationId: context.correlationId,
+      route: req.nextUrl.pathname, method: req.method, resourceType: 'order', resourceId: id,
+      outcome: 'not_current_rider', detail: { assigned_rider_id: order.rider_id },
+    })
+    return json({ error: 'Not your delivery' }, { status: 403 })
   }
   if (order.delivery_type === 'PICKUP') {
     return NextResponse.json({ error: 'Pickup orders are collected, not delivered.' }, { status: 400 })
@@ -88,7 +99,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Enter the customer’s 6-character delivery code.' }, { status: 400 })
     }
     if (!verifyHandoverCode(rawCode, order.handover_code_hash as string | null)) {
-      const { locked } = await recordWrongHandoverAttempt(db, id, HANDOVER_ATTEMPT_LIMIT)
+      const { locked, assignmentCurrent } = await recordWrongHandoverAttempt(
+        db, id, HANDOVER_ATTEMPT_LIMIT, session.role === 'rider' ? session.userId : undefined,
+      )
+      if (!assignmentCurrent) {
+        await recordSecurityEvent({
+          eventType: 'stale_rider_access', severity: 'warn', surface: 'orders.deliver',
+          actorId: session.userId ?? null, actorRole: session.role, sessionId: session.sessionId,
+          ip: req.headers.get('x-forwarded-for'), requestId: context.requestId,
+          correlationId: context.correlationId, route: req.nextUrl.pathname, method: req.method,
+          resourceType: 'order', resourceId: id, outcome: 'reassigned_before_wrong_code_count',
+        })
+        return json({ error: 'Delivery assignment changed. Refresh and try again.' }, { status: 409 })
+      }
       await audit({
         actor_id: session.phone, actor_role: session.role,
         action: 'handover_code_wrong', target_table: 'orders', target_id: id,
@@ -108,7 +131,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // once even on a double-tap. The code (or leave-at-gate confirm) IS the release
   // trigger — no code, no completion, no money (Invariant I2).
   const now = new Date().toISOString()
-  const { data: claimed } = await db
+  let claimQuery = db
     .from('orders')
     .update({
       status: 'COMPLETED', delivered_at: now, completed_at: now,
@@ -118,9 +141,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
     .eq('id', id)
     .eq('status', 'PICKED_UP')
-    .select('id')
+  if (session.role === 'rider') claimQuery = claimQuery.eq('rider_id', session.userId!)
+  const { data: claimed } = await claimQuery.select('id')
   if (!claimed || claimed.length === 0) {
-    return NextResponse.json({ error: 'Order was already updated.' }, { status: 409 })
+    if (session.role === 'rider') {
+      await recordSecurityEvent({
+        eventType: 'stale_rider_access', severity: 'warn', surface: 'orders.deliver',
+        actorId: session.userId ?? null, actorRole: session.role, sessionId: session.sessionId,
+        ip: req.headers.get('x-forwarded-for'), requestId: context.requestId,
+        correlationId: context.correlationId, route: req.nextUrl.pathname, method: req.method,
+        resourceType: 'order', resourceId: id, outcome: 'claim_lost',
+        detail: { expected_status: 'PICKED_UP' },
+      })
+    }
+    return json({ error: 'Order was already updated.' }, { status: 409 })
   }
 
   // Rider's binding handover consent (Invariant I8).
@@ -186,6 +220,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     sessionId: session.sessionId,
     ip: req.headers.get('x-forwarded-for'),
     userAgent: req.headers.get('user-agent'),
+    requestId: context.requestId,
+    correlationId: context.correlationId,
+    route: req.nextUrl.pathname,
+    method: req.method,
+    resourceType: 'order',
+    resourceId: id,
+    outcome: 'completed',
     detail: {
       order_id: id,
       order_number: order.order_number,
@@ -222,5 +263,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     cityId: order.city_id as string | null,
   }).catch(() => {})
 
-  return NextResponse.json({ success: true, status: 'COMPLETED', method })
+  return json({ success: true, status: 'COMPLETED', method })
 }

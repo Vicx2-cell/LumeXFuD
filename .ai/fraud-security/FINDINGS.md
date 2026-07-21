@@ -48,6 +48,12 @@ Order pricing already came from menu/add-on/delivery data on the server and the 
 
 Status: repaired. A SHA-256 digest binds the key to canonical authoritative prices, basket, hashed destination, delivery/payment/reward/group semantics, and schedule. Payload/owner mismatches fail closed before replay and emit correlated evidence. Keys are bounded, the route enforces customer role, and account/network/unpaid-order signals are proportionate. A single large basket remains observe-only; no raw destination is stored in the new digest column.
 
+## FS-009 - CRITICAL - Reassigned riders could win stale mutation races
+
+Delivery and status routes checked the assigned rider in one read, then updated by order ID/status only. Reassignment between those operations allowed a stale rider to complete the write. Wrong-code accounting had the same gap and could lock the new rider's code. Optional proof upload could attach after reassignment. Rider acceptance also changed the order and rider in separate statements, allowing partial or competing assignment state.
+
+Status: repaired. Rider acceptance now locks and updates both rows in one service-role RPC. Rider status/delivery mutations recheck `rider_id` in the write predicate, wrong-code counting locks only the expected assigned rider's picked-up order, and proof uploads are assignment/status-bound with orphan cleanup. Every stale/rejected outcome records request-correlated evidence; raw handover codes are never recorded.
+
 ## Scoped inventory observed
 
 - Authentication/session paths: `lib/session.ts`, `lib/pin-auth.ts`, `lib/rate-limit.ts`, `proxy.ts`, and `app/api/auth/**`.

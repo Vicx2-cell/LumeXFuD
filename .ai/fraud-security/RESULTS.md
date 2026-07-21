@@ -48,3 +48,10 @@
 - Bound idempotency replay to a privacy-minimized hash of authoritative order intent and rejected payload/owner substitution.
 - Added explicit customer-role enforcement plus request-correlated account and shared-network checkout limits.
 - Added unpaid-order velocity, unusual-quantity, invalid-key, mismatch, and safe-replay evidence without automatic accusation or permanent action.
+
+## FS-009 complete
+
+- Made order assignment and rider busy-state changes one row-locked transaction.
+- Bound rider status transitions, delivery completion, wrong-code counters, and optional proof writes to the current assignment at mutation time.
+- Preserved payout and handover-code secrecy while rejecting replay, reassignment, and wrong-role races.
+- Added request-correlated stale-rider and assignment-rejection evidence suitable for incident timelines.
