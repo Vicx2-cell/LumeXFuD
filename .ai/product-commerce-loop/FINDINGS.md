@@ -9,4 +9,4 @@
 - Initial broad search shows existing feed, attribution, group order, storefront, and guest-phone code paths.
 - Normal solo checkout already validates add-ons server-side from `menu_item_addons` and snapshots them to `order_items`.
 - Group ordering dropped add-ons when starting a group from cart, when displaying group items, when merging into checkout cart, and when computing wallet split readiness/shares.
-- Direct add from `/group/[code]` still adds the base item only. It now shows add-on availability, but a full in-page add-on picker remains a product gap.
+- Direct add from `/group/[code]` previously added the base item only. It now opens a mobile bottom sheet for add-on selection before posting to the validated API.

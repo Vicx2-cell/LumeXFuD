@@ -47,6 +47,8 @@ export default function GroupOrderPage() {
   const [busyId, setBusyId] = useState('')
   const [copied, setCopied] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const [selecting, setSelecting] = useState<MenuItem | null>(null)
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([])
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000)
@@ -79,22 +81,39 @@ export default function GroupOrderPage() {
     return () => clearInterval(t)
   }, [load])
 
-  const addItem = async (menu_item_id: string) => {
+  const addItem = async (menu_item_id: string, addons: GroupOrderAddonSnapshot[] = []) => {
     setBusyId(menu_item_id); setError(''); lastMutate.current = Date.now()
     // Optimistic: show it instantly, then reconcile with the server silently.
     const m = data?.menu.find((x) => x.id === menu_item_id)
     if (data && m) {
-      setData({ ...data, items: [...data.items, { id: `tmp-${menu_item_id}-${now}`, contributor_id: 'me', contributor_name: 'You', quantity: 1, notes: null, menu_item_id, name: m.name, price_kobo: m.price_kobo, addons: [], mine: true }] })
+      setData({ ...data, items: [...data.items, { id: `tmp-${menu_item_id}-${now}`, contributor_id: 'me', contributor_name: 'You', quantity: 1, notes: null, menu_item_id, name: m.name, price_kobo: m.price_kobo, addons, mine: true }] })
     }
     try {
       const res = await fetch(`/api/group-order/${code}/items`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ menu_item_id, quantity: 1 }),
+        body: JSON.stringify({ menu_item_id, quantity: 1, addons: addons.map((addon) => addon.id) }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) setError(d.error ?? 'Could not add.')
       await load(true, true)
     } catch { setError('Connection error.'); await load(true, true) } finally { setBusyId('') }
+  }
+
+  const addFromMenu = (item: MenuItem) => {
+    if (item.addons.length === 0) {
+      void addItem(item.id)
+      return
+    }
+    setSelecting(item)
+    setSelectedAddonIds([])
+  }
+
+  const confirmAddons = () => {
+    if (!selecting) return
+    const addons = selecting.addons.filter((addon) => selectedAddonIds.includes(addon.id))
+    setSelecting(null)
+    setSelectedAddonIds([])
+    void addItem(selecting.id, addons)
   }
 
   const removeItem = async (id: string) => {
@@ -205,6 +224,43 @@ export default function GroupOrderPage() {
 
   return (
     <Shell>
+      {selecting && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/65" onClick={() => setSelecting(null)}>
+          <div className="w-full max-w-md rounded-t-3xl border border-white/10 bg-[#111113] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-semibold text-white">{selecting.name}</h2>
+                <p className="text-sm text-white/45">{naira(selecting.price_kobo)}</p>
+              </div>
+              <button type="button" onClick={() => setSelecting(null)} className="h-10 w-10 shrink-0 rounded-full border border-white/10 bg-white/5 text-sm text-white/60" aria-label="Close add-ons">x</button>
+            </div>
+            <div className="space-y-2">
+              {selecting.addons.map((addon) => {
+                const checked = selectedAddonIds.includes(addon.id)
+                return (
+                  <button
+                    key={addon.id}
+                    type="button"
+                    onClick={() => setSelectedAddonIds((current) => checked ? current.filter((id) => id !== addon.id) : [...current, addon.id])}
+                    className="flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3 text-left"
+                    style={{ borderColor: checked ? '#F5A623' : 'rgba(255,255,255,0.10)', background: checked ? 'rgba(245,166,35,0.10)' : 'rgba(255,255,255,0.04)' }}
+                  >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-xs font-bold" style={{ borderColor: checked ? '#F5A623' : 'rgba(255,255,255,0.30)', background: checked ? '#F5A623' : 'transparent', color: '#000' }}>
+                      {checked ? '✓' : ''}
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm text-white">{addon.name}</span>
+                    <span className="shrink-0 text-sm text-white/55">+{naira(addon.price_kobo)}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <button type="button" onClick={confirmAddons} className="mt-5 w-full rounded-2xl py-4 text-sm font-bold text-black" style={{ background: '#F5A623', minHeight: 52 }}>
+              Add to group · {naira(selecting.price_kobo + selecting.addons.filter((addon) => selectedAddonIds.includes(addon.id)).reduce((sum, addon) => sum + addon.price_kobo, 0))}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-bold text-white">Group order</h1>
         <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }}>{data.vendor.name}</span>
@@ -328,7 +384,7 @@ export default function GroupOrderPage() {
               <p className="text-sm text-white truncate">{m.name}</p>
               <p className="text-[11px] text-white/40">{naira(m.price_kobo)}{m.addons.length > 0 ? ` · ${m.addons.length} add-on${m.addons.length === 1 ? '' : 's'}` : ''}</p>
             </div>
-            <button onClick={() => addItem(m.id)} disabled={busyId === m.id || expired}
+            <button onClick={() => addFromMenu(m)} disabled={busyId === m.id || expired}
               className="shrink-0 rounded-lg px-4 text-xs font-semibold text-black disabled:opacity-50" style={{ background: '#F5A623', minHeight: 44 }}>
               {busyId === m.id ? '…' : '+ Add'}
             </button>
