@@ -1,6 +1,7 @@
 import { Redis } from '@upstash/redis'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { getFeature } from '@/lib/features'
+import { getCronHealth } from '@/lib/cron-health'
 import routeManifest from '@/lib/route-manifest.json'
 
 // The Sentinel — a READ-ONLY health snapshot of the whole platform, shared by
@@ -42,6 +43,111 @@ export interface SentinelSnapshot {
 }
 
 type DB = ReturnType<typeof createSupabaseAdmin>
+
+export interface OperationalFailureCounts {
+  payment_failures_15m: number
+  refund_failures_15m: number
+  webhook_failures_15m: number
+  email_failures_15m: number
+  notification_failures_15m: number
+  overdue_crons: Array<{ key: string; label: string; money: boolean }>
+  redis_configured: boolean
+  redis_ok: boolean
+}
+
+export function deriveOperationalProviderIssues(counts: OperationalFailureCounts): SentinelIssue[] {
+  const issues: SentinelIssue[] = []
+  const paymentTotal = counts.payment_failures_15m + counts.refund_failures_15m
+
+  if (!counts.redis_configured) {
+    issues.push({
+      severity: 'SEV2',
+      code: 'REDIS_UNCONFIGURED',
+      message: 'Redis is not configured. Rate limits, Sentinel alert dedupe, and short-lived operational caches may be degraded.',
+    })
+  } else if (!counts.redis_ok) {
+    issues.push({
+      severity: 'SEV1',
+      code: 'REDIS_UNREACHABLE',
+      message: 'Redis health check failed. Rate limits, alert dedupe, and cached operational controls may be unreliable.',
+    })
+  }
+
+  if (paymentTotal >= 3) {
+    issues.push({
+      severity: 'SEV1',
+      code: 'PAYMENT_FAILURE_BURST',
+      message: `${paymentTotal} payment/refund failure(s) in 15 minutes. Check Paystack, wallet refund reservations, and checkout callbacks.`,
+    })
+  } else if (paymentTotal > 0) {
+    issues.push({
+      severity: 'SEV2',
+      code: 'PAYMENT_FAILURES',
+      message: `${paymentTotal} payment/refund failure(s) in 15 minutes. Watch checkout and refund queues.`,
+    })
+  }
+
+  if (counts.webhook_failures_15m >= 3) {
+    issues.push({
+      severity: 'SEV1',
+      code: 'WEBHOOK_FAILURE_BURST',
+      message: `${counts.webhook_failures_15m} webhook failure/reject event(s) in 15 minutes. Payment state may lag provider truth.`,
+    })
+  } else if (counts.webhook_failures_15m > 0) {
+    issues.push({
+      severity: 'SEV2',
+      code: 'WEBHOOK_FAILURES',
+      message: `${counts.webhook_failures_15m} webhook failure/reject event(s) in 15 minutes.`,
+    })
+  }
+
+  if (counts.email_failures_15m >= 5) {
+    issues.push({
+      severity: 'SEV2',
+      code: 'EMAIL_FAILURE_BURST',
+      message: `${counts.email_failures_15m} transactional email failure(s) in 15 minutes. Application, receipt, or support replies may be delayed.`,
+    })
+  } else if (counts.email_failures_15m > 0) {
+    issues.push({
+      severity: 'SEV3',
+      code: 'EMAIL_FAILURES',
+      message: `${counts.email_failures_15m} transactional email failure(s) in 15 minutes.`,
+    })
+  }
+
+  if (counts.notification_failures_15m >= 5) {
+    issues.push({
+      severity: 'SEV2',
+      code: 'NOTIFICATION_FAILURE_BURST',
+      message: `${counts.notification_failures_15m} notification failure(s) in 15 minutes. Order updates may not reach users.`,
+    })
+  } else if (counts.notification_failures_15m > 0) {
+    issues.push({
+      severity: 'SEV3',
+      code: 'NOTIFICATION_FAILURES',
+      message: `${counts.notification_failures_15m} notification failure(s) in 15 minutes.`,
+    })
+  }
+
+  const moneyCrons = counts.overdue_crons.filter((job) => job.money)
+  if (moneyCrons.length > 0) {
+    issues.push({
+      severity: 'SEV1',
+      code: 'MONEY_CRON_OVERDUE',
+      message: `${moneyCrons.length} money cron(s) overdue: ${moneyCrons.map((job) => job.label).join(', ')}. Wallet holds, refunds, or sweeps may be stranded.`,
+    })
+  }
+  const nonMoneyCrons = counts.overdue_crons.filter((job) => !job.money)
+  if (nonMoneyCrons.length > 0) {
+    issues.push({
+      severity: 'SEV2',
+      code: 'CRON_OVERDUE',
+      message: `${nonMoneyCrons.length} cron(s) overdue: ${nonMoneyCrons.map((job) => job.label).join(', ')}.`,
+    })
+  }
+
+  return issues
+}
 
 function redis(): Redis | null {
   const url = process.env.UPSTASH_REDIS_REST_URL
@@ -121,6 +227,7 @@ export async function gatherSnapshot(db: DB): Promise<SentinelSnapshot> {
 
   const todayIso = todayStartWAT()
   const since90m = new Date(Date.now() - 90 * 60_000).toISOString()
+  const since15m = new Date(Date.now() - 15 * 60_000).toISOString()
   const peak = isPeakNow()
 
   let ordersToday: Array<{ payment_status: string; total_amount: number; status: string }> = []
@@ -152,6 +259,57 @@ export async function gatherSnapshot(db: DB): Promise<SentinelSnapshot> {
     console.error('[sentinel] snapshot query failed:', err)
     dbOk = false
     issues.push({ severity: 'SEV1', code: 'DB_UNREACHABLE', message: 'Database query failed — the app may be down or Supabase is unreachable.' })
+  }
+
+  try {
+    const r = redis()
+    let redisOk = false
+    if (r) {
+      try {
+        await r.ping()
+        redisOk = true
+      } catch (err) {
+        console.error('[sentinel] redis health check failed:', err)
+      }
+    }
+
+    const [
+      failedOrders,
+      failedRefunds,
+      failedPremium,
+      failedBoosts,
+      webhookRejects,
+      emailFailures,
+      notificationFailures,
+      cronHealth,
+    ] = await Promise.all([
+      db.from('orders').select('id', { count: 'exact', head: true }).eq('payment_status', 'FAILED').gte('updated_at', since15m),
+      db.from('refunds').select('id', { count: 'exact', head: true }).in('status', ['FAILED', 'NEEDS_ATTENTION']).gte('created_at', since15m),
+      db.from('premium_payment_events').select('id', { count: 'exact', head: true }).eq('status', 'failed').gte('updated_at', since15m),
+      db.from('boost_payment_events').select('id', { count: 'exact', head: true }).eq('status', 'failed').gte('updated_at', since15m),
+      db.from('security_events').select('id', { count: 'exact', head: true }).eq('event_type', 'webhook_reject').gte('created_at', since15m),
+      db.from('transactional_email_events').select('id', { count: 'exact', head: true }).eq('status', 'FAILED').gte('updated_at', since15m),
+      db.from('notifications').select('id', { count: 'exact', head: true }).eq('status', 'FAILED').gte('created_at', since15m),
+      getCronHealth(),
+    ])
+
+    issues.push(...deriveOperationalProviderIssues({
+      payment_failures_15m: (failedOrders.count ?? 0) + (failedPremium.count ?? 0) + (failedBoosts.count ?? 0),
+      refund_failures_15m: failedRefunds.count ?? 0,
+      webhook_failures_15m: webhookRejects.count ?? 0,
+      email_failures_15m: emailFailures.count ?? 0,
+      notification_failures_15m: notificationFailures.count ?? 0,
+      overdue_crons: cronHealth.filter((job) => job.overdue).map((job) => ({ key: job.key, label: job.label, money: job.money })),
+      redis_configured: !!r,
+      redis_ok: redisOk,
+    }))
+  } catch (err) {
+    console.error('[sentinel] operational failure checks failed:', err)
+    issues.push({
+      severity: 'SEV2',
+      code: 'OPS_SIGNAL_UNAVAILABLE',
+      message: 'Sentinel could not read one or more operational failure signals. Alert coverage may be incomplete.',
+    })
   }
 
   try {
