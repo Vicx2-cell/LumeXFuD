@@ -20,3 +20,6 @@
 - Normal vendor product selection previously opened the configuration sheet only for items with add-ons, so item notes could not be captured for every product.
 - Customer cart lines previously did not show item imagery, did not allow note edits, and removed lines without an immediate undo recovery path.
 - Cart reducer already preserves configured add-ons by cart-line key; focused tests now cover configured item separation/merge, note edits without add-on/image loss, and remove behavior.
+- There was no `/store/{vendor-slug}` route. Existing live ordering is `/vendor/[id]`, while `/uturu/vendor/[slug]` is a separate content/SEO profile.
+- Vendor slugs are backed by migration `089_vendor_slug.sql`, which normalizes and deduplicates database slugs, but the commerce route still needed local guards for reserved platform words and malformed shared URLs.
+- The new `/store/[slug]` route resolves only active, non-deleted, non-suspended vendors and delegates rendering to the existing `/vendor/[id]` page so menu, add-ons, cart, checkout, payment, dispatch, and order systems remain canonical.

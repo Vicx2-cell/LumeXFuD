@@ -14,8 +14,12 @@
 - Passed after cart/product selection change: `npm.cmd run lint`.
 - Passed after cart/product selection change: `npm.cmd run build`.
 - Passed after cart/product selection change: `git diff --check` with only existing LF-to-CRLF working-copy warnings.
+- Passed after storefront route change: `npm.cmd test -- --run test/storefront.test.ts test/cart-context.test.ts`.
+- Passed after storefront route change: `npm.cmd run lint`.
+- Passed after storefront route change: `npm.cmd run build`.
 
 ## Added During Loop
 
 - `test/group-order-addons.test.ts`
 - `test/cart-context.test.ts`
+- `test/storefront.test.ts`

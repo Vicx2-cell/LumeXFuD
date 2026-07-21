@@ -2,12 +2,11 @@
 
 ## In Progress
 
-- [ ] Commit the verified cart/product selection improvement.
-- [ ] Inspect next Phase A-D gap after cart/product selection.
+- [ ] Commit the verified `/store/[slug]` storefront improvement.
+- [ ] Inspect next Phase A-D gap after commerce storefront routing.
 
 ## Pending
 
-- [ ] Complete `/store/{vendor-slug}` direct vendor storefront path using existing vendor/menu/cart/checkout systems.
 - [ ] Complete guest checkout verification gaps that are ready locally.
 - [ ] Run boundary verification for the active four phases.
 
@@ -23,5 +22,7 @@
 - [x] Added product sheet item notes for normal ordering.
 - [x] Added cart item images, editable item notes, remove, and undo recovery.
 - [x] Added focused cart reducer regression tests.
+- [x] Added `/store/[slug]` commerce-first vendor storefront route.
+- [x] Added storefront slug normalization and reserved-word tests.
 - [x] Added focused group-order add-on helper tests.
 - [x] Ran lint and focused tests for first slice.

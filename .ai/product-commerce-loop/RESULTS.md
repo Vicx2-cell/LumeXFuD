@@ -24,4 +24,8 @@
 - Implemented current cart/product selection slice: product configuration sheet opens for all normal vendor menu items, item notes persist to cart, cart lines show item images where available, notes can be edited in cart, and remove has undo recovery.
 - Added focused cart reducer regression tests for configured item separation/merge, note editing, image/add-on preservation, and removal.
 - Verification passed: focused cart/group tests, lint, production build, and diff whitespace check.
-- Commit pending for current slice.
+- Committed as `a2aa9c8 Improve cart item editing`.
+- Implemented commerce storefront route `/store/[slug]`: resolves normalized vendor slugs to active vendors, rejects reserved words, produces vendor-specific metadata, and reuses the existing live `/vendor/[id]` ordering surface.
+- Added focused storefront slug tests for normalization, Unicode/punctuation, malformed encodings, reserved words, and canonical `/store` paths.
+- Verification passed: focused storefront/cart tests, lint, and production build.
+- Commit pending for storefront route slice.

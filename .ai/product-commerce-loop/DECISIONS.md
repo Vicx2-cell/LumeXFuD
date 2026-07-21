@@ -14,3 +14,6 @@
 - Open the product configuration sheet for every normal vendor menu item, even when no add-ons exist, so notes and future option controls share one reachable mobile surface.
 - Store menu item images on cart lines for cart review, while continuing to use server-authoritative menu and add-on pricing during order creation.
 - Use a short-lived client-side undo snapshot for cart removals rather than silently restoring or mutating selections.
+- Implement `/store/[slug]` as a commerce entry point that reuses the existing live vendor order page instead of cloning menu/cart/checkout behavior.
+- Keep `/uturu/vendor/[slug]` available as the content/SEO profile; `/store/[slug]` is the shareable ordering storefront.
+- Reject reserved platform words for storefront slugs at the route-helper layer and rely on the existing vendor visibility filter for inactive, suspended, or deleted vendors.
