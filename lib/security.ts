@@ -89,3 +89,21 @@ export function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false
   return origin === appUrl || origin === appUrl.replace(/\/$/, '')
 }
+
+export function isSameOriginBrowserRequest(headers: Headers): boolean {
+  const fetchSite = headers.get('sec-fetch-site')?.toLowerCase()
+  if (fetchSite) return fetchSite === 'same-origin' || fetchSite === 'none'
+
+  const origin = headers.get('origin')
+  if (origin) return isAllowedOrigin(origin)
+
+  const referer = headers.get('referer')
+  if (referer) {
+    try { return isAllowedOrigin(new URL(referer).origin) } catch { return false }
+  }
+
+  // Local tests, CLI tools, and server-to-server probes often omit browser
+  // request metadata. In production, sensitive evidence routes fail closed unless
+  // at least one browser provenance signal is present.
+  return process.env.NODE_ENV !== 'production'
+}

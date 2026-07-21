@@ -97,3 +97,9 @@
 - Repaired partial-refund webhook replay/misclassification by targeting a single refund row and preserving provider refund references when Paystack returns them.
 - Added regression tests for suspended/inactive/wrong-role session minting and ambiguous partial-refund webhook events.
 - Verification passed for targeted tests, a broader 283-test fraud/security set, and TypeScript. Production build and complete suite were not rerun for this checkpoint yet.
+
+## FS-015 red-team checkpoint
+
+- Repaired CSRF-triggerable side effects on incident list/export GET routes by requiring same-origin browser provenance before evidence custody/export actions.
+- Added regression coverage for `Sec-Fetch-Site: cross-site`, same-origin/direct navigation, Origin/Referer fallback, and production fail-closed behavior.
+- Verification passed for targeted incident/CSRF tests, a broader 286-test fraud/security set, and TypeScript. Production build and complete suite were not rerun for this checkpoint yet.

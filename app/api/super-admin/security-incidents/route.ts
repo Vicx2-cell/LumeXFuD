@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { createRequestContext, applyRequestContext } from '@/lib/request-context'
 import { approximateLocationForConsole, maskIncidentIdentifier, maskNetworkIndicator } from '@/lib/incident-redaction'
+import { isSameOriginBrowserRequest } from '@/lib/security'
 
 const createInput = z.object({
   event_id: z.number().int().positive(),
@@ -34,6 +35,7 @@ export async function GET(req: NextRequest) {
   const session = await getCurrentUser()
   if (!session) return json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'super_admin') return json({ error: 'Forbidden' }, { status: 403 })
+  if (!isSameOriginBrowserRequest(req.headers)) return json({ error: 'Forbidden' }, { status: 403 })
   const db = createSupabaseAdmin()
   const { data: incidents, error } = await db.from('security_incidents')
     .select('id, incident_id, severity, confidence, classification, status, account_id, account_role, affected_orders, affected_payments, triggered_rules, containment_actions, approximate_location, location_accuracy_warning, recommended_action, evidence_hold, created_at')

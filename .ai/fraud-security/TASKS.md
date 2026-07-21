@@ -14,4 +14,5 @@
 12. **COMPLETE - FS-012:** lawful accuracy-aware handover location, implausible-travel evidence, and verified-place poisoning prevention.
 13. **COMPLETE - FS-013:** complete incident facts, append-only human case transitions, false-positive handling, and case-console controls.
 14. **COMPLETE - FINAL:** isolated production build and complete test-suite verification.
-15. **READY TO COMMIT - FS-014:** red-team bypass repair for final session issuance eligibility and partial-refund webhook row targeting.
+15. **COMPLETE - FS-014:** red-team bypass repair for final session issuance eligibility and partial-refund webhook row targeting.
+16. **READY TO COMMIT - FS-015:** cross-site GET protection for incident custody and evidence export side effects.

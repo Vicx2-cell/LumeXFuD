@@ -139,3 +139,9 @@
 - PASS: `npm.cmd test -- --run test/refund-webhook-target.test.ts test/refund-naira.test.ts test/webhook-idempotency.test.ts` completed in 10.6s command time / 7.15s Vitest duration: 3 files, 12/12 tests passed.
 - PASS: `npm.cmd test -- --run test/account-restriction.test.ts test/proxy-revocation.test.ts test/access-control.test.ts test/webhook-route.test.ts test/webhook-and-exposure.test.ts test/webhook-idempotency.test.ts test/refund-risk.test.ts test/refund-naira.test.ts test/refund-webhook-target.test.ts test/order-fraud.test.ts test/order-fraud-route.test.ts test/stale-rider-access.test.ts test/security-incidents.test.ts test/security-incident-case-route.test.ts test/security-events.test.ts` completed in 17.0s command time / 14.14s Vitest duration: 15 files, 283/283 tests passed.
 - PASS: `npx.cmd tsc --noEmit` passed after the session-boundary repair and again after the refund-webhook repair.
+
+## FS-015 red-team checkpoint
+
+- PASS: `npm.cmd test -- --run test/csrf-origin.test.ts test/security-incidents.test.ts test/security-incident-case-route.test.ts test/incident-redaction.test.ts test/privileged-api-proxy.test.ts` completed in 6.6s command time / 2.78s Vitest duration: 5 files, 22/22 tests passed.
+- PASS: `npm.cmd test -- --run test/csrf-origin.test.ts test/account-restriction.test.ts test/proxy-revocation.test.ts test/access-control.test.ts test/webhook-route.test.ts test/webhook-and-exposure.test.ts test/webhook-idempotency.test.ts test/refund-risk.test.ts test/refund-naira.test.ts test/refund-webhook-target.test.ts test/order-fraud.test.ts test/order-fraud-route.test.ts test/stale-rider-access.test.ts test/security-incidents.test.ts test/security-incident-case-route.test.ts test/security-events.test.ts` completed in 16.0s command time / 13.28s Vitest duration: 16 files, 286/286 tests passed.
+- PASS: `npx.cmd tsc --noEmit` passed.

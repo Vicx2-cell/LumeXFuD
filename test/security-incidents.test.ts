@@ -32,6 +32,7 @@ describe('security incident evidence model', () => {
     expect(exportRoute).toMatch(/human_authorization_required: true/i)
     expect(exportRoute).toMatch(/createHash\('sha256'\)/i)
     expect(exportRoute).toMatch(/action: 'EXPORTED'/i)
+    expect(exportRoute).toMatch(/isSameOriginBrowserRequest\(req\.headers\)/i)
     expect(exportRoute).not.toMatch(/fetch\(|EFCC|sendEmail|sendSms|sendWhatsApp/i)
   })
 
@@ -43,6 +44,7 @@ describe('security incident evidence model', () => {
     expect(createRoute).toMatch(/create_security_incident_v2/i)
     expect(refundRoute).toMatch(/p_orders: \[order\.id\]/i)
     expect(refundRoute).toMatch(/p_payments: \[order\.paystack_reference\]/i)
+    expect(createRoute).toMatch(/isSameOriginBrowserRequest\(req\.headers\)/i)
   })
 
   it('requires super-admin human review and fails closed if the evidence event is unavailable', () => {

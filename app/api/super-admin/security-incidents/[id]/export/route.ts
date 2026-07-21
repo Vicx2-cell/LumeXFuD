@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { applyRequestContext, createRequestContext } from '@/lib/request-context'
+import { isSameOriginBrowserRequest } from '@/lib/security'
 
 const idSchema = z.string().uuid()
 
@@ -13,6 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const session = await getCurrentUser()
   if (!session) return json({ error: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'super_admin') return json({ error: 'Forbidden' }, { status: 403 })
+  if (!isSameOriginBrowserRequest(req.headers)) return json({ error: 'Forbidden' }, { status: 403 })
   const parsedId = idSchema.safeParse((await params).id)
   if (!parsedId.success) return json({ error: 'Invalid incident ID' }, { status: 400 })
 

@@ -97,3 +97,9 @@ Status: repaired. `createSession()` now fails closed unless the subject still ma
 `refund.processed` and `refund.failed` updated `refunds` by `paystack_transaction_reference` only. Multiple partial refunds for one Paystack charge share that transaction reference, so one provider event could mark every processing partial refund completed or failed, creating false ledger state and incorrect customer notifications.
 
 Status: repaired. Paystack refund initiation now preserves the provider refund reference when available. Refund webhook handling selects exactly one processing refund by provider refund reference, then by unique amount, then only by single-row fallback. Ambiguous events are not applied and instead emit `webhook_reject` evidence for human review.
+
+## FS-015 - HIGH - Incident evidence GET routes had CSRF-triggerable side effects
+
+The incident list route records `VIEWED` custody on `GET`, and the evidence export route records `EXPORTED` custody and returns an attachment on `GET`. Because the main session cookie is `SameSite=Lax`, a cross-site top-level navigation can still carry a super-admin cookie. An attacker could not read the response through browser SOP, but could make a super-admin unknowingly append custody/export records and potentially trigger a local evidence download.
+
+Status: repaired. Incident list and export routes now require same-origin browser provenance before performing the sensitive read/side effect. `Sec-Fetch-Site: cross-site` is rejected, same-origin and direct user navigations are allowed, Origin/Referer are used as fallbacks, and ambiguous production requests fail closed.
