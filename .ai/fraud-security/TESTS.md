@@ -94,3 +94,13 @@
 - PASS: admin/block, admin/wallet-adjust, feature flags, stats, and WhatsApp remain super-only at the proxy and handler layers.
 - PASS: changed IP and user-agent indicators together remain observe-only and explicitly do not prove identity.
 - PASS: one wrong-role signal cannot recommend a financial freeze.
+
+## FS-011 verification
+
+- PASS (1.08s Vitest duration; 23.2s command with TypeScript): focused multi-account token, referral integration, rewards, risk, request-context, and security-event tests (6 files, 28 tests), followed by `npx.cmd tsc --noEmit`.
+- PASS (4.56s Vitest duration; 6.3s command): broader auth/referral/reward/risk/authz/OTP/email/restriction tests (11 files, 56 tests).
+- PASS: correlation token is deterministic, keyed, non-reversible, and unavailable with a weak/missing secret.
+- PASS: shared IP alone and the first two correlated claims remain observe-only.
+- PASS: the third same-referrer/same-token claim in 24 hours enters reward-only manual review and emits no token/raw user-agent detail.
+- PASS: the completion trigger returns before issuing either referral credit while manual review is active.
+- PASS: no customer suspension, permanent ban, identity claim, or unrelated financial freeze is introduced.

@@ -22,6 +22,7 @@ export type SecurityEventType =
   | 'order_idempotency_invalid'
   | 'stale_rider_access' | 'rider_assignment_rejected'
   | 'suspicious_admin_access'
+  | 'multi_account_indicator'
 
 export interface SecurityEventInput {
   eventType: SecurityEventType

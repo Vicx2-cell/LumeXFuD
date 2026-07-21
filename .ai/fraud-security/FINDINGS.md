@@ -60,6 +60,12 @@ The API proxy deliberately excluded all APIs, and 53 admin/super-admin handlers 
 
 Status: repaired. The proxy now narrowly matches admin, super-admin, refund, and wallet-freeze APIs, returns JSON rather than redirects, rechecks revocation, enforces super-only aliases, and records all missing/invalid/wrong-role denials. Authorized session network/user-agent changes produce observe-only evidence with an explicit no-identity-proof warning. They never block, revoke, freeze, or accuse by themselves.
 
+## FS-011 - HIGH - Referral reward correlation data was raw and unused
+
+Customer referral signup stored raw IP and raw user-agent fields but neither created structured evidence nor held correlated reward claims. The later `device_hash` column was unused. Repeated accounts could therefore qualify referral credits through the same referrer/request context without review, while the stored raw user-agent was more identifying than needed.
+
+Status: repaired. Registration derives a keyed, domain-separated correlation token from already-lawful request metadata and stores no raw user-agent in referral correlation fields. Shared IP alone contributes zero risk. The first two same-context claims remain normal; only the third within 24 hours for the same referrer enters reversible reward-only manual review. The authoritative award trigger honors the hold, while signup and unrelated account actions continue normally. Evidence explicitly states that indicators do not prove common identity.
+
 ## Scoped inventory observed
 
 - Authentication/session paths: `lib/session.ts`, `lib/pin-auth.ts`, `lib/rate-limit.ts`, `proxy.ts`, and `app/api/auth/**`.

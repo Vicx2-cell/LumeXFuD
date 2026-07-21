@@ -15,8 +15,12 @@ import { buildPublicDisplayName, buildPublicHandleCandidates, chooseAvailablePub
 import { autoFollowOfficialAccount } from '@/lib/feed/official-follow'
 import { sendWelcomeEmail } from '@/lib/transactional-email'
 import { EMAIL_VERIFIED_COOKIE, emailVerifiedCookieOptions, verifyEmailVerified } from '@/lib/email-verify'
+import { applyRequestContext, createRequestContext } from '@/lib/request-context'
+import { evaluateMultiAccountReferralRisk, referralCorrelationToken } from '@/lib/multi-account-risk'
+import { recordSecurityEvent } from '@/lib/security-events'
 
 export async function POST(req: NextRequest) {
+  const context = createRequestContext(req.headers)
   try {
     // Feature flag: a super admin can close new sign-ups platform-wide.
     if (!(await getFeature('signups'))) {
@@ -187,15 +191,41 @@ export async function POST(req: NextRequest) {
     const userAgent = req.headers.get('user-agent') ?? undefined
 
     // Attach a referral if a valid code was supplied (and the feature is on). The
-    // RPC does all fraud checks server-side (code exists, not self, not already
-    // referred) and is a no-op otherwise — never block sign-up on it. Non-fatal.
+    // RPC validates the referral and places only a third same-context reward
+    // claim into manual review. Referral failure never blocks account creation.
     if (data.referral_code && (await getFeature('referral'))) {
-      db.rpc('attach_referral', {
-        p_referred: user.id,
-        p_code: data.referral_code,
-        p_ip: ipAddress ?? null,
-        p_device: userAgent ?? null,
-      }).then(() => {}, () => {})
+      try {
+        const correlationToken = referralCorrelationToken(
+          ipAddress ?? null, userAgent ?? null,
+          process.env.REFERRAL_SIGNAL_SECRET ?? process.env.JWT_SECRET,
+        )
+        const { data: referralResult } = await db.rpc('attach_referral_with_risk', {
+          p_referred: user.id, p_code: data.referral_code,
+          p_ip: ipAddress ?? null, p_correlation_token: correlationToken,
+        })
+        const row = (referralResult as Array<{
+          attached: boolean; referral_id: string | null; manual_review: boolean; matched_recent: number
+        }> | null)?.[0]
+        if (row?.attached && row.manual_review) {
+          const risk = evaluateMultiAccountReferralRisk({
+            sameReferrerTokenClaims24h: row.matched_recent,
+            hasCorrelationToken: Boolean(correlationToken),
+          })
+          await recordSecurityEvent({
+            eventType: 'multi_account_indicator', severity: 'warn', surface: 'auth.register.referral',
+            actorId: user.id, actorRole: 'customer', ip: ipAddress, userAgent,
+            requestId: context.requestId, correlationId: context.correlationId,
+            route: req.nextUrl.pathname, method: req.method, resourceType: 'referral',
+            resourceId: row.referral_id, outcome: 'reward_manual_review',
+            detail: {
+              score: risk.score, confidence: risk.confidence,
+              triggered_rules: risk.triggeredRules, actions: risk.actions,
+              matched_recent_claims: row.matched_recent,
+              warning: 'Request indicators do not prove common identity.',
+            },
+          })
+        }
+      } catch { /* referral attachment remains non-fatal to account creation */ }
     }
 
     // Record the customer's acceptance of the Terms, Privacy and Refund policies at
@@ -220,7 +250,7 @@ export async function POST(req: NextRequest) {
     // Burn the phone-verified cookie — single use.
     res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
     res.cookies.set(EMAIL_VERIFIED_COOKIE, '', emailVerifiedCookieOptions(0))
-    return res
+    return applyRequestContext(res, context)
   } catch (error) {
     if (error instanceof ZodError) {
       const firstIssue = error.issues[0]

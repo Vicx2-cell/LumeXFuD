@@ -62,3 +62,10 @@
 - Centralized evidence for missing, invalid, revoked, and wrong-role privileged access attempts.
 - Enforced route-policy super-only aliases before handlers while retaining handler defense in depth.
 - Compared only lawful same-session IP/user-agent indicators and kept those changes observe-only with explicit accuracy limits.
+
+## FS-011 complete
+
+- Replaced raw referral user-agent correlation with a keyed, scoped pseudonymous token.
+- Added same-referrer/same-context/24-hour reward-claim evidence while making shared IP alone insufficient.
+- Put only corroborated third claims into reversible human review and made the reward trigger honor that hold.
+- Kept signup, sessions, ordering, and non-referral funds unaffected; indicators never assert shared identity.
