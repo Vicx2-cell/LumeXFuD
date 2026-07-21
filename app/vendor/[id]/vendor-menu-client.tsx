@@ -50,6 +50,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
   // Transient "+1" fly-to-cart cue: { id: which item, n: nonce to replay }.
   const [fly, setFly] = useState<{ id: string; n: number } | null>(null)
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([])
+  const [itemNotes, setItemNotes] = useState('')
   const sentProfileOpen = useRef(false)
   const sentMenuItems = useRef<Set<string>>(new Set())
 
@@ -115,13 +116,15 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
     }
   }, [campaignId, filtered, vendor.id])
 
-  function buildCartItem(item: MenuItem, addons: CartAddon[]): CartItem {
+  function buildCartItem(item: MenuItem, addons: CartAddon[], notes = ''): CartItem {
     return {
       id: cartLineKey(item.id, addons),
       menu_item_id: item.id,
       name: item.name,
       price_kobo: item.price_kobo,
+      image_url: item.image_url,
       quantity: 1,
+      special_instructions: notes.trim() || undefined,
       // Per-dish time, falling back to the vendor's base — so the cart ETA works.
       prep_time_minutes: item.prep_time_minutes ?? vendor.prep_time_minutes,
       addons,
@@ -154,20 +157,18 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
 
   function handleAdd(item: MenuItem) {
     if (isClosed) return
-    if (item.addons.length > 0) {
-      setSelecting(item)
-      setSelectedAddonIds([])
-      return
-    }
-    doAdd(buildCartItem(item, []))
+    setSelecting(item)
+    setSelectedAddonIds([])
+    setItemNotes('')
   }
 
   function confirmAddons() {
     if (!selecting) return
     const chosen = selecting.addons.filter((a) => selectedAddonIds.includes(a.id))
-    doAdd(buildCartItem(selecting, chosen.map((a) => ({ id: a.id, name: a.name, price_kobo: a.price_kobo }))))
+    doAdd(buildCartItem(selecting, chosen.map((a) => ({ id: a.id, name: a.name, price_kobo: a.price_kobo })), itemNotes))
     setSelecting(null)
     setSelectedAddonIds([])
+    setItemNotes('')
   }
 
   function handleConflictConfirm() {
@@ -209,38 +210,55 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       {/* Add-on selection sheet */}
       {selecting && (
         <div className="fixed inset-0 z-50 flex items-end justify-center lx-scrim" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setSelecting(null)}>
-          <div className="lx-sheet glass-thick w-full max-w-lg p-5 space-y-4 max-h-[85vh] overflow-y-auto" style={{ borderRadius: '28px 28px 0 0' }} onClick={(e) => e.stopPropagation()}>
+          <div className="lx-sheet glass-thick w-full max-w-lg p-5 space-y-4 max-h-[min(88dvh,680px)] overflow-y-auto overscroll-contain scroll-pb-28" style={{ borderRadius: '28px 28px 0 0' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-lg">{selecting.name}</h3>
+              <div className="min-w-0 pr-3">
+                <h3 className="font-semibold text-lg leading-snug break-words">{selecting.name}</h3>
                 <p className="lx-amber text-sm">{formatPrice(selecting.price_kobo)}</p>
               </div>
-              <button onClick={() => setSelecting(null)} className="text-white/40 text-sm">Close</button>
+              <button onClick={() => setSelecting(null)} className="h-11 shrink-0 rounded-xl px-3 text-sm text-white/60" style={{ background: 'rgba(255,255,255,0.06)' }}>Close</button>
             </div>
 
-            <p className="text-xs uppercase tracking-[0.18em] text-white/40">Add extras (optional)</p>
-            <div className="space-y-2">
-              {selecting.addons.map((a) => {
-                const checked = selectedAddonIds.includes(a.id)
-                return (
-                  <button key={a.id}
-                    onClick={() => setSelectedAddonIds((prev) => checked ? prev.filter((x) => x !== a.id) : [...prev, a.id])}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left"
-                    style={{ background: checked ? 'rgba(245,166,35,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${checked ? '#F5A623' : 'rgba(255,255,255,0.07)'}` }}>
-                    <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
-                      style={{ background: checked ? '#F5A623' : 'transparent', border: `2px solid ${checked ? '#F5A623' : 'rgba(255,255,255,0.3)'}` }}>
-                      {checked && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
-                    </div>
-                    <span className="flex-1 text-sm">{a.name}</span>
-                    <span className="text-sm text-white/60">+{formatPrice(a.price_kobo)}</span>
-                  </button>
-                )
-              })}
+            {selecting.addons.length > 0 && (
+              <>
+                <p className="text-xs uppercase tracking-[0.18em] text-white/40">Optional extras</p>
+                <div className="space-y-2">
+                  {selecting.addons.map((a) => {
+                    const checked = selectedAddonIds.includes(a.id)
+                    return (
+                      <button key={a.id}
+                        onClick={() => setSelectedAddonIds((prev) => checked ? prev.filter((x) => x !== a.id) : [...prev, a.id])}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left"
+                        style={{ background: checked ? 'rgba(245,166,35,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${checked ? '#F5A623' : 'rgba(255,255,255,0.07)'}` }}>
+                        <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                          style={{ background: checked ? '#F5A623' : 'transparent', border: `2px solid ${checked ? '#F5A623' : 'rgba(255,255,255,0.3)'}` }}>
+                          {checked && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
+                        </div>
+                        <span className="min-w-0 flex-1 break-words text-sm leading-snug">{a.name}</span>
+                        <span className="text-sm text-white/60">+{formatPrice(a.price_kobo)}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+
+            <div>
+              <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-white/40" htmlFor="item-notes">Item note</label>
+              <textarea
+                id="item-notes"
+                value={itemNotes}
+                onChange={(e) => setItemNotes(e.target.value.slice(0, 200))}
+                placeholder="Optional kitchen note"
+                rows={2}
+                className="lx-field w-full resize-none px-4 py-3 text-sm outline-none"
+              />
+              <p className="mt-1 text-right text-xs text-white/30">{itemNotes.length}/200</p>
             </div>
 
             {/* Sticky footer so the confirm button is always reachable, even with
                 a long add-on list on a small phone. */}
-            <div className="sticky bottom-0 -mx-5 -mb-5 px-5 pt-3 pb-5" style={{ background: 'linear-gradient(to top, var(--lx-surface-solid) 72%, transparent)' }}>
+            <div className="sticky bottom-0 -mx-5 -mb-5 px-5 pt-3 pb-[calc(20px+env(safe-area-inset-bottom))]" style={{ background: 'linear-gradient(to top, var(--lx-surface-solid) 72%, transparent)' }}>
               <button onClick={confirmAddons} className="lx-btn-amber w-full rounded-2xl py-4">
                 Add to cart · {formatPrice(selectingTotal)}
               </button>

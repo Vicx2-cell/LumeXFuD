@@ -3,7 +3,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Timer, Users } from 'lucide-react'
-import { useCart } from '@/components/cart-context'
+import Image from 'next/image'
+import { FOOD_BLUR } from '@/lib/blur'
+import { useCart, type CartItem } from '@/components/cart-context'
 import { BottomNav } from '@/components/nav-bottom'
 import { formatPrice } from '@/lib/money'
 import { useFeatures } from '@/lib/use-features'
@@ -38,7 +40,7 @@ function CartSection({ title, subtitle, children }: { title: string; subtitle?: 
 
 export default function CartPage() {
   const router = useRouter()
-  const { cart, setQuantity, clearCart, subtotal, totalItems } = useCart()
+  const { cart, addItem, removeItem, setQuantity, setItemNotes, clearCart, subtotal, totalItems } = useCart()
   const features = useFeatures()
   const [groupBusy, setGroupBusy] = useState(false)
 
@@ -82,6 +84,7 @@ export default function CartPage() {
   const [isGuest,          setIsGuest]          = useState(false)
   const [guestName,        setGuestName]        = useState('')
   const [guestPhone,       setGuestPhone]       = useState('')
+  const [removedLine,      setRemovedLine]      = useState<{ vendor_id: string; vendor_name: string; item: CartItem } | null>(null)
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' })
@@ -260,6 +263,15 @@ export default function CartPage() {
           >
             Browse vendors
           </button>
+          {removedLine && (
+            <button
+              type="button"
+              onClick={undoRemove}
+              className="mt-3 min-h-11 rounded-xl border border-white/10 bg-white/[0.06] px-5 text-sm font-semibold text-white/70"
+            >
+              Undo remove
+            </button>
+          )}
         </div>
         <BottomNav />
       </main>
@@ -281,6 +293,22 @@ export default function CartPage() {
       if (!res.ok) { setError(d.error ?? 'Could not start group order.'); return }
       router.push(`/group/${d.code}`)
     } catch { setError('Connection error.') } finally { setGroupBusy(false) }
+  }
+
+  function removeCartLine(item: CartItem) {
+    if (cart.vendor_id && cart.vendor_name) {
+      setRemovedLine({ vendor_id: cart.vendor_id, vendor_name: cart.vendor_name, item })
+    }
+    removeItem(item.id)
+    window.setTimeout(() => {
+      setRemovedLine((current) => current?.item.id === item.id ? null : current)
+    }, 7000)
+  }
+
+  function undoRemove() {
+    if (!removedLine) return
+    addItem(removedLine.vendor_id, removedLine.vendor_name, removedLine.item)
+    setRemovedLine(null)
   }
 
   async function handleCheckout() {
@@ -455,14 +483,37 @@ export default function CartPage() {
             const addonsKobo = item.addons.reduce((s, a) => s + a.price_kobo, 0)
             const eachKobo = item.price_kobo + addonsKobo
             return (
-            <div key={item.id} className={`flex items-center gap-2 px-3 sm:px-4 py-3 ${idx < cart.items.length - 1 ? 'border-b border-white/5' : ''}`}>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{item.name}</p>
+            <div key={item.id} className={`grid grid-cols-[48px_1fr] gap-3 px-3 py-3 sm:grid-cols-[56px_1fr_auto] sm:px-4 ${idx < cart.items.length - 1 ? 'border-b border-white/5' : ''}`}>
+              <div className="relative h-12 w-12 overflow-hidden rounded-xl border border-white/8 bg-white/5 sm:h-14 sm:w-14">
+                {item.image_url ? (
+                  <Image src={item.image_url} alt="" fill sizes="56px" className="object-cover" placeholder="blur" blurDataURL={FOOD_BLUR} />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-white/20" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2" /><path d="M7 2v20" /><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></svg>
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="break-words text-sm font-medium leading-snug">{item.name}</p>
                 {item.addons.length > 0 && (
-                  <p className="text-xs text-white/40 mt-0.5 truncate">+ {item.addons.map((a) => a.name).join(', ')}</p>
+                  <p className="mt-0.5 break-words text-xs leading-snug text-white/40">+ {item.addons.map((a) => a.name).join(', ')}</p>
                 )}
                 <p className="text-xs text-white/40 mt-0.5">{formatPrice(eachKobo)} each</p>
+                <label className="mt-2 block text-[11px] uppercase tracking-[0.14em] text-white/35" htmlFor={`notes-${item.id}`}>Item note</label>
+                <textarea
+                  id={`notes-${item.id}`}
+                  value={item.special_instructions ?? ''}
+                  onChange={(e) => setItemNotes(item.id, e.target.value.slice(0, 200))}
+                  rows={2}
+                  placeholder="Optional kitchen note"
+                  className="lx-field mt-1 w-full resize-none px-3 py-2 text-xs outline-none"
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => router.push(`/vendor/${cart.vendor_id}`)} className="min-h-10 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-white/60">Edit</button>
+                  <button type="button" onClick={() => removeCartLine(item)} className="min-h-10 rounded-lg border border-red-400/20 bg-red-500/10 px-3 text-xs font-semibold text-red-300">Remove</button>
+                </div>
               </div>
+              <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:flex-col sm:items-end">
               <div className="flex items-center gap-1.5 shrink-0">
                 <button onClick={() => setQuantity(item.id, item.quantity - 1)} aria-label={`Decrease ${item.name} quantity`}
                   className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold transition-transform active:scale-90"
@@ -472,11 +523,18 @@ export default function CartPage() {
                   className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold transition-transform active:scale-90"
                   style={{ background: '#F5A623', color: '#000', minWidth: 44, minHeight: 44 }}>+</button>
               </div>
-              <p className="text-sm font-semibold w-16 sm:w-20 text-right shrink-0 tabular-nums">{formatPrice(eachKobo * item.quantity)}</p>
+              <p className="text-sm font-semibold text-right shrink-0 tabular-nums">{formatPrice(eachKobo * item.quantity)}</p>
+              </div>
             </div>
             )
           })}
         </div>
+        {removedLine && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2">
+            <p className="min-w-0 truncate text-xs text-white/55">Removed {removedLine.item.name}</p>
+            <button type="button" onClick={undoRemove} className="min-h-10 shrink-0 rounded-lg px-3 text-xs font-semibold" style={{ background: 'rgba(245,166,35,0.15)', color: '#F5A623' }}>Undo</button>
+          </div>
+        )}
         </CartSection>
 
         {/* Delivery type */}

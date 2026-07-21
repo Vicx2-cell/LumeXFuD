@@ -13,6 +13,7 @@ export interface CartItem {
   menu_item_id: string
   name: string
   price_kobo: number    // base item price; add-ons are priced separately
+  image_url?: string | null
   quantity: number
   special_instructions?: string
   // Effective prep minutes for this dish (its own time, or the vendor's base),
@@ -44,10 +45,11 @@ type CartAction =
   | { type: 'ADD_ITEM'; vendor_id: string; vendor_name: string; item: CartItem }
   | { type: 'REMOVE_ITEM'; id: string }
   | { type: 'SET_QUANTITY'; id: string; quantity: number }
+  | { type: 'SET_ITEM_NOTES'; id: string; notes: string }
   | { type: 'CLEAR' }
   | { type: 'HYDRATE'; state: CartState }
 
-function cartReducer(state: CartState, action: CartAction): CartState {
+export function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case 'HYDRATE': {
       // Normalize older persisted carts that predate add-ons.
@@ -103,6 +105,15 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       }
     }
 
+    case 'SET_ITEM_NOTES': {
+      return {
+        ...state,
+        items: state.items.map((i) =>
+          i.id === action.id ? { ...i, special_instructions: action.notes.trim() || undefined } : i
+        ),
+      }
+    }
+
     case 'CLEAR':
       return { vendor_id: null, vendor_name: null, items: [] }
 
@@ -120,6 +131,7 @@ interface CartContextValue {
   addItem: (vendor_id: string, vendor_name: string, item: CartItem) => boolean
   removeItem: (id: string) => void
   setQuantity: (id: string, quantity: number) => void
+  setItemNotes: (id: string, notes: string) => void
   clearCart: () => void
   // Replace the entire cart in one shot (used by "Order again" — avoids the
   // stale-closure problem of clear-then-add, and preserves item quantities,
@@ -166,6 +178,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_QUANTITY', id, quantity })
   }
 
+  function setItemNotes(id: string, notes: string) {
+    dispatch({ type: 'SET_ITEM_NOTES', id, notes })
+  }
+
   function clearCart() {
     dispatch({ type: 'CLEAR' })
   }
@@ -179,7 +195,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const subtotal = cart.items.reduce((sum, i) => sum + lineKobo(i) * i.quantity, 0)
 
   return (
-    <CartContext.Provider value={{ cart, addItem, removeItem, setQuantity, clearCart, replaceCart, totalItems, subtotal }}>
+    <CartContext.Provider value={{ cart, addItem, removeItem, setQuantity, setItemNotes, clearCart, replaceCart, totalItems, subtotal }}>
       {children}
     </CartContext.Provider>
   )

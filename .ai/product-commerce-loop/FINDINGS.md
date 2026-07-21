@@ -13,3 +13,10 @@
 - Guest checkout was schema-ready (`orders.guest_phone`) but disabled by an early `/api/orders` authentication gate and by the order page redirecting every unauthenticated viewer.
 - Guest order tracking requires a non-enumerable access token because order numbers are sequential.
 - Vendor share page preferred `/uturu/vendor/[slug]`, a content-first SEO page. For commerce sharing, the primary link should land directly on `/vendor/[id]` where the live menu/cart flow starts.
+- Verified commit `7576ddb` by content: it created durable loop files and preserved group-order add-on snapshots through seeding, display, checkout cart handoff, totals, and split-share math.
+- Verified commit `238c138` by content: it added a direct `/group/[code]` add-on picker bottom sheet for group-order participant ordering.
+- Verified commit `e3a17c5` by content: it added hashed guest order access tokens, guest-aware order creation, callback tracking links, and token-aware order viewing.
+- Verified commit `63af3c7` by content: it changed vendor share copy/actions to prioritize direct `/vendor/[id]` order links while keeping the SEO profile as secondary.
+- Normal vendor product selection previously opened the configuration sheet only for items with add-ons, so item notes could not be captured for every product.
+- Customer cart lines previously did not show item imagery, did not allow note edits, and removed lines without an immediate undo recovery path.
+- Cart reducer already preserves configured add-ons by cart-line key; focused tests now cover configured item separation/merge, note edits without add-on/image loss, and remove behavior.

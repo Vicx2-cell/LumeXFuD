@@ -3,6 +3,7 @@
 Date: 2026-07-21
 Branch: audit/production-readiness
 Starting commit: 13e22e6 Add admin rider reassignment
+Latest verified commit before this slice: 63af3c7 Prioritize direct vendor order links
 
 ## Scope
 
@@ -19,6 +20,7 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - Second product-commerce improvement implemented: direct `/group/[code]` menu adds now support a mobile bottom-sheet add-on picker.
 - Third product-commerce improvement implemented: guest delivery checkout with Paystack callback access tokens.
 - Fourth product-commerce improvement implemented: vendor share tools now lead with the direct order link instead of the content-first SEO profile.
+- Current slice implemented and pending commit: normal vendor product selection now captures item notes for every item, stores item images in cart lines, and the customer cart exposes editable notes, item images, remove, and undo recovery without changing customer selections silently.
 
 ## Baseline
 
@@ -26,3 +28,4 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - Project uses Next.js 16.2.6, React 19.2.4, Vitest, Supabase, and Sentry.
 - Baseline typecheck script is absent in `package.json`.
 - Focused tests, lint, and build passed for group-order, guest-checkout, and storefront-share slices.
+- Current slice verification passed: focused cart/group tests, lint, production build, and diff whitespace check.

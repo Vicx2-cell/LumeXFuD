@@ -16,4 +16,12 @@
 - Committed as `e3a17c5 Add secure guest checkout`.
 - Implemented direct-order vendor share links with secondary public profile link.
 - Verification passed for storefront-share slice: build and lint.
-- Fourth commit pending.
+- Committed as `63af3c7 Prioritize direct vendor order links`.
+
+## 2026-07-22
+
+- Verified the four preserved commits by inspecting actual commit contents instead of relying on titles.
+- Implemented current cart/product selection slice: product configuration sheet opens for all normal vendor menu items, item notes persist to cart, cart lines show item images where available, notes can be edited in cart, and remove has undo recovery.
+- Added focused cart reducer regression tests for configured item separation/merge, note editing, image/add-on preservation, and removal.
+- Verification passed: focused cart/group tests, lint, production build, and diff whitespace check.
+- Commit pending for current slice.
