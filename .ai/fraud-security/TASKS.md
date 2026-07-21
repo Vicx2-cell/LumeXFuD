@@ -11,4 +11,5 @@
 9. **COMPLETE - FS-009:** atomic rider acceptance and assignment-bound status, handover, wrong-code, and proof-photo writes with stale-access evidence.
 10. **COMPLETE - FS-010:** privileged API denial evidence, super-only alias enforcement, session indicator change evidence, and false-positive-safe admin risk signals.
 11. **COMPLETE - FS-011:** privacy-minimized referral multi-account correlation and reversible reward manual review.
-12. **READY - FS-012+:** lawful location inconsistency and remaining console/false-positive gaps.
+12. **COMPLETE - FS-012:** lawful accuracy-aware handover location, implausible-travel evidence, and verified-place poisoning prevention.
+13. **READY - FS-013:** remaining false-positive protections and incident-console gaps.

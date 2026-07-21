@@ -104,3 +104,14 @@
 - PASS: the third same-referrer/same-token claim in 24 hours enters reward-only manual review and emits no token/raw user-agent detail.
 - PASS: the completion trigger returns before issuing either referral credit while manual review is active.
 - PASS: no customer suspension, permanent ban, identity claim, or unrelated financial freeze is introduced.
+
+## FS-012 verification
+
+- PASS (1.63s Vitest duration; 26.3s command with TypeScript): focused location-risk, route integration, delivery pricing, handover, stale-rider, request-context, and security-event tests (7 files, 39 tests), followed by `npx.cmd tsc --noEmit`.
+- PASS (4.74s Vitest duration; 6.6s command): broader location, saved/vendor place, handover, order state/speed, money-path, incident, and redaction tests (13 files, 84 tests).
+- PASS: NaN/out-of-range coordinates are not persisted as validated evidence.
+- PASS: missing or poor accuracy is observe-only even at extreme distance; shared uncertainty is not converted into an accusation.
+- PASS: nearby accurate handover is unflagged; >5km accurate mismatch plus >160km/h prior travel produces factual corroborated rules.
+- PASS: event coordinates are rounded and carry the no-identity/no-presence warning.
+- PASS: only <=250m-accuracy, within-radius rider handover can promote a verified place; generic completion cannot.
+- PASS: location signals are evaluated after the assignment-bound handover claim and never block valid-code completion or release funds independently.

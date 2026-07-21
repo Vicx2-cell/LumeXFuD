@@ -14,7 +14,6 @@ import { getFeature } from '@/lib/features'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
-import { promoteVerifiedPlaceFromOrder } from '@/lib/location-intelligence'
 import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 import { finalizeOrderFeedAttribution, reverseOrderFeedAttribution } from '@/lib/feed/attribution'
 import {
@@ -422,20 +421,6 @@ export async function PATCH(
     gpsAccuracy: parsed.data.gps_accuracy ?? null,
     validationStatus: parsed.data.latitude != null && parsed.data.longitude != null ? 'captured' : 'not_validated',
   })
-
-  if (newStatus === 'COMPLETED' && order.delivery_type !== 'PICKUP') {
-    void promoteVerifiedPlaceFromOrder(db, {
-      orderId: id,
-      orderNumber: order.order_number as string,
-      deliveryAddress: order.delivery_address as string | null,
-      deliveryLodge: order.delivery_lodge as string | null,
-      deliveryBlock: order.delivery_block as string | null,
-      deliveryRoom: order.delivery_room as string | null,
-      latitude: parsed.data.latitude ?? (order.delivery_latitude as number | null),
-      longitude: parsed.data.longitude ?? (order.delivery_longitude as number | null),
-      cityId: order.city_id as string | null,
-    }).catch(() => {})
-  }
 
   if (newStatus === 'DELIVERED' || newStatus === 'COMPLETED') {
     void maybeApplyLateDeliveryCredit(id).catch((err) => {

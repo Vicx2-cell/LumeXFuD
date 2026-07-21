@@ -23,6 +23,7 @@ export type SecurityEventType =
   | 'stale_rider_access' | 'rider_assignment_rejected'
   | 'suspicious_admin_access'
   | 'multi_account_indicator'
+  | 'location_inconsistency'
 
 export interface SecurityEventInput {
   eventType: SecurityEventType

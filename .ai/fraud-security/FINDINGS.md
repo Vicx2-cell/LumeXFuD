@@ -66,6 +66,12 @@ Customer referral signup stored raw IP and raw user-agent fields but neither cre
 
 Status: repaired. Registration derives a keyed, domain-separated correlation token from already-lawful request metadata and stores no raw user-agent in referral correlation fields. Shared IP alone contributes zero risk. The first two same-context claims remain normal; only the third within 24 hours for the same referrer enters reversible reward-only manual review. The authoritative award trigger honors the hold, while signup and unrelated account actions continue normally. Evidence explicitly states that indicators do not prove common identity.
 
+## FS-012 - HIGH - Delivery location was stored but never validated
+
+Rider handover coordinates and GPS accuracy were already legitimate delivery fields, and `order_status_events` already had distance/validation columns. The route always marked coordinates merely “captured,” never calculated distance or implausible travel, and allowed unvalidated rider coordinates—or generic completion coordinates—to increase verified-place confidence. This enabled place-data poisoning and left investigations without accuracy-aware facts.
+
+Status: repaired. The verified handover path now validates finite coordinates, calculates distance from the customer's delivery pin, compares a rider's prior lawful status location for implausible travel, stores accuracy/distance/validation facts, and emits only observe-mode location evidence. Missing or >250m accuracy cannot become an inconsistency claim. Security detail rounds coordinates to roughly 100m and carries a no-identity/no-presence warning. Only accurate, nearby rider handovers promote places; the generic completion path no longer promotes unvalidated coordinates. A valid code still completes delivery regardless of location signal.
+
 ## Scoped inventory observed
 
 - Authentication/session paths: `lib/session.ts`, `lib/pin-auth.ts`, `lib/rate-limit.ts`, `proxy.ts`, and `app/api/auth/**`.

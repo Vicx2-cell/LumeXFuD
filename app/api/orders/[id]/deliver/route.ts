@@ -16,6 +16,7 @@ import { promoteVerifiedPlaceFromOrder } from '@/lib/location-intelligence'
 import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 import { finalizeOrderFeedAttribution } from '@/lib/feed/attribution'
 import { applyRequestContext, createRequestContext } from '@/lib/request-context'
+import { distanceMeters, evaluateLocationRisk, validCoordinates } from '@/lib/location-risk'
 
 // POST /api/orders/[id]/deliver
 // Delivery handover (delivery_handover_v1). The DEFAULT path: the ASSIGNED rider
@@ -157,6 +158,60 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return json({ error: 'Order was already updated.' }, { status: 409 })
   }
 
+  const hasCurrentLocation = validCoordinates(body.latitude, body.longitude)
+  const hasExpectedLocation = validCoordinates(order.delivery_latitude, order.delivery_longitude)
+  const currentLatitude = hasCurrentLocation ? body.latitude as number : null
+  const currentLongitude = hasCurrentLocation ? body.longitude as number : null
+  const gpsAccuracy = typeof body.gps_accuracy === 'number' && Number.isFinite(body.gps_accuracy) && body.gps_accuracy >= 0
+    ? body.gps_accuracy : null
+  const distanceFromExpected = hasCurrentLocation && hasExpectedLocation
+    ? distanceMeters(
+        currentLatitude!, currentLongitude!,
+        Number(order.delivery_latitude), Number(order.delivery_longitude),
+      )
+    : null
+
+  let previousTravelMeters: number | null = null
+  let elapsedSeconds: number | null = null
+  let previousAccuracyMeters: number | null = null
+  if (session.role === 'rider' && hasCurrentLocation) {
+    const { data: previous } = await db.from('order_status_events')
+      .select('latitude, longitude, gps_accuracy, created_at')
+      .eq('actor_type', 'rider').eq('actor_id', session.userId!)
+      .not('latitude', 'is', null).not('longitude', 'is', null)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle()
+    if (previous && validCoordinates(previous.latitude, previous.longitude)) {
+      previousTravelMeters = distanceMeters(
+        Number(previous.latitude), Number(previous.longitude), currentLatitude!, currentLongitude!,
+      )
+      elapsedSeconds = Math.max(0, (Date.now() - new Date(previous.created_at as string).getTime()) / 1000)
+      previousAccuracyMeters = Number.isFinite(Number(previous.gps_accuracy)) ? Number(previous.gps_accuracy) : null
+    }
+  }
+  const locationRisk = evaluateLocationRisk({
+    distanceFromExpectedMeters: distanceFromExpected, gpsAccuracyMeters: gpsAccuracy,
+    previousTravelMeters, elapsedSeconds, previousAccuracyMeters,
+  })
+  if (locationRisk.triggeredRules.length) {
+    await recordSecurityEvent({
+      eventType: 'location_inconsistency',
+      severity: locationRisk.score >= 60 ? 'warn' : 'info', surface: 'orders.deliver',
+      actorId: session.userId ?? null, actorRole: session.role, sessionId: session.sessionId,
+      ip: req.headers.get('x-forwarded-for'), requestId: context.requestId,
+      correlationId: context.correlationId, route: req.nextUrl.pathname, method: req.method,
+      resourceType: 'order', resourceId: id, outcome: 'observed_only',
+      detail: {
+        approximate_latitude: currentLatitude == null ? null : Math.round(currentLatitude * 1000) / 1000,
+        approximate_longitude: currentLongitude == null ? null : Math.round(currentLongitude * 1000) / 1000,
+        accuracy_m: gpsAccuracy, distance_from_expected_m: distanceFromExpected,
+        previous_travel_m: previousTravelMeters, elapsed_seconds: elapsedSeconds,
+        score: locationRisk.score, confidence: locationRisk.confidence,
+        triggered_rules: locationRisk.triggeredRules, actions: locationRisk.actions,
+        warning: 'Approximate location indicators do not prove identity or presence.',
+      },
+    })
+  }
+
   // Rider's binding handover consent (Invariant I8).
   void recordConsent({
     actorId: order.rider_id as string, role: 'rider',
@@ -245,23 +300,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     actorType: session.role,
     actorId: session.userId ?? session.phone,
     status: 'COMPLETED',
-    latitude: typeof body.latitude === 'number' ? body.latitude : null,
-    longitude: typeof body.longitude === 'number' ? body.longitude : null,
-    gpsAccuracy: typeof body.gps_accuracy === 'number' ? body.gps_accuracy : null,
-    validationStatus: typeof body.latitude === 'number' && typeof body.longitude === 'number' ? 'captured' : 'not_validated',
+    latitude: currentLatitude,
+    longitude: currentLongitude,
+    gpsAccuracy,
+    distanceFromExpectedMeters: distanceFromExpected,
+    validationStatus: !hasCurrentLocation ? 'not_validated'
+      : gpsAccuracy == null || gpsAccuracy > 250 ? 'low_accuracy'
+      : locationRisk.triggeredRules.some((rule) => rule !== 'location_low_accuracy') ? 'inconsistent'
+      : 'validated',
   })
 
-  void promoteVerifiedPlaceFromOrder(db, {
-    orderId: id,
-    orderNumber: order.order_number as string,
-    deliveryAddress: order.delivery_address as string | null,
-    deliveryLodge: order.delivery_lodge as string | null,
-    deliveryBlock: order.delivery_block as string | null,
-    deliveryRoom: order.delivery_room as string | null,
-    latitude: typeof body.latitude === 'number' ? body.latitude : (order.delivery_latitude as number | null),
-    longitude: typeof body.longitude === 'number' ? body.longitude : (order.delivery_longitude as number | null),
-    cityId: order.city_id as string | null,
-  }).catch(() => {})
+  const trustedRadius = Math.max(750, (gpsAccuracy ?? 0) * 4)
+  if (hasCurrentLocation && gpsAccuracy != null && gpsAccuracy <= 250 &&
+      distanceFromExpected != null && distanceFromExpected <= trustedRadius) {
+    void promoteVerifiedPlaceFromOrder(db, {
+      orderId: id,
+      orderNumber: order.order_number as string,
+      deliveryAddress: order.delivery_address as string | null,
+      deliveryLodge: order.delivery_lodge as string | null,
+      deliveryBlock: order.delivery_block as string | null,
+      deliveryRoom: order.delivery_room as string | null,
+      latitude: currentLatitude,
+      longitude: currentLongitude,
+      cityId: order.city_id as string | null,
+    }).catch(() => {})
+  }
 
   return json({ success: true, status: 'COMPLETED', method })
 }

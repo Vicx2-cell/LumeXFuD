@@ -69,3 +69,10 @@
 - Added same-referrer/same-context/24-hour reward-claim evidence while making shared IP alone insufficient.
 - Put only corroborated third claims into reversible human review and made the reward trigger honor that hold.
 - Kept signup, sessions, ordering, and non-referral funds unaffected; indicators never assert shared identity.
+
+## FS-012 complete
+
+- Turned existing delivery GPS/accuracy fields into factual distance and validation evidence without collecting new location categories.
+- Added accuracy-aware expected-location and implausible-travel rules with observe-only enforcement.
+- Rounded investigative coordinates and explicitly warned that location does not prove identity or presence.
+- Prevented low-accuracy, distant, missing, generic-completion, and invalid coordinates from influencing verified places.

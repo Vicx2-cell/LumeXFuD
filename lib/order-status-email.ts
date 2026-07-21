@@ -15,6 +15,7 @@ export async function emailCommittedOrderStatus(db: DB, input: {
   latitude?: number | null
   longitude?: number | null
   gpsAccuracy?: number | null
+  distanceFromExpectedMeters?: number | null
   validationStatus?: string
 }): Promise<TransactionalEmailResult> {
   const statusEventId = crypto.randomUUID()
@@ -28,6 +29,7 @@ export async function emailCommittedOrderStatus(db: DB, input: {
       latitude: input.latitude,
       longitude: input.longitude,
       gpsAccuracy: input.gpsAccuracy,
+      distanceFromExpectedMeters: input.distanceFromExpectedMeters,
       validationStatus: input.validationStatus,
     })
   } catch {
