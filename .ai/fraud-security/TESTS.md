@@ -124,3 +124,11 @@
 - PASS: unsupported status, missing factual note, missing evidence event, missing case, and transaction failure do not report success.
 - PASS: affected order/payment evidence is preserved by automatic refund cases and manual case creation supports bounded approximate-location facts.
 - PASS: false-positive status appends timeline and custody records; it cannot delete evidence, lift restrictions, revive sessions, unfreeze wallets, or assert innocence/guilt automatically.
+
+## Final isolated verification
+
+- PASS: `$fraudBuildTimer = [System.Diagnostics.Stopwatch]::StartNew(); npm.cmd run build` completed alone in 126.167s. Next.js 16.2.6 compiled successfully, completed TypeScript, and generated 150/150 static pages.
+- PASS: after the build process exited, `$fraudTestTimer = [System.Diagnostics.Stopwatch]::StartNew(); npm.cmd test` completed alone in 39.185s (37.24s Vitest duration): 113/113 files and 807/807 tests passed.
+- No failure occurred in the isolated full suite, so no deterministic, timing-sensitive, or environmental defect remained to rerun or classify.
+- The earlier concurrent-load 758/759 checkpoint is not a full pass and is superseded by this serialized 807/807 result.
+- PASS: ancestry checks confirmed all six pre-existing loop commits remain intact: `fddff21`, `355ccd1`, `383dc8c`, `df09a57`, `44f9967`, and `4c10bd1`.
