@@ -34,3 +34,10 @@
 - Preserved Paystack idempotent 200/no-op behavior while recording duplicate delivery/replay evidence.
 - Added server-generated request/correlation IDs to every webhook response and event.
 - Kept one duplicate as a weak, observe-only signal to protect against false positives from normal provider retries.
+
+## FS-007 complete
+
+- Added a pure cumulative refund-risk evaluator using only lawful customer/order/refund ledger facts already collected for product operation.
+- Added request-correlated events for risk evaluation, atomic reservation rejection, provider failure, and failed compensation.
+- Added automatic incident/evidence-hold creation only for corroborated velocity and cumulative-value indicators, with an explicit human-review/no-proof warning.
+- Preserved the existing atomic refund cap, cumulative step-up, compensation, role boundary, and external-money ordering.

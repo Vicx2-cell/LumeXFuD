@@ -36,6 +36,12 @@ The unique replay guard correctly prevented duplicate processing, but the `23505
 
 Status: repaired. Duplicate deliveries remain 200/no-op, now emit a request-correlated `webhook_replay` event with a weak payment signal. A single duplicate evaluates to observe-only and cannot affect an account or financial operation.
 
+## FS-007 - HIGH - Refund abuse had no cumulative evidence or case escalation
+
+The atomic refund reservation prevented over-refunds and concurrent duplicates, but the route recorded no structured security evidence. It did not evaluate customer-ledger refund velocity/value across orders, repeated partial-refund fragmentation, reservation rejections, or provider compensation failures. Investigators therefore lacked correlated facts even when the money path itself remained safe.
+
+Status: repaired. The admin refund route now returns server-generated request/correlation IDs, preserves structured risk and failure events, and evaluates only existing customer/order/refund ledger facts. One refund, a full refund, or high value alone stays observe-only. Only corroborated repeated activity creates an evidence hold and security-admin case; it does not automatically freeze money or accuse the customer.
+
 ## Scoped inventory observed
 
 - Authentication/session paths: `lib/session.ts`, `lib/pin-auth.ts`, `lib/rate-limit.ts`, `proxy.ts`, and `app/api/auth/**`.

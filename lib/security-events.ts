@@ -17,6 +17,7 @@ export type SecurityEventType =
   | 'order_status_transition' | 'order_handover_completed' | 'rider_order_accepted'
   | 'late_delivery_credit_issued'
   | 'order_delivery_delay_detected'
+  | 'refund_risk_evaluated' | 'refund_provider_failure' | 'refund_reservation_rejected'
 
 export interface SecurityEventInput {
   eventType: SecurityEventType
@@ -54,10 +55,10 @@ export function redactDetail(input: unknown, depth = 0): unknown {
   return input
 }
 
-export async function recordSecurityEvent(e: SecurityEventInput): Promise<void> {
+export async function recordSecurityEvent(e: SecurityEventInput): Promise<number | null> {
   try {
     const db = createSupabaseAdmin()
-    const { error } = await db.from('security_events').insert({
+    const { data, error } = await db.from('security_events').insert({
       actor_id: e.actorId ?? null,
       actor_role: e.actorRole ?? null,
       session_id: e.sessionId ?? null,
@@ -74,10 +75,15 @@ export async function recordSecurityEvent(e: SecurityEventInput): Promise<void> 
       severity: e.severity,
       surface: e.surface,
       detail: redactDetail(e.detail ?? {}),
-    })
-    if (error) console.error('[security-events] insert failed:', error.message)
+    }).select('id').single()
+    if (error) {
+      console.error('[security-events] insert failed:', error.message)
+      return null
+    }
+    return typeof data?.id === 'number' ? data.id : null
   } catch (err) {
     // Spine may not exist yet (migration 085 not run) or DB blip — never throw.
     console.error('[security-events] insert threw:', err)
+    return null
   }
 }

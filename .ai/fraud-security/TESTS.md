@@ -57,3 +57,12 @@
 - PASS: production build on Next.js 16.2.6, including TypeScript and 150 generated static pages.
 - PASS after isolated reproduction: `test/handover-flow.test.ts` (8/8).
 - Full suite under concurrent build load: 758 passed, one timeout-only failure; the timed-out test passed immediately in isolation, so no delivery-code assertion failure was reproduced.
+
+## FS-007 verification
+
+- PASS (1.47s Vitest duration): `npm.cmd test -- test/refund-risk.test.ts test/risk-engine.test.ts test/security-events.test.ts` (3 files, 19 tests).
+- PASS (combined command 56.5s): the focused tests above followed by `npx.cmd tsc --noEmit`.
+- PASS (5.93s Vitest duration; 8.5s command): broader refund, money-path, webhook, request-context, risk, and security-event set (9 files, 50 tests).
+- PASS: a legitimate first/full refund and value alone remain observe-only and cannot create a hold or freeze.
+- PASS: repeated account refunds plus cumulative value create a human-review evidence hold; repeated split refunds preserve an order-abuse indicator without case escalation by themselves.
+- PASS: atomic reservation remains the concurrency/replay authority; rejected races and provider compensation outcomes now produce correlated evidence.

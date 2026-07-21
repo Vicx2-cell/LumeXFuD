@@ -10,28 +10,42 @@ import { recordPlatformEarning } from '@/lib/platform-earnings'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { requireStepUpForAmount } from '@/lib/step-up'
 import { emailCommittedOrderStatus } from '@/lib/order-status-email'
+import { applyRequestContext, createRequestContext } from '@/lib/request-context'
+import { recordSecurityEvent } from '@/lib/security-events'
+import { evaluateRefundRisk } from '@/lib/refund-risk'
 
 export async function POST(req: NextRequest) {
+  const context = createRequestContext(req.headers)
+  const json = <T,>(body: T, init?: ResponseInit) => applyRequestContext(NextResponse.json(body, init), context)
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
   const session = await getCurrentUser()
   if (!session || (session.role !== 'admin' && session.role !== 'super_admin')) {
-    return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    return json({ error: 'Admin only' }, { status: 403 })
   }
 
   const rl = await rateLimitGeneric(`refund:${session.phone}`, 20, 300, true)
   if (!rl.success) {
-    return NextResponse.json({ error: 'Too many refund requests. Please slow down.' }, { status: 429 })
+    await recordSecurityEvent({
+      eventType: 'ratelimit_hit', severity: 'warn', surface: 'refund',
+      actorId: session.userId ?? session.phone, actorRole: session.role,
+      sessionId: session.sessionId, ip, userAgent: req.headers.get('user-agent'),
+      requestId: context.requestId, correlationId: context.correlationId,
+      route: req.nextUrl.pathname, method: req.method, outcome: 'rate_limited',
+      detail: { rule: 'refund_admin_velocity' },
+    })
+    return json({ error: 'Too many refund requests. Please slow down.' }, { status: 429 })
   }
 
   let body: unknown
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    return json({ error: 'Invalid request body' }, { status: 400 })
   }
 
   const parsed = refundInput.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
+    return json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
   }
 
   const { order_id, reason, amount } = parsed.data
@@ -44,15 +58,15 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error || !order) {
-    return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    return json({ error: 'Order not found' }, { status: 404 })
   }
 
   // Only card-paid orders are refundable here, and only until fully refunded.
   if (order.payment_status !== 'PAID' && order.payment_status !== 'PARTIALLY_REFUNDED') {
-    return NextResponse.json({ error: 'Order is not in a refundable state' }, { status: 400 })
+    return json({ error: 'Order is not in a refundable state' }, { status: 400 })
   }
   if (!order.paystack_reference) {
-    return NextResponse.json({ error: 'Order has no card payment to refund' }, { status: 400 })
+    return json({ error: 'Order has no card payment to refund' }, { status: 400 })
   }
 
   // Sum refunds already issued (all but FAILED): cap at the REMAINING balance and
@@ -64,14 +78,63 @@ export async function POST(req: NextRequest) {
 
   const refundAmount = amount ?? remaining
   if (refundAmount <= 0 || refundAmount > remaining) {
-    return NextResponse.json({ error: 'Refund exceeds remaining refundable amount' }, { status: 400 })
+    return json({ error: 'Refund exceeds remaining refundable amount' }, { status: 400 })
   }
 
   // Rule #28: re-auth once the CUMULATIVE refund on this order reaches ₦50,000.
   const reauthPin = (body as Record<string, unknown> | null)?.reauth_pin
   const stepUp = await requireStepUpForAmount(session, priorRefunded + refundAmount, reauthPin)
   if (!stepUp.ok) {
-    return NextResponse.json({ error: stepUp.error, reauth_required: true }, { status: stepUp.status })
+    return json({ error: stepUp.error, reauth_required: true }, { status: stepUp.status })
+  }
+
+  // Account-wide evidence uses the existing customer/order/refund ledger only.
+  // Guest phone, IP and device indicators are not used to infer identity.
+  let accountRefundRows: Array<{ amount_kobo: number }> = []
+  if (order.customer_id) {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const { data } = await db.from('refunds')
+      .select('amount_kobo, orders!inner(customer_id)')
+      .eq('orders.customer_id', order.customer_id)
+      .neq('status', 'FAILED').gte('created_at', since).limit(200)
+    accountRefundRows = (data ?? []) as Array<{ amount_kobo: number }>
+  }
+  const risk = evaluateRefundRisk({
+    accountRefundCount30d: accountRefundRows.length,
+    accountRefundedKobo30d: accountRefundRows.reduce((sum, row) => sum + Number(row.amount_kobo), 0),
+    sameOrderPriorRefundCount: priorRows?.length ?? 0,
+    orderTotalKobo: Number(order.total_amount), requestedKobo: refundAmount,
+  })
+  const eventId = await recordSecurityEvent({
+    eventType: 'refund_risk_evaluated',
+    severity: risk.score >= 75 ? 'critical' : risk.score >= 45 ? 'warn' : 'info',
+    surface: 'refund', actorId: session.userId ?? session.phone, actorRole: session.role,
+    sessionId: session.sessionId, ip, userAgent: req.headers.get('user-agent'),
+    requestId: context.requestId, correlationId: context.correlationId,
+    route: req.nextUrl.pathname, method: req.method,
+    resourceType: 'order', resourceId: order.id as string, outcome: 'evaluated',
+    detail: {
+      score: risk.score, confidence: risk.confidence, category_scores: risk.categoryScores,
+      triggered_rules: risk.triggeredRules, actions: risk.actions,
+      account_refund_count_30d: accountRefundRows.length,
+      account_refunded_kobo_30d: accountRefundRows.reduce((sum, row) => sum + Number(row.amount_kobo), 0),
+      same_order_prior_refund_count: priorRows?.length ?? 0,
+      requested_kobo: refundAmount, order_total_kobo: Number(order.total_amount),
+    },
+  })
+  if (eventId && risk.actions.includes('create_evidence_hold')) {
+    const incidentId = `LXSI-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
+    const { error: incidentError } = await db.rpc('create_security_incident', {
+      p_incident_id: incidentId, p_event_id: eventId,
+      p_actor_id: session.userId ?? session.phone, p_severity: risk.score >= 90 ? 'critical' : 'high',
+      p_confidence: risk.confidence, p_classification: 'refund_abuse_indicator',
+      p_account_id: order.customer_id as string, p_account_role: 'customer',
+      p_rules: risk.triggeredRules, p_actions: risk.actions,
+      p_evidence_hold: true, p_hold_reason: 'Corroborated cumulative refund-risk indicators',
+      p_recommended_action: 'Human review required; indicators do not prove fraud.',
+      p_request_id: context.requestId,
+    })
+    if (incidentError) console.error('[paystack/refund] incident creation failed:', incidentError.message)
   }
 
   // Atomic reserve: locks the order, re-checks the cap under the lock, writes the
@@ -82,16 +145,23 @@ export async function POST(req: NextRequest) {
   })
   if (reserveErr) {
     console.error('[paystack/refund] reserve_order_refund RPC error:', reserveErr.message)
-    return NextResponse.json({ error: 'Could not record refund' }, { status: 500 })
+    return json({ error: 'Could not record refund' }, { status: 500 })
   }
   const row = (reserved as Array<{ refund_id: string; success: boolean; error_code: string | null; fully_refunded: boolean }>)[0]
   if (!row?.success) {
+    await recordSecurityEvent({
+      eventType: 'refund_reservation_rejected', severity: 'warn', surface: 'refund',
+      actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+      ip, requestId: context.requestId, correlationId: context.correlationId,
+      route: req.nextUrl.pathname, method: req.method, resourceType: 'order', resourceId: order.id as string,
+      outcome: row?.error_code ?? 'rejected', detail: { error_code: row?.error_code ?? 'UNKNOWN' },
+    })
     const map: Record<string, [number, string]> = {
       NOT_FOUND: [404, 'Order not found'], NOT_REFUNDABLE: [400, 'Order is not in a refundable state'],
       INVALID_AMOUNT: [400, 'Invalid refund amount'], EXCEEDS_TOTAL: [400, 'Refund exceeds order total'],
     }
     const [st, msg] = map[row?.error_code ?? ''] ?? [409, 'Refund could not be processed']
-    return NextResponse.json({ error: msg }, { status: st })
+    return json({ error: msg }, { status: st })
   }
 
   // External money movement AFTER the ledger reservation; compensate on failure.
@@ -108,7 +178,15 @@ export async function POST(req: NextRequest) {
       // Money-path inconsistency: log loudly now, wire to the #8 alert later.
       console.error('[paystack/refund] fail_order_refund compensation failed:', compErr.message)
     }
-    return NextResponse.json({ error: 'Refund could not be initiated with the payment provider' }, { status: 502 })
+    await recordSecurityEvent({
+      eventType: 'refund_provider_failure', severity: compErr ? 'critical' : 'warn', surface: 'refund',
+      actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+      ip, requestId: context.requestId, correlationId: context.correlationId,
+      route: req.nextUrl.pathname, method: req.method, resourceType: 'order', resourceId: order.id as string,
+      outcome: compErr ? 'compensation_failed' : 'compensated',
+      detail: { refund_id: row.refund_id, requested_kobo: refundAmount },
+    })
+    return json({ error: 'Refund could not be initiated with the payment provider' }, { status: 502 })
   }
 
   // Full refund → flip the order workflow status too (parity with prior behaviour).
@@ -145,7 +223,7 @@ export async function POST(req: NextRequest) {
     target_table: 'orders',
     target_id: order.id as string,
     new_value: { refund_amount: refundAmount, reason },
-    ip_address: req.headers.get('x-forwarded-for') ?? undefined,
+    ip_address: ip,
   })
 
   // Notify customer
@@ -165,5 +243,5 @@ export async function POST(req: NextRequest) {
     }).catch(() => {})
   }
 
-  return NextResponse.json({ success: true })
+  return json({ success: true })
 }
