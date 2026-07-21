@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-07-21T21:47:13.627Z",
-  "count": 238,
+  "generated_at": "2026-07-21T21:51:26.140Z",
+  "count": 239,
   "routes": [
     {
       "path": "/api/admin/audit",
@@ -129,6 +129,13 @@
     },
     {
       "path": "/api/admin/orders/[id]/emergency-cancel",
+      "dynamic": true,
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/admin/orders/[id]/reassign-rider",
       "dynamic": true,
       "methods": [
         "POST"

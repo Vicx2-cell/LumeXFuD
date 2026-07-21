@@ -15,7 +15,7 @@ export type SecurityEventType =
   | 'stepup_fail' | 'ledger_anomaly' | 'handover_bruteforce' | 'ai_injection'
   | 'session_revoked' | 'rls_coverage_gap' | 'chain_tamper'
   | 'order_status_transition' | 'order_handover_completed' | 'rider_order_accepted'
-  | 'emergency_order_cancelled'
+  | 'emergency_order_cancelled' | 'order_rider_reassigned'
   | 'late_delivery_credit_issued'
   | 'order_delivery_delay_detected'
   | 'refund_risk_evaluated' | 'refund_provider_failure' | 'refund_reservation_rejected'
