@@ -3,6 +3,7 @@ import { verifySessionToken, isSessionLive } from './lib/session'
 import { createSupabaseAdmin } from './lib/supabase/server'
 import { sessionCookieName } from './lib/session-cookie'
 import { recordSecurityEvent } from './lib/security-events'
+import { applyRequestContext, createRequestContext } from './lib/request-context'
 
 const PROTECTED: Array<{ pattern: RegExp; roles: string[] }> = [
   { pattern: /^\/home(\/|$)/,          roles: ['customer', 'admin', 'super_admin'] },
@@ -92,6 +93,7 @@ async function hasPinResetPending(phone: string, role: string): Promise<boolean>
 // Next.js 16: function must be named "proxy" (renamed from "middleware")
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
+  const requestContext = createRequestContext(req.headers)
 
   // ─── Edge exploit-scanner firewall ──────────────────────────────────────────
   // Instantly 404 automated probes for paths that are NEVER legitimate on this
@@ -99,7 +101,7 @@ export async function proxy(req: NextRequest) {
   // noisy bot floods that hammer every public site before they reach app code,
   // and never reveals that the path was "blocked". Real routes are unaffected.
   if (SCANNER_RE.test(pathname)) {
-    return new NextResponse('Not found', { status: 404 })
+    return applyRequestContext(new NextResponse('Not found', { status: 404 }), requestContext)
   }
 
   // Per-request CSP nonce. Global Web Crypto + btoa are available on the
@@ -116,11 +118,13 @@ export async function proxy(req: NextRequest) {
   // still enforced via the response header below; security is unchanged.
   const requestHeaders = new Headers(req.headers)
   requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('x-request-id', requestContext.requestId)
+  requestHeaders.set('x-correlation-id', requestContext.correlationId)
 
   // Attaches the CSP to any response we return.
   const withCsp = (res: NextResponse): NextResponse => {
     res.headers.set('Content-Security-Policy', csp)
-    return res
+    return applyRequestContext(res, requestContext)
   }
   const next = () => withCsp(NextResponse.next({ request: { headers: requestHeaders } }))
   const redirect = (url: URL) => withCsp(NextResponse.redirect(url))
@@ -145,6 +149,11 @@ export async function proxy(req: NextRequest) {
           actorId: session.userId, actorRole: session.role, sessionId: session.sessionId,
           ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined,
           userAgent: req.headers.get('user-agent') ?? undefined,
+          requestId: requestContext.requestId,
+          correlationId: requestContext.correlationId,
+          route: pathname,
+          method: req.method,
+          outcome: 'denied',
           detail: { reason: 'revoked_or_expired_token_at_edge', path: pathname },
         })
         const loginUrl = new URL('/auth', req.url)

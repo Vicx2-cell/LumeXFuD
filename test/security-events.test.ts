@@ -29,6 +29,35 @@ describe('redactDetail — secrets never reach the log', () => {
   })
 })
 
+describe('migration 133 - request metadata is integrity protected', () => {
+  const file = join(process.cwd(), 'supabase', 'migrations', '133_security_event_request_integrity.sql')
+  const sql = readFileSync(file, 'utf8')
+
+  it('adds searchable request, correlation, and resource identifiers', () => {
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS request_id TEXT/i)
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS correlation_id TEXT/i)
+    expect(sql).toMatch(/idx_security_events_correlation/i)
+    expect(sql).toMatch(/idx_security_events_resource/i)
+  })
+
+  it('binds all identity, session, network, and request indicators into v2 hashes', () => {
+    for (const field of [
+      'actor_id', 'actor_role', 'session_id', 'ip', 'user_agent',
+      'request_id', 'correlation_id', 'route', 'method',
+      'resource_type', 'resource_id', 'outcome',
+    ]) {
+      expect(sql, `${field} must be integrity protected`).toMatch(new RegExp(`'${field}'\\s*,\\s*p\\.${field}`, 'i'))
+    }
+    expect(sql).toMatch(/security_events_canonical_v2/i)
+    expect(sql).toMatch(/integrity payload mismatch/i)
+  })
+
+  it('keeps the legacy verifier path for existing v1 rows', () => {
+    expect(sql).toMatch(/IF r\.integrity_payload IS NULL THEN/i)
+    expect(sql).toMatch(/security_events_canonical\(/i)
+  })
+})
+
 describe('getSecret — weak JWT_SECRET is rejected at runtime', () => {
   it('refuses to sign with a too-short secret (RED #3)', async () => {
     const old = process.env.JWT_SECRET

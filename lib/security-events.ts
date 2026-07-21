@@ -25,6 +25,13 @@ export interface SecurityEventInput {
   sessionId?: string | null
   ip?: string | null
   userAgent?: string | null
+  requestId?: string | null
+  correlationId?: string | null
+  route?: string | null
+  method?: string | null
+  resourceType?: string | null
+  resourceId?: string | null
+  outcome?: string | null
   detail?: Record<string, unknown>
 }
 
@@ -54,6 +61,13 @@ export async function recordSecurityEvent(e: SecurityEventInput): Promise<void> 
       session_id: e.sessionId ?? null,
       ip: e.ip ?? null,
       user_agent: e.userAgent ? e.userAgent.slice(0, 300) : null,
+      request_id: e.requestId ?? null,
+      correlation_id: e.correlationId ?? null,
+      route: e.route ? e.route.slice(0, 300) : null,
+      method: e.method ? e.method.slice(0, 16).toUpperCase() : null,
+      resource_type: e.resourceType ? e.resourceType.slice(0, 100) : null,
+      resource_id: e.resourceId ? e.resourceId.slice(0, 200) : null,
+      outcome: e.outcome ? e.outcome.slice(0, 100) : null,
       event_type: e.eventType,
       severity: e.severity,
       surface: e.surface,
