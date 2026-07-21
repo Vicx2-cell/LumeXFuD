@@ -42,6 +42,12 @@ The atomic refund reservation prevented over-refunds and concurrent duplicates, 
 
 Status: repaired. The admin refund route now returns server-generated request/correlation IDs, preserves structured risk and failure events, and evaluates only existing customer/order/refund ledger facts. One refund, a full refund, or high value alone stays observe-only. Only corroborated repeated activity creates an evidence hold and security-admin case; it does not automatically freeze money or accuse the customer.
 
+## FS-008 - HIGH - Order idempotency replay was not bound to its payload
+
+Order pricing already came from menu/add-on/delivery data on the server and the unique idempotency key prevented duplicate charges. However, the key was unbounded and bound only to an owner. The same customer could reuse it with a materially different basket, destination, payment mode, reward, or group intent and receive the original checkout response with no manipulation evidence. Checkout rate limits also emitted no event, had no high-capacity shared-network layer, and the route itself did not reject non-customer sessions.
+
+Status: repaired. A SHA-256 digest binds the key to canonical authoritative prices, basket, hashed destination, delivery/payment/reward/group semantics, and schedule. Payload/owner mismatches fail closed before replay and emit correlated evidence. Keys are bounded, the route enforces customer role, and account/network/unpaid-order signals are proportionate. A single large basket remains observe-only; no raw destination is stored in the new digest column.
+
 ## Scoped inventory observed
 
 - Authentication/session paths: `lib/session.ts`, `lib/pin-auth.ts`, `lib/rate-limit.ts`, `proxy.ts`, and `app/api/auth/**`.

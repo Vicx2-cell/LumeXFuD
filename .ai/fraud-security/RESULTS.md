@@ -41,3 +41,10 @@
 - Added request-correlated events for risk evaluation, atomic reservation rejection, provider failure, and failed compensation.
 - Added automatic incident/evidence-hold creation only for corroborated velocity and cumulative-value indicators, with an explicit human-review/no-proof warning.
 - Preserved the existing atomic refund cap, cumulative step-up, compensation, role boundary, and external-money ordering.
+
+## FS-008 complete
+
+- Preserved server-side menu, add-on, delivery, and fee calculation; client prices remain untrusted.
+- Bound idempotency replay to a privacy-minimized hash of authoritative order intent and rejected payload/owner substitution.
+- Added explicit customer-role enforcement plus request-correlated account and shared-network checkout limits.
+- Added unpaid-order velocity, unusual-quantity, invalid-key, mismatch, and safe-replay evidence without automatic accusation or permanent action.

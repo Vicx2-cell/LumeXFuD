@@ -24,11 +24,27 @@ import { getBusyModeThrottle } from '@/lib/busy-mode'
 import { captureCustomerLocation } from '@/lib/location-intelligence'
 import { computeDeliveryPriceEstimate, getDeliveryPricingConfig, haversineDistanceMeters } from '@/lib/delivery-pricing'
 import { sendOrderConfirmationEmail } from '@/lib/transactional-email'
+import { applyRequestContext, createRequestContext } from '@/lib/request-context'
+import { recordSecurityEvent } from '@/lib/security-events'
+import { evaluateOrderCreationRisk, hashOrderDestination, hashOrderIntent, normalizeIdempotencyKey } from '@/lib/order-fraud'
 
 export async function POST(req: NextRequest) {
+  const context = createRequestContext(req.headers)
+  const json = <T,>(body: T, init?: ResponseInit) => applyRequestContext(NextResponse.json(body, init), context)
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
   const session = await getCurrentUser()
   if (!session) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    return json({ error: 'Authentication required' }, { status: 401 })
+  }
+  if (session.role !== 'customer') {
+    await recordSecurityEvent({
+      eventType: 'authz_deny', severity: 'warn', surface: 'order_creation',
+      actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+      ip, userAgent: req.headers.get('user-agent'), requestId: context.requestId,
+      correlationId: context.correlationId, route: req.nextUrl.pathname, method: req.method,
+      outcome: 'wrong_role', detail: { required_role: 'customer' },
+    })
+    return json({ error: 'Forbidden' }, { status: 403 })
   }
 
   // Feature flag: ordering can be paused platform-wide by a super admin.
@@ -49,7 +65,29 @@ export async function POST(req: NextRequest) {
   // per user (15 / 5 min) to stop checkout spam. No-ops if Upstash is unset.
   const rl = await rateLimitGeneric(`order:create:${session.userId ?? session.phone}`, 15, 300, true)
   if (!rl.success) {
-    return NextResponse.json({ error: 'Too many orders in a short time. Please wait a moment and try again.' }, { status: 429 })
+    await recordSecurityEvent({
+      eventType: 'ratelimit_hit', severity: 'warn', surface: 'order_creation',
+      actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+      ip, requestId: context.requestId, correlationId: context.correlationId,
+      route: req.nextUrl.pathname, method: req.method, outcome: 'account_rate_limited',
+      detail: { rule: 'order_account_velocity' },
+    })
+    return json({ error: 'Too many orders in a short time. Please wait a moment and try again.' }, { status: 429 })
+  }
+  if (ip) {
+    // High shared-network ceiling: detects distributed fake-order traffic without
+    // treating a campus NAT as one customer.
+    const networkRl = await rateLimitGeneric(`order:create:network:${ip}`, 60, 300, true)
+    if (!networkRl.success) {
+      await recordSecurityEvent({
+        eventType: 'ratelimit_hit', severity: 'warn', surface: 'order_creation',
+        actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+        ip, requestId: context.requestId, correlationId: context.correlationId,
+        route: req.nextUrl.pathname, method: req.method, outcome: 'network_rate_limited',
+        detail: { rule: 'order_shared_network_velocity' },
+      })
+      return json({ error: 'Too many orders in a short time. Please wait a moment and try again.' }, { status: 429 })
+    }
   }
 
   let body: Record<string, unknown>
@@ -376,7 +414,46 @@ export async function POST(req: NextRequest) {
   // orders.idempotency_key UNIQUE constraint makes the second concurrent insert
   // fail, so we never open a second Paystack transaction for the same intent.
   // Absent header → random key (no cross-request dedup, but no regression).
-  const idempotencyKey = req.headers.get('idempotency-key')?.trim() || crypto.randomUUID()
+  const suppliedIdempotencyKey = req.headers.get('idempotency-key')
+  const normalizedIdempotencyKey = normalizeIdempotencyKey(suppliedIdempotencyKey)
+  if (suppliedIdempotencyKey !== null && normalizedIdempotencyKey === null) {
+    await recordSecurityEvent({
+      eventType: 'order_idempotency_invalid', severity: 'warn', surface: 'order_creation',
+      actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+      ip, requestId: context.requestId, correlationId: context.correlationId,
+      route: req.nextUrl.pathname, method: req.method, outcome: 'invalid_key_format',
+      detail: { supplied_length: suppliedIdempotencyKey.length },
+    })
+    return json({ error: 'Invalid idempotency key' }, { status: 400 })
+  }
+  const idempotencyKey = normalizedIdempotencyKey ?? crypto.randomUUID()
+
+  let pendingOrders30m = 0
+  if (customerId) {
+    const since = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+    const { count } = await db.from('orders').select('id', { count: 'exact', head: true })
+      .eq('customer_id', customerId).eq('status', 'PENDING_PAYMENT').gte('created_at', since)
+    pendingOrders30m = count ?? 0
+  }
+  const creationRisk = evaluateOrderCreationRisk({
+    pendingOrders30m,
+    totalItemQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
+  })
+  if (creationRisk.triggeredRules.length) {
+    await recordSecurityEvent({
+      eventType: 'order_risk_evaluated', severity: creationRisk.score >= 45 ? 'warn' : 'info',
+      surface: 'order_creation', actorId: session.userId ?? session.phone,
+      actorRole: session.role, sessionId: session.sessionId, ip,
+      requestId: context.requestId, correlationId: context.correlationId,
+      route: req.nextUrl.pathname, method: req.method, outcome: 'evaluated',
+      detail: {
+        score: creationRisk.score, confidence: creationRisk.confidence,
+        triggered_rules: creationRisk.triggeredRules, actions: creationRisk.actions,
+        pending_orders_30m: pendingOrders30m,
+        total_item_quantity: items.reduce((sum, item) => sum + item.quantity, 0),
+      },
+    })
+  }
 
   // Customer-wallet kill switch (also gates group-split below). The actual
   // wallet/card SPLIT is resolved AFTER any reward discount is applied — a reward
@@ -396,6 +473,22 @@ export async function POST(req: NextRequest) {
       groupSplitEnabled = g.split_enabled !== false
     }
   }
+
+  const orderIntentHash = hashOrderIntent({
+    customerId, vendorId: vendor_id,
+    items: items.map((item) => ({
+      menuItemId: item.menu_item_id, quantity: item.quantity, addonIds: item.addons ?? [],
+    })),
+    deliveryType: delivery_type,
+    destinationHash: hashOrderDestination({
+      address: resolvedAddress,
+      latitude: hasCoords ? delivery_latitude as number : null,
+      longitude: hasCoords ? delivery_longitude as number : null,
+    }),
+    paymentMethod: payment_method, applyReward: apply_reward,
+    groupOrderId: linkedGroupId, scheduledFor: scheduledForIso,
+    subtotalKobo: subtotal, totalKobo: totalAmount,
+  })
 
   const orderInsert: Record<string, unknown> = {
     order_number: orderNumber,
@@ -425,6 +518,7 @@ export async function POST(req: NextRequest) {
     wallet_amount_kobo: 0,
     paystack_reference: orderNumber,
     idempotency_key: idempotencyKey,
+    order_intent_hash: orderIntentHash,
     payment_status: 'PENDING',
     rider_payment_status: 'PENDING',
     prep_time_minutes: prepMinutes,
@@ -460,17 +554,47 @@ export async function POST(req: NextRequest) {
     if (orderError?.code === '23505') {
       const { data: existing } = await db
         .from('orders')
-        .select('order_number, customer_id, paystack_authorization_url, paystack_access_code')
+        .select('order_number, customer_id, order_intent_hash, paystack_authorization_url, paystack_access_code')
         .eq('idempotency_key', idempotencyKey)
         .maybeSingle()
 
       // Bind the key to its owner — a client must not retrieve another
       // customer's checkout link by reusing their idempotency key.
       if (existing && existing.customer_id !== customerId) {
-        return NextResponse.json({ error: 'Invalid idempotency key' }, { status: 409 })
+        await recordSecurityEvent({
+          eventType: 'order_intent_mismatch', severity: 'critical', surface: 'order_creation',
+          actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+          ip, requestId: context.requestId, correlationId: context.correlationId,
+          route: req.nextUrl.pathname, method: req.method, outcome: 'owner_mismatch',
+          detail: { rule: 'order_idempotency_owner_mismatch' },
+        })
+        return json({ error: 'Invalid idempotency key' }, { status: 409 })
+      }
+      if (existing?.order_intent_hash && existing.order_intent_hash !== orderIntentHash) {
+        const mismatchRisk = evaluateOrderCreationRisk({
+          pendingOrders30m, totalItemQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
+          idempotencyPayloadMismatch: true,
+        })
+        await recordSecurityEvent({
+          eventType: 'order_intent_mismatch', severity: 'critical', surface: 'order_creation',
+          actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+          ip, requestId: context.requestId, correlationId: context.correlationId,
+          route: req.nextUrl.pathname, method: req.method, outcome: 'payload_mismatch',
+          resourceType: 'order', resourceId: existing.order_number,
+          detail: { score: mismatchRisk.score, confidence: mismatchRisk.confidence, triggered_rules: mismatchRisk.triggeredRules },
+        })
+        return json({ error: 'Invalid idempotency key' }, { status: 409 })
       }
       if (existing?.paystack_authorization_url) {
-        return NextResponse.json({
+        await recordSecurityEvent({
+          eventType: 'order_idempotency_replay', severity: 'info', surface: 'order_creation',
+          actorId: session.userId ?? session.phone, actorRole: session.role, sessionId: session.sessionId,
+          ip, requestId: context.requestId, correlationId: context.correlationId,
+          route: req.nextUrl.pathname, method: req.method, outcome: 'safe_replay',
+          resourceType: 'order', resourceId: existing.order_number,
+          detail: { intent_match: existing.order_intent_hash ? true : 'legacy_unknown' },
+        })
+        return json({
           order_number: existing.order_number,
           authorization_url: existing.paystack_authorization_url,
           access_code: existing.paystack_access_code,
@@ -478,7 +602,7 @@ export async function POST(req: NextRequest) {
         })
       }
       // Original is still being created (auth not stored yet) — ask the client to retry.
-      return NextResponse.json({ error: 'Order is being created, please retry' }, { status: 409 })
+      return json({ error: 'Order is being created, please retry' }, { status: 409 })
     }
     return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
   }

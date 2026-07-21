@@ -18,6 +18,8 @@ export type SecurityEventType =
   | 'late_delivery_credit_issued'
   | 'order_delivery_delay_detected'
   | 'refund_risk_evaluated' | 'refund_provider_failure' | 'refund_reservation_rejected'
+  | 'order_risk_evaluated' | 'order_idempotency_replay' | 'order_intent_mismatch'
+  | 'order_idempotency_invalid'
 
 export interface SecurityEventInput {
   eventType: SecurityEventType

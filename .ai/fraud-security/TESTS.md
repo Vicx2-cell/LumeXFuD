@@ -66,3 +66,12 @@
 - PASS: a legitimate first/full refund and value alone remain observe-only and cannot create a hold or freeze.
 - PASS: repeated account refunds plus cumulative value create a human-review evidence hold; repeated split refunds preserve an order-abuse indicator without case escalation by themselves.
 - PASS: atomic reservation remains the concurrency/replay authority; rejected races and provider compensation outcomes now produce correlated evidence.
+
+## FS-008 verification
+
+- PASS (1.12s Vitest duration; 16.2s with TypeScript): focused order-fraud, route-boundary, risk, request-context, and security-event tests (5 files, 25 tests), followed by `npx.cmd tsc --noEmit`.
+- PASS (5.43s Vitest duration; 7.2s command): broader order, money-path, authorization, validators, delivery pricing, rewards, state/speed, and webhook-idempotency tests (12 files, 71 tests).
+- PASS: order-intent digest is stable under harmless add-on ordering and changes for price, quantity, destination, or payment-mode substitution.
+- PASS: oversized, short, whitespace-bearing, and malformed idempotency keys fail closed.
+- PASS: wrong-role, account-rate, shared-network-rate, owner-mismatch, payload-mismatch, and safe-replay outcomes preserve request-correlated evidence.
+- PASS: one unusual basket remains observe-only; one payload mismatch alone does not recommend a financial freeze or evidence hold.

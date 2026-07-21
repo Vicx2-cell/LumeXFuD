@@ -7,4 +7,5 @@
 5. **COMPLETE - FS-005:** incidents, evidence holds, immutable timeline/custody, masked super-admin console, and audited human-review export.
 6. **COMPLETE - FS-006:** webhook replay evidence.
 7. **COMPLETE - FS-007:** cumulative refund velocity/value and split-refund evidence, provider/reservation failure evidence, proportionate incident escalation, and request correlation.
-8. **READY - FS-008+:** order manipulation/fake orders, stale/reassigned rider, privileged access, multi-account, lawful location, and remaining console/false-positive gaps.
+8. **COMPLETE - FS-008:** order manipulation/fake-order evidence, customer-only boundary, bounded idempotency keys, and payload-bound replay.
+9. **READY - FS-009+:** stale/reassigned rider, privileged access, multi-account, lawful location, and remaining console/false-positive gaps.
