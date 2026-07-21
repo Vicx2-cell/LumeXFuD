@@ -51,3 +51,9 @@
 - PASS: duplicate emits `webhook_replay` with request ID, provider resource, and observe-only risk.
 - PASS: forged signature and dedupe-storage failure remain rejected/deferred with structured evidence.
 - PASS: focused webhook/idempotency/risk tests, TypeScript, and targeted ESLint.
+
+## Checkpoint
+
+- PASS: production build on Next.js 16.2.6, including TypeScript and 150 generated static pages.
+- PASS after isolated reproduction: `test/handover-flow.test.ts` (8/8).
+- Full suite under concurrent build load: 758 passed, one timeout-only failure; the timed-out test passed immediately in isolation, so no delivery-code assertion failure was reproduced.
