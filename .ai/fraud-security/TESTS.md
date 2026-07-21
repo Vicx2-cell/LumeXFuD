@@ -145,3 +145,9 @@
 - PASS: `npm.cmd test -- --run test/csrf-origin.test.ts test/security-incidents.test.ts test/security-incident-case-route.test.ts test/incident-redaction.test.ts test/privileged-api-proxy.test.ts` completed in 6.6s command time / 2.78s Vitest duration: 5 files, 22/22 tests passed.
 - PASS: `npm.cmd test -- --run test/csrf-origin.test.ts test/account-restriction.test.ts test/proxy-revocation.test.ts test/access-control.test.ts test/webhook-route.test.ts test/webhook-and-exposure.test.ts test/webhook-idempotency.test.ts test/refund-risk.test.ts test/refund-naira.test.ts test/refund-webhook-target.test.ts test/order-fraud.test.ts test/order-fraud-route.test.ts test/stale-rider-access.test.ts test/security-incidents.test.ts test/security-incident-case-route.test.ts test/security-events.test.ts` completed in 16.0s command time / 13.28s Vitest duration: 16 files, 286/286 tests passed.
 - PASS: `npx.cmd tsc --noEmit` passed.
+
+## FS-016 red-team checkpoint
+
+- PASS: `npm.cmd test -- --run test/account-restriction.test.ts test/proxy-revocation.test.ts test/access-control.test.ts` completed in 16.6s command time / 12.79s Vitest duration: 3 files, 226/226 tests passed.
+- PASS: `npm.cmd test -- --run test/csrf-origin.test.ts test/account-restriction.test.ts test/proxy-revocation.test.ts test/access-control.test.ts test/webhook-route.test.ts test/webhook-and-exposure.test.ts test/webhook-idempotency.test.ts test/refund-risk.test.ts test/refund-naira.test.ts test/refund-webhook-target.test.ts test/order-fraud.test.ts test/order-fraud-route.test.ts test/stale-rider-access.test.ts test/security-incidents.test.ts test/security-incident-case-route.test.ts test/security-events.test.ts` completed in 23.6s command time / 20.49s Vitest duration: 16 files, 287/287 tests passed.
+- PASS: `npx.cmd tsc --noEmit` passed.

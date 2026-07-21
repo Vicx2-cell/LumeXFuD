@@ -112,6 +112,11 @@ describe('session issuance subject integrity', () => {
       'utf8',
     )
     await db.exec(sql)
+    const revocationSql = readFileSync(
+      join(process.cwd(), 'supabase', 'migrations', '141_deactivation_session_revocation.sql'),
+      'utf8',
+    )
+    await db.exec(revocationSql)
   }, 60_000)
 
   afterAll(async () => {
@@ -174,6 +179,38 @@ describe('session issuance subject integrity', () => {
       INSERT INTO sessions (user_id, phone, role, expires_at)
       VALUES ('60000000-0000-4000-8000-000000000001', '+2348000000006', 'super_admin', '2099-01-01T00:00:00Z');
     `)).rejects.toThrow(/not eligible/i)
+  })
+
+  it('revokes already-issued vendor, rider, and admin sessions on deactivation or role change', async () => {
+    await db.exec(`
+      INSERT INTO vendors (id, phone, is_active)
+      VALUES ('70000000-0000-4000-8000-000000000001', '+2348000000007', true);
+      INSERT INTO riders (id, phone, is_active)
+      VALUES ('80000000-0000-4000-8000-000000000001', '+2348000000008', true);
+      INSERT INTO admins (id, phone, role, is_active)
+      VALUES ('90000000-0000-4000-8000-000000000001', '+2348000000009', 'super_admin', true);
+      INSERT INTO sessions (user_id, phone, role, expires_at)
+      VALUES
+        ('70000000-0000-4000-8000-000000000001', '+2348000000007', 'vendor', '2099-01-01T00:00:00Z'),
+        ('80000000-0000-4000-8000-000000000001', '+2348000000008', 'rider', '2099-01-01T00:00:00Z'),
+        ('90000000-0000-4000-8000-000000000001', '+2348000000009', 'super_admin', '2099-01-01T00:00:00Z');
+      UPDATE vendors SET is_active = false WHERE id = '70000000-0000-4000-8000-000000000001';
+      UPDATE riders SET is_active = false WHERE id = '80000000-0000-4000-8000-000000000001';
+      UPDATE admins SET role = 'admin' WHERE id = '90000000-0000-4000-8000-000000000001';
+    `)
+
+    const result = await db.query<{ active: number; revoked: number }>(`
+      SELECT
+        count(*) FILTER (WHERE revoked_at IS NULL)::int AS active,
+        count(*) FILTER (WHERE revoked_at IS NOT NULL)::int AS revoked
+      FROM sessions
+      WHERE user_id IN (
+        '70000000-0000-4000-8000-000000000001',
+        '80000000-0000-4000-8000-000000000001',
+        '90000000-0000-4000-8000-000000000001'
+      )
+    `)
+    expect(result.rows[0]).toEqual({ active: 0, revoked: 3 })
   })
 })
 

@@ -103,3 +103,9 @@ Status: repaired. Paystack refund initiation now preserves the provider refund r
 The incident list route records `VIEWED` custody on `GET`, and the evidence export route records `EXPORTED` custody and returns an attachment on `GET`. Because the main session cookie is `SameSite=Lax`, a cross-site top-level navigation can still carry a super-admin cookie. An attacker could not read the response through browser SOP, but could make a super-admin unknowingly append custody/export records and potentially trigger a local evidence download.
 
 Status: repaired. Incident list and export routes now require same-origin browser provenance before performing the sensitive read/side effect. `Sec-Fetch-Site: cross-site` is rejected, same-origin and direct user navigations are allowed, Origin/Referer are used as fallbacks, and ambiguous production requests fail closed.
+
+## FS-016 - HIGH - Deactivated operator accounts could keep already-issued sessions
+
+Suspension revokes customer/vendor/rider sessions, and FS-014 blocks new session creation for inactive subjects. However, deactivation through `is_active=false`, admin role changes, and phone changes did not revoke already-issued vendor, rider, or admin sessions. Any route that forgot to re-check active state could therefore accept a stale token after the operator was disabled or demoted.
+
+Status: repaired. Migration 141 revokes active sessions transactionally when vendor/rider accounts are deactivated, when customer/vendor/rider/admin phone changes, and when admin accounts are deactivated or change role. Regression tests prove active vendor, rider, and super-admin sessions are revoked after deactivation/demotion.
