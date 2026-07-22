@@ -29,6 +29,7 @@ import { recordSecurityEvent } from '@/lib/security-events'
 import { evaluateOrderCreationRisk, hashOrderDestination, hashOrderIntent, normalizeIdempotencyKey } from '@/lib/order-fraud'
 import { createGuestOrderToken, hashGuestOrderToken } from '@/lib/guest-order-access'
 import { normalizePhone } from '@/lib/phone'
+import { validateMenuAddonSelection, type MenuAddonChoice } from '@/lib/menu-addon-selection'
 
 export async function POST(req: NextRequest) {
   const context = createRequestContext(req.headers)
@@ -248,30 +249,29 @@ export async function POST(req: NextRequest) {
 
   // ── Add-ons: validate each belongs to its item + is available, price from DB ──
   // (never trust client add-on prices — rule #4). chosenAddons is parallel to items.
-  const allAddonIds = Array.from(new Set(items.flatMap((i) => i.addons ?? [])))
-  const addonMap = new Map<string, { id: string; menu_item_id: string; name: string; price_kobo: number; is_available: boolean }>()
-  if (allAddonIds.length > 0) {
-    const { data: addonRows } = await db
-      .from('menu_item_addons')
-      .select('id, menu_item_id, name, price_kobo, is_available')
-      .in('id', allAddonIds)
-      .is('deleted_at', null)
-    for (const a of (addonRows ?? []) as Array<{ id: string; menu_item_id: string; name: string; price_kobo: number; is_available: boolean }>) {
-      addonMap.set(a.id, a)
-    }
+  const { data: addonRows, error: addonError } = await db
+    .from('menu_item_addons')
+    .select('id, menu_item_id, name, price_kobo, is_available, is_required')
+    .in('menu_item_id', itemIds)
+    .is('deleted_at', null)
+  if (addonError) {
+    return NextResponse.json({ error: 'Menu options could not be validated' }, { status: 503 })
+  }
+  const addonsByItem = new Map<string, MenuAddonChoice[]>()
+  for (const addon of (addonRows ?? []) as MenuAddonChoice[]) {
+    const current = addonsByItem.get(addon.menu_item_id) ?? []
+    current.push(addon)
+    addonsByItem.set(addon.menu_item_id, current)
   }
 
   const chosenAddons: Array<Array<{ name: string; price_kobo: number }>> = []
   for (const item of items) {
-    const picked: Array<{ name: string; price_kobo: number }> = []
-    for (const addonId of item.addons ?? []) {
-      const a = addonMap.get(addonId)
-      if (!a || a.menu_item_id !== item.menu_item_id || !a.is_available) {
-        return NextResponse.json({ error: 'One or more add-ons are invalid or unavailable' }, { status: 400 })
-      }
-      picked.push({ name: a.name, price_kobo: a.price_kobo })
+    const availableChoices = addonsByItem.get(item.menu_item_id) ?? []
+    const selection = validateMenuAddonSelection(availableChoices, item.addons ?? [])
+    if (selection.error) {
+      return NextResponse.json({ error: selection.error }, { status: 400 })
     }
-    chosenAddons.push(picked)
+    chosenAddons.push(selection.selected.map((addon) => ({ name: addon.name, price_kobo: addon.price_kobo })))
   }
 
   // SERVER-SIDE price calculation — never trust client (rule #4 + #17).

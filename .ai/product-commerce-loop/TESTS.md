@@ -30,6 +30,17 @@
 - Checked browser-test tooling: `npx.cmd playwright --version` returned `Version 1.60.0`.
 - Not run: live viewport walkthroughs for product configuration because no Playwright harness or seeded active vendor fixture is available in the repository state.
 
+## Browser Harness Slice — 2026-07-22
+
+- Passed: `npm.cmd test -- --run test/menu-addon-selection.test.ts lib/validators.test.ts` — 2 files, 24 tests.
+- Passed: `npm.cmd test -- --run test/menu-addon-selection.test.ts lib/validators.test.ts test/cart-context.test.ts test/storefront.test.ts test/guest-checkout-contract.test.ts test/authz-coverage.test.ts` — 6 files, 36 tests.
+- Passed: `npx.cmd tsc --noEmit` after the final fixture client typing repair.
+- Passed: `npm.cmd run lint` after replacing the explicit-any fixture client type.
+- Passed assertions at 390x844: `npx.cmd playwright test test/e2e/commerce-flow.spec.ts --project=chromium --workers=1 --retries=0 --grep "390x844" --timeout=45000 --global-timeout=90000 --reporter=line`. Playwright reported `1 passed`; the process exit was 1 only because the global limit expired during npm-wrapped dev-server teardown after the scenario.
+- Reviewed evidence: `guest-terms-390x844.png` shows the configured item, required and optional selections, edited note, guest identity section, final total, consent unchecked, and disabled pay action. Earlier failure traces/screenshots were inspected before each repair.
+- Blocked before scenario execution at 320x700: Chromium headless shell launched but did not establish its debugging pipe; Playwright interrupted the unstarted test after the bounded suite/teardown windows. No viewport assertion is claimed.
+- Not run after the environment startup blocker: 412x915, 360x800, 768x1024, and desktop.
+
 ## Added During Loop
 
 - `test/group-order-addons.test.ts`

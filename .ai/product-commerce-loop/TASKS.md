@@ -2,11 +2,13 @@
 
 ## In Progress
 
-- [ ] Commit final loop-state update.
+- [ ] Commit the bounded commerce browser harness and required-choice repair.
 
 ## Pending
 
-- [ ] Browser viewport walkthrough at 320, 360, 375, 390, 412, 768, and desktop once a seeded active vendor/menu/add-on fixture or test harness is available.
+- [ ] Resume 320, 412, 360, 768, and desktop browser execution only after headless Chromium launches reliably; do not claim unexercised viewports.
+- [ ] Complete Phase E group ordering.
+- [ ] Complete Phase F feed restoration and upgrade.
 
 ## Done
 
@@ -30,3 +32,7 @@
 - [x] Checked local browser-test capability: Playwright package is installed, but no app Playwright config/specs or seeded commerce fixture is present.
 - [x] Added focused group-order add-on helper tests.
 - [x] Ran lint and focused tests for first slice.
+- [x] Added deterministic, production-isolated Playwright commerce fixture and bounded Chromium configuration.
+- [x] Added required menu choices to the canonical add-on model and enforced them in storefront and order validation.
+- [x] Fixed public guest cart access, guest-field labels, and Paystack-only checkout rendering when wallet is disabled.
+- [x] Passed the complete baseline scenario at 390x844 and reviewed its screenshot and retained failure evidence from earlier iterations.

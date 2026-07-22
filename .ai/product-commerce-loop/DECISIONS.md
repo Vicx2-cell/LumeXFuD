@@ -21,3 +21,7 @@
 - Reuse the existing order idempotency header contract from the cart and keep the same key across connection errors; clear it after server validation failures so corrected payloads can retry cleanly.
 - Classify existing admin operational routes under the admin/super-admin route policy and classify `/api/health` as public so the central coverage backstop remains authoritative.
 - Keep customer order chat actor creation explicit (`session && session.role === 'customer' && session.userId`) to preserve the one-order customer-only communication guard.
+- Keep `/cart` public at the edge because the product supports identified guest checkout; order creation remains authorized and validated in `/api/orders`.
+- Reuse `menu_item_addons` for a single required-choice group via `is_required`: required rows are alternatives and the customer must choose exactly one. This extends the canonical pricing and snapshot path instead of introducing a parallel option engine.
+- Gate deterministic Playwright data behind both `PLAYWRIGHT_COMMERCE_FIXTURE=1` and a fixed non-production service key. The fixture never opens a real Supabase connection, uses no real payment, and cannot activate under production credentials.
+- Bound Playwright to one Chromium worker, zero retries, explicit route/field assertions, failure traces/screenshots, a 20-second browser-launch cap, and a 120-second global cap.

@@ -120,6 +120,8 @@ export default function CartPage() {
         })
         .catch(() => {})
         .finally(() => setWalletLoading(false))
+    } else {
+      setWalletLoading(false)
     }
 
     // A stored location can still pre-fill the location name in checkout.
@@ -719,12 +721,12 @@ export default function CartPage() {
               <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-white/55">Name</label>
-                    <input value={guestName} onChange={(e) => setGuestName(e.target.value.slice(0, 80))} className="lx-field w-full px-3 py-2.5 text-sm outline-none" autoComplete="name" />
+                    <label htmlFor="guest-name" className="mb-1 block text-xs font-medium text-white/55">Name</label>
+                    <input id="guest-name" value={guestName} onChange={(e) => setGuestName(e.target.value.slice(0, 80))} className="lx-field w-full px-3 py-2.5 text-sm outline-none" autoComplete="name" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-white/55">WhatsApp phone</label>
-                    <input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value.slice(0, 20))} className="lx-field w-full px-3 py-2.5 text-sm outline-none" inputMode="tel" autoComplete="tel" />
+                    <label htmlFor="guest-phone" className="mb-1 block text-xs font-medium text-white/55">WhatsApp phone</label>
+                    <input id="guest-phone" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value.slice(0, 20))} className="lx-field w-full px-3 py-2.5 text-sm outline-none" inputMode="tel" autoComplete="tel" />
                   </div>
                 </div>
               </div>

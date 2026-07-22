@@ -362,6 +362,7 @@ export const MERCHANT_CATEGORIES = ['restaurant', 'supermarket', 'pharmacy'] as 
 export const menuAddonInput = z.object({
   name:        z.string().min(1).max(60),
   price_naira: z.number().int().min(0).max(100_000),
+  is_required: z.boolean().optional().default(false),
 })
 
 export const createMenuItemInput = z.object({

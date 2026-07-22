@@ -11,7 +11,7 @@ import { LogoutButton } from '@/components/logout-button'
 const CATEGORIES = ['RICE', 'PROTEIN', 'DRINKS', 'SNACKS', 'OTHER'] as const
 type Category = (typeof CATEGORIES)[number]
 
-interface Addon { id?: string; name: string; price_kobo: number; is_available?: boolean }
+interface Addon { id?: string; name: string; price_kobo: number; is_available?: boolean; is_required?: boolean }
 interface MenuItem {
   id: string
   name: string
@@ -26,7 +26,7 @@ interface MenuItem {
   addons: Addon[]
 }
 
-interface FormAddon { name: string; price: string }
+interface FormAddon { name: string; price: string; is_required: boolean }
 interface FormState {
   name: string
   price: string
@@ -88,7 +88,7 @@ export default function VendorMenuPage() {
       image_url: item.image_url ?? '',
       is_available: item.is_available,
       prep: item.prep_time_minutes != null ? String(item.prep_time_minutes) : '',
-      addons: item.addons.map((a) => ({ name: a.name, price: String(Math.round(a.price_kobo / 100)) })),
+      addons: item.addons.map((a) => ({ name: a.name, price: String(Math.round(a.price_kobo / 100)), is_required: Boolean(a.is_required) })),
     })
     setError('')
     setShowForm(true)
@@ -152,7 +152,7 @@ export default function VendorMenuPage() {
       image_url: form.image_url || undefined,
       is_available: form.is_available,
       prep_time_minutes: form.prep.trim() === '' ? null : parseInt(form.prep, 10),
-      addons: form.addons.map((a) => ({ name: a.name.trim(), price_naira: parseInt(a.price, 10) })),
+      addons: form.addons.map((a) => ({ name: a.name.trim(), price_naira: parseInt(a.price, 10), is_required: a.is_required })),
     }
     try {
       const res = editingId
@@ -306,15 +306,21 @@ export default function VendorMenuPage() {
             {/* Add-ons */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="lx-mono">Add-ons (optional)</span>
-                <button onClick={() => setForm({ ...form, addons: [...form.addons, { name: '', price: '' }] })} className="lx-amber text-xs font-semibold">+ Add-on</button>
+                <span className="lx-mono">Options and add-ons</span>
+                <button onClick={() => setForm({ ...form, addons: [...form.addons, { name: '', price: '', is_required: false }] })} className="lx-amber text-xs font-semibold">+ Add-on</button>
               </div>
               <div className="space-y-2">
                 {form.addons.map((a, i) => (
-                  <div key={i} className="flex gap-2 items-center">
-                    <input value={a.name} onChange={(e) => { const next = [...form.addons]; next[i] = { ...a, name: e.target.value }; setForm({ ...form, addons: next }) }} placeholder="Extra meat" className={addonInputCls + ' flex-1 min-w-0'} />
-                    <input value={a.price} inputMode="numeric" onChange={(e) => { const next = [...form.addons]; next[i] = { ...a, price: e.target.value.replace(/[^0-9]/g, '') }; setForm({ ...form, addons: next }) }} placeholder="₦300" className={addonInputCls + ' w-20 shrink-0'} />
-                    <button type="button" aria-label="Remove add-on" onClick={() => setForm({ ...form, addons: form.addons.filter((_, j) => j !== i) })} className="lx-tap text-red-400 text-lg shrink-0 w-9 h-9 flex items-center justify-center rounded-lg">×</button>
+                  <div key={i} className="rounded-xl border border-white/10 p-2">
+                    <div className="flex gap-2 items-center">
+                      <input value={a.name} onChange={(e) => { const next = [...form.addons]; next[i] = { ...a, name: e.target.value }; setForm({ ...form, addons: next }) }} placeholder="Extra meat" className={addonInputCls + ' flex-1 min-w-0'} />
+                      <input value={a.price} inputMode="numeric" onChange={(e) => { const next = [...form.addons]; next[i] = { ...a, price: e.target.value.replace(/[^0-9]/g, '') }; setForm({ ...form, addons: next }) }} placeholder="₦300" className={addonInputCls + ' w-20 shrink-0'} />
+                      <button type="button" aria-label="Remove add-on" onClick={() => setForm({ ...form, addons: form.addons.filter((_, j) => j !== i) })} className="lx-tap text-red-400 text-lg shrink-0 w-9 h-9 flex items-center justify-center rounded-lg">×</button>
+                    </div>
+                    <label className="mt-2 flex min-h-11 items-center gap-2 text-xs text-white/60">
+                      <input type="checkbox" checked={a.is_required} onChange={(e) => { const next = [...form.addons]; next[i] = { ...a, is_required: e.target.checked }; setForm({ ...form, addons: next }) }} className="h-4 w-4 accent-amber-500" />
+                      Required choice (customer chooses exactly one required option)
+                    </label>
                   </div>
                 ))}
               </div>

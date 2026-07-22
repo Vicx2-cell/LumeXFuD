@@ -14,7 +14,6 @@ const PROTECTED: Array<{ pattern: RegExp; roles: string[] }> = [
   { pattern: /^\/super-admin(\/|$)/,    roles: ['super_admin'] },
   { pattern: /^\/orders(\/|$)/,         roles: ['customer', 'vendor', 'rider', 'admin', 'super_admin'] },
   { pattern: /^\/profile(\/|$)/,        roles: ['customer', 'vendor', 'rider', 'admin', 'super_admin'] },
-  { pattern: /^\/cart(\/|$)/,           roles: ['customer', 'admin', 'super_admin'] },
 ]
 
 const ROLE_HOME: Record<string, string> = {

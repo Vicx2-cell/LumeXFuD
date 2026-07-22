@@ -101,14 +101,14 @@ export default async function VendorPage({
   if (itemIds.length > 0) {
     const { data: addonRows } = await db
       .from('menu_item_addons')
-      .select('id, menu_item_id, name, price_kobo')
+      .select('id, menu_item_id, name, price_kobo, is_required')
       .in('menu_item_id', itemIds)
       .eq('is_available', true)
       .is('deleted_at', null)
       .order('display_order', { ascending: true })
     for (const a of (addonRows ?? []) as Array<MenuAddon & { menu_item_id: string }>) {
       const arr = byItem.get(a.menu_item_id) ?? []
-      arr.push({ id: a.id, name: a.name, price_kobo: a.price_kobo })
+      arr.push({ id: a.id, name: a.name, price_kobo: a.price_kobo, is_required: Boolean(a.is_required) })
       byItem.set(a.menu_item_id, arr)
     }
   }
@@ -185,6 +185,7 @@ export interface MenuAddon {
   id: string
   name: string
   price_kobo: number
+  is_required: boolean
 }
 
 export interface VendorInfo {

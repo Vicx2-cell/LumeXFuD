@@ -38,3 +38,12 @@
 - Committed as `7f9b5d7 Repair phase boundary verification`.
 - Checked browser-test tooling: Playwright 1.60.0 is installed, but live viewport walkthroughs remain blocked by absence of configured browser specs and seeded active vendor/menu/add-on fixtures in local state.
 - Final loop-state update pending commit.
+
+## 2026-07-22 Browser Verification Resume
+
+- Preserved all interrupted Playwright work after classifying the fixture, config, public cart route, and artifact ignores as valid; removed the broad reload/back experiment from the bounded baseline.
+- Added migration `146_required_menu_choices.sql` and reused the canonical menu add-on/order snapshot path for one required-choice group.
+- Fixed guest cart edge access, accessible guest labels, and a wallet-disabled loading bug that hid the Paystack-only checkout section.
+- Added a deterministic fixture vendor, slug, product image, required choices, optional long-name add-on, and unavailable add-on without real credentials, payments, or production data.
+- The 390x844 baseline completed all 12 requested steps. The runner teardown issue was repaired by launching Next directly; subsequent viewport execution was stopped after Chromium itself stalled before the 320x700 test could start.
+- Focused tests, typecheck, lint, and diff whitespace verification pass. Additional browser viewport claims remain precisely environment-blocked.

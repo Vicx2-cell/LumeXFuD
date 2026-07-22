@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Pill } from '@/components/ui/pill'
 import { FindStoreCard } from '@/components/find-store-card'
 import { getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
-import type { VendorInfo, MenuItem, VendorReview } from './page'
+import type { VendorInfo, MenuAddon, MenuItem, VendorReview } from './page'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks', 'Other']
 
@@ -164,11 +164,26 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
 
   function confirmAddons() {
     if (!selecting) return
+    const required = selecting.addons.filter((addon) => addon.is_required)
+    const requiredSelected = required.filter((addon) => selectedAddonIds.includes(addon.id))
+    if (required.length > 0 && requiredSelected.length !== 1) return
     const chosen = selecting.addons.filter((a) => selectedAddonIds.includes(a.id))
     doAdd(buildCartItem(selecting, chosen.map((a) => ({ id: a.id, name: a.name, price_kobo: a.price_kobo })), itemNotes))
     setSelecting(null)
     setSelectedAddonIds([])
     setItemNotes('')
+  }
+
+  function toggleAddon(addon: MenuAddon) {
+    setSelectedAddonIds((current) => {
+      const checked = current.includes(addon.id)
+      if (addon.is_required) {
+        const requiredIds = new Set(selecting?.addons.filter((choice) => choice.is_required).map((choice) => choice.id) ?? [])
+        const withoutRequired = current.filter((id) => !requiredIds.has(id))
+        return checked ? withoutRequired : [...withoutRequired, addon.id]
+      }
+      return checked ? current.filter((id) => id !== addon.id) : [...current, addon.id]
+    })
   }
 
   function handleConflictConfirm() {
@@ -186,6 +201,9 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
   const selectingTotal = selecting
     ? selecting.price_kobo + selecting.addons.filter((a) => selectedAddonIds.includes(a.id)).reduce((s, a) => s + a.price_kobo, 0)
     : 0
+  const requiredAddons = selecting?.addons.filter((addon) => addon.is_required) ?? []
+  const optionalAddons = selecting?.addons.filter((addon) => !addon.is_required) ?? []
+  const requiredSelectionComplete = requiredAddons.length === 0 || requiredAddons.filter((addon) => selectedAddonIds.includes(addon.id)).length === 1
 
   return (
     <>
@@ -219,15 +237,47 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
               <button onClick={() => setSelecting(null)} className="h-11 shrink-0 rounded-xl px-3 text-sm text-white/60" style={{ background: 'rgba(255,255,255,0.06)' }}>Close</button>
             </div>
 
-            {selecting.addons.length > 0 && (
+            {requiredAddons.length > 0 && (
               <>
-                <p className="text-xs uppercase tracking-[0.18em] text-white/40">Optional extras</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/60">Required choice</p>
+                  <span className="text-xs text-amber-300">Choose 1</span>
+                </div>
                 <div className="space-y-2">
-                  {selecting.addons.map((a) => {
+                  {requiredAddons.map((a) => {
                     const checked = selectedAddonIds.includes(a.id)
                     return (
                       <button key={a.id}
-                        onClick={() => setSelectedAddonIds((prev) => checked ? prev.filter((x) => x !== a.id) : [...prev, a.id])}
+                        type="button"
+                        role="radio"
+                        aria-checked={checked}
+                        onClick={() => toggleAddon(a)}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left"
+                        style={{ background: checked ? 'rgba(245,166,35,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${checked ? '#F5A623' : 'rgba(255,255,255,0.07)'}` }}>
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+                          style={{ background: checked ? '#F5A623' : 'transparent', border: `2px solid ${checked ? '#F5A623' : 'rgba(255,255,255,0.3)'}` }}>
+                          {checked && <div className="h-2 w-2 rounded-full bg-black" />}
+                        </div>
+                        <span className="min-w-0 flex-1 break-words text-sm leading-snug">{a.name}</span>
+                        <span className="shrink-0 text-sm text-white/60">{a.price_kobo > 0 ? `+${formatPrice(a.price_kobo)}` : 'Included'}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+
+            {optionalAddons.length > 0 && (
+              <>
+                <p className="text-xs uppercase tracking-[0.18em] text-white/40">Optional extras</p>
+                <div className="space-y-2">
+                  {optionalAddons.map((a) => {
+                    const checked = selectedAddonIds.includes(a.id)
+                    return (
+                      <button key={a.id}
+                        type="button"
+                        aria-pressed={checked}
+                        onClick={() => toggleAddon(a)}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left"
                         style={{ background: checked ? 'rgba(245,166,35,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${checked ? '#F5A623' : 'rgba(255,255,255,0.07)'}` }}>
                         <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
@@ -235,7 +285,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
                           {checked && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
                         </div>
                         <span className="min-w-0 flex-1 break-words text-sm leading-snug">{a.name}</span>
-                        <span className="text-sm text-white/60">+{formatPrice(a.price_kobo)}</span>
+                        <span className="shrink-0 text-sm text-white/60">+{formatPrice(a.price_kobo)}</span>
                       </button>
                     )
                   })}
@@ -259,8 +309,8 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
             {/* Sticky footer so the confirm button is always reachable, even with
                 a long add-on list on a small phone. */}
             <div className="sticky bottom-0 -mx-5 -mb-5 px-5 pt-3 pb-[calc(20px+env(safe-area-inset-bottom))]" style={{ background: 'linear-gradient(to top, var(--lx-surface-solid) 72%, transparent)' }}>
-              <button onClick={confirmAddons} className="lx-btn-amber w-full rounded-2xl py-4">
-                Add to cart · {formatPrice(selectingTotal)}
+              <button onClick={confirmAddons} disabled={!requiredSelectionComplete} className="lx-btn-amber w-full rounded-2xl py-4 disabled:cursor-not-allowed disabled:opacity-50">
+                {requiredSelectionComplete ? `Add to cart · ${formatPrice(selectingTotal)}` : 'Choose 1 required option'}
               </button>
             </div>
           </div>

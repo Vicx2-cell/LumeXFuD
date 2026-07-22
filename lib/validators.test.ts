@@ -5,10 +5,9 @@ import { createOrderInput, menuAddonInput, createMenuItemInput } from './validat
 // against the real Zod schemas the API routes use (app/api/orders, app/api/vendor/menu),
 // so they prove the server rejects out-of-bounds input before any DB work.
 //
-// NOTE: this codebase has no "option group" min/max *select* model — the menu uses
-// flat priced add-ons (migration 020). The min/max constraints that actually exist
-// are: item quantity 1..20, add-ons per item <=20, items per order 1..50, and the
-// menu add-on/item price + name bounds. Those are what's covered here.
+// Menu options reuse the canonical add-on model. A required-choice flag is
+// enforced against live rows by the order route; these schema tests cover payload
+// bounds and configuration defaults before database validation.
 
 const UUID = '11111111-1111-4111-8111-111111111111'
 const UUID2 = '22222222-2222-4222-8222-222222222222'
@@ -116,7 +115,15 @@ describe('createOrderInput — other field bounds + defaults', () => {
 
 describe('menuAddonInput — name (1..60) + price_naira (0..100000)', () => {
   it('accepts a valid add-on', () => {
-    expect(menuAddonInput.safeParse({ name: 'Extra meat', price_naira: 300 }).success).toBe(true)
+    const result = menuAddonInput.safeParse({ name: 'Extra meat', price_naira: 300 })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.is_required).toBe(false)
+  })
+
+  it('accepts a required menu choice', () => {
+    const result = menuAddonInput.safeParse({ name: 'Large bowl', price_naira: 500, is_required: true })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.is_required).toBe(true)
   })
 
   it('rejects empty/over-long names', () => {

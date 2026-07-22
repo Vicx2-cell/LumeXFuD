@@ -87,6 +87,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           menu_item_id:  id,
           name:          a.name,
           price_kobo:    toKobo(a.price_naira),
+          is_required:   a.is_required,
           display_order: idx,
         }))
       )

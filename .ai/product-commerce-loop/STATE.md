@@ -3,7 +3,7 @@
 Date: 2026-07-21
 Branch: audit/production-readiness
 Starting commit: 13e22e6 Add admin rider reassignment
-Latest verified commit before this slice: 7f9b5d7 Repair phase boundary verification
+Latest verified commit before this slice: bc17b1e Record commerce loop verification state
 
 ## Scope
 
@@ -20,11 +20,10 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - Second product-commerce improvement implemented: direct `/group/[code]` menu adds now support a mobile bottom-sheet add-on picker.
 - Third product-commerce improvement implemented: guest delivery checkout with Paystack callback access tokens.
 - Fourth product-commerce improvement implemented: vendor share tools now lead with the direct order link instead of the content-first SEO profile.
-- Current slice implemented and pending commit: normal vendor product selection now captures item notes for every item, stores item images in cart lines, and the customer cart exposes editable notes, item images, remove, and undo recovery without changing customer selections silently.
-- Storefront slice implemented and pending commit: `/store/[slug]` now resolves active vendor slugs into the existing live vendor ordering page with vendor-specific metadata and reserved/normalized slug guards.
-- Guest checkout slice implemented and pending commit: guest order creation now requires explicit terms/privacy acknowledgement and the cart sends a stable idempotency key for checkout retries.
-- Boundary verification repair implemented and pending commit: central route policy now classifies the existing admin operational routes and health endpoint, and order chat actor binding remains customer-only while satisfying the regression test.
-- Final local state update pending commit: worktree is clean after `7f9b5d7`; Playwright is installed but there is no configured browser spec suite or seeded live vendor fixture for the requested product-sheet viewport walkthrough.
+- Cart, storefront, guest checkout, boundary repair, and prior loop-state commits are preserved through `bc17b1e`.
+- Current browser slice pending commit: deterministic test-only commerce data, a bounded Playwright harness, a public guest-compatible cart route, labelled guest fields, required menu choices on the existing add-on model, storefront selection enforcement, and server-authoritative required-choice validation.
+- The 390x844 browser scenario passed all assertions and produced a reviewed full-page screenshot. The command's global timeout expired during the original npm-wrapped dev-server teardown after the test passed; the harness now launches Next directly.
+- The first 320x700 attempt did not enter the test because Chromium headless shell stalled before establishing its debugging pipe. The owned process exited; existing interactive Chrome sessions were not touched. Per the bounded retry policy, 412x915 and remaining viewport claims are deferred rather than repeatedly rerun.
 
 ## Baseline
 
@@ -36,4 +35,4 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - Storefront slice verification passed: focused storefront/cart tests, lint, and production build.
 - Guest checkout slice verification passed: focused guest/validator tests, lint, and production build.
 - Phase boundary verification passed after repair: full Vitest suite, focused access-control rerun, lint, and production build.
-- Browser viewport verification remains human/data blocked in this environment: no Playwright config/specs and no known seeded active vendor/menu/add-on/cart fixture.
+- Browser data/harness gap is closed locally; additional viewport execution is environment-blocked by a Chromium startup stall, with only 390x844 claimed as exercised.

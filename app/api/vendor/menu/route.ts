@@ -13,6 +13,7 @@ interface AddonRow {
   name: string
   price_kobo: number
   is_available: boolean
+  is_required: boolean
   display_order: number
 }
 
@@ -37,7 +38,7 @@ export async function GET() {
   if (itemIds.length > 0) {
     const { data } = await db
       .from('menu_item_addons')
-      .select('id, menu_item_id, name, price_kobo, is_available, display_order')
+      .select('id, menu_item_id, name, price_kobo, is_available, is_required, display_order')
       .in('menu_item_id', itemIds)
       .is('deleted_at', null)
       .order('display_order', { ascending: true })
@@ -102,6 +103,7 @@ export async function POST(req: NextRequest) {
         menu_item_id:  item.id,
         name:          a.name,
         price_kobo:    toKobo(a.price_naira),
+        is_required:   a.is_required,
         display_order: idx,
       }))
     )
