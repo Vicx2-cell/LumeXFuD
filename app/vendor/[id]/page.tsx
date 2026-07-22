@@ -17,10 +17,10 @@ export default async function VendorPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams?: Promise<{ campaign?: string }>
+  searchParams?: Promise<{ campaign?: string; item?: string }>
 }) {
   const { id } = await params
-  const search = ((await (searchParams ?? Promise.resolve({})).catch(() => ({}))) as { campaign?: string })
+  const search = ((await (searchParams ?? Promise.resolve({})).catch(() => ({}))) as { campaign?: string; item?: string })
   const db = createSupabaseAdmin()
 
   const { data: vendor } = await db
@@ -46,16 +46,18 @@ export default async function VendorPage({
     .maybeSingle()
 
   const vendorProfileId = (vendorProfile as { id?: string } | null)?.id ?? null
-  const [followerResult, followingResult, postResult] = vendorProfileId
+  const [followerResult, followingResult, postResult, recentPostResult] = vendorProfileId
     ? await Promise.all([
         db.from('follows').select('id', { count: 'exact', head: true }).eq('followed_profile_id', vendorProfileId),
         db.from('follows').select('id', { count: 'exact', head: true }).eq('follower_profile_id', vendorProfileId),
         db.from('posts').select('id', { count: 'exact', head: true }).eq('author_profile_id', vendorProfileId).eq('status', 'published').is('deleted_at', null),
+        db.from('posts').select('id, body, post_kind, published_at').eq('author_profile_id', vendorProfileId).eq('status', 'published').eq('is_archived', false).is('deleted_at', null).order('published_at', { ascending: false }).limit(3),
       ])
-    : [{ count: 0 }, { count: 0 }, { count: 0 }]
+    : [{ count: 0 }, { count: 0 }, { count: 0 }, { data: [] }]
   const followerCount = followerResult.count ?? 0
   const followingCount = followingResult.count ?? 0
   const postCount = postResult.count ?? 0
+  const recentPosts = (recentPostResult.data ?? []) as Array<{ id: string; body: string | null; post_kind: string; published_at: string | null }>
 
   const session = await getCurrentUser()
   let viewerFollowsVendor = false
@@ -154,7 +156,24 @@ export default async function VendorPage({
         reviews={reviews}
         loggedOut={!session}
         campaignId={search?.campaign ?? ''}
+        initialMenuItemId={search?.item ?? ''}
       />
+      {recentPosts.length > 0 ? (
+        <section className="mx-auto max-w-5xl px-4 pb-8 sm:px-6 lg:px-8" aria-labelledby="vendor-updates-title">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 id="vendor-updates-title" className="text-lg font-semibold text-white">Latest updates</h2>
+            {vendorProfileId ? <Link href={`/feed-v2/profile/${vendorProfileId}`} className="text-sm font-semibold text-[#F5A623]">View all</Link> : null}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {recentPosts.map((post) => (
+              <Link key={post.id} href={`/feed-v2/post/${post.id}`} className="min-h-28 rounded-lg border border-white/8 bg-white/[0.03] p-4 transition hover:border-white/16">
+                <p className="text-xs font-semibold uppercase text-white/40">{post.post_kind.replaceAll('_', ' ')}</p>
+                <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/80">{post.body?.trim() || 'Open this vendor update.'}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
       {vendor.slug && (
         <div className="max-w-xl mx-auto px-4 pb-4 text-center">
           {/* Link to the public, shareable SEO page for this vendor. Useful for

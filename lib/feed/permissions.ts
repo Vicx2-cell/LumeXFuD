@@ -19,6 +19,8 @@ export type FeedPermissionVendor = {
   is_verified: boolean | null
   business_verified: boolean | null
   id_verified: boolean | null
+  suspended_until?: string | null
+  deleted_at?: string | null
 }
 
 export type FeedPublisherKind = 'official' | 'verified_vendor' | 'ambassador' | 'student' | 'blocked'
@@ -32,6 +34,8 @@ export function isVerifiedFeedVendor(vendor: FeedPermissionVendor | null | undef
     vendor
       && vendor.approval_state === 'approved'
       && vendor.is_active !== false
+      && !vendor.deleted_at
+      && (!vendor.suspended_until || new Date(vendor.suspended_until).getTime() <= Date.now())
       && (vendor.is_verified || vendor.business_verified || vendor.id_verified),
   )
 }
@@ -86,7 +90,7 @@ export async function loadFeedPermissionContext(
   const { data: vendor } = typedProfile?.vendor_id
     ? await db
         .from('vendors')
-        .select('id, approval_state, is_active, is_verified, business_verified, id_verified')
+        .select('id, approval_state, is_active, is_verified, business_verified, id_verified, suspended_until, deleted_at')
         .eq('id', typedProfile.vendor_id)
         .maybeSingle()
     : { data: null }

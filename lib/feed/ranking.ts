@@ -8,6 +8,7 @@ import type {
 } from './types'
 
 export const FEED_ALGORITHM_VERSION = '2026-07-10.feed.v1'
+export const MAX_CONSECUTIVE_VENDOR_POSTS = 2
 
 export const DEFAULT_FEED_WEIGHTS: FeedWeights = {
   proximityWeight: 1.3,
@@ -167,7 +168,8 @@ export function rankFeedCandidates(
   viewer: FeedViewerContext,
   weights: FeedWeights = DEFAULT_FEED_WEIGHTS,
 ): FeedRankingResult {
-  const items = candidates
+  const scored = candidates
+    .filter((candidate, index, all) => all.findIndex((item) => item.id === candidate.id) === index)
     .map((candidate) => scoreFeedCandidate(candidate, viewer, weights))
     .sort((a, b) => {
       if (a.score !== b.score) return b.score - a.score
@@ -175,6 +177,21 @@ export function rankFeedCandidates(
       const bTime = new Date(b.publishedAt ?? b.createdAt).getTime()
       return bTime - aTime
     })
+
+  const items: RankedFeedCandidate[] = []
+  const remaining = [...scored]
+  while (remaining.length > 0) {
+    const previous = items.slice(-MAX_CONSECUTIVE_VENDOR_POSTS)
+    const repeatedVendor = previous.length === MAX_CONSECUTIVE_VENDOR_POSTS
+      && previous[0]?.vendorId
+      && previous.every((item) => item.vendorId === previous[0]?.vendorId)
+      ? previous[0].vendorId
+      : null
+    const nextIndex = repeatedVendor
+      ? remaining.findIndex((item) => !item.vendorId || item.vendorId !== repeatedVendor)
+      : 0
+    items.push(remaining.splice(nextIndex >= 0 ? nextIndex : 0, 1)[0]!)
+  }
 
   return { version: FEED_ALGORITHM_VERSION, items }
 }

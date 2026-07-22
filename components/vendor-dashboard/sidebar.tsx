@@ -10,6 +10,7 @@ import {
   ListOrdered,
   Menu,
   Settings2,
+  Sparkles,
   Star,
   Store,
   UtensilsCrossed,
@@ -29,6 +30,7 @@ const PRIMARY_ITEMS: SidebarItem[] = [
   { label: 'Orders', href: '/vendor-dashboard/orders', icon: ListOrdered },
   { label: 'Menu', href: '/vendor-dashboard/menu', icon: UtensilsCrossed },
   { label: 'Store', href: '/vendor-dashboard/store', icon: Store },
+  { label: 'Feed', href: '/vendor-dashboard/videos', icon: Sparkles },
   { label: 'Earnings', href: '/vendor-dashboard/earnings', icon: CircleDollarSign },
 ]
 
@@ -122,6 +124,9 @@ export function VendorDashboardSidebar({
       </nav>
 
       <div className="border-t border-white/8 p-4">
+        <Link href="/feed-v2/create" onClick={onClose} className="mb-1 flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-white/70 transition hover:bg-white/[0.04] hover:text-white">
+          <Sparkles size={17} /> Create feed post
+        </Link>
         <Link href="/vendor-dashboard/store" onClick={onClose} className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-white/48 transition hover:bg-white/[0.04] hover:text-white">
           <Settings2 size={17} /> Store settings
         </Link>

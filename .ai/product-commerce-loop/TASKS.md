@@ -2,7 +2,7 @@
 
 ## In Progress
 
-- [ ] Commit completed Phase E group-order lifecycle and participant flow.
+- [ ] Commit the verified vendor feed publishing and commerce-link slice.
 
 ## Pending
 
@@ -42,3 +42,7 @@
 - [x] Added storefront group creation and organizer/participant mobile controls with required choices, add-ons, notes, share, removal, lock, reconciliation, and checkout.
 - [x] Added abandoned-group expiry cron and group lifecycle audit events.
 - [x] Disabled participant-paid split billing for the supported organizer-paid model.
+- [x] Committed Phase E group ordering as `33211a0`.
+- [x] Traced the feed restriction/revert history and current authorization model.
+- [x] Restored vendor dashboard feed authoring and lifecycle entry points.
+- [x] Added vendor preview, draft, recent-post editing, owned menu links, post detail, storefront updates, live availability degradation, attribution, and fair rotation.

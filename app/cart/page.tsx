@@ -15,6 +15,7 @@ import { DeliveryAddress } from '@/components/delivery-address'
 import { CartRewardHint } from '@/components/cart-reward-hint'
 import { composeDeliveryAddress, type DeliveryAddressParts } from '@/lib/delivery-address'
 import { getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
+import { recordFeedCommerceEvent } from '@/lib/feed/client-attribution'
 
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
 
@@ -363,6 +364,7 @@ export default function CartPage() {
         metadata: { delivery_type: deliveryType, total },
       })
     }
+    void recordFeedCommerceEvent('checkout_start', cart.vendor_id)
 
     try {
       const res = await fetch('/api/orders', {

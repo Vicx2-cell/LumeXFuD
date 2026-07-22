@@ -45,6 +45,8 @@ export type FeedV2RailCollection = {
 
 type FeedV2BasePost = {
   id: string
+  vendorId?: string
+  menuItemId?: string
   authorProfileId?: string
   author: string
   handle: string

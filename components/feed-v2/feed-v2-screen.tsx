@@ -40,6 +40,7 @@ import type {
   FeedV2Story,
   FeedV2Tab,
 } from '@/app/feed-v2/fixtures'
+import { recordFeedCommerceEvent, rememberFeedCommerceSource } from '@/lib/feed/client-attribution'
 
 type FeedV2ScreenProps = {
   posts: FeedV2Post[]
@@ -1284,6 +1285,7 @@ function OrderSheet({
   onRepost,
   onSave,
   onShare,
+  onOrder,
 }: {
   post: FeedV2Post | null
   onClose: () => void
@@ -1292,6 +1294,7 @@ function OrderSheet({
   onRepost: (post: FeedV2Post) => void
   onSave: (post: FeedV2Post) => void
   onShare: (post: FeedV2Post) => void
+  onOrder: (post: FeedV2Post) => void
 }) {
   const active = Boolean(post)
   if (!post) return null
@@ -1364,7 +1367,7 @@ function OrderSheet({
                 {isOfficialPost ? 'See live vendors currently open around campus.' : 'Fast ordering, warm campus delivery, and clean handoff.'}
               </p>
             </div>
-            <button type="button" className={styles.orderButtonLarge} onClick={onClose}>
+            <button type="button" className={styles.orderButtonLarge} onClick={() => onOrder(post)}>
               <span>{ctaLabel}</span>
               <ArrowRight size={16} aria-hidden="true" />
             </button>
@@ -1383,6 +1386,7 @@ export function FeedV2Screen({
   rightRail,
   ...timelineProps
 }: FeedV2ScreenProps) {
+  const router = useRouter()
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
   const [selectedStoryIndex, setSelectedStoryIndex] = useState<number | null>(null)
   const [likedIds, setLikedIds] = useState<string[]>(() => posts.filter((post) => post.viewerLiked).map((post) => post.id))
@@ -1566,7 +1570,7 @@ export function FeedV2Screen({
   }
 
   const handleShare = async (post: FeedV2Post) => {
-    const url = `${window.location.origin}/feed-v2#${post.id}`
+    const url = `${window.location.origin}/feed-v2/post/${post.id}`
     timelineProps.onShare?.(post)
     adjustCount(post.id, 'shareCount', 1)
     void recordFeedEvent(post.id, 'share')
@@ -1575,6 +1579,14 @@ export function FeedV2Screen({
       return
     }
     await navigator.clipboard?.writeText(url).catch(() => {})
+  }
+
+  const handleOrder = (post: FeedV2Post) => {
+    if (!post.vendorId || !post.ctaLabel) return
+    rememberFeedCommerceSource(post.id, post.vendorId)
+    void recordFeedCommerceEvent('menu_click', post.vendorId)
+    const item = post.menuItemId ? `?item=${encodeURIComponent(post.menuItemId)}` : ''
+    router.push(`/vendor/${encodeURIComponent(post.vendorId)}${item}`)
   }
 
   const submitComment = async (event: FormEvent<HTMLFormElement>) => {
@@ -1736,6 +1748,7 @@ export function FeedV2Screen({
             onRepost={handleRepost}
             onSave={handleSave}
             onShare={handleShare}
+            onOrder={handleOrder}
           />
         </div>
 

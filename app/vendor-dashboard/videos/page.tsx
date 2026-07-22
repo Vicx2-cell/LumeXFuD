@@ -1,4 +1,4 @@
-import { VideosClient } from '@/components/vendor-dashboard-videos-client'
+import { VideosClient } from './videos-client'
 
 export default function VendorVideosPage() {
   return <VideosClient />

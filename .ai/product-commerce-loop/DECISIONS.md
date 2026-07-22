@@ -31,3 +31,8 @@
 - Support organizer-paid checkout only. `split_enabled` is migrated false, UI/API toggles are removed, and order creation cannot activate participant wallet collection from stale data.
 - Preserve each participant line separately in the organizer cart so notes are not merged or lost; `/api/orders` compares the exact reconciled line multiset before linking the group.
 - Expire abandoned groups every 15 minutes through the existing authenticated cron-health framework.
+- Keep the canonical `posts`/`post_media`/`post_menu_items` system and existing lifecycle routes; restore the vendor dashboard entry points and enrich the existing composer rather than adding a vendor-only feed engine.
+- Allow vendor drafts to remain editable and published posts to be edited for 24 hours. Archived, deleted, older, and multi-media posts are not editable in the current single-media composer, preventing silent content loss.
+- Treat live menu/vendor state as authoritative for feed purchase actions. A stale snapshot may describe the historical post, but it cannot keep an Order action active after an item or vendor becomes unavailable.
+- Carry feed commerce attribution with the existing privacy-safe `feed_events` and order-attribution tables. Session storage keeps only post/vendor UUIDs for 72 hours; no customer identity, capability token, or full URL is stored.
+- Apply a maximum of two consecutive posts per vendor when alternatives exist after explainable scoring, and suppress duplicate candidate IDs.

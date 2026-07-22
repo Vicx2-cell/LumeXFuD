@@ -26,6 +26,8 @@ describe('customer feed publishing rules', () => {
   it('allows only approved feed publishers to publish posts', () => {
     const approvedVendor: FeedPermissionVendor = { id: 'vendor', approval_state: 'approved', is_active: true, is_verified: true, business_verified: false, id_verified: false }
     expect(canPublishFeedPost({ ...profile('vendor'), vendor_id: 'vendor' }, approvedVendor)).toBe(true)
+    expect(canPublishFeedPost({ ...profile('vendor'), vendor_id: 'vendor' }, { ...approvedVendor, suspended_until: new Date(Date.now() + 60_000).toISOString() })).toBe(false)
+    expect(canPublishFeedPost({ ...profile('vendor'), vendor_id: 'vendor' }, { ...approvedVendor, is_active: false })).toBe(false)
     expect(canPublishFeedPost({ ...profile('admin'), is_system_account: true, official_badge_kind: 'official' }, null)).toBe(true)
     expect(canPublishFeedPost(profile('rider'), null)).toBe(false)
   })

@@ -3,7 +3,7 @@
 Date: 2026-07-21
 Branch: audit/production-readiness
 Starting commit: 13e22e6 Add admin rider reassignment
-Latest verified commit before this slice: 1949f72 Add bounded commerce browser verification
+Latest verified commit before this slice: 33211a0 Complete organizer-paid group ordering
 
 ## Scope
 
@@ -24,7 +24,7 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - Current browser slice pending commit: deterministic test-only commerce data, a bounded Playwright harness, a public guest-compatible cart route, labelled guest fields, required menu choices on the existing add-on model, storefront selection enforcement, and server-authoritative required-choice validation.
 - The 390x844 browser scenario passed all assertions and produced a reviewed full-page screenshot. The command's global timeout expired during the original npm-wrapped dev-server teardown after the test passed; the harness now launches Next directly.
 - The first 320x700 attempt did not enter the test because Chromium headless shell stalled before establishing its debugging pipe. The owned process exited; existing interactive Chrome sessions were not touched. Per the bounded retry policy, 412x915 and remaining viewport claims are deferred rather than repeatedly rerun.
-- Phase E group ordering is implemented and pending commit: explicit lifecycle and participant records, hashed guest participant sessions, organizer-paid checkout, atomic writes versus lock, optimistic item versions, readiness, limits, budgets, deadline expiry, final reconciliation, exact group-to-order validation, one-order uniqueness, audit events, and storefront/mobile controls.
+- Phase E group ordering is committed as `33211a0`: explicit lifecycle and participant records, hashed guest participant sessions, organizer-paid checkout, atomic writes versus lock, optimistic item versions, readiness, limits, budgets, deadline expiry, final reconciliation, exact group-to-order validation, one-order uniqueness, audit events, and storefront/mobile controls.
 - Participant-paid wallet splitting is disabled and explicitly deferred. Existing legacy split functions remain unreachable; the supported group model has one authenticated organizer payer and one resulting order.
 
 ## Baseline
@@ -39,3 +39,4 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - Phase boundary verification passed after repair: full Vitest suite, focused access-control rerun, lint, and production build.
 - Browser data/harness gap is closed locally; additional viewport execution is environment-blocked by a Chromium startup stall, with only 390x844 claimed as exercised.
 - Phase E focused boundary passed 250 tests, TypeScript, lint, and diff whitespace checks. Browser-based group mobile execution remains under the already-recorded Chromium startup blocker; no new viewport claim is made.
+- Phase F vendor publishing slice is implemented and pending commit: restored vendor dashboard authoring/management entry points, vendor menu-linked compose/preview/draft/edit, live vendor/item purchase-state validation, stable post detail links, storefront vendor updates, feed-to-order event attribution, and fair vendor rotation.

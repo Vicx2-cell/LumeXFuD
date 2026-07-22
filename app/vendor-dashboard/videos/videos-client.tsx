@@ -210,7 +210,7 @@ export function VideosClient() {
           <div className="grid gap-3 md:grid-cols-3">
             <button
               type="button"
-              onClick={() => router.push('/feed-v2')}
+              onClick={() => router.push('/feed-v2/create')}
               className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 text-left transition hover:border-white/15"
             >
               <p className="text-xs uppercase tracking-wide text-white/40">Native upload</p>
@@ -405,6 +405,9 @@ export function VideosClient() {
                       Orders: {item.order_count} · Storage: {fmtBytes(item.storage_bytes ?? 0)} · Created: {fmtDate(item.created_at)}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
+                      {(item.status === 'draft' || item.status === 'published') && !item.is_archived && !item.deleted_at ? (
+                        <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" onClick={() => router.push(`/feed-v2/create?edit=${item.id}`)}>Edit</button>
+                      ) : null}
                       <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy} onClick={() => void mutate(`/api/feed/posts/${item.id}/archive`, 'POST', { reason: 'Archive from manager' })}>Archive</button>
                       <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy} onClick={() => void mutate(`/api/feed/posts/${item.id}/restore`, 'POST')}>Restore</button>
                       <button type="button" className="lx-btn-secondary px-3 py-2 text-xs" disabled={busy} onClick={() => { if (window.confirm('Delete this post?')) void mutate(`/api/feed/posts/${item.id}`, 'DELETE', { reason: 'Deleted from manager' }) }}>Delete</button>

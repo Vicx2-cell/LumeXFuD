@@ -1,6 +1,6 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { classifyDiscoveryTopics, getCampusDeals, getFeaturedVendors, getTrendingTopics } from '@/lib/feed/discovery'
-import { formatOfficialFeedHeadline } from '@/lib/feed/display'
+import { formatOfficialFeedHeadline, isFeedMenuOrderable } from '@/lib/feed/display'
 import { OFFICIAL_SYSTEM_AVATAR_URL } from '@/lib/feed/official-service'
 import { loadFeedViewerContext } from '@/lib/feed/service'
 import { formatPrice } from '@/lib/money'
@@ -137,6 +137,8 @@ type LiveVendorRow = FeedPermissionVendor & {
   closing_time: string | null
   city_id: string | null
   zone_id: string | null
+  suspended_until: string | null
+  deleted_at: string | null
 }
 
 type LiveMenuItemRow = {
@@ -163,6 +165,7 @@ export interface FeedV2SurfaceData {
 
 export type FeedV2SurfaceOptions = {
   tab?: FeedV2TabKey
+  postId?: string
 }
 
 function unique(values: Array<string | null | undefined>) {
@@ -320,7 +323,11 @@ function buildFeedPost(args: {
   const liveMenuPrice = liveMenuItem ? formatPrice(liveMenuItem.price_kobo) : null
   const menuEntryName = menuEntry ? menuEntry.menu_item_name_snapshot : null
   const liveMenuName = liveMenuItem ? liveMenuItem.name : null
-  const hasOrderableMenu = Boolean((menuEntry?.is_available_snapshot ?? false) || liveMenuItem?.is_available)
+  const hasOrderableMenu = isFeedMenuOrderable({
+    liveItemAvailable: Boolean(liveMenuItem?.is_available),
+    vendorOpen: isVendorOpen,
+    vendorApproved: approved === 'approved',
+  })
   const body = row.body?.trim() ?? menuEntry?.menu_item_name_snapshot ?? officialHeadline ?? 'New post'
   const area = row.location_text?.trim()
     || vendor?.zone_id
@@ -392,10 +399,12 @@ function buildFeedPost(args: {
   if (menuEntry || liveMenuItem) {
     const image = menuEntry?.menu_item_image_url_snapshot ?? liveMenuItem?.image_url ?? storyImage ?? '/icons/icon-192-v2.png'
     const price = liveMenuPrice ?? formatPrice(menuEntry?.menu_item_price_kobo_snapshot ?? liveMenuItem?.price_kobo ?? 0)
-    const available = menuEntry ? menuEntry.is_available_snapshot : Boolean(liveMenuItem?.is_available)
+    const available = hasOrderableMenu
     return {
       kind: 'menu',
       id: row.id,
+      vendorId: row.vendor_id ?? undefined,
+      menuItemId: liveMenuItem?.id ?? menuEntry?.menu_item_id,
       authorProfileId: row.author_profile_id,
       author: displayName,
       handle,
@@ -408,7 +417,7 @@ function buildFeedPost(args: {
       tags: row.hashtags_cached ?? undefined,
       verified: approved === 'approved',
       statusPills: available ? statusPills : ['Currently unavailable', ...statusPills.slice(0, 1)],
-      ctaLabel: available ? 'Order Now' : undefined,
+      ctaLabel: available ? 'Order Now' : 'View Store',
       ...engagementFields(row),
       item: {
         name: menuEntryName ?? liveMenuName ?? body,
@@ -449,6 +458,7 @@ function buildFeedPost(args: {
     return {
       kind: bodyKind,
       id: row.id,
+      vendorId: row.vendor_id ?? undefined,
       authorProfileId: row.author_profile_id,
       author: displayName,
       handle,
@@ -464,7 +474,7 @@ function buildFeedPost(args: {
       tags: row.hashtags_cached ?? undefined,
       verified: approved === 'approved',
       statusPills,
-      ctaLabel: hasOrderableMenu ? 'Order Now' : undefined,
+      ctaLabel: row.vendor_id ? (hasOrderableMenu ? 'Order Now' : 'Visit Store') : undefined,
       ...engagementFields(row),
       publisherType,
       approvalState: approved,
@@ -476,6 +486,7 @@ function buildFeedPost(args: {
   return {
     kind: 'text',
     id: row.id,
+    vendorId: row.vendor_id ?? undefined,
     authorProfileId: row.author_profile_id,
     author: displayName,
     handle,
@@ -488,7 +499,7 @@ function buildFeedPost(args: {
     tags: row.hashtags_cached ?? undefined,
     verified: approved === 'approved',
     statusPills,
-    ctaLabel: undefined,
+    ctaLabel: row.vendor_id ? 'Visit Store' : undefined,
     ...engagementFields(row),
     publisherType,
     approvalState: approved,
@@ -827,14 +838,15 @@ export async function loadFeedV2Surface(options: FeedV2SurfaceOptions = {}): Pro
   const db = createSupabaseAdmin()
   const tab = tabToKey(options.tab)
   const viewer = await loadFeedViewerContext()
-  const { data: postRows, error } = await db
+  let postQuery = db
     .from('posts')
     .select('id, author_profile_id, vendor_id, related_menu_item_id, related_promotion_ref, post_kind, status, visibility, body, content_warning, campus_id, zone_id, location_text, hashtags_cached, view_count, like_count, reply_count, repost_count, bookmark_count, share_count, menu_click_count, cart_add_count, order_count, revenue_kobo, watch_time_ms, completion_rate, safe_rank_score, is_sponsored, is_boosted, is_archived, published_at, created_at')
     .eq('status', 'published')
     .is('deleted_at', null)
     .order('published_at', { ascending: false })
     .order('created_at', { ascending: false })
-    .limit(24)
+  postQuery = options.postId ? postQuery.eq('id', options.postId) : postQuery.limit(24)
+  const { data: postRows, error } = await postQuery
 
   if (error) throw new Error(error.message)
 
@@ -844,7 +856,7 @@ export async function loadFeedV2Surface(options: FeedV2SurfaceOptions = {}): Pro
   const vendorIds = unique(rows.map((row) => row.vendor_id))
   const menuIds = unique(rows.map((row) => row.related_menu_item_id))
 
-  const [mediaResult, menuResult, officialResult, profileResult, vendorResult, liveMenuResult] = await Promise.all([
+  const [mediaResult, menuResult, officialResult, profileResult, vendorResult] = await Promise.all([
     postIds.length > 0
       ? db.from('post_media').select('id, post_id, media_kind, public_url, alt_text, caption, sort_order, is_primary, width, height').in('post_id', postIds)
       : Promise.resolve({ data: [] }),
@@ -858,12 +870,17 @@ export async function loadFeedV2Surface(options: FeedV2SurfaceOptions = {}): Pro
       ? db.from('social_profiles').select('id, handle, display_name, avatar_url, profile_kind, official_badge_kind, is_verified, is_system_account, premium_verified, premium_featured_until, premium_label, vendor_id, customer_id, rider_id, admin_id, campus_id, zone_id').in('id', authorIds)
       : Promise.resolve({ data: [] }),
     vendorIds.length > 0
-      ? db.from('vendors').select('id, shop_name, approval_state, is_active, is_verified, business_verified, id_verified, avg_rating, total_ratings, opening_time, closing_time, city_id, zone_id').in('id', vendorIds)
-      : Promise.resolve({ data: [] }),
-    menuIds.length > 0
-      ? db.from('menu_items').select('id, vendor_id, name, price_kobo, image_url, is_available, category').in('id', menuIds)
+      ? db.from('vendors').select('id, shop_name, approval_state, is_active, is_verified, business_verified, id_verified, avg_rating, total_ratings, opening_time, closing_time, city_id, zone_id, suspended_until, deleted_at').in('id', vendorIds)
       : Promise.resolve({ data: [] }),
   ])
+
+  const linkedMenuIds = unique([
+    ...menuIds,
+    ...((menuResult.data ?? []) as LiveMenuSnapshotRow[]).map((row) => row.menu_item_id),
+  ])
+  const liveMenuResult = linkedMenuIds.length > 0
+    ? await db.from('menu_items').select('id, vendor_id, name, price_kobo, image_url, is_available, category').in('id', linkedMenuIds).is('deleted_at', null)
+    : { data: [] }
 
   const mediaByPostId = new Map<string, LiveMediaRow[]>()
   for (const row of (mediaResult.data ?? []) as LiveMediaRow[]) {
@@ -906,7 +923,12 @@ export async function loadFeedV2Surface(options: FeedV2SurfaceOptions = {}): Pro
       vendor: vendorById.get(row.vendor_id ?? '') ?? null,
       media: mediaByPostId.get(row.id) ?? [],
       menuItems: menuByPostId.get(row.id) ?? [],
-      liveMenuItem: row.related_menu_item_id ? liveMenuById.get(row.related_menu_item_id) ?? null : null,
+      liveMenuItem: (() => {
+        const attached = menuByPostId.get(row.id) ?? []
+        const primary = attached.find((item) => item.is_primary) ?? attached[0]
+        const menuItemId = row.related_menu_item_id ?? primary?.menu_item_id
+        return menuItemId ? liveMenuById.get(menuItemId) ?? null : null
+      })(),
       official: officialByPostId.get(row.id) ?? null,
     }))
     .filter((item): item is FeedV2Post => Boolean(item))

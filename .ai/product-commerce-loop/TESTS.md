@@ -56,3 +56,11 @@
 - `test/cart-context.test.ts`
 - `test/storefront.test.ts`
 - `test/guest-checkout-contract.test.ts`
+
+## Phase F Vendor Publishing Slice - 2026-07-22
+
+- Passed: `npm.cmd test -- --run lib/feed/authoring.test.ts lib/feed/permissions.test.ts lib/feed/display.test.ts lib/feed/ranking.test.ts lib/feed/attribution.test.ts lib/feed/interactions.test.ts app/api/feed/uploads/route.test.ts app/api/feed/posts/[id]/restore/route.test.ts` - 8 files, 35 tests.
+- Passed: `npx.cmd tsc --noEmit`.
+- Passed: `npm.cmd run lint` with no warnings.
+- Passed: `git diff --check` with only repository line-ending warnings.
+- Covered: publisher eligibility including inactive/suspended vendors, official author restrictions, draft/recent edit policy, menu-link availability, stale purchase-action degradation, fair vendor rotation, duplicate suppression, attribution/reversal, interactions, upload validation, and restore authorization.

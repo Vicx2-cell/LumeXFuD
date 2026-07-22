@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatCompactCount, formatDiscountLabel, formatMenuItemPrice, formatOfficialFeedHeadline, pickPrimaryMenuItem, resolveFeedHeroMedia } from './display'
+import { formatCompactCount, formatDiscountLabel, formatMenuItemPrice, formatOfficialFeedHeadline, isFeedMenuOrderable, pickPrimaryMenuItem, resolveFeedHeroMedia } from './display'
 
 describe('feed display helpers', () => {
   it('prefers the primary menu item and its live image', () => {
@@ -84,5 +84,11 @@ describe('feed display helpers', () => {
     expect(formatOfficialFeedHeadline('evening_collection')).toBe('Late-night picks')
     expect(formatOfficialFeedHeadline('student_budget')).toBe('Meals under budget')
     expect(formatOfficialFeedHeadline('new_on_lumex')).toBe('New on LumeX')
+  })
+
+  it('uses live item and vendor state for purchase actions', () => {
+    expect(isFeedMenuOrderable({ liveItemAvailable: true, vendorOpen: true, vendorApproved: true })).toBe(true)
+    expect(isFeedMenuOrderable({ liveItemAvailable: false, vendorOpen: true, vendorApproved: true })).toBe(false)
+    expect(isFeedMenuOrderable({ liveItemAvailable: true, vendorOpen: false, vendorApproved: true })).toBe(false)
   })
 })

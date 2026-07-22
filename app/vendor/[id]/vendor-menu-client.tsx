@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Pill } from '@/components/ui/pill'
 import { FindStoreCard } from '@/components/find-store-card'
 import { getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
+import { recordFeedCommerceEvent } from '@/lib/feed/client-attribution'
 import type { VendorInfo, MenuAddon, MenuItem, VendorReview } from './page'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks', 'Other']
@@ -37,7 +38,7 @@ function Stars({ value, size = 13 }: { value: number; size?: number }) {
   )
 }
 
-export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false, campaignId = '' }: { vendor: VendorInfo; menu: MenuItem[]; reviews?: VendorReview[]; loggedOut?: boolean; campaignId?: string }) {
+export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false, campaignId = '', initialMenuItemId = '' }: { vendor: VendorInfo; menu: MenuItem[]; reviews?: VendorReview[]; loggedOut?: boolean; campaignId?: string; initialMenuItemId?: string }) {
   const router = useRouter()
   const { cart, addItem, clearCart, totalItems, subtotal } = useCart()
   const [activeCategory, setActiveCategory] = useState('All')
@@ -65,6 +66,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
   }))
   const sentProfileOpen = useRef(false)
   const sentMenuItems = useRef<Set<string>>(new Set())
+  const openedLinkedItem = useRef(false)
 
   const isPaused = Boolean(vendor.paused_until && new Date(vendor.paused_until) > new Date())
   const isClosed = vendor.status === 'CLOSED' || isPaused
@@ -110,6 +112,16 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
   }, [menu, activeCategory, search])
 
   useEffect(() => {
+    if (!initialMenuItemId || openedLinkedItem.current) return
+    const item = menu.find((candidate) => candidate.id === initialMenuItemId && candidate.is_available)
+    if (!item) return
+    openedLinkedItem.current = true
+    setSelecting(item)
+    setSelectedAddonIds([])
+    setItemNotes('')
+  }, [initialMenuItemId, menu])
+
+  useEffect(() => {
     if (!campaignId) return
     const next = filtered.slice(0, 6).filter((item) => !sentMenuItems.current.has(item.id))
     for (const item of next) {
@@ -150,6 +162,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       setShowConflict(true)
       return
     }
+    void recordFeedCommerceEvent('add_to_cart', vendor.id)
     if (campaignId) {
       trackCampaignEvent({
         campaignId,

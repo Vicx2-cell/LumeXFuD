@@ -118,3 +118,7 @@ export function formatDiscountLabel(currentKobo: number, oldKobo: number | null 
   if (percent <= 0 || percent >= 100) return null
   return `${percent}% OFF`
 }
+
+export function isFeedMenuOrderable(input: { liveItemAvailable: boolean; vendorOpen: boolean; vendorApproved: boolean }) {
+  return input.liveItemAvailable && input.vendorOpen && input.vendorApproved
+}

@@ -56,3 +56,12 @@
 - Added `Start group order` to the canonical storefront with controlled group configuration fields.
 - Bound the final order to the organizer, vendor, fulfilment, destination, and exact reconciled contribution lines; repeated placement reuses the existing order even if a later browser session presents a new idempotency key.
 - Verification passed: 250 focused tests, TypeScript, lint, and diff whitespace checks. No production deployment or real payment occurred.
+
+## 2026-07-22 Phase F Vendor Publishing
+
+- Traced the customer-story restriction and feed/profile revert sequence; confirmed vendor publishing remained in the canonical backend but disappeared from the redesigned vendor dashboard and remained incomplete in the generic composer.
+- Restored vendor dashboard create/manage entry points and added preview, draft save, owner-scoped recent-post editing, and owned available menu-item attachment to the existing composer.
+- Blocked inactive, suspended, deleted, and unverified vendors from publishing; retained admin-only official author selection and official-account protection.
+- Added stable post detail URLs, latest vendor updates on the storefront, exact linked-product opening, live item/vendor availability degradation, and feed menu-click/add-to-cart/checkout/completed-order attribution.
+- Added explainable fair vendor rotation and duplicate suppression without fabricated engagement.
+- Verification passed: 35 focused tests, TypeScript, lint, and diff whitespace checks.

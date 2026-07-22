@@ -7,7 +7,7 @@ import { canPublishFeedPost, loadFeedPermissionContext } from './permissions'
 import { publishVideoPostAtomic } from './video-management'
 import type { SessionPayload } from '@/lib/session'
 import type { FeedComposerActionInput } from './validators'
-import { normalizeFeedAuthorMode } from './authoring'
+import { canAttachFeedMenuItem, canEditFeedPost, normalizeFeedAuthorMode } from './authoring'
 
 type FeedComposerBody = FeedComposerActionInput
 
@@ -38,6 +38,7 @@ async function loadOwnedMenuSnapshots(db: ReturnType<typeof createSupabaseAdmin>
     .eq('vendor_id', vendorId)
   const rows = (data ?? []) as Array<{ id: string; name: string; price_kobo: number; image_url: string | null; is_available: boolean; deleted_at: string | null }>
   if (rows.length !== menuItemIds.length) throw new Error('One or more menu items could not be found')
+  if (rows.some((row) => !canAttachFeedMenuItem(row))) throw new Error('Only available menu items can be attached')
   return rows
 }
 
@@ -127,16 +128,23 @@ export async function createOrSaveFeedPost(
   } else {
     const { data: existingPost } = await db
       .from('posts')
-      .select('id, author_profile_id')
+      .select('id, author_profile_id, status, published_at, is_archived, deleted_at, post_media(id)')
       .eq('id', draftId)
       .maybeSingle()
     if (!existingPost) throw new Error('Draft not found')
     if (String((existingPost as { author_profile_id: string }).author_profile_id) !== profile.id) {
       throw new Error('This draft belongs to a different author')
     }
+    if (!canEditFeedPost(existingPost as { status: string; published_at: string | null; is_archived: boolean | null; deleted_at: string | null })) {
+      throw new Error('Published posts can only be edited for 24 hours')
+    }
+    if (((existingPost as { post_media?: Array<{ id: string }> }).post_media ?? []).length > 1) {
+      throw new Error('Posts with multiple media cannot be edited in this composer')
+    }
+    const wasPublished = (existingPost as { status: string }).status === 'published'
     await db.from('posts').update({
       post_kind: postKind,
-      status: requireAtomicPublish ? 'draft' : (mode === 'draft' ? 'draft' : 'published'),
+      status: requireAtomicPublish ? 'draft' : (wasPublished || mode === 'publish' ? 'published' : 'draft'),
       visibility: body.visibility,
       audience_scope: body.audience_scope,
       body: cleanBody,
@@ -147,7 +155,9 @@ export async function createOrSaveFeedPost(
       hashtags_cached: hashtags,
       scheduled_for: body.scheduled_for ?? null,
       is_pinned: body.is_pinned ?? false,
-      published_at: requireAtomicPublish ? null : (mode === 'publish' ? new Date().toISOString() : null),
+      published_at: requireAtomicPublish
+        ? null
+        : (wasPublished ? (existingPost as { published_at: string | null }).published_at : (mode === 'publish' ? new Date().toISOString() : null)),
       is_archived: false,
       archived_at: null,
       deleted_at: null,
