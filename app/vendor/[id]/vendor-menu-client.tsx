@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
 import Image from 'next/image'
 import { FOOD_BLUR } from '@/lib/blur'
 import { useRouter } from 'next/navigation'
@@ -51,10 +51,22 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
   const [fly, setFly] = useState<{ id: string; n: number } | null>(null)
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([])
   const [itemNotes, setItemNotes] = useState('')
+  const [showGroupForm, setShowGroupForm] = useState(false)
+  const [groupBusy, setGroupBusy] = useState(false)
+  const [groupError, setGroupError] = useState('')
+  const [groupForm, setGroupForm] = useState(() => ({
+    name: '',
+    delivery_address: '',
+    delivery_type: 'BIKE' as 'BIKE' | 'DOOR' | 'PICKUP',
+    deadline: localDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000)),
+    budget_naira: '',
+    participant_limit: '8',
+    shared_note: '',
+  }))
   const sentProfileOpen = useRef(false)
   const sentMenuItems = useRef<Set<string>>(new Set())
 
-  const isPaused = vendor.paused_until && new Date(vendor.paused_until) > new Date()
+  const isPaused = Boolean(vendor.paused_until && new Date(vendor.paused_until) > new Date())
   const isClosed = vendor.status === 'CLOSED' || isPaused
 
   // Remember this vendor for a logged-out visitor (arrived via the share link) so
@@ -194,6 +206,36 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
     setPendingItem(null)
   }
 
+  async function startGroupOrder() {
+    if (loggedOut) {
+      router.push(`/auth?next=${encodeURIComponent(`/vendor/${vendor.id}`)}`)
+      return
+    }
+    if (groupForm.delivery_address.trim().length < 5) { setGroupError('Add one delivery destination for the group.'); return }
+    setGroupBusy(true)
+    setGroupError('')
+    try {
+      const response = await fetch('/api/group-order/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendor_id: vendor.id,
+          name: groupForm.name.trim() || undefined,
+          delivery_address: groupForm.delivery_address.trim(),
+          delivery_type: groupForm.delivery_type,
+          deadline: new Date(groupForm.deadline).toISOString(),
+          per_person_budget_kobo: groupForm.budget_naira ? Number(groupForm.budget_naira) * 100 : null,
+          participant_limit: Number(groupForm.participant_limit),
+          shared_note: groupForm.shared_note.trim() || undefined,
+        }),
+      })
+      const payload = await response.json().catch(() => ({})) as { code?: string; error?: string }
+      if (response.status === 401) { router.push(`/auth?next=${encodeURIComponent(`/vendor/${vendor.id}`)}`); return }
+      if (!response.ok || !payload.code) { setGroupError(payload.error ?? 'Could not start the group order.'); return }
+      router.push(`/group/${payload.code}`)
+    } catch { setGroupError('Connection lost. Try again.') } finally { setGroupBusy(false) }
+  }
+
   // Total quantity of this menu item across all its add-on variants.
   const qtyForItem = (menuItemId: string) =>
     cart.items.filter((i) => i.menu_item_id === menuItemId).reduce((s, i) => s + i.quantity, 0)
@@ -207,6 +249,22 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
 
   return (
     <>
+      {showGroupForm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70" onClick={() => setShowGroupForm(false)}>
+          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-white/10 bg-[#111113] p-5" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">Start group order</h2><p className="mt-1 text-xs text-white/50">One vendor, one destination, organizer pays.</p></div><button onClick={() => setShowGroupForm(false)} aria-label="Close group form" className="h-11 w-11 rounded-xl border border-white/10">Close</button></div>
+            <div className="mt-5 grid gap-4">
+              <GroupField label="Group name"><input value={groupForm.name} onChange={(event) => setGroupForm({ ...groupForm, name: event.target.value.slice(0, 80) })} className="lx-field w-full px-3 py-2.5" placeholder="Friday lunch" /></GroupField>
+              <GroupField label="Delivery destination"><input value={groupForm.delivery_address} onChange={(event) => setGroupForm({ ...groupForm, delivery_address: event.target.value.slice(0, 500) })} className="lx-field w-full px-3 py-2.5" placeholder="Hall, block, room or pickup point" /></GroupField>
+              <div className="grid grid-cols-2 gap-3"><GroupField label="Fulfilment"><select value={groupForm.delivery_type} onChange={(event) => setGroupForm({ ...groupForm, delivery_type: event.target.value as 'BIKE' | 'DOOR' | 'PICKUP' })} className="lx-field w-full px-3 py-2.5"><option value="BIKE">Bike delivery</option><option value="DOOR">Door delivery</option><option value="PICKUP">Pickup</option></select></GroupField><GroupField label="Deadline"><input type="datetime-local" value={groupForm.deadline} onChange={(event) => setGroupForm({ ...groupForm, deadline: event.target.value })} className="lx-field w-full px-3 py-2.5" /></GroupField></div>
+              <div className="grid grid-cols-2 gap-3"><GroupField label="Budget per person"><input inputMode="numeric" value={groupForm.budget_naira} onChange={(event) => setGroupForm({ ...groupForm, budget_naira: event.target.value.replace(/[^0-9]/g, '') })} className="lx-field w-full px-3 py-2.5" placeholder="Optional NGN" /></GroupField><GroupField label="Participant limit"><input inputMode="numeric" value={groupForm.participant_limit} onChange={(event) => setGroupForm({ ...groupForm, participant_limit: event.target.value.replace(/[^0-9]/g, '').slice(0, 2) })} className="lx-field w-full px-3 py-2.5" /></GroupField></div>
+              <GroupField label="Shared note"><textarea value={groupForm.shared_note} onChange={(event) => setGroupForm({ ...groupForm, shared_note: event.target.value.slice(0, 300) })} rows={2} className="lx-field w-full resize-none px-3 py-2.5" placeholder="Optional note for everyone" /></GroupField>
+              {groupError && <p className="text-sm text-red-300">{groupError}</p>}
+              <button onClick={startGroupOrder} disabled={groupBusy || isClosed} className="lx-btn-amber min-h-13 w-full disabled:opacity-50">{groupBusy ? 'Starting...' : 'Create group and get link'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Conflict dialog */}
       {showConflict && (
         <div className="fixed inset-0 z-50 flex items-end justify-center lx-scrim" style={{ background: 'rgba(0,0,0,0.6)' }}>
@@ -391,6 +449,9 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       {/* Find this store — address, landmark, storefront photo + one-tap directions */}
       <div className="mx-auto max-w-5xl px-4 pt-4 sm:px-6 lg:px-8">
         <FindStoreCard vendor={vendor} shopName={vendor.shop_name} />
+        <button type="button" onClick={() => { setGroupError(''); setShowGroupForm(true) }} disabled={isClosed} className="mt-3 min-h-12 w-full rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 text-sm font-semibold text-amber-200 disabled:opacity-50">
+          Start group order
+        </button>
       </div>
 
       {menu.length > 10 && (
@@ -518,4 +579,13 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       )}
     </>
   )
+}
+
+function GroupField({ label, children }: { label: string; children: ReactNode }) {
+  return <label className="block text-xs text-white/60"><span className="mb-1.5 block">{label}</span>{children}</label>
+}
+
+function localDateTime(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }

@@ -30,6 +30,11 @@ import { evaluateOrderCreationRisk, hashOrderDestination, hashOrderIntent, norma
 import { createGuestOrderToken, hashGuestOrderToken } from '@/lib/guest-order-access'
 import { normalizePhone } from '@/lib/phone'
 import { validateMenuAddonSelection, type MenuAddonChoice } from '@/lib/menu-addon-selection'
+import { normalizeGroupOrderAddons } from '@/lib/group-order-addons'
+
+function groupCheckoutLineKey(menuItemId: string, quantity: number, addonIds: string[], notes: string | null | undefined): string {
+  return `${menuItemId}|${quantity}|${addonIds.slice().sort().join(',')}|${(notes ?? '').trim()}`
+}
 
 export async function POST(req: NextRequest) {
   const context = createRequestContext(req.headers)
@@ -489,14 +494,29 @@ export async function POST(req: NextRequest) {
   // that group's host and it's still open for this vendor. Validated here so a
   // client can't attach someone else's group.
   let linkedGroupId: string | null = null
-  let groupSplitEnabled = false
-  if (group_order_id && customerId) {
-    const { data: gq } = await db.from('group_orders').select('id, host_customer_id, vendor_id, status, split_enabled').eq('id', group_order_id).maybeSingle()
-    const g = gq as { id: string; host_customer_id: string; vendor_id: string; status: string; split_enabled?: boolean } | null
-    if (g && g.host_customer_id === customerId && g.vendor_id === vendor_id && g.status === 'OPEN') {
-      linkedGroupId = g.id
-      groupSplitEnabled = g.split_enabled !== false
+  // The supported group model is organizer-paid. Participant wallet collection
+  // remains explicitly deferred and cannot be activated by stale database flags.
+  const groupSplitEnabled = false
+  if (group_order_id) {
+    if (!customerId) return NextResponse.json({ error: 'Organizer authentication is required for group checkout.' }, { status: 401 })
+    const { data: gq } = await db.from('group_orders').select('id, host_customer_id, vendor_id, status, delivery_type, delivery_address').eq('id', group_order_id).maybeSingle()
+    const g = gq as { id: string; host_customer_id: string; vendor_id: string; status: string; delivery_type: string; delivery_address: string | null } | null
+    if (!g || g.host_customer_id !== customerId || g.vendor_id !== vendor_id || g.status !== 'AWAITING_PAYMENT') {
+      return NextResponse.json({ error: 'This group checkout is stale or no longer belongs to the organizer.' }, { status: 409 })
     }
+    if (g.delivery_type !== delivery_type || (g.delivery_type !== 'PICKUP' && g.delivery_address !== resolvedAddress)) {
+      return NextResponse.json({ error: 'Group fulfilment or destination changed. Reopen the group and reconcile again.' }, { status: 409 })
+    }
+    const { data: groupLines } = await db.from('group_order_items').select('menu_item_id, quantity, notes, addons').eq('group_order_id', g.id)
+    const expectedLines = (groupLines ?? []).map((record) => {
+      const row = record as { menu_item_id: string; quantity: number; notes: string | null; addons: unknown }
+      return groupCheckoutLineKey(row.menu_item_id, row.quantity, normalizeGroupOrderAddons(row.addons).map((addon) => addon.id), row.notes)
+    }).sort()
+    const submittedLines = items.map((item) => groupCheckoutLineKey(item.menu_item_id, item.quantity, item.addons ?? [], item.special_instructions ?? null)).sort()
+    if (expectedLines.length !== submittedLines.length || expectedLines.some((line, index) => line !== submittedLines[index])) {
+      return NextResponse.json({ error: 'Group contributions changed. Return to the group and reconcile again.' }, { status: 409 })
+    }
+    linkedGroupId = g.id
   }
 
   const orderIntentHash = hashOrderIntent({
@@ -581,11 +601,14 @@ export async function POST(req: NextRequest) {
     // Return the original order's stored Paystack authorization instead of
     // creating a second order/charge.
     if (orderError?.code === '23505') {
-      const { data: existing } = await db
-        .from('orders')
-        .select('order_number, customer_id, order_intent_hash, paystack_authorization_url, paystack_access_code')
-        .eq('idempotency_key', idempotencyKey)
-        .maybeSingle()
+      const fields = 'order_number, customer_id, order_intent_hash, paystack_authorization_url, paystack_access_code'
+      const groupExisting = linkedGroupId
+        ? await db.from('orders').select(fields).eq('group_order_id', linkedGroupId).maybeSingle()
+        : { data: null }
+      const keyExisting = groupExisting.data
+        ? groupExisting
+        : await db.from('orders').select(fields).eq('idempotency_key', idempotencyKey).maybeSingle()
+      const existing = keyExisting.data
 
       // Bind the key to its owner — a client must not retrieve another
       // customer's checkout link by reusing their idempotency key.

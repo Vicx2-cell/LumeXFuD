@@ -2,12 +2,11 @@
 
 ## In Progress
 
-- [ ] Commit the bounded commerce browser harness and required-choice repair.
+- [ ] Commit completed Phase E group-order lifecycle and participant flow.
 
 ## Pending
 
 - [ ] Resume 320, 412, 360, 768, and desktop browser execution only after headless Chromium launches reliably; do not claim unexercised viewports.
-- [ ] Complete Phase E group ordering.
 - [ ] Complete Phase F feed restoration and upgrade.
 
 ## Done
@@ -36,3 +35,10 @@
 - [x] Added required menu choices to the canonical add-on model and enforced them in storefront and order validation.
 - [x] Fixed public guest cart access, guest-field labels, and Paystack-only checkout rendering when wallet is disabled.
 - [x] Passed the complete baseline scenario at 390x844 and reviewed its screenshot and retained failure evidence from earlier iterations.
+- [x] Committed browser harness and commerce fixes as `1949f72`.
+- [x] Normalized group states to draft/open/validating/locked/awaiting-payment/placed/cancelled/expired/failed.
+- [x] Added guest-compatible participant sessions, explicit readiness, owned edits, participant limits, deadlines, budgets, and reconnect-safe re-entry.
+- [x] Added atomic add/edit/delete-versus-lock functions, lock version checks, server-authoritative reconciliation, and exact final basket validation.
+- [x] Added storefront group creation and organizer/participant mobile controls with required choices, add-ons, notes, share, removal, lock, reconciliation, and checkout.
+- [x] Added abandoned-group expiry cron and group lifecycle audit events.
+- [x] Disabled participant-paid split billing for the supported organizer-paid model.

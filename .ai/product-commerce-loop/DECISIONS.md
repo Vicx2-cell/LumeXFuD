@@ -25,3 +25,9 @@
 - Reuse `menu_item_addons` for a single required-choice group via `is_required`: required rows are alternatives and the customer must choose exactly one. This extends the canonical pricing and snapshot path instead of introducing a parallel option engine.
 - Gate deterministic Playwright data behind both `PLAYWRIGHT_COMMERCE_FIXTURE=1` and a fixed non-production service key. The fixture never opens a real Supabase connection, uses no real payment, and cannot activate under production credentials.
 - Bound Playwright to one Chromium worker, zero retries, explicit route/field assertions, failure traces/screenshots, a 20-second browser-launch cap, and a 120-second global cap.
+- Keep group states uppercase to migrate the existing table in place; rename `CHECKED_OUT` data to `PLACED` and add the missing lifecycle states rather than creating a parallel status system.
+- Model every organizer/member as a `group_order_participants` row. Permanent customer identity is optional for participants, while organizer identity remains a verified customer account.
+- Serialize contribution mutations and locking on the `group_orders` row and use expected versions for stale-tab detection. Final placement has a partial unique index on `orders.group_order_id` in addition to ordinary checkout idempotency.
+- Support organizer-paid checkout only. `split_enabled` is migrated false, UI/API toggles are removed, and order creation cannot activate participant wallet collection from stale data.
+- Preserve each participant line separately in the organizer cart so notes are not merged or lost; `/api/orders` compares the exact reconciled line multiset before linking the group.
+- Expire abandoned groups every 15 minutes through the existing authenticated cron-health framework.

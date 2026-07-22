@@ -41,6 +41,15 @@
 - Blocked before scenario execution at 320x700: Chromium headless shell launched but did not establish its debugging pipe; Playwright interrupted the unstarted test after the bounded suite/teardown windows. No viewport assertion is claimed.
 - Not run after the environment startup blocker: 412x915, 360x800, 768x1024, and desktop.
 
+## Phase E Group Ordering — 2026-07-22
+
+- Passed: `npm.cmd test -- --run test/group-order-state.test.ts test/group-order-reconciliation.test.ts test/group-participant-session.test.ts test/group-order-lifecycle-contract.test.ts test/group-order-addons.test.ts test/menu-addon-selection.test.ts test/authz.test.ts test/authz-coverage.test.ts test/access-control.test.ts test/cart-context.test.ts` — 10 files, 250 tests.
+- Passed: `npx.cmd tsc --noEmit` after group checkout signature and storefront boolean repairs.
+- Passed: `npm.cmd run lint` with no warnings after removing unused group-page imports.
+- Passed: `git diff --check` with only repository line-ending warnings.
+- Covered deterministically: terminal state transitions, editability at lock/deadline, budget bounds, readiness reconciliation, vendor/item/add-on/price conflicts, high-entropy participant capabilities, explicit route classification, atomic SQL contract, organizer-only placement, and disabled split activation.
+- Not claimed: live group mobile browser screenshots because headless Chromium startup is already precisely blocked in this environment.
+
 ## Added During Loop
 
 - `test/group-order-addons.test.ts`

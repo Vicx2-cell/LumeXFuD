@@ -3,148 +3,168 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { groupOrderLineTotalKobo, normalizeGroupOrderAddons } from '@/lib/group-order-addons'
+import { resolveGroupParticipant } from '@/lib/group-order-participant'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// GET /api/group-order/[code] — the shared group view: vendor, the running item
-// list (who added what, with live menu prices), the available menu for adding
-// more, and whether the caller is the host. Logged-in customers only.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
   const session = await getCurrentUser()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.role !== 'customer') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (session && session.role !== 'customer') return NextResponse.json({ error: 'Customer participants only.' }, { status: 403 })
 
-  // The 6-char code is the access key — cap lookups so it can't be brute-forced.
-  const rl = await rateLimitGeneric(`group-view:${session.userId ?? session.phone}`, 60, 60)
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local'
+  const rl = await rateLimitGeneric(`group-view:${session?.phone ?? ip}`, 90, 60)
   if (!rl.success) return NextResponse.json({ error: 'Too many requests.' }, { status: 429 })
 
-  const { code } = await params
+  const { code: rawCode } = await params
+  const code = rawCode.toUpperCase()
   const db = createSupabaseAdmin()
+  const { data: groupRow } = await db.from('group_orders').select(
+    'id, code, name, vendor_id, host_customer_id, status, expires_at, delivery_type, delivery_address, per_person_budget_kobo, participant_limit, shared_note, version, reconciliation',
+  ).eq('code', code).maybeSingle()
+  const group = groupRow as {
+    id: string
+    code: string
+    name: string | null
+    vendor_id: string
+    host_customer_id: string
+    status: string
+    expires_at: string
+    delivery_type: string
+    delivery_address: string | null
+    per_person_budget_kobo: number | null
+    participant_limit: number
+    shared_note: string | null
+    version: number
+    reconciliation: unknown
+  } | null
+  if (!group) return NextResponse.json({ error: 'Group order not found.' }, { status: 404 })
 
-  const { data: g } = await db
-    .from('group_orders')
-    .select('id, code, vendor_id, host_customer_id, status, expires_at')
-    .eq('code', code.toUpperCase())
-    .maybeSingle()
-  const group = g as { id: string; code: string; vendor_id: string; host_customer_id: string; status: string; expires_at: string } | null
-  if (!group) return NextResponse.json({ error: 'Group order not found' }, { status: 404 })
-  if (group.status === 'CANCELLED') {
-    return NextResponse.json({ error: 'This group order was cancelled by the host.', cancelled: true }, { status: 410 })
+  const expired = Date.parse(group.expires_at) <= Date.now()
+  if (expired && group.status === 'OPEN') {
+    await db.from('group_orders').update({ status: 'EXPIRED', version: group.version + 1 }).eq('id', group.id).eq('status', 'OPEN')
+    group.status = 'EXPIRED'
   }
-  if (group.status === 'EXPIRED' || new Date(group.expires_at).getTime() < Date.now()) {
-    return NextResponse.json({ error: 'This group order has expired.', expired: true }, { status: 410 })
+
+  const [{ data: vendorRow }, { data: hostRow }] = await Promise.all([
+    db.from('vendors').select('id, shop_name, status, is_active, approval_state').eq('id', group.vendor_id).maybeSingle(),
+    db.from('customers').select('id, name').eq('id', group.host_customer_id).maybeSingle(),
+  ])
+  const vendor = vendorRow as { id: string; shop_name: string | null; status: string; is_active: boolean; approval_state: string } | null
+  const host = hostRow as { id: string; name: string | null } | null
+  const actor = await resolveGroupParticipant(db, group.id, code, session)
+  const isHost = actor.customerId === group.host_customer_id
+  const activeActor = isHost || (actor.participantId && ['JOINED', 'EDITING', 'READY'].includes(actor.status ?? ''))
+
+  const summary = {
+    code: group.code,
+    group_order_id: group.id,
+    name: group.name ?? 'Group order',
+    status: group.status,
+    expires_at: group.expires_at,
+    delivery_type: group.delivery_type,
+    delivery_address: group.delivery_address,
+    per_person_budget_kobo: group.per_person_budget_kobo,
+    participant_limit: group.participant_limit,
+    shared_note: group.shared_note,
+    organizer: { id: group.host_customer_id, name: host?.name ?? 'Organizer' },
+    vendor: { id: group.vendor_id, name: vendor?.shop_name ?? 'Vendor', status: vendor?.status ?? 'CLOSED' },
+    version: group.version,
+    reconciliation: normalizeReconciliation(group.reconciliation),
   }
 
-  // Did the host turn bill-splitting on? Best-effort (column may not exist pre-067).
-  let splitEnabled = true
-  try {
-    const { data: s } = await db.from('group_orders').select('split_enabled').eq('id', group.id).maybeSingle()
-    const v = (s as { split_enabled?: boolean } | null)?.split_enabled
-    if (typeof v === 'boolean') splitEnabled = v
-  } catch { /* default split on */ }
+  if (!activeActor) {
+    return NextResponse.json({ ...summary, join_required: true, is_host: false })
+  }
 
-  const { data: me } = await db.from('customers').select('id').eq('phone', session.phone).maybeSingle()
-  const myId = (me as { id: string } | null)?.id ?? ''
-
-  const [{ data: vendor }, { data: menu }, { data: items }] = await Promise.all([
-    db.from('vendors').select('id, name').eq('id', group.vendor_id).maybeSingle(),
-    db.from('menu_items').select('id, name, price_kobo, category, menu_item_addons(id, name, price_kobo, is_available, display_order)').eq('vendor_id', group.vendor_id).eq('is_available', true).is('deleted_at', null).order('display_order', { ascending: true }),
+  await db.from('group_order_participants').update({ last_seen_at: new Date().toISOString() }).eq('id', actor.participantId ?? '')
+  const [{ data: participants }, { data: items }, { data: menu }] = await Promise.all([
+    db.from('group_order_participants')
+      .select('id, customer_id, display_name, status, joined_at, last_seen_at')
+      .eq('group_order_id', group.id)
+      .order('joined_at', { ascending: true }),
     db.from('group_order_items')
-      .select('id, contributor_id, contributor_name, quantity, notes, addons, menu_item_id, menu_items(name, price_kobo)')
+      .select('id, participant_id, contributor_id, contributor_name, quantity, notes, addons, menu_item_id, unit_price_kobo, version, menu_items(name, price_kobo, is_available)')
       .eq('group_order_id', group.id)
       .order('created_at', { ascending: true }),
+    db.from('menu_items')
+      .select('id, name, price_kobo, category, is_available, menu_item_addons(id, name, price_kobo, is_available, is_required, display_order)')
+      .eq('vendor_id', group.vendor_id)
+      .eq('is_available', true)
+      .is('deleted_at', null)
+      .order('display_order', { ascending: true }),
   ])
 
-  const v = vendor as { id: string; name: string | null } | null
-  const itemRows = (items ?? []).map((r) => {
-    const row = r as unknown as { id: string; contributor_id: string; contributor_name: string | null; quantity: number; notes: string | null; addons: unknown; menu_item_id: string; menu_items: { name: string; price_kobo: number } | null }
-    const addons = normalizeGroupOrderAddons(row.addons)
+  const itemRows = (items ?? []).map((record) => {
+    const row = record as unknown as {
+      id: string
+      participant_id: string | null
+      contributor_id: string | null
+      contributor_name: string | null
+      quantity: number
+      notes: string | null
+      addons: unknown
+      menu_item_id: string
+      unit_price_kobo: number | null
+      version: number
+      menu_items: { name: string; price_kobo: number; is_available: boolean } | null
+    }
+    const ownerKey = row.participant_id ?? row.contributor_id ?? ''
     return {
       id: row.id,
-      contributor_id: row.contributor_id,
-      contributor_name: row.contributor_name ?? 'Someone',
+      participant_id: row.participant_id,
+      contributor_id: ownerKey,
+      contributor_name: row.contributor_name ?? 'Participant',
       quantity: row.quantity,
       notes: row.notes,
       menu_item_id: row.menu_item_id,
-      name: row.menu_items?.name ?? 'Item',
-      price_kobo: row.menu_items?.price_kobo ?? 0,
-      addons,
-      mine: row.contributor_id === myId,
+      name: row.menu_items?.name ?? 'Unavailable item',
+      price_kobo: row.unit_price_kobo ?? row.menu_items?.price_kobo ?? 0,
+      current_price_kobo: row.menu_items?.price_kobo ?? 0,
+      available: Boolean(row.menu_items?.is_available),
+      addons: normalizeGroupOrderAddons(row.addons),
+      version: row.version,
+      mine: ownerKey === (actor.participantId ?? actor.customerId),
     }
   })
 
-  // Wallet coverage: can each member's wallet cover their FOOD so far? (Fees are
-  // added at checkout; this is the readiness indicator + top-up prompt driver.)
-  const foodByPerson = new Map<string, number>()
-  for (const r of itemRows) foodByPerson.set(r.contributor_id, (foodByPerson.get(r.contributor_id) ?? 0) + groupOrderLineTotalKobo(r))
-  const contribIds = Array.from(foodByPerson.keys())
-  const funded: Record<string, boolean> = {}
-  let myBalanceKobo = 0
-  try {
-    const lookupIds = Array.from(new Set([...contribIds, myId])).filter(Boolean)
-    if (lookupIds.length) {
-      const { data: wallets } = await db.from('customer_wallets').select('customer_id, balance_kobo, is_frozen').in('customer_id', lookupIds)
-      const balMap = new Map((wallets ?? []).map((w) => {
-        const row = w as { customer_id: string; balance_kobo: number; is_frozen: boolean }
-        return [row.customer_id, row.is_frozen ? 0 : Number(row.balance_kobo)]
-      }))
-      for (const id of contribIds) funded[id] = (balMap.get(id) ?? 0) >= (foodByPerson.get(id) ?? 0)
-      myBalanceKobo = balMap.get(myId) ?? 0
-    }
-  } catch { /* coverage is best-effort */ }
+  const totals = new Map<string, number>()
+  for (const item of itemRows) totals.set(item.contributor_id, (totals.get(item.contributor_id) ?? 0) + groupOrderLineTotalKobo(item))
 
   return NextResponse.json({
-    code: group.code,
-    group_order_id: group.id,
-    status: group.status,
-    expires_at: group.expires_at,
-    is_host: group.host_customer_id === myId,
-    host_id: group.host_customer_id,
-    split_enabled: splitEnabled,
-    funded,
-    my_balance_kobo: myBalanceKobo,
-    my_food_kobo: foodByPerson.get(myId) ?? 0,
-    vendor: { id: group.vendor_id, name: v?.name ?? 'Vendor' },
+    ...summary,
+    join_required: false,
+    is_host: isHost,
+    participant_id: actor.participantId,
+    participant_status: actor.status,
+    participants: (participants ?? []).map((record) => {
+      const row = record as { id: string; customer_id: string | null; display_name: string; status: string; joined_at: string; last_seen_at: string }
+      return { ...row, subtotal_kobo: totals.get(row.id) ?? totals.get(row.customer_id ?? '') ?? 0, mine: row.id === actor.participantId }
+    }),
     items: itemRows,
-    menu: (menu ?? []).map((m) => {
-      const row = m as unknown as { id: string; name: string; price_kobo: number; category: string; menu_item_addons?: Array<{ id: string; name: string; price_kobo: number; is_available: boolean; display_order: number }> }
+    menu: group.status === 'OPEN' ? (menu ?? []).map((record) => {
+      const row = record as unknown as {
+        id: string
+        name: string
+        price_kobo: number
+        category: string
+        menu_item_addons?: Array<{ id: string; name: string; price_kobo: number; is_available: boolean; is_required: boolean; display_order: number }>
+      }
       return {
         id: row.id,
         name: row.name,
         price_kobo: row.price_kobo,
         category: row.category,
-        addons: (row.menu_item_addons ?? [])
-          .filter((addon) => addon.is_available)
-          .sort((a, b) => a.display_order - b.display_order)
-          .map((addon) => ({ id: addon.id, name: addon.name, price_kobo: addon.price_kobo })),
+        addons: (row.menu_item_addons ?? []).filter((addon) => addon.is_available).sort((a, b) => a.display_order - b.display_order),
       }
-    }),
+    }) : [],
   })
 }
 
-// PATCH /api/group-order/[code] — host toggles bill-splitting on/off.
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
-  const session = await getCurrentUser()
-  if (!session || session.role !== 'customer') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+export async function PATCH() {
+  return NextResponse.json({ error: 'Participant-paid split billing is not supported for this group-order model.' }, { status: 409 })
+}
 
-  const { code } = await params
-  const body = await req.json().catch(() => null)
-  const split = (body as { split_enabled?: unknown } | null)?.split_enabled
-  if (typeof split !== 'boolean') return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
-
-  const db = createSupabaseAdmin()
-  const { data: gRow } = await db.from('group_orders').select('id, host_customer_id, status').eq('code', code.toUpperCase()).maybeSingle()
-  const g = gRow as { id: string; host_customer_id: string; status: string } | null
-  if (!g) return NextResponse.json({ error: 'Group order not found' }, { status: 404 })
-  if (g.status !== 'OPEN') return NextResponse.json({ error: 'This group order is closed.' }, { status: 409 })
-
-  const { data: meRow } = await db.from('customers').select('id').eq('phone', session.phone).maybeSingle()
-  if ((meRow as { id: string } | null)?.id !== g.host_customer_id) {
-    return NextResponse.json({ error: 'Only the host can change this.' }, { status: 403 })
-  }
-
-  const { error } = await db.from('group_orders').update({ split_enabled: split }).eq('id', g.id)
-  if (error) return NextResponse.json({ error: 'Could not update.' }, { status: 500 })
-  return NextResponse.json({ success: true, split_enabled: split })
+function normalizeReconciliation(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
 }

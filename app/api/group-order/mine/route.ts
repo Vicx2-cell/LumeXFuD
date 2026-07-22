@@ -21,25 +21,25 @@ export async function GET() {
 
   const nowIso = new Date().toISOString()
 
-  // Groups I host, plus groups I've added an item to.
-  const { data: contribRows } = await db.from('group_order_items').select('group_order_id').eq('contributor_id', myId)
-  const contribIds = Array.from(new Set((contribRows ?? []).map((r) => (r as { group_order_id: string }).group_order_id)))
+  // Explicit membership survives empty contributions and reconnects.
+  const { data: participantRows } = await db.from('group_order_participants').select('group_order_id').eq('customer_id', myId).in('status', ['JOINED', 'EDITING', 'READY'])
+  const participantGroupIds = Array.from(new Set((participantRows ?? []).map((r) => (r as { group_order_id: string }).group_order_id)))
 
   const { data: hosted } = await db
     .from('group_orders')
-    .select('id, code, vendor_id, host_customer_id, expires_at')
-    .eq('status', 'OPEN').gt('expires_at', nowIso).eq('host_customer_id', myId)
+    .select('id, code, name, status, vendor_id, host_customer_id, expires_at')
+    .in('status', ['OPEN', 'LOCKED', 'VALIDATING', 'AWAITING_PAYMENT']).gt('expires_at', nowIso).eq('host_customer_id', myId)
 
   let joined: typeof hosted = []
-  if (contribIds.length > 0) {
+  if (participantGroupIds.length > 0) {
     const { data } = await db
       .from('group_orders')
-      .select('id, code, vendor_id, host_customer_id, expires_at')
-      .eq('status', 'OPEN').gt('expires_at', nowIso).in('id', contribIds)
+      .select('id, code, name, status, vendor_id, host_customer_id, expires_at')
+      .in('status', ['OPEN', 'LOCKED', 'VALIDATING', 'AWAITING_PAYMENT']).gt('expires_at', nowIso).in('id', participantGroupIds)
     joined = data ?? []
   }
 
-  const byId = new Map<string, { id: string; code: string; vendor_id: string; host_customer_id: string; expires_at: string }>()
+  const byId = new Map<string, { id: string; code: string; name: string | null; status: string; vendor_id: string; host_customer_id: string; expires_at: string }>()
   for (const g of [...(hosted ?? []), ...(joined ?? [])]) byId.set((g as { id: string }).id, g as never)
   const groups = Array.from(byId.values())
   if (groups.length === 0) return NextResponse.json({ groups: [] })
@@ -51,6 +51,8 @@ export async function GET() {
   return NextResponse.json({
     groups: groups.map((g) => ({
       code: g.code,
+      name: g.name ?? 'Group order',
+      status: g.status,
       vendor_name: vendorName.get(g.vendor_id) ?? 'Vendor',
       is_host: g.host_customer_id === myId,
       expires_at: g.expires_at,

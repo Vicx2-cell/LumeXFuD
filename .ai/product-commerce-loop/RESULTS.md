@@ -47,3 +47,12 @@
 - Added a deterministic fixture vendor, slug, product image, required choices, optional long-name add-on, and unavailable add-on without real credentials, payments, or production data.
 - The 390x844 baseline completed all 12 requested steps. The runner teardown issue was repaired by launching Next directly; subsequent viewport execution was stopped after Chromium itself stalled before the 320x700 test could start.
 - Focused tests, typecheck, lint, and diff whitespace verification pass. Additional browser viewport claims remain precisely environment-blocked.
+
+## 2026-07-22 Phase E Group Ordering
+
+- Added migration `147_group_order_lifecycle.sql` with normalized states, participant/session ownership, versioned lines, audit events, atomic mutation/lock/readiness functions, legacy participant backfill, and one-order-per-group enforcement.
+- Added guest-compatible join/resume, participant-owned add/edit/remove, readiness, organizer participant removal, compare-and-set locking, final reconciliation, checkout transition, cancellation, and expiry cleanup routes.
+- Rebuilt the group page around organizer-paid ordering with clear status, deadline, destination, budget, ownership, conflicts, required choices, optional add-ons, item notes, reconnect messages, share/copy/WhatsApp actions, and mobile sticky actions.
+- Added `Start group order` to the canonical storefront with controlled group configuration fields.
+- Bound the final order to the organizer, vendor, fulfilment, destination, and exact reconciled contribution lines; repeated placement reuses the existing order even if a later browser session presents a new idempotency key.
+- Verification passed: 250 focused tests, TypeScript, lint, and diff whitespace checks. No production deployment or real payment occurred.

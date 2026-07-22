@@ -27,10 +27,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
   if ((meRow as { id: string } | null)?.id !== g.host_customer_id) {
     return NextResponse.json({ error: 'Only the host can cancel this group.' }, { status: 403 })
   }
-  if (g.status !== 'OPEN') return NextResponse.json({ error: 'This group is already closed.' }, { status: 409 })
+  if (!['OPEN', 'LOCKED', 'FAILED'].includes(g.status)) return NextResponse.json({ error: 'This group can no longer be cancelled.' }, { status: 409 })
 
-  const { error } = await db.from('group_orders').update({ status: 'CANCELLED' }).eq('id', g.id).eq('status', 'OPEN')
+  const { data: cancelled, error } = await db.from('group_orders').update({ status: 'CANCELLED' }).eq('id', g.id).eq('status', g.status).select('id')
   if (error) return NextResponse.json({ error: 'Could not cancel.' }, { status: 500 })
+  if (!cancelled?.length) return NextResponse.json({ error: 'The group changed in another tab. Refresh first.', conflict: true }, { status: 409 })
 
   await notifyGroupCancelled(db, g.id)
   return NextResponse.json({ success: true })

@@ -90,6 +90,11 @@ export const ROUTE_POLICY: Record<string, Policy> = {
 
   'campaign/track': { kind: 'public' },
 
+  ...map([
+    'group-order/[code]', 'group-order/[code]/items',
+    'group-order/[code]/join', 'group-order/[code]/ready',
+  ], { kind: 'public' }),
+
   ...map(['premium/plans'], { kind: 'public' }),
 
   ...map(['premium/subscribe'], role(['vendor'])),
@@ -99,7 +104,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   ...map([
     'customer/addresses', 'customer/favorites', 'customer/places', 'customer/places/[id]',
     'customer/places/[id]/use', 'customer/places/photo', 'profile/image', 'customer/locations', 'customer/locations/[id]',
-    'group-order/[code]', 'group-order/[code]/cancel', 'group-order/[code]/items',
+    'group-order/[code]/cancel', 'group-order/[code]/lock', 'group-order/[code]/checkout',
     'group-order/create', 'group-order/mine',
     'orders', 'orders/[id]/cancel', 'orders/[id]/reorder', 'orders/[id]/handover-code',
     'orders/[id]/status', 'orders/[id]/messages', 'orders/[id]/messages/read',
@@ -129,7 +134,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'cron/order-delay-watch', 'cron/recalculate-vendor-scores', 'cron/release-payments', 'cron/release-scheduled',
     'cron/reset-daily-limits', 'cron/reset-weekly-leaderboard', 'cron/sentinel',
     'cron/official-feed', 'cron/subscription-check', 'cron/vendor-auto-cancel', 'cron/wallet-reconciliation',
-    'cron/wallet-release-held', 'cron/wallet-sweep',
+    'cron/wallet-release-held', 'cron/wallet-sweep', 'cron/expire-group-orders',
   ], { kind: 'cron' }),
 
   'paystack/webhook': { kind: 'webhook' },

@@ -14,11 +14,11 @@ export function generateGroupCode(len = 6): string {
   return s
 }
 
-interface ContribAgg { name: string; items: string[]; total: number }
+interface ContribAgg { customerId: string | null; name: string; items: string[]; total: number }
 
 /**
  * Notify every participant that the group order has been PLACED + where it's
- * going. Idempotent: only the caller that flips the group OPEN→CHECKED_OUT sends
+ * going. Idempotent: only the caller that flips AWAITING_PAYMENT→PLACED sends
  * (so the wallet path and a retried webhook never double-notify). Best-effort —
  * never throws, so it can't disturb the order/payment flow that calls it.
  */
@@ -29,46 +29,45 @@ export async function notifyGroupOrderPlaced(
   try {
     const { data: flipped } = await db
       .from('group_orders')
-      .update({ status: 'CHECKED_OUT' })
+      .update({ status: 'PLACED' })
       .eq('id', opts.groupOrderId)
-      .eq('status', 'OPEN')
+      .eq('status', 'AWAITING_PAYMENT')
       .select('id, vendor_id, host_customer_id')
     if (!flipped || flipped.length === 0) return // already finalized → don't re-notify
     const group = flipped[0] as { id: string; vendor_id: string; host_customer_id: string }
 
-    // Did the host choose to split, or treat everyone? Best-effort (default split).
-    let splitEnabled = true
-    try {
-      const { data: s } = await db.from('group_orders').select('split_enabled').eq('id', opts.groupOrderId).maybeSingle()
-      const v = (s as { split_enabled?: boolean } | null)?.split_enabled
-      if (typeof v === 'boolean') splitEnabled = v
-    } catch { /* column may not exist yet → default split */ }
+    const splitEnabled = false
 
     const [{ data: vendor }, { data: host }, { data: items }, { data: ord }] = await Promise.all([
       db.from('vendors').select('name').eq('id', group.vendor_id).maybeSingle(),
       db.from('customers').select('name').eq('id', group.host_customer_id).maybeSingle(),
-      db.from('group_order_items').select('contributor_id, contributor_name, quantity, addons, menu_items(name, price_kobo)').eq('group_order_id', opts.groupOrderId),
-      db.from('orders').select('id, delivery_fee, platform_markup').eq('paystack_reference', opts.orderNumber).maybeSingle(),
+      db.from('group_order_items').select('participant_id, contributor_id, contributor_name, quantity, addons, menu_items(name, price_kobo)').eq('group_order_id', opts.groupOrderId),
+      db.from('orders').select('id, delivery_fee, platform_markup').eq('order_number', opts.orderNumber).maybeSingle(),
     ])
     const vendorName = (vendor as { name: string | null } | null)?.name ?? 'the vendor'
     const hostName = ((host as { name: string | null } | null)?.name ?? 'your friend').split(/\s+/)[0]
 
     const byContributor = new Map<string, ContribAgg>()
     for (const r of items ?? []) {
-      const row = r as unknown as { contributor_id: string; contributor_name: string | null; quantity: number; menu_items: { name: string; price_kobo: number } | null }
-      const e = byContributor.get(row.contributor_id) ?? { name: row.contributor_name ?? 'Someone', items: [], total: 0 }
+      const row = r as unknown as { participant_id: string | null; contributor_id: string | null; contributor_name: string | null; quantity: number; menu_items: { name: string; price_kobo: number } | null }
+      const key = row.contributor_id ?? `guest:${row.participant_id ?? 'unknown'}`
+      const e = byContributor.get(key) ?? { customerId: row.contributor_id, name: row.contributor_name ?? 'Someone', items: [], total: 0 }
       e.items.push(`${row.quantity}× ${row.menu_items?.name ?? 'item'}`)
       e.total += (row.menu_items?.price_kobo ?? 0) * row.quantity
-      byContributor.set(row.contributor_id, e)
+      byContributor.set(key, e)
     }
-    const ids = Array.from(byContributor.keys())
-    if (ids.length === 0) return
+    const ids = Array.from(new Set(Array.from(byContributor.values()).flatMap((entry) => entry.customerId ? [entry.customerId] : [])))
+    if (byContributor.size === 0) return
 
     // Split delivery + platform fee EQUALLY among everyone in the group.
     const order = ord as { id?: string; delivery_fee: number | null; platform_markup: number | null } | null
     const orderId = order?.id ?? null
+    if (orderId) {
+      await db.from('group_orders').update({ placed_order_id: orderId }).eq('id', opts.groupOrderId).eq('status', 'PLACED')
+      await db.from('group_order_events').insert({ group_order_id: opts.groupOrderId, actor_customer_id: group.host_customer_id, event_type: 'order_placed', metadata: { order_id: orderId, order_number: opts.orderNumber } })
+    }
     const feesKobo = (Number(order?.delivery_fee) || 0) + (Number(order?.platform_markup) || 0)
-    const feeShare = Math.round(feesKobo / ids.length)
+    const feeShare = Math.round(feesKobo / byContributor.size)
     const naira = (k: number) => `₦${Math.round(k / 100).toLocaleString()}`
 
     const { data: custs } = await db.from('customers').select('id, phone').in('id', ids)
@@ -138,8 +137,8 @@ export async function notifyGroupSplitPaid(
 ): Promise<void> {
   try {
     const { data: flipped } = await db
-      .from('group_orders').update({ status: 'CHECKED_OUT' })
-      .eq('id', opts.groupOrderId).eq('status', 'OPEN').select('id, vendor_id')
+      .from('group_orders').update({ status: 'PLACED' })
+      .eq('id', opts.groupOrderId).eq('status', 'AWAITING_PAYMENT').select('id, vendor_id')
     if (!flipped || flipped.length === 0) return
     const vendorId = (flipped[0] as { vendor_id: string }).vendor_id
 
@@ -188,8 +187,10 @@ export async function notifyGroupCancelled(
     ])
     const vendorName = (vendor as { name: string | null } | null)?.name ?? 'the vendor'
     const hostName = ((host as { name: string | null } | null)?.name ?? 'The host').split(/\s+/)[0]
-    const ids = Array.from(new Set((items ?? []).map((r) => (r as { contributor_id: string }).contributor_id)))
-      .filter((id) => id !== g.host_customer_id)
+    const ids = Array.from(new Set((items ?? []).flatMap((r) => {
+      const id = (r as { contributor_id: string | null }).contributor_id
+      return id ? [id] : []
+    }))).filter((id) => id !== g.host_customer_id)
     if (ids.length === 0) return
     const { data: custs } = await db.from('customers').select('id, phone').in('id', ids)
     for (const c of (custs ?? []) as Array<{ id: string; phone: string }>) {

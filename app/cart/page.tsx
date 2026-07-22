@@ -133,6 +133,11 @@ export default function CartPage() {
           setAddr((cur) => cur.lodge ? cur : { ...cur, lodge: prefill })
         }, 0)
       }
+      const groupDeliveryType = sessionStorage.getItem('lx_group_delivery_type')
+      if (groupDeliveryType === 'BIKE' || groupDeliveryType === 'DOOR' || groupDeliveryType === 'PICKUP') {
+        sessionStorage.removeItem('lx_group_delivery_type')
+        setDeliveryType(groupDeliveryType)
+      }
     } catch { /* ignore */ }
 
     // Surface any items "Order again" had to drop (no longer on the menu).
@@ -283,12 +288,19 @@ export default function CartPage() {
 
   async function startGroupOrder() {
     if (!cart.vendor_id || cart.items.length === 0) return
+    const groupAddress = deliveryType === 'PICKUP' ? `Pickup at ${cart.vendor_name}` : composedAddress
+    if (!groupAddress) {
+      setError('Add the group delivery destination before starting the group.')
+      return
+    }
     setGroupBusy(true); setError('')
     try {
       const res = await fetch('/api/group-order/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vendor_id: cart.vendor_id,
+          delivery_type: deliveryType,
+          delivery_address: groupAddress,
           items: cart.items.map((i) => ({ menu_item_id: i.menu_item_id, quantity: i.quantity, notes: i.special_instructions, addons: i.addons.map((addon) => addon.id) })),
         }),
       })
