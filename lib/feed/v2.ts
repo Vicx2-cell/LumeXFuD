@@ -20,6 +20,7 @@ type LivePostRow = {
   vendor_id: string | null
   related_menu_item_id: string | null
   related_promotion_ref: string | null
+  quoted_post_id: string | null
   post_kind: string
   status: string
   visibility: string
@@ -161,11 +162,22 @@ export interface FeedV2SurfaceData {
   posts: FeedV2Post[]
   stories: FeedV2Story[]
   rightRail: FeedV2RightRailData
+  hasMore: boolean
+  nextOffset: number
+}
+
+type LiveQuotedPostRow = {
+  id: string
+  body: string | null
+  status: string
+  deleted_at: string | null
 }
 
 export type FeedV2SurfaceOptions = {
   tab?: FeedV2TabKey
   postId?: string
+  offset?: number
+  limit?: number
 }
 
 function unique(values: Array<string | null | undefined>) {
@@ -293,8 +305,9 @@ function buildFeedPost(args: {
   menuItems: LiveMenuSnapshotRow[]
   liveMenuItem: LiveMenuItemRow | null
   official: LiveOfficialRow | null
+  quotedPost: LiveQuotedPostRow | null
 }): FeedV2Post | null {
-  const { row, profile, vendor, media, menuItems, liveMenuItem, official } = args
+  const { row, profile, vendor, media, menuItems, liveMenuItem, official, quotedPost } = args
   if (!canPublishFeedPost(profile, vendor)) return null
   const displayName = resolveDisplayName(profile, vendor)
   const handle = resolveHandle(profile, vendor)
@@ -500,6 +513,7 @@ function buildFeedPost(args: {
     verified: approved === 'approved',
     statusPills,
     ctaLabel: row.vendor_id ? 'Visit Store' : undefined,
+    quotedPost: quotedPost ? { id: quotedPost.id, body: quotedPost.body?.trim() || 'Open quoted post' } : undefined,
     ...engagementFields(row),
     publisherType,
     approvalState: approved,
@@ -840,21 +854,28 @@ export async function loadFeedV2Surface(options: FeedV2SurfaceOptions = {}): Pro
   const viewer = await loadFeedViewerContext()
   let postQuery = db
     .from('posts')
-    .select('id, author_profile_id, vendor_id, related_menu_item_id, related_promotion_ref, post_kind, status, visibility, body, content_warning, campus_id, zone_id, location_text, hashtags_cached, view_count, like_count, reply_count, repost_count, bookmark_count, share_count, menu_click_count, cart_add_count, order_count, revenue_kobo, watch_time_ms, completion_rate, safe_rank_score, is_sponsored, is_boosted, is_archived, published_at, created_at')
+    .select('id, author_profile_id, vendor_id, related_menu_item_id, related_promotion_ref, quoted_post_id, post_kind, status, visibility, body, content_warning, campus_id, zone_id, location_text, hashtags_cached, view_count, like_count, reply_count, repost_count, bookmark_count, share_count, menu_click_count, cart_add_count, order_count, revenue_kobo, watch_time_ms, completion_rate, safe_rank_score, is_sponsored, is_boosted, is_archived, published_at, created_at')
     .eq('status', 'published')
     .is('deleted_at', null)
     .order('published_at', { ascending: false })
     .order('created_at', { ascending: false })
-  postQuery = options.postId ? postQuery.eq('id', options.postId) : postQuery.limit(24)
+  const pageLimit = Math.max(1, Math.min(24, options.limit ?? 12))
+  const offset = Math.max(0, options.offset ?? 0)
+  postQuery = options.postId
+    ? postQuery.eq('id', options.postId).limit(1)
+    : postQuery.range(offset, offset + pageLimit)
   const { data: postRows, error } = await postQuery
 
   if (error) throw new Error(error.message)
 
-  const rows = (postRows ?? []) as LivePostRow[]
+  const loadedRows = (postRows ?? []) as LivePostRow[]
+  const hasMore = !options.postId && loadedRows.length > pageLimit
+  const rows = loadedRows.slice(0, pageLimit)
   const postIds = rows.map((row) => row.id)
   const authorIds = unique(rows.map((row) => row.author_profile_id))
   const vendorIds = unique(rows.map((row) => row.vendor_id))
   const menuIds = unique(rows.map((row) => row.related_menu_item_id))
+  const quotedPostIds = unique(rows.map((row) => row.quoted_post_id))
 
   const [mediaResult, menuResult, officialResult, profileResult, vendorResult] = await Promise.all([
     postIds.length > 0
@@ -881,6 +902,13 @@ export async function loadFeedV2Surface(options: FeedV2SurfaceOptions = {}): Pro
   const liveMenuResult = linkedMenuIds.length > 0
     ? await db.from('menu_items').select('id, vendor_id, name, price_kobo, image_url, is_available, category').in('id', linkedMenuIds).is('deleted_at', null)
     : { data: [] }
+  const quotedPostResult = quotedPostIds.length > 0
+    ? await db.from('posts').select('id, body, status, deleted_at').in('id', quotedPostIds).eq('status', 'published').is('deleted_at', null)
+    : { data: [] }
+  const quotedPostById = new Map((quotedPostResult.data ?? []).map((row) => {
+    const post = row as LiveQuotedPostRow
+    return [post.id, post] as const
+  }))
 
   const mediaByPostId = new Map<string, LiveMediaRow[]>()
   for (const row of (mediaResult.data ?? []) as LiveMediaRow[]) {
@@ -930,6 +958,7 @@ export async function loadFeedV2Surface(options: FeedV2SurfaceOptions = {}): Pro
         return menuItemId ? liveMenuById.get(menuItemId) ?? null : null
       })(),
       official: officialByPostId.get(row.id) ?? null,
+      quotedPost: row.quoted_post_id ? quotedPostById.get(row.quoted_post_id) ?? null : null,
     }))
     .filter((item): item is FeedV2Post => Boolean(item))
 
@@ -945,5 +974,7 @@ export async function loadFeedV2Surface(options: FeedV2SurfaceOptions = {}): Pro
     posts: visiblePosts,
     stories: liveStories,
     rightRail,
+    hasMore,
+    nextOffset: offset + rows.length,
   }
 }

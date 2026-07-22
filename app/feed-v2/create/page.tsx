@@ -76,6 +76,7 @@ export default function FeedV2CreatePage() {
   const searchParams = useSearchParams()
   const initialMode = searchParams.get('mode') === 'story' ? 'story' : 'post'
   const editPostId = searchParams.get('edit')
+  const quotePostId = searchParams.get('quote')
   const [mode, setMode] = useState<ComposerMode>(initialMode)
   const [viewerRole, setViewerRole] = useState<string | null>(null)
   const [body, setBody] = useState('')
@@ -254,6 +255,7 @@ export default function FeedV2CreatePage() {
               hashtags: [],
               mentions: [],
               menu_items: selectedMenuItemId ? [{ menu_item_id: selectedMenuItemId, is_primary: true }] : [],
+              quoted_post_id: quotePostId ?? undefined,
               mode: saveMode,
             }
           : {

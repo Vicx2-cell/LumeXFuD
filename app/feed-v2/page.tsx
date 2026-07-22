@@ -35,12 +35,16 @@ export default async function FeedV2Page({ searchParams }: { searchParams?: Prom
   let livePosts: FeedV2Post[] = []
   let liveStories: FeedV2Story[] = []
   let liveRightRail: FeedV2RightRailData = { topics: [], vendors: [], collections: [] }
+  let hasMore = false
+  let nextOffset = 0
 
   try {
     const live = await loadFeedV2Surface({ tab: activeTab })
     livePosts = live.posts
     liveStories = live.stories
     liveRightRail = live.rightRail
+    hasMore = live.hasMore
+    nextOffset = live.nextOffset
   } catch (error) {
     console.error('[feed-v2] live data load failed:', error instanceof Error ? error.message : error)
   }
@@ -52,6 +56,9 @@ export default async function FeedV2Page({ searchParams }: { searchParams?: Prom
       tabs={tabsForActive(activeTab)}
       leftNav={feedV2LeftNav}
       rightRail={liveRightRail}
+      hasMore={hasMore}
+      activeTab={activeTab}
+      nextOffset={nextOffset}
     />
   )
 }

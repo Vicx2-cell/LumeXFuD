@@ -64,3 +64,19 @@
 - Passed: `npm.cmd run lint` with no warnings.
 - Passed: `git diff --check` with only repository line-ending warnings.
 - Covered: publisher eligibility including inactive/suspended vendors, official author restrictions, draft/recent edit policy, menu-link availability, stale purchase-action degradation, fair vendor rotation, duplicate suppression, attribution/reversal, interactions, upload validation, and restore authorization.
+
+## Phase F Feed Experience Slice - 2026-07-22
+
+- Passed: `npm.cmd test -- --run lib/feed app/api/feed test/authz.test.ts test/authz-coverage.test.ts` - 20 files, 74 tests.
+- Passed: `npx.cmd tsc --noEmit`.
+- Passed: `npm.cmd run lint` with no warnings.
+- Passed: `git diff --check` with only repository line-ending warnings.
+- Added route tests for validated tabs, bounded offsets, next-offset propagation, and rejection before query.
+- Browser screenshots are not claimed for this slice because the previously recorded Chromium startup blocker remains; mobile constraints were code-reviewed and type/lint tested only.
+
+## Final Boundary - 2026-07-22
+
+- Passed: `npm.cmd test` - 132 files, 882 tests, 48.80 seconds.
+- Passed: `npm.cmd run lint` with no warnings.
+- Passed: `npm.cmd run build` - exit 0 in 93.5 seconds; Next.js compiled successfully, TypeScript passed, and 153 static pages were generated.
+- Passed: `git diff --check` before the final durable-state update, with only repository line-ending warnings.

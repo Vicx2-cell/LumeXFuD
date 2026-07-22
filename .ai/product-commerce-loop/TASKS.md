@@ -1,13 +1,12 @@
 # Product Commerce Loop Tasks
 
-## In Progress
+## Blocked
 
-- [ ] Commit the verified vendor feed publishing and commerce-link slice.
+- [ ] Commit the verified feed mobile, pagination, and interaction slice and leave the worktree clean. `.git` is read-only in the sandbox, and the required escalation was rejected because the approval service quota is exhausted until 2026-07-28 18:02.
 
 ## Pending
 
 - [ ] Resume 320, 412, 360, 768, and desktop browser execution only after headless Chromium launches reliably; do not claim unexercised viewports.
-- [ ] Complete Phase F feed restoration and upgrade.
 
 ## Done
 
@@ -46,3 +45,8 @@
 - [x] Traced the feed restriction/revert history and current authorization model.
 - [x] Restored vendor dashboard feed authoring and lifecycle entry points.
 - [x] Added vendor preview, draft, recent-post editing, owned menu links, post detail, storefront updates, live availability degradation, attribution, and fair rotation.
+- [x] Committed vendor feed publishing as `b49d10c`.
+- [x] Added bounded infinite loading, sparse-tab offset advancement, session scroll restoration, and offline/empty/retry states.
+- [x] Connected quote, report, not-interested, hide, mute, and block UI to canonical routes; added quoted-post rendering and success-only share counting.
+- [x] Completed all ready local Phase F feed restoration and upgrade work.
+- [x] Passed the final full suite (132 files, 882 tests), lint, and production build.

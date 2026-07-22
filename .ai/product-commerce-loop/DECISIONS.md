@@ -36,3 +36,6 @@
 - Treat live menu/vendor state as authoritative for feed purchase actions. A stale snapshot may describe the historical post, but it cannot keep an Order action active after an item or vendor becomes unavailable.
 - Carry feed commerce attribution with the existing privacy-safe `feed_events` and order-attribution tables. Session storage keeps only post/vendor UUIDs for 72 hours; no customer identity, capability token, or full URL is stored.
 - Apply a maximum of two consecutive posts per vendor when alternatives exist after explainable scoring, and suppress duplicate candidate IDs.
+- Page the V2 transformer directly in bounded 12-row windows and return an authoritative next raw offset. This avoids mixing the live V2 UI with the older ranked-snapshot response and prevents filtered tabs from retrying an empty raw page.
+- Persist at most 100 public post summaries and scroll position per tab in session storage for ten minutes. This restores feed context without persisting customer identity or long-lived browsing history.
+- Count a share only after Web Share resolves or clipboard copy succeeds; cancelled share sheets do not create engagement.

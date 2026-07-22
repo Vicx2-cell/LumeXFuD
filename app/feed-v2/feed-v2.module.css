@@ -2360,7 +2360,24 @@
   .postContent { padding-left: 51px; }
 }
 
+.mediaWide { aspect-ratio: 16 / 10; }
+.mediaSquare { aspect-ratio: 1; }
+.mediaPortrait { aspect-ratio: 4 / 5; }
+
 @media (max-width: 767px) {
+  .mediaFrame,
+  .mediaSingle .mediaFrame,
+  .mediaPair .mediaFrame,
+  .mediaTriple .mediaFrame,
+  .mediaQuad .mediaFrame {
+    min-height: 0;
+    max-height: min(72dvh, 620px);
+  }
+
+  .postBody {
+    overflow-wrap: anywhere;
+  }
+
   .storyViewer {
     width: 100vw;
     height: 100dvh;

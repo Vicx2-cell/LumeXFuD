@@ -58,3 +58,10 @@
 - Current server authorization already allows feed posts only for the protected official profile, approved verified active vendors, and approved ambassadors. Customers are story-only, riders are blocked, vendor menu attachments are ownership-checked, and only admin/super-admin sessions can select the system-owned LumeX author.
 - The practical removal is discoverability and incomplete authoring UI: the vendor dashboard has no Feed/Post navigation item, its video manager sends `Create post` to `/feed-v2` instead of `/feed-v2/create`, and the composer publishes only text/media even though the canonical API already supports drafts, edits by `draft_id`, owned menu-item links, and promotions.
 - Existing canonical routes already cover likes, bookmarks, follows, replies, reposts, quotes, shares/events, reports, archive, restore, soft-delete, moderation, pagination, and feed profiles. Existing feed rendering currently uses a 55%-visible two-second dwell before sending a qualified impression; event storage deduplicates one viewer/post/day, so render, preload, invisible cards, and rapid same-account refreshes are not counted as new qualified views.
+
+## 2026-07-22 Final Boundary
+
+- All ready local Phase F work is implemented and verified. The second Phase F commit cannot be created in the current environment: unprivileged Git cannot create `.git/index.lock`, and the required escalation request was rejected because the approval service quota is exhausted until 2026-07-28 18:02. No alternate Git-index workaround was attempted.
+- This leaves a valid, explained working-tree diff for the feed experience slice and durable records. It is the only reason the repository cannot be left clean.
+- Browser evidence remains limited to the passing 390x844 scenario. The 320x700 run was blocked before test execution by Chromium's debugging-pipe startup stall; 360x800, 412x915, 768x1024, and desktop remain unexercised and are not claimed.
+- No real payments, production credentials, user data, or production deployment were used.

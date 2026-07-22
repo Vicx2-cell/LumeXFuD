@@ -65,3 +65,13 @@
 - Added stable post detail URLs, latest vendor updates on the storefront, exact linked-product opening, live item/vendor availability degradation, and feed menu-click/add-to-cart/checkout/completed-order attribution.
 - Added explainable fair vendor rotation and duplicate suppression without fabricated engagement.
 - Verification passed: 35 focused tests, TypeScript, lint, and diff whitespace checks.
+
+## 2026-07-22 Phase F Feed Experience
+
+- Added bounded infinite loading from the canonical V2 transformer with deterministic raw offsets for sparse Following/Nearby pages, duplicate suppression, loading/retry UI, and no automatic failure loop.
+- Added ten-minute per-tab scroll/post restoration, explicit offline and empty states, and bounded mobile media aspect ratios so flyer/video/image posts do not create giant blank canvases.
+- Connected quote, report, not-interested, hide-creator, mute, and block controls to their existing routes; quoted posts now retain a safe detail link and source excerpt.
+- Share counts now advance only after a successful Web Share or clipboard operation.
+- Verification passed: 74 feed/authorization tests, TypeScript, lint, and diff whitespace checks.
+- Final boundary verification passed: the full suite completed with 132 files and 882 tests, lint passed, and the production build exited 0 after compiling, typechecking, and generating 153 static pages.
+- The slice remains uncommitted only because `.git/index` is sandbox-read-only and the required escalation was rejected when the approval service reported quota exhaustion until 2026-07-28 18:02. The valid implementation and durable-state changes are preserved; no workaround or production deployment was attempted.

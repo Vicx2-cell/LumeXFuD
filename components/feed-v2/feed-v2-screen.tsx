@@ -52,6 +52,9 @@ type FeedV2ScreenProps = {
     vendors: FeedV2RailVendor[]
     collections: FeedV2RailCollection[]
   }
+  hasMore?: boolean
+  nextOffset?: number
+  activeTab?: 'for_you' | 'following' | 'nearby' | 'deals' | 'trending'
   menuOpenFor?: string | null
   isActionPending?: (postId: string, kind: string) => boolean
   onToggleMenu?: (post: FeedV2Post) => void
@@ -407,6 +410,12 @@ function PostBody({
     return (
       <div className={styles.textBlock}>
         <p className={styles.postBody}>{post.body}</p>
+        {post.quotedPost ? (
+          <Link href={`/feed-v2/post/${post.quotedPost.id}`} className="mt-3 block rounded-lg border border-white/10 bg-white/[0.025] p-4" onClick={(event) => event.stopPropagation()}>
+            <span className="text-xs font-semibold uppercase text-white/40">Quoted post</span>
+            <p className="mt-2 line-clamp-4 text-sm leading-6 text-white/75">{post.quotedPost.body}</p>
+          </Link>
+        ) : null}
         <Tags tags={post.tags} />
       </div>
     )
@@ -453,6 +462,7 @@ function PostMedia({
         : media.length === 3
           ? styles.mediaTriple
           : styles.mediaQuad
+  const ratioClass = post.ratio === 'portrait' ? styles.mediaPortrait : post.ratio === 'square' ? styles.mediaSquare : styles.mediaWide
 
   return (
     <div
@@ -463,7 +473,7 @@ function PostMedia({
       }}
     >
       {media.slice(0, 4).map((item, index) => (
-        <div key={`${post.id}-${item.src}-${index}`} className={styles.mediaFrame}>
+        <div key={`${post.id}-${item.src}-${index}`} className={`${styles.mediaFrame} ${ratioClass}`}>
           {(() => {
             const overlayText = 'overlayText' in item ? item.overlayText : undefined
             return overlayText ? (
@@ -943,6 +953,12 @@ function Timeline({
 }) {
   return (
     <div className={styles.timeline}>
+      {posts.length === 0 ? (
+        <div className="mx-4 my-8 rounded-lg border border-white/8 bg-white/[0.025] px-5 py-10 text-center">
+          <h2 className="text-lg font-semibold text-white">No posts here yet</h2>
+          <p className="mt-2 text-sm text-white/50">Try another feed tab or check again when vendors publish an update.</p>
+        </div>
+      ) : null}
       {posts.map((post, index) => {
         const official = isOfficial(post)
         const toneClass =
@@ -1379,14 +1395,23 @@ function OrderSheet({
 }
 
 export function FeedV2Screen({
-  posts,
+  posts: initialPosts,
   stories,
   tabs,
   leftNav,
   rightRail,
+  hasMore: initialHasMore = false,
+  nextOffset: initialNextOffset = initialPosts.length,
+  activeTab = 'for_you',
   ...timelineProps
 }: FeedV2ScreenProps) {
   const router = useRouter()
+  const [posts, setPosts] = useState(initialPosts)
+  const [hasMore, setHasMore] = useState(initialHasMore)
+  const [nextOffset, setNextOffset] = useState(initialNextOffset)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [online, setOnline] = useState(true)
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
   const [selectedStoryIndex, setSelectedStoryIndex] = useState<number | null>(null)
   const [likedIds, setLikedIds] = useState<string[]>(() => posts.filter((post) => post.viewerLiked).map((post) => post.id))
@@ -1402,10 +1427,95 @@ export function FeedV2Screen({
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [commentError, setCommentError] = useState('')
   const [actionNotice, setActionNotice] = useState('')
+  const [reportPostId, setReportPostId] = useState<string | null>(null)
+  const [reportType, setReportType] = useState('misleading_food')
+  const [reportReason, setReportReason] = useState('')
+  const [reportBusy, setReportBusy] = useState(false)
   const screenRef = useRef<HTMLDivElement | null>(null)
   const headerRef = useRef<HTMLElement | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const postsRef = useRef(posts)
+  const hasMoreRef = useRef(hasMore)
+  const nextOffsetRef = useRef(nextOffset)
+
+  postsRef.current = posts
+  hasMoreRef.current = hasMore
+  nextOffsetRef.current = nextOffset
 
   const menuOpenFor = timelineProps.menuOpenFor ?? localMenuOpenFor
+
+  useEffect(() => {
+    setPosts(initialPosts)
+    setHasMore(initialHasMore)
+    setNextOffset(initialNextOffset)
+    setLoadError('')
+  }, [initialHasMore, initialNextOffset, initialPosts])
+
+  useEffect(() => {
+    const key = `lx_feed_restore_${activeTab}`
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(key) ?? 'null') as { posts?: FeedV2Post[]; hasMore?: boolean; nextOffset?: number; scrollY?: number; savedAt?: number } | null
+      if (saved?.savedAt && Date.now() - saved.savedAt < 10 * 60 * 1000 && (saved.posts?.length ?? 0) >= initialPosts.length) {
+        setPosts(saved.posts ?? initialPosts)
+        setHasMore(Boolean(saved.hasMore))
+        setNextOffset(Math.max(initialNextOffset, saved.nextOffset ?? initialNextOffset))
+        requestAnimationFrame(() => window.scrollTo({ top: Math.max(0, saved.scrollY ?? 0), behavior: 'instant' }))
+      }
+    } catch {
+      // A corrupt restoration entry falls back to the fresh server page.
+    }
+
+    return () => {
+      try {
+        sessionStorage.setItem(key, JSON.stringify({
+          posts: postsRef.current.slice(0, 100),
+          hasMore: hasMoreRef.current,
+          nextOffset: nextOffsetRef.current,
+          scrollY: window.scrollY,
+          savedAt: Date.now(),
+        }))
+      } catch {
+        // Feed navigation remains usable when browser storage is unavailable.
+      }
+    }
+  }, [activeTab, initialNextOffset, initialPosts])
+
+  useEffect(() => {
+    const sync = () => setOnline(navigator.onLine)
+    sync()
+    window.addEventListener('online', sync)
+    window.addEventListener('offline', sync)
+    return () => {
+      window.removeEventListener('online', sync)
+      window.removeEventListener('offline', sync)
+    }
+  }, [])
+
+  useEffect(() => {
+    const node = loadMoreRef.current
+    if (!node || !hasMore || loadingMore || loadError || !online || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return
+      observer.disconnect()
+      setLoadingMore(true)
+      setLoadError('')
+      void fetch(`/api/feed/page?tab=${activeTab}&offset=${nextOffset}`, { cache: 'no-store' })
+        .then(async (res) => {
+          const data = await res.json().catch(() => ({})) as { posts?: FeedV2Post[]; hasMore?: boolean; nextOffset?: number; error?: string }
+          if (!res.ok) throw new Error(data.error ?? 'Could not load more posts')
+          setPosts((current) => {
+            const known = new Set(current.map((post) => post.id))
+            return [...current, ...(data.posts ?? []).filter((post) => !known.has(post.id))]
+          })
+          setHasMore(Boolean(data.hasMore))
+          setNextOffset(data.nextOffset ?? nextOffset)
+        })
+        .catch((error) => setLoadError(error instanceof Error ? error.message : 'Could not load more posts'))
+        .finally(() => setLoadingMore(false))
+    }, { rootMargin: '500px 0px' })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [activeTab, hasMore, loadError, loadingMore, nextOffset, online])
 
   const visiblePosts = posts.map((post) => ({ ...post, ...(countOverrides[post.id] ?? {}) }))
   const selectedPost = visiblePosts.find((post) => post.id === selectedPostId) ?? null
@@ -1572,13 +1682,61 @@ export function FeedV2Screen({
   const handleShare = async (post: FeedV2Post) => {
     const url = `${window.location.origin}/feed-v2/post/${post.id}`
     timelineProps.onShare?.(post)
-    adjustCount(post.id, 'shareCount', 1)
-    void recordFeedEvent(post.id, 'share')
     if (navigator.share) {
-      await navigator.share({ title: `${post.author} on LumeX Fud`, text: post.body, url }).catch(() => {})
+      try {
+        await navigator.share({ title: `${post.author} on LumeX Fud`, text: post.body, url })
+        adjustCount(post.id, 'shareCount', 1)
+        void recordFeedEvent(post.id, 'share')
+      } catch {}
       return
     }
-    await navigator.clipboard?.writeText(url).catch(() => {})
+    try {
+      await navigator.clipboard?.writeText(url)
+      adjustCount(post.id, 'shareCount', 1)
+      void recordFeedEvent(post.id, 'share')
+      setActionNotice('Post link copied')
+    } catch {
+      setActionNotice('Could not copy the post link')
+    }
+  }
+
+  const postFeedback = async (post: FeedV2Post, kind: 'not_interested' | 'hide_creator') => {
+    const res = await fetch(`/api/feed/posts/${post.id}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind }) })
+    const data = await res.json().catch(() => ({})) as { error?: string }
+    if (!res.ok) throw new Error(data.error ?? 'Could not update feed preference')
+    setPosts((current) => current.filter((item) => item.id !== post.id))
+    setActionNotice(kind === 'not_interested' ? 'Post hidden' : 'Creator hidden')
+  }
+
+  const toggleProfileControl = async (post: FeedV2Post, kind: 'mute' | 'block') => {
+    if (!post.authorProfileId) return
+    const res = await fetch(`/api/feed/profiles/${post.authorProfileId}/${kind}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }) })
+    const data = await res.json().catch(() => ({})) as { error?: string }
+    if (!res.ok) throw new Error(data.error ?? `Could not ${kind} this profile`)
+    setPosts((current) => current.filter((item) => item.authorProfileId !== post.authorProfileId))
+    setActionNotice(kind === 'mute' ? 'Profile muted' : 'Profile blocked')
+  }
+
+  const submitReport = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!reportPostId || reportReason.trim().length < 3 || reportBusy) return
+    setReportBusy(true)
+    try {
+      const res = await fetch(`/api/feed/posts/${reportPostId}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report_type: reportType, reason: reportReason.trim() }),
+      })
+      const data = await res.json().catch(() => ({})) as { error?: string }
+      if (!res.ok) throw new Error(data.error ?? 'Could not report post')
+      setReportPostId(null)
+      setReportReason('')
+      setActionNotice('Report sent for review')
+    } catch (error) {
+      setActionNotice(error instanceof Error ? error.message : 'Could not report post')
+    } finally {
+      setReportBusy(false)
+    }
   }
 
   const handleOrder = (post: FeedV2Post) => {
@@ -1712,6 +1870,12 @@ export function FeedV2Screen({
   return (
     <div ref={screenRef} className={styles.screen}>
       <div className={styles.shell}>
+        {!online ? (
+          <div className="sticky top-0 z-50 flex min-h-11 items-center justify-center gap-3 bg-[#211a10] px-4 text-sm text-amber-100" role="status">
+            You are offline. Existing posts remain available.
+            <button type="button" onClick={() => router.refresh()} className="font-semibold underline">Retry</button>
+          </div>
+        ) : null}
         <Header tabs={tabs} stories={stories} onSelectTab={timelineProps.onSelectTab} onOpenStory={handleOpenStory} headerRef={headerRef} />
         <div className={styles.grid}>
           <LeftRail items={leftNav} />
@@ -1728,12 +1892,22 @@ export function FeedV2Screen({
               onRepost={handleRepost}
               onSave={handleSave}
               onShare={handleShare}
+              onQuote={(post) => router.push(`/feed-v2/create?quote=${post.id}`)}
+              onReport={(post) => { setReportPostId(post.id); setReportReason('') }}
+              onNotInterested={(post) => void postFeedback(post, 'not_interested').catch((error) => setActionNotice(error instanceof Error ? error.message : 'Action failed'))}
+              onHideCreator={(post) => void postFeedback(post, 'hide_creator').catch((error) => setActionNotice(error instanceof Error ? error.message : 'Action failed'))}
+              onMute={(post) => void toggleProfileControl(post, 'mute').catch((error) => setActionNotice(error instanceof Error ? error.message : 'Action failed'))}
+              onBlock={(post) => void toggleProfileControl(post, 'block').catch((error) => setActionNotice(error instanceof Error ? error.message : 'Action failed'))}
               onOpenPost={handleOpenPost}
               followOverrides={followOverrides}
               likedIds={likedIds}
               savedIds={savedIds}
               repostedIds={repostedIds}
             />
+            <div ref={loadMoreRef} className="min-h-20 px-4 py-6 text-center" aria-live="polite">
+              {loadingMore ? <div className="mx-auto h-16 max-w-xl rounded-lg lx-skeleton" aria-label="Loading more posts" /> : null}
+              {loadError ? <div><p className="text-sm text-rose-300">{loadError}</p><button type="button" onClick={() => setLoadError('')} className="mt-2 min-h-11 px-4 text-sm font-semibold text-white underline">Try again</button></div> : null}
+            </div>
           </main>
           <RightRail rightRail={rightRail} />
         </div>
@@ -1774,6 +1948,17 @@ export function FeedV2Screen({
             setCommentError('')
           }}
         />
+
+        {reportPostId ? (
+          <div className={styles.sheetScrimVisible + ' ' + styles.sheetScrim} onClick={() => setReportPostId(null)}>
+            <form className="mx-auto mb-4 w-[min(520px,calc(100vw-24px))] rounded-lg border border-white/10 bg-[#101116] p-5" onSubmit={submitReport} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Report post">
+              <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold text-white">Report post</h2><button type="button" onClick={() => setReportPostId(null)} className="grid h-11 w-11 place-items-center rounded-full bg-white/6" aria-label="Close report"><X size={17} /></button></div>
+              <label className="mt-4 block text-sm text-white/70">Reason<select value={reportType} onChange={(event) => setReportType(event.target.value)} className="mt-2 min-h-12 w-full rounded-lg border border-white/10 bg-[#171920] px-3 text-white"><option value="misleading_food">Misleading food information</option><option value="fake_promotion">Fake promotion</option><option value="spam">Spam</option><option value="impersonation">Impersonation</option><option value="other">Other</option></select></label>
+              <label className="mt-4 block text-sm text-white/70">Details<textarea value={reportReason} onChange={(event) => setReportReason(event.target.value.slice(0, 1000))} rows={4} className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-[#171920] p-3 text-white" placeholder="Tell the moderation team what is wrong" /></label>
+              <button type="submit" disabled={reportBusy || reportReason.trim().length < 3} className="mt-4 min-h-12 w-full rounded-lg bg-[#F5A623] px-4 font-semibold text-black disabled:opacity-45">{reportBusy ? 'Sending' : 'Send report'}</button>
+            </form>
+          </div>
+        ) : null}
 
         {actionNotice ? <div className={styles.actionNotice} role="status">{actionNotice}</div> : null}
 

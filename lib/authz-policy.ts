@@ -89,6 +89,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   ...map(['feed/cleanup/diagnostics'], role(SUPER)),
 
   'campaign/track': { kind: 'public' },
+  'feed/page': { kind: 'public' },
 
   ...map([
     'group-order/[code]', 'group-order/[code]/items',
