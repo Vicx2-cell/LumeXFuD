@@ -30,6 +30,12 @@ export function LandingNav() {
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <ThemeToggleButton />
           <Link
+            href="/home"
+            className="px-3 sm:px-4 py-2 text-sm font-medium text-white/85 hover:text-white transition-colors"
+          >
+            Browse
+          </Link>
+          <Link
             href="/auth"
             className="px-3 sm:px-4 py-2 text-sm font-medium text-white/85 hover:text-white transition-colors"
           >

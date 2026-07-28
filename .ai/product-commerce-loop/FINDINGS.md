@@ -72,3 +72,8 @@
 - A new 320px artifact exposed a real checkout issue: the fixed payment action visually covered guest identity fields. The cart now switches to an inline final action after checkout enters the viewport, and the browser assertion verifies the final action is below consent.
 - The first complete viewport run exposed a second real issue only at 768x1024 and desktop: the persistent bottom navigation shared the product-sheet stacking level and intercepted Add to cart. Raising the active product-selection overlay resolves the interaction without changing the navigation.
 - An explicitly owned fixture server with `PLAYWRIGHT_REUSE_SERVER=1` allows Playwright to finish cleanly. The final all-viewport run passed 6/6; no browser verification blocker remains.
+
+## 2026-07-28 Guest Entry Repair
+
+- Production verification exposed a product-entry gap rather than a checkout defect: `/cart` and storefronts were public, but the landing page's Start ordering route pointed to registration and the marketplace `/home` was protected by the edge proxy.
+- The existing marketplace server component is guest-safe: it already accepts a missing session and only loads customer favorites/location preference for a customer session. The repair therefore opens browse access without widening any authenticated API route.

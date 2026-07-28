@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     let query = db
       .from('vendors')
       .select(`
-        id, shop_name, owner_name, logo_url, shop_photo_url,
+        id, slug, shop_name, owner_name, logo_url, shop_photo_url,
         prep_time_minutes, status, paused_until, category, description,
         avg_rating, total_ratings, is_active, subscription_paid_until, city_id, zone_id,
         vendor_scores ( composite_score, visibility_tier )
@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
 
     const vendorRows = (vendors ?? []) as Array<{
       id: string
+      slug: string | null
       shop_name: string
       owner_name: string | null
       logo_url: string | null

@@ -47,11 +47,11 @@ export function Hero({ hoursLabel }: { hoursLabel: string }) {
         <div className="lx-hero-cta">
           <Magnetic className="w-full sm:w-auto">
             <Link
-              href="/auth/register"
+              href="/home"
               className="lx-btn-amber px-8 py-4 text-base flex items-center justify-center w-full sm:w-auto"
               style={{ minHeight: 56 }}
             >
-              Start ordering
+              Browse restaurants
             </Link>
           </Magnetic>
           <Magnetic className="w-full sm:w-auto">
@@ -65,7 +65,7 @@ export function Hero({ hoursLabel }: { hoursLabel: string }) {
           </Magnetic>
         </div>
 
-        <p className="lx-hero-fine">Platform hours: {hoursLabel} daily</p>
+        <p className="lx-hero-fine">Browse without an account. Platform hours: {hoursLabel} daily</p>
       </div>
 
       {/* ── Scroll cue ── */}

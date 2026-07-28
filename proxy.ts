@@ -7,7 +7,6 @@ import { applyRequestContext, createRequestContext } from './lib/request-context
 import { evaluateAdminAccessRisk, privilegedApiRoles } from './lib/admin-access-risk'
 
 const PROTECTED: Array<{ pattern: RegExp; roles: string[] }> = [
-  { pattern: /^\/home(\/|$)/,          roles: ['customer', 'admin', 'super_admin'] },
   { pattern: /^\/vendor-dashboard(\/|$)/, roles: ['vendor', 'admin', 'super_admin'] },
   { pattern: /^\/rider(\/|$)/,          roles: ['rider', 'admin', 'super_admin'] },
   { pattern: /^\/admin(\/|$)/,          roles: ['admin', 'super_admin'] },

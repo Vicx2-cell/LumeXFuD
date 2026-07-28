@@ -41,3 +41,4 @@
 - Count a share only after Web Share resolves or clipboard copy succeeds; cancelled share sheets do not create engagement.
 - Reuse an explicitly owned fixture server only when `PLAYWRIGHT_REUSE_SERVER=1`; normal Playwright runs retain their isolated server behavior while local viewport verification gets deterministic teardown.
 - When checkout enters view, replace the fixed checkout action with an inline action below consent. Product-selection sheets sit above persistent navigation so their confirm action remains touchable at every viewport.
+- Keep `/home` public as the browse-first guest marketplace. Server-side customer-only data and client-side favorites/profile controls remain conditional on a customer session; vendors with slugs use `/store/[slug]` as the marketplace destination.

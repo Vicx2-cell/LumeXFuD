@@ -48,3 +48,4 @@
 - [x] Passed the final full suite (132 files, 882 tests), lint, and production build.
 - [x] Committed the feed resilience and mobile experience slice as `54292e7`.
 - [x] Repaired checkout and product-sheet sticky-action overlap and passed all six requested browser viewports.
+- [x] Opened the landing-to-marketplace guest ordering journey and added browser coverage for it.

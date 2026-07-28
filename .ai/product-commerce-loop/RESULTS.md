@@ -82,3 +82,9 @@
 - Repaired the 320px checkout overlap by switching from a fixed action to an inline final action once checkout enters view. Repaired tablet/desktop product-sheet interaction by placing the active selection overlay above the persistent bottom navigation.
 - Added explicit browser assertions that consent remains above the final disabled payment action. The deterministic commerce flow passed at 320x700, 360x800, 390x844, 412x915, 768x1024, and 1280x900 desktop.
 - The reusable local fixture-server mode eliminates the earlier teardown stall without changing ordinary isolated Playwright behavior. Full tests (132 files, 882 tests), TypeScript, lint, and production build (153 static pages) passed. No production deployment occurred.
+
+## 2026-07-28 Guest Entry Repair
+
+- Corrected the production journey gap discovered after deployment: guest checkout existed, but the public landing page sent visitors to registration and `/home` was edge-protected.
+- Made `/home` a public browse-first marketplace, changed the landing actions to Browse restaurants, linked vendor cards to canonical storefront slugs where available, and removed guest favorite/account controls that would otherwise call protected APIs.
+- Added browser and contract coverage for landing-to-marketplace guest entry. Full tests (133 files, 884 tests), TypeScript, lint, and production build (153 static pages) passed before deployment.

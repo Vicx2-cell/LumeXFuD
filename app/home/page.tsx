@@ -98,7 +98,7 @@ async function getVendorsAndTrending(zoneId?: string | null) {
     let query = db
       .from('vendors')
       .select(`
-        id, shop_name, logo_url, shop_photo_url, prep_time_minutes,
+        id, slug, shop_name, logo_url, shop_photo_url, prep_time_minutes,
         status, paused_until, category, avg_rating, total_ratings, is_active,
         city_id, zone_id,
         vendor_scores ( composite_score, visibility_tier )
@@ -198,7 +198,7 @@ export default async function CustomerHomePage() {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {walletOn && (
+            {walletOn && session?.role === 'customer' && (
               <a
                 href="/profile/wallet"
                 className="lx-card-amber-strong flex h-11 w-11 items-center justify-center rounded-full"
@@ -207,14 +207,22 @@ export default async function CustomerHomePage() {
                 <WalletCards size={18} className="lx-amber" aria-hidden="true" />
               </a>
             )}
-            <NotificationBell />
-            <a
-              href="/profile"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--lx-border)] bg-[var(--lx-surface)] text-[var(--lx-text-muted)] hover:text-[var(--lx-text)]"
-              aria-label="Profile"
-            >
-              <UserRound size={18} aria-hidden="true" />
-            </a>
+            {session?.role === 'customer' ? (
+              <>
+                <NotificationBell />
+                <a
+                  href="/profile"
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--lx-border)] bg-[var(--lx-surface)] text-[var(--lx-text-muted)] hover:text-[var(--lx-text)]"
+                  aria-label="Profile"
+                >
+                  <UserRound size={18} aria-hidden="true" />
+                </a>
+              </>
+            ) : (
+              <a href="/auth" className="lx-btn-secondary px-4 py-2 text-sm" style={{ minHeight: 44 }}>
+                Sign in
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -232,6 +240,7 @@ export default async function CustomerHomePage() {
           initialLocations={locations as HomeLocationRow[]}
           initialSelectedZoneId={preferredZoneId ?? locations[0]?.zone_id ?? ''}
           campaignId={marketplaceCampaignId}
+          canManageFavorites={session?.role === 'customer'}
         />
       </Suspense>
       </div>
@@ -251,6 +260,7 @@ function SkeletonGrid() {
 
 export interface VendorData {
   id: string
+  slug: string | null
   shop_name: string
   logo_url: string | null
   shop_photo_url: string | null

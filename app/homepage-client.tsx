@@ -11,6 +11,7 @@ import { vendorTrustBadges } from '@/lib/vendor-trust'
 import { VerifiedBadge } from '@/components/verified-badge'
 import { Pill } from '@/components/ui/pill'
 import { campaignHref, getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
+import { storePath } from '@/lib/storefront'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks']
 
@@ -30,12 +31,14 @@ export function HomepageClient({
   initialLocations = [],
   initialSelectedZoneId = '',
   campaignId = '',
+  canManageFavorites = false,
 }: {
   initialVendors: VendorData[]
   initialFavorites?: string[]
   initialLocations?: LocationRow[]
   initialSelectedZoneId?: string
   campaignId?: string
+  canManageFavorites?: boolean
 }) {
   // NOTE: realtime vendor-status subscription temporarily removed while isolating
   // the iOS "page couldn't load" crash on /home. Vendors are server-rendered
@@ -83,6 +86,7 @@ export function HomepageClient({
   }, [selectedZoneId])
 
   const toggleFavorite = (vendorId: string) => {
+    if (!canManageFavorites) return
     const willFav = !favorites.has(vendorId)
     setFavorites((prev) => {
       const next = new Set(prev)
@@ -170,7 +174,7 @@ export function HomepageClient({
 
       {/* Category chips + Favourites filter (one-tap re-order shortcut) */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
-        {favorites.size > 0 && (
+        {canManageFavorites && favorites.size > 0 && (
           <Pill
             active={favOnly}
             onClick={() => setFavOnly((v) => !v)}
@@ -221,6 +225,7 @@ export function HomepageClient({
                 favorited={favorites.has(vendor.id)}
                 onToggleFavorite={toggleFavorite}
                 campaignId={campaignId}
+                canManageFavorites={canManageFavorites}
               />
             ))}
           </div>
@@ -235,11 +240,13 @@ function VendorCard({
   favorited,
   onToggleFavorite,
   campaignId,
+  canManageFavorites,
 }: {
   vendor: VendorData
   favorited: boolean
   onToggleFavorite: (id: string) => void
   campaignId?: string
+  canManageFavorites: boolean
 }) {
   // One-shot heart "beat" on tap (not on mount) — fires only on user interaction.
   const [beat, setBeat] = useState(false)
@@ -258,7 +265,7 @@ function VendorCard({
   const statusLabel = isPaused ? 'Paused' : vendor.status
 
   const trust = vendorTrustBadges(vendor)
-  const href = campaignHref(`/vendor/${vendor.id}`, campaignId)
+  const href = campaignHref(vendor.slug ? storePath(vendor.slug) : `/vendor/${vendor.id}`, campaignId)
 
   useEffect(() => {
     if (!campaignId || sentImpression.current) return
@@ -333,7 +340,7 @@ function VendorCard({
         </div>
 
         {/* Favourite heart — inside the Link, so stop the navigation on tap. */}
-        <button
+        {canManageFavorites && <button
           type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBeat(true); onToggleFavorite(vendor.id) }}
           aria-label={favorited ? `Remove ${vendor.shop_name} from favourites` : `Add ${vendor.shop_name} to favourites`}
@@ -345,7 +352,7 @@ function VendorCard({
             className={beat ? 'lx-heartbeat' : undefined} onAnimationEnd={() => setBeat(false)}>
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
           </svg>
-        </button>
+        </button>}
 
         {/* Vendor logo badge overlaid on the cover */}
         {vendor.logo_url && (

@@ -87,3 +87,9 @@
 - Exercised: 320x700, 360x800, 390x844, 412x915, 768x1024, and 1280x900 desktop.
 - Repaired and verified: fixed checkout action no longer covers guest checkout/consent content; product-sheet add-to-cart action now sits above the persistent bottom navigation at tablet and desktop widths.
 - Passed: `npx.cmd tsc --noEmit`, `npm.cmd test` - 132 files and 882 tests, `npm.cmd run lint`, and `npm.cmd run build` - exit 0 in 165 seconds with 153 static pages.
+
+## Guest Entry Repair - 2026-07-28
+
+- Passed: `npx.cmd playwright test test/e2e/guest-entry.spec.ts --project=chromium --workers=1 --retries=0 --timeout=45000 --global-timeout=120000 --reporter=line` with an explicitly owned fixture server - 1 scenario passed in 19 seconds.
+- Covered: landing page -> Browse restaurants -> public `/home` marketplace -> guest Sign in affordance, without an authentication redirect.
+- Passed: focused guest/storefront contracts (3 files, 7 tests), final `npm.cmd test` (133 files, 884 tests), `npx.cmd tsc --noEmit`, `npm.cmd run lint`, and `npm.cmd run build` - exit 0 in 154 seconds with 153 static pages.
