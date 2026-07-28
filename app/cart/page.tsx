@@ -42,10 +42,10 @@ function newCheckoutAttemptKey(): string {
 
 function CartSection({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
-    <section className="lx-surface space-y-4 p-4 sm:p-5">
-      <div>
-        <h2 className="text-sm font-semibold text-white/85">{title}</h2>
-        {subtitle && <p className="mt-1 text-xs text-white/45">{subtitle}</p>}
+    <section className="space-y-3 border-t border-white/10 pt-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-semibold text-white/90">{title}</h2>
+        {subtitle && <p className="truncate text-xs text-white/40">{subtitle}</p>}
       </div>
       {children}
     </section>
@@ -535,15 +535,14 @@ export default function CartPage() {
             <ArrowLeft size={18} aria-hidden="true" />
           </button>
           <div>
-            <h1 className="font-semibold">Your cart</h1>
-            <p className="text-xs text-[var(--lx-text-muted)]">Review items, delivery, and payment</p>
+            <h1 className="font-semibold">Cart</h1>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-3xl space-y-5 px-4 py-6 sm:px-6 lx-enter">
+      <div className="mx-auto max-w-3xl space-y-6 px-4 py-5 sm:px-6 lx-enter">
         {/* Estimated time — longest dish + delivery window */}
-        <div className="lx-card-amber rounded-2xl p-3 flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 border-b border-white/10 pb-4">
           <Timer size={18} className="lx-amber shrink-0" aria-hidden="true" />
           <p className="text-sm">
             <span className="text-white/55">Estimated </span>
@@ -558,7 +557,7 @@ export default function CartPage() {
           <button
             onClick={startGroupOrder}
             disabled={groupBusy}
-            className="lx-card-amber lx-amber w-full rounded-2xl py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+            className="inline-flex min-h-11 items-center gap-2 self-start rounded-lg border border-[#F5A623]/30 px-3 text-sm font-semibold text-[#F5A623] disabled:opacity-50"
           >
             <Users size={17} aria-hidden="true" />
             {groupBusy ? 'Starting…' : 'Order with friends (split one delivery)'}
@@ -586,7 +585,7 @@ export default function CartPage() {
         )}
 
         <CartSection title="Your items" subtitle={`${totalItems} item${totalItems === 1 ? '' : 's'} from ${cart.vendor_name}`}>
-        <div className="glass-thin overflow-hidden rounded-2xl">
+        <div className="overflow-hidden border-y border-white/10">
           {cart.items.map((item, idx) => {
             const addonsKobo = item.addons.reduce((s, a) => s + a.price_kobo, 0)
             const eachKobo = item.price_kobo + addonsKobo
@@ -917,7 +916,7 @@ export default function CartPage() {
         )}
 
         {/* Order summary */}
-        <div className="glass-thin rounded-2xl p-4 space-y-2">
+        <div className="space-y-2 border-y border-white/10 py-4">
           <div className="flex justify-between text-sm">
             <span className="text-white/60">Subtotal</span>
             <span>{formatPrice(subtotal)}</span>
