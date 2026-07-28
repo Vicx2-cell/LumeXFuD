@@ -88,3 +88,11 @@
 - Corrected the production journey gap discovered after deployment: guest checkout existed, but the public landing page sent visitors to registration and `/home` was edge-protected.
 - Made `/home` a public browse-first marketplace, changed the landing actions to Browse restaurants, linked vendor cards to canonical storefront slugs where available, and removed guest favorite/account controls that would otherwise call protected APIs.
 - Added browser and contract coverage for landing-to-marketplace guest entry. Full tests (133 files, 884 tests), TypeScript, lint, and production build (153 static pages) passed before deployment.
+# 2026-07-28 Guest Checkout Incident Release
+
+- Commit `ac880c1 Preserve checkout retries across refresh` deployed to `https://lumexfud.com.ng`.
+- Production health returned HTTP 200 with commit `ac880c1c437d7db71a08a700f41b53425d92b405`.
+- Focused guest-entry/checkout tests: 2 files, 4 tests passed.
+- `npx.cmd tsc --noEmit` passed.
+- `npx.cmd eslint app/cart/page.tsx app/api/orders/route.ts test/guest-checkout-contract.test.ts` passed.
+- A zero-row production schema check confirmed guest order access columns exist. No live order or payment was created for verification.
