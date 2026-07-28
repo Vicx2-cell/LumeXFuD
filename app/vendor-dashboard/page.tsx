@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, CircleDollarSign, Clock3, Store, UtensilsCrossed } from 'lucide-react'
+import { ArrowRight, Clock3, Share2, Store, UtensilsCrossed } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/ui/page-header'
 import { LogoutButton } from '@/components/logout-button'
@@ -74,7 +74,14 @@ export default function VendorDashboard() {
       <div className="mx-auto max-w-6xl px-4 pt-5 sm:px-6 sm:pt-7">
         <PageHeader
           title={vendor?.shop_name ?? 'Store'}
-          actions={<LogoutButton />}
+          actions={
+            <div className="flex items-center gap-2">
+              <Link href="/vendor-dashboard/share" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/15 px-3 text-sm font-semibold text-white/80 hover:bg-white/[0.04]">
+                <Share2 size={16} /> <span className="hidden sm:inline">Share store</span>
+              </Link>
+              <LogoutButton />
+            </div>
+          }
         />
       </div>
 
@@ -121,7 +128,7 @@ export default function VendorDashboard() {
         <section className="grid gap-3 sm:grid-cols-3">
           <DashboardAction href="/vendor-dashboard/orders" icon={ArrowRight} title="Run the queue" body="Accept and move orders through prep." />
           <DashboardAction href="/vendor-dashboard/menu" icon={UtensilsCrossed} title="Update menu" body="Prices, stock, photos, and items." />
-          <DashboardAction href="/vendor-dashboard/earnings" icon={CircleDollarSign} title="View payouts" body="Available, held, and withdrawn money." />
+          <DashboardAction href="/vendor-dashboard/share" icon={Share2} title="Share your store" body="Copy the customer storefront link or send it on WhatsApp." />
         </section>
 
         <section className="border-y border-white/10 py-4 sm:py-5">

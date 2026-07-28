@@ -4,14 +4,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Image from 'next/image'
 import { formatPrice } from '@/lib/money'
-import { CountUp, GlassSheen } from '@/components/fx'
+import { CountUp } from '@/components/fx'
 import { Settings2, ChevronRight } from 'lucide-react'
 import { BackButton } from '@/components/back-button'
 import { LogoutButton } from '@/components/logout-button'
 import { NotificationBell } from '@/components/notification-bell'
 import { RiderHotspots } from '@/components/rider-hotspots'
 import { KycPanel } from '@/components/kyc-panel'
-import { LaunchCounter } from '@/components/launch-counter'
 import { ProfileImageUpload } from '@/components/profile-image-upload'
 import { DefaultAvatar } from '@/components/default-avatar'
 import { AlertBanner } from '@/components/ui/alert-banner'
@@ -426,7 +425,6 @@ export default function RiderDashboard() {
       className="lx-page lx-console overflow-hidden mx-auto w-full max-w-lg lg:max-w-2xl sm:border-x sm:border-white/5"
       style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom))' }}
     >
-      <GlassSheen />
       {/* Toast */}
       {toast && (
         <div className="fixed left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-medium shadow-lg lx-scale-in max-w-[92vw] text-center"
@@ -460,7 +458,7 @@ export default function RiderDashboard() {
                 {rider.avg_rating?.toFixed(1) ?? '—'}
               </p>
               <a href="/rider/reviews" className="lx-amber text-xs font-medium mt-1.5 inline-block">
-                See your reviews →
+                View reviews
               </a>
             </div>
           </div>
@@ -496,7 +494,7 @@ export default function RiderDashboard() {
 
       {/* Wallet card */}
       {wallet && (
-        <div className="lx-surface mx-4 mb-5 p-4 lx-enter">
+        <div className="mx-4 mb-5 border-y border-white/10 py-4 lx-enter">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs text-white/40 uppercase tracking-wide">Wallet</p>
             <span className="text-xs px-2 py-0.5 rounded-full font-bold"
@@ -525,7 +523,7 @@ export default function RiderDashboard() {
       {current && (
         <div className="mx-4 mb-5">
           <p className="text-xs text-white/40 uppercase tracking-wide mb-2">Active order</p>
-          <div className="glass lx-card-amber-soft p-4 lx-scale-in">
+          <div className="border border-[#F5A623]/20 bg-[#F5A623]/[0.06] p-4 lx-scale-in">
             <div className="flex items-start justify-between mb-3">
               <div>
                 <p className="font-semibold text-white">{current.order_number}</p>
@@ -686,12 +684,12 @@ export default function RiderDashboard() {
         </div>
 
         {!isOnline && (
-          <div className="lx-surface p-6 text-center">
+          <div className="border-y border-white/10 px-4 py-7 text-center">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
             </div>
             <p className="font-semibold text-white/75">You&apos;re offline</p>
-            <p className="text-sm text-white/40 mt-1">Go online to start catching orders.</p>
+            <p className="text-sm text-white/40 mt-1">Go online when you are ready to accept deliveries.</p>
             <button
               onClick={toggleStatus}
               disabled={statusLoading}
@@ -705,19 +703,19 @@ export default function RiderDashboard() {
         )}
 
         {isOnline && available.length === 0 && !current && (
-          <div className="lx-surface p-6 text-center">
+          <div className="border-y border-white/10 px-4 py-7 text-center">
             <div className="lx-icon-badge w-14 h-14 rounded-2xl mb-3">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5h-5l-2.5-6"/><path d="M12 6h3l2 5"/><path d="M6 11h7"/></svg>
             </div>
-            <p className="font-semibold text-white/75">Engine&apos;s warm, no orders yet</p>
-            <p className="text-sm text-white/40 mt-1">We&apos;ll buzz you the second one is ready.</p>
+            <p className="font-semibold text-white/75">No orders available</p>
+            <p className="text-sm text-white/40 mt-1">New delivery offers will appear here.</p>
           </div>
         )}
 
         {isOnline && available.length > 0 && (
           <div className="space-y-3 lx-stagger">
             {available.map((order) => (
-              <div key={order.id} className="lx-surface p-4">
+              <div key={order.id} className="border-y border-white/10 py-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <p className="font-semibold text-white tabular-nums">{order.order_number}</p>
@@ -753,13 +751,12 @@ export default function RiderDashboard() {
       {/* Setup & account — below the work so orders stay up top. Riders have no
           working-hours schedule (like Chowdeck): availability is the Online/Offline
           toggle alone, nothing time-boxed. */}
-      <div className="mx-4 mt-5"><LaunchCounter /></div>
       <div className="mx-4 mt-5"><KycPanel role="rider" /></div>
 
       {/* Account & settings consolidated on one page (profile, payout, security,
           sign out) — keeps this screen focused on deliveries. */}
       <div className="mx-4 mt-5 mb-2">
-        <a href="/rider/settings" className="block lx-surface lx-tap p-4">
+        <a href="/rider/settings" className="block border-y border-white/10 py-4 lx-tap">
           <div className="flex items-center gap-3">
             <span className="w-9 h-9 rounded-xl grid place-items-center text-white/55 shrink-0" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--lx-border)' }}>
               <Settings2 size={18} strokeWidth={1.75} />

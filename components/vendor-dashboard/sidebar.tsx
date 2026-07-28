@@ -10,6 +10,7 @@ import {
   ListOrdered,
   Menu,
   Settings2,
+  Share2,
   Sparkles,
   Star,
   Store,
@@ -30,11 +31,15 @@ const PRIMARY_ITEMS: SidebarItem[] = [
   { label: 'Orders', href: '/vendor-dashboard/orders', icon: ListOrdered },
   { label: 'Menu', href: '/vendor-dashboard/menu', icon: UtensilsCrossed },
   { label: 'Store', href: '/vendor-dashboard/store', icon: Store },
-  { label: 'Feed', href: '/vendor-dashboard/videos', icon: Sparkles },
-  { label: 'Earnings', href: '/vendor-dashboard/earnings', icon: CircleDollarSign },
 ]
 
 const SECONDARY_ITEMS: SidebarItem[] = [
+  { label: 'Share store', href: '/vendor-dashboard/share', icon: Share2 },
+  { label: 'Earnings', href: '/vendor-dashboard/earnings', icon: CircleDollarSign },
+]
+
+const MORE_ITEMS: SidebarItem[] = [
+  { label: 'Feed', href: '/vendor-dashboard/videos', icon: Sparkles },
   { label: 'Reviews', href: '/vendor-dashboard/reviews', icon: Star },
   { label: 'Support', href: '/vendor-dashboard/support', icon: LifeBuoy },
 ]
@@ -117,10 +122,16 @@ export function VendorDashboardSidebar({
         <div className="space-y-1">
           {PRIMARY_ITEMS.map((item) => <NavItem key={item.href} item={item} pathname={pathname} pending={counts.pending} onNavigate={onClose} />)}
         </div>
-        <p className="px-3 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">More</p>
+        <p className="px-3 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">Business</p>
         <div className="space-y-1">
           {SECONDARY_ITEMS.map((item) => <NavItem key={item.href} item={item} pathname={pathname} pending={counts.pending} onNavigate={onClose} />)}
         </div>
+        <details className="mt-4 group">
+          <summary className="cursor-pointer list-none px-3 text-xs font-semibold text-white/45 hover:text-white">More tools</summary>
+          <div className="mt-2 space-y-1">
+            {MORE_ITEMS.map((item) => <NavItem key={item.href} item={item} pathname={pathname} pending={counts.pending} onNavigate={onClose} />)}
+          </div>
+        </details>
       </nav>
 
       <div className="border-t border-white/8 p-4">
@@ -149,7 +160,7 @@ function MiniCount({ label, value }: { label: string; value: number }) {
 
 export function VendorMobileBottomNav({ pending, onMore }: { pending: number; onMore: () => void }) {
   const pathname = usePathname()
-  const items = PRIMARY_ITEMS.filter((item) => item.label !== 'Store')
+  const items = PRIMARY_ITEMS
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-[#09090b]/95 px-2 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-2xl lg:hidden" aria-label="Vendor quick navigation">

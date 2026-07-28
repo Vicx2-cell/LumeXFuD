@@ -301,17 +301,19 @@ export function ProfileClient({
           <BackButton />
           <div>
             <h1 className="font-semibold">Profile</h1>
-            <p className="text-xs text-[var(--lx-text-muted)]">Account, preferences, and security</p>
+            <p className="text-xs text-[var(--lx-text-muted)]">Account settings</p>
           </div>
         </div>
       </div>
 
       <div className="mx-auto max-w-3xl space-y-5 px-4 py-6 sm:px-6 lx-enter">
         {/* Profile picture */}
-        <div className="flex flex-col items-center pt-1">
+        <div className="flex items-center gap-3 border-b border-white/10 pb-5">
           <ProfileImageUpload slot="avatar" shape="circle" current={profile?.avatar_url ?? null} deletable />
-          {profile?.name && <p className="text-base font-semibold mt-3">{profile.name}</p>}
-          <p className="text-xs text-white/40 tabular-nums mt-0.5">{phone}</p>
+          <div className="min-w-0">
+            <p className="truncate text-base font-semibold">{profile?.name || 'Your profile'}</p>
+            <p className="mt-0.5 text-xs text-white/40 tabular-nums">{phone}</p>
+          </div>
         </div>
 
         {/* LumeX Wallet — primary entry point. Hidden when the customer wallet is off. */}
@@ -319,7 +321,7 @@ export function ProfileClient({
         {features.customer_wallet_enabled === true && (
         <Link
           href="/profile/wallet"
-          className="lx-card-amber lx-tap flex items-center gap-3 rounded-2xl p-4"
+          className="lx-card-amber lx-tap flex items-center gap-3 rounded-lg p-4"
         >
           <span className="lx-icon-badge flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><WalletCards size={20} aria-hidden="true" /></span>
           <div className="flex-1 min-w-0">
@@ -331,7 +333,7 @@ export function ProfileClient({
         )}
         <Link
           href="/profile/locations"
-          className="lx-tap flex items-center gap-3 rounded-2xl p-4 glass-thin"
+          className="lx-tap flex items-center gap-3 rounded-lg border border-white/10 p-4"
         >
           <span className="lx-icon-badge flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><MapPin size={20} aria-hidden="true" /></span>
           <div className="flex-1 min-w-0">
@@ -343,7 +345,7 @@ export function ProfileClient({
         </div>
 
         {/* Appearance — light / dark / auto (customer-facing only) */}
-        <div className="glass-thin rounded-2xl p-4 space-y-3">
+        <div className="border-y border-white/10 py-4 space-y-3">
           <h3 className="text-sm font-semibold text-white/70">Appearance</h3>
           <ThemeToggle />
         </div>
@@ -434,7 +436,7 @@ export function ProfileClient({
         )}
 
         {/* Edit profile */}
-        <div className="glass-thin rounded-2xl p-4 space-y-4">
+        <div className="border-y border-white/10 py-4 space-y-4">
           <h3 className="text-sm font-semibold text-white/70">Your details</h3>
           <div>
             <label className="block text-xs text-white/50 mb-1.5">Phone</label>
@@ -506,7 +508,7 @@ export function ProfileClient({
         <LumiMemoryCard />
 
         {/* Security — PIN management */}
-        <div className="glass-thin rounded-2xl p-4 space-y-3">
+        <div className="border-y border-white/10 py-4 space-y-3">
           <h3 className="text-sm font-semibold text-white/70">Security</h3>
 
           {pinSuccess && (
@@ -586,7 +588,7 @@ export function ProfileClient({
 
         {/* Help & support — number is set by the super-admin in Controls */}
         {supportPhone && supportPhone.trim() && (
-          <div className="glass-thin rounded-2xl p-4 space-y-3">
+          <div className="border-y border-white/10 py-4 space-y-3">
             <h3 className="text-sm font-semibold text-white/70">Help & support</h3>
             <p className="text-xs text-white/45">Order issue or question? Reach the LumeX team.</p>
             <a
@@ -609,7 +611,7 @@ export function ProfileClient({
         )}
 
         {/* NDPR links */}
-        <div className="glass-thin rounded-2xl p-4 space-y-3">
+        <div className="border-y border-white/10 py-4 space-y-3">
           <h3 className="text-sm font-semibold text-white/70">Privacy & data</h3>
           <a href="/api/auth/export" className="block text-sm text-white/65 hover:text-white py-1.5 transition-colors">
             Export my data (NDPR)
