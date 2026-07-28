@@ -39,3 +39,5 @@
 - Page the V2 transformer directly in bounded 12-row windows and return an authoritative next raw offset. This avoids mixing the live V2 UI with the older ranked-snapshot response and prevents filtered tabs from retrying an empty raw page.
 - Persist at most 100 public post summaries and scroll position per tab in session storage for ten minutes. This restores feed context without persisting customer identity or long-lived browsing history.
 - Count a share only after Web Share resolves or clipboard copy succeeds; cancelled share sheets do not create engagement.
+- Reuse an explicitly owned fixture server only when `PLAYWRIGHT_REUSE_SERVER=1`; normal Playwright runs retain their isolated server behavior while local viewport verification gets deterministic teardown.
+- When checkout enters view, replace the fixed checkout action with an inline action below consent. Product-selection sheets sit above persistent navigation so their confirm action remains touchable at every viewport.

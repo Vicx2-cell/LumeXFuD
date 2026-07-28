@@ -87,6 +87,8 @@ export default function CartPage() {
   const [guestPhone,       setGuestPhone]       = useState('')
   const [removedLine,      setRemovedLine]      = useState<{ vendor_id: string; vendor_name: string; item: CartItem } | null>(null)
   const checkoutAttemptKeyRef = useRef<string | null>(null)
+  const checkoutSurfaceRef = useRef<HTMLDivElement | null>(null)
+  const [showStickyCheckout, setShowStickyCheckout] = useState(true)
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' })
@@ -155,6 +157,22 @@ export default function CartPage() {
       if (campaign) setCampaignId(campaign)
     } catch { /* ignore */ }
   }, [features.customer_wallet_enabled])
+
+  useEffect(() => {
+    const updateStickyCheckout = () => {
+      const checkoutTop = checkoutSurfaceRef.current?.getBoundingClientRect().top
+      // The inline action below consent takes over once checkout enters view.
+      setShowStickyCheckout(checkoutTop === undefined || checkoutTop > window.innerHeight - 24)
+    }
+
+    updateStickyCheckout()
+    window.addEventListener('scroll', updateStickyCheckout, { passive: true })
+    window.addEventListener('resize', updateStickyCheckout)
+    return () => {
+      window.removeEventListener('scroll', updateStickyCheckout)
+      window.removeEventListener('resize', updateStickyCheckout)
+    }
+  }, [walletLoading])
 
   useEffect(() => {
     if (deliveryType === 'PICKUP' || !coords || !cart.vendor_id) {
@@ -445,8 +463,29 @@ export default function CartPage() {
     }
   }
 
+  const checkoutDisabled = loading || (isPickup && !pickupAgree) || (!isPickup && !orderAgree)
+  const checkoutLabel = loading ? 'Processing...' : (
+    (!isPickup && scheduleOn ? 'Schedule - ' : '') + (
+      effectivePaymentMethod === 'WALLET'
+        ? `Pay ${formatPrice(total)} from Wallet`
+        : effectivePaymentMethod === 'SPLIT'
+          ? `Pay ${formatPrice(paystackAmount)} + Wallet ${formatPrice(walletAmount)}`
+          : `Pay ${formatPrice(total)}`
+    )
+  )
+  const checkoutAction = () => (
+    <button
+      onClick={handleCheckout}
+      disabled={checkoutDisabled}
+      className="lx-btn-amber w-full py-4 text-base"
+      style={{ minHeight: 56, borderRadius: 16 }}
+    >
+      {checkoutLabel}
+    </button>
+  )
+
   return (
-    <main className="lx-page pb-32 overflow-hidden">
+    <main className="lx-page pb-48 overflow-hidden">
       {/* Header */}
       <div className="sticky top-0 z-40 glass-thin px-4 py-3" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
         <div className="mx-auto flex max-w-3xl items-center gap-3">
@@ -730,6 +769,7 @@ export default function CartPage() {
         {/* The whole selector shows regardless of the wallet flag; only the WALLET
             row is gated on it, so Paystack is never hidden (card must always work). */}
         {!walletLoading && (
+          <div ref={checkoutSurfaceRef}>
           <CartSection title="Checkout" subtitle="Pick how you want to pay and confirm the final breakdown.">
             {authChecked && isGuest && (
               <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
@@ -831,6 +871,7 @@ export default function CartPage() {
               </div>
             </div>
           </CartSection>
+          </div>
         )}
 
         {/* Order summary */}
@@ -947,6 +988,10 @@ export default function CartPage() {
           </CartSection>
         )}
 
+        <div className="pt-1">
+          {checkoutAction()}
+        </div>
+
         {reorderNote && (
           <div className="lx-card-amber lx-amber rounded-xl p-3 text-sm">
             {reorderNote}
@@ -962,26 +1007,11 @@ export default function CartPage() {
 
       {/* Fixed pay button — sits clear of the bottom nav (64px) AND the device
           safe-area inset so the home indicator never clips it. */}
-      <div className="fixed left-0 right-0 z-40 px-4 pb-2" style={{ bottom: 'calc(64px + env(safe-area-inset-bottom))' }}>
-        <div className="mx-auto max-w-3xl">
-          <button
-            onClick={handleCheckout}
-            disabled={loading || (isPickup && !pickupAgree) || (!isPickup && !orderAgree)}
-            className="lx-btn-amber w-full py-4 text-base"
-            style={{ minHeight: 56, borderRadius: 16 }}
-          >
-            {loading ? 'Processing…' : (
-              (!isPickup && scheduleOn ? '🗓️ Schedule · ' : '') + (
-                effectivePaymentMethod === 'WALLET'
-                  ? `Pay ${formatPrice(total)} from Wallet`
-                  : effectivePaymentMethod === 'SPLIT'
-                    ? `Pay ${formatPrice(paystackAmount)} + Wallet ${formatPrice(walletAmount)}`
-                    : `Pay ${formatPrice(total)}`
-              )
-            )}
-          </button>
+      {showStickyCheckout && (
+        <div className="fixed left-0 right-0 z-40 px-4 pb-2" style={{ bottom: 'calc(64px + env(safe-area-inset-bottom))' }}>
+          <div className="mx-auto max-w-3xl">{checkoutAction()}</div>
         </div>
-      </div>
+      )}
 
       <BottomNav />
     </main>

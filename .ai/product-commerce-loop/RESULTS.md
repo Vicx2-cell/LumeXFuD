@@ -75,3 +75,10 @@
 - Verification passed: 74 feed/authorization tests, TypeScript, lint, and diff whitespace checks.
 - Final boundary verification passed: the full suite completed with 132 files and 882 tests, lint passed, and the production build exited 0 after compiling, typechecking, and generating 153 static pages.
 - The slice remains uncommitted only because `.git/index` is sandbox-read-only and the required escalation was rejected when the approval service reported quota exhaustion until 2026-07-28 18:02. The valid implementation and durable-state changes are preserved; no workaround or production deployment was attempted.
+
+## 2026-07-28 Browser Completion
+
+- The previously pending feed experience slice was committed as `54292e7 Complete feed resilience and mobile experience`; the worktree was clean before the final viewport repair.
+- Repaired the 320px checkout overlap by switching from a fixed action to an inline final action once checkout enters view. Repaired tablet/desktop product-sheet interaction by placing the active selection overlay above the persistent bottom navigation.
+- Added explicit browser assertions that consent remains above the final disabled payment action. The deterministic commerce flow passed at 320x700, 360x800, 390x844, 412x915, 768x1024, and 1280x900 desktop.
+- The reusable local fixture-server mode eliminates the earlier teardown stall without changing ordinary isolated Playwright behavior. Full tests (132 files, 882 tests), TypeScript, lint, and production build (153 static pages) passed. No production deployment occurred.

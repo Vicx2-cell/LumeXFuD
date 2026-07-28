@@ -298,7 +298,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
 
       {/* Add-on selection sheet */}
       {selecting && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center lx-scrim" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setSelecting(null)}>
+        <div className="fixed inset-0 z-[60] flex items-end justify-center lx-scrim" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setSelecting(null)}>
           <div className="lx-sheet glass-thick w-full max-w-lg p-5 space-y-4 max-h-[min(88dvh,680px)] overflow-y-auto overscroll-contain scroll-pb-28" style={{ borderRadius: '28px 28px 0 0' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div className="min-w-0 pr-3">

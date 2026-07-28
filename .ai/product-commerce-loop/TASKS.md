@@ -1,12 +1,8 @@
 # Product Commerce Loop Tasks
 
-## Blocked
+## Remaining
 
-- [ ] Commit the verified feed mobile, pagination, and interaction slice and leave the worktree clean. `.git` is read-only in the sandbox, and the required escalation was rejected because the approval service quota is exhausted until 2026-07-28 18:02.
-
-## Pending
-
-- [ ] Resume 320, 412, 360, 768, and desktop browser execution only after headless Chromium launches reliably; do not claim unexercised viewports.
+- None. All ready local commerce, group-order, and feed tasks are complete.
 
 ## Done
 
@@ -50,3 +46,5 @@
 - [x] Connected quote, report, not-interested, hide, mute, and block UI to canonical routes; added quoted-post rendering and success-only share counting.
 - [x] Completed all ready local Phase F feed restoration and upgrade work.
 - [x] Passed the final full suite (132 files, 882 tests), lint, and production build.
+- [x] Committed the feed resilience and mobile experience slice as `54292e7`.
+- [x] Repaired checkout and product-sheet sticky-action overlap and passed all six requested browser viewports.

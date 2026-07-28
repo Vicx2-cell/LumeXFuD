@@ -80,3 +80,10 @@
 - Passed: `npm.cmd run lint` with no warnings.
 - Passed: `npm.cmd run build` - exit 0 in 93.5 seconds; Next.js compiled successfully, TypeScript passed, and 153 static pages were generated.
 - Passed: `git diff --check` before the final durable-state update, with only repository line-ending warnings.
+
+## Browser Completion - 2026-07-28
+
+- Passed: `npx.cmd playwright test test/e2e/commerce-flow.spec.ts --project=chromium --workers=1 --retries=0 --timeout=45000 --global-timeout=180000 --reporter=line` with `PLAYWRIGHT_REUSE_SERVER=1` - all 6 scenarios passed in 1.1 minutes.
+- Exercised: 320x700, 360x800, 390x844, 412x915, 768x1024, and 1280x900 desktop.
+- Repaired and verified: fixed checkout action no longer covers guest checkout/consent content; product-sheet add-to-cart action now sits above the persistent bottom navigation at tablet and desktop widths.
+- Passed: `npx.cmd tsc --noEmit`, `npm.cmd test` - 132 files and 882 tests, `npm.cmd run lint`, and `npm.cmd run build` - exit 0 in 165 seconds with 153 static pages.

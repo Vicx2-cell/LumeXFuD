@@ -1,9 +1,9 @@
 # Product Commerce Loop State
 
-Date: 2026-07-22
+Date: 2026-07-28
 Branch: audit/production-readiness
 Starting commit: 13e22e6 Add admin rider reassignment
-Latest verified commit: b49d10c Restore vendor feed publishing
+Latest verified commit: 54292e7 Complete feed resilience and mobile experience
 
 ## Scope
 
@@ -22,8 +22,8 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - Fourth product-commerce improvement implemented: vendor share tools now lead with the direct order link instead of the content-first SEO profile.
 - Cart, storefront, guest checkout, boundary repair, and prior loop-state commits are preserved through `bc17b1e`.
 - Browser verification slice committed as `1949f72`: deterministic test-only commerce data, a bounded Playwright harness, a public guest-compatible cart route, labelled guest fields, required menu choices on the existing add-on model, storefront selection enforcement, and server-authoritative required-choice validation.
-- The 390x844 browser scenario passed all assertions and produced a reviewed full-page screenshot. The command's global timeout expired during the original npm-wrapped dev-server teardown after the test passed; the harness now launches Next directly.
-- The first 320x700 attempt did not enter the test because Chromium headless shell stalled before establishing its debugging pipe. The owned process exited; existing interactive Chrome sessions were not touched. Per the bounded retry policy, 412x915 and remaining viewport claims are deferred rather than repeatedly rerun.
+- Browser verification is complete at 320x700, 360x800, 390x844, 412x915, 768x1024, and 1280x900 desktop. The fixture server is explicitly reusable for local runs so Playwright no longer hangs while tearing down Next's dev-server process tree.
+- The final viewport repair prevents the fixed checkout action from covering checkout/consent fields and raises the product selection sheet above the persistent bottom navigation.
 - Phase E group ordering is committed as `33211a0`: explicit lifecycle and participant records, hashed guest participant sessions, organizer-paid checkout, atomic writes versus lock, optimistic item versions, readiness, limits, budgets, deadline expiry, final reconciliation, exact group-to-order validation, one-order uniqueness, audit events, and storefront/mobile controls.
 - Participant-paid wallet splitting is disabled and explicitly deferred. Existing legacy split functions remain unreachable; the supported group model has one authenticated organizer payer and one resulting order.
 
@@ -37,9 +37,8 @@ Out of scope: repeating fraud-security or operational readiness audits, architec
 - Storefront slice verification passed: focused storefront/cart tests, lint, and production build.
 - Guest checkout slice verification passed: focused guest/validator tests, lint, and production build.
 - Phase boundary verification passed after repair: full Vitest suite, focused access-control rerun, lint, and production build.
-- Browser data/harness gap is closed locally; additional viewport execution is environment-blocked by a Chromium startup stall, with only 390x844 claimed as exercised.
+- Browser data/harness gap is closed and all requested viewport scenarios are exercised and passing.
 - Phase E focused boundary passed 250 tests, TypeScript, lint, and diff whitespace checks. Browser-based group mobile execution remains under the already-recorded Chromium startup blocker; no new viewport claim is made.
 - Phase F vendor publishing is committed as `b49d10c`: restored vendor dashboard authoring/management entry points, vendor menu-linked compose/preview/draft/edit, live vendor/item purchase-state validation, stable post detail links, storefront vendor updates, feed-to-order event attribution, and fair vendor rotation.
-- Phase F mobile/interaction slice is implemented and pending commit: bounded infinite loading with sparse-page offsets, scroll restoration, offline/empty/retry states, mobile media ratios, successful-share counting, quote context, and connected report/preference/mute/block actions.
-- Phase F local implementation is complete and verified. The pending feed-experience commit and clean-worktree requirement are blocked because the sandbox cannot write `.git/index`, and the required escalation was rejected after the approval service reported its usage quota exhausted until 2026-07-28 18:02.
-- Final boundary verification passed: 132 Vitest files and 882 tests, lint, and a production build covering TypeScript plus 153 static pages. No production deployment occurred.
+- Phase F mobile/interaction slice is committed as `54292e7`: bounded infinite loading with sparse-page offsets, scroll restoration, offline/empty/retry states, mobile media ratios, successful-share counting, quote context, and connected report/preference/mute/block actions.
+- Final boundary verification passed again after the viewport repairs: 132 Vitest files and 882 tests, lint, and a production build covering TypeScript plus 153 static pages. No production deployment occurred.
