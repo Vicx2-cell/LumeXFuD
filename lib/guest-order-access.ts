@@ -1,5 +1,7 @@
 import { createHash, randomBytes } from 'crypto'
 
+export const GUEST_ORDER_COOKIE_PREFIX = 'lx_guest_order_'
+
 export function createGuestOrderToken(): string {
   return randomBytes(24).toString('base64url')
 }
@@ -13,5 +15,11 @@ export function isValidGuestOrderToken(token: string | null | undefined): token 
 }
 
 export function guestOrderCookieName(orderNumber: string): string {
-  return `lx_guest_order_${orderNumber.replace(/[^A-Za-z0-9_-]/g, '_')}`
+  return `${GUEST_ORDER_COOKIE_PREFIX}${orderNumber.replace(/[^A-Za-z0-9_-]/g, '_')}`
+}
+
+export function guestOrderNumberFromCookieName(cookieName: string): string | null {
+  if (!cookieName.startsWith(GUEST_ORDER_COOKIE_PREFIX)) return null
+  const orderNumber = cookieName.slice(GUEST_ORDER_COOKIE_PREFIX.length)
+  return /^[A-Za-z0-9-]{3,80}$/.test(orderNumber) ? orderNumber : null
 }

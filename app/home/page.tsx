@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import dynamicImport from 'next/dynamic'
 import { Suspense } from 'react'
-import { UserRound, WalletCards } from 'lucide-react'
+import { ReceiptText, UserRound, WalletCards } from 'lucide-react'
 import { BottomNav } from '@/components/nav-bottom'
 import { BrandLogo } from '@/components/brand-logo'
 import { getFeature } from '@/lib/features'
@@ -211,9 +211,10 @@ export default async function CustomerHomePage() {
                 </a>
               </>
             ) : (
-              <a href="/auth" className="lx-btn-secondary px-4 py-2 text-sm" style={{ minHeight: 44 }}>
-                Sign in
-              </a>
+              <>
+                <a href="/orders" className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--lx-border)] bg-[var(--lx-surface)] text-[var(--lx-text-muted)]" aria-label="Track an order" title="Track an order"><ReceiptText size={18} aria-hidden="true" /></a>
+                <a href="/auth" className="lx-btn-secondary px-4 py-2 text-sm" style={{ minHeight: 44 }}>Sign in</a>
+              </>
             )}
           </div>
         </div>

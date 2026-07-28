@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import Link from 'next/link'
@@ -13,6 +14,7 @@ import { CancelOrderButton } from '@/components/cancel-order-button'
 import { VerifiedBadge } from '@/components/verified-badge'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
+import { guestOrderNumberFromCookieName, hashGuestOrderToken, isValidGuestOrderToken } from '@/lib/guest-order-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,7 +48,27 @@ export default async function OrdersPage({
   searchParams: Promise<{ page?: string }>
 }) {
   const session = await getCurrentUser()
-  if (!session || session.role !== 'customer') redirect('/auth?next=/orders')
+  if (!session || session.role !== 'customer') {
+    const cookieStore = await cookies()
+    const guestAttempts = cookieStore.getAll().flatMap((cookie) => {
+      const orderNumber = guestOrderNumberFromCookieName(cookie.name)
+      return orderNumber && isValidGuestOrderToken(cookie.value) ? [{ orderNumber, token: cookie.value }] : []
+    }).slice(0, 10)
+    if (guestAttempts.length > 0) {
+      const db = createSupabaseAdmin()
+      const { data: guestOrders } = await db
+        .from('orders')
+        .select('order_number, guest_access_token_hash, created_at')
+        .in('order_number', guestAttempts.map((attempt) => attempt.orderNumber))
+        .not('guest_access_token_hash', 'is', null)
+        .order('created_at', { ascending: false })
+      const recoverable = (guestOrders ?? []).find((order) => guestAttempts.some((attempt) => (
+        attempt.orderNumber === order.order_number && hashGuestOrderToken(attempt.token) === order.guest_access_token_hash
+      )))
+      if (recoverable?.order_number) redirect(`/order/${recoverable.order_number}`)
+    }
+    redirect('/auth?next=/orders')
+  }
 
   const db = createSupabaseAdmin()
   const { data: customer } = await db
