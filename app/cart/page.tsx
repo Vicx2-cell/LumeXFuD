@@ -18,6 +18,7 @@ import { getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
 import { recordFeedCommerceEvent } from '@/lib/feed/client-attribution'
 
 const TIP_OPTIONS = [0, 10000, 20000, 50000]
+const CHECKOUT_ATTEMPT_STORAGE_KEY = 'lumex_checkout_attempt_v1'
 
 type PaymentMethod = 'PAYSTACK' | 'WALLET' | 'SPLIT'
 type DeliveryEstimate = {
@@ -25,6 +26,18 @@ type DeliveryEstimate = {
   serviceFeeKobo: number
   deliveryFeeKobo: number
   activeSurchargeTotalKobo: number
+}
+
+type StoredCheckoutAttempt = { key: string; fingerprint: string }
+
+function checkoutFingerprint(input: Record<string, unknown>): string {
+  return JSON.stringify(input)
+}
+
+function newCheckoutAttemptKey(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
 function CartSection({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
@@ -86,7 +99,7 @@ export default function CartPage() {
   const [guestName,        setGuestName]        = useState('')
   const [guestPhone,       setGuestPhone]       = useState('')
   const [removedLine,      setRemovedLine]      = useState<{ vendor_id: string; vendor_name: string; item: CartItem } | null>(null)
-  const checkoutAttemptKeyRef = useRef<string | null>(null)
+  const checkoutAttemptKeyRef = useRef<StoredCheckoutAttempt | null>(null)
   const checkoutSurfaceRef = useRef<HTMLDivElement | null>(null)
   const [showStickyCheckout, setShowStickyCheckout] = useState(true)
 
@@ -345,6 +358,28 @@ export default function CartPage() {
     setRemovedLine(null)
   }
 
+  function resolveCheckoutAttemptKey(fingerprint: string): string {
+    if (checkoutAttemptKeyRef.current?.fingerprint === fingerprint) return checkoutAttemptKeyRef.current.key
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(CHECKOUT_ATTEMPT_STORAGE_KEY) ?? 'null') as StoredCheckoutAttempt | null
+      if (stored?.key && stored.fingerprint === fingerprint) {
+        checkoutAttemptKeyRef.current = stored
+        return stored.key
+      }
+    } catch { /* A malformed browser value must never block checkout. */ }
+
+    const key = newCheckoutAttemptKey()
+    const attempt = { key, fingerprint }
+    checkoutAttemptKeyRef.current = attempt
+    try { sessionStorage.setItem(CHECKOUT_ATTEMPT_STORAGE_KEY, JSON.stringify(attempt)) } catch { /* storage can be unavailable */ }
+    return key
+  }
+
+  function clearCheckoutAttempt() {
+    checkoutAttemptKeyRef.current = null
+    try { sessionStorage.removeItem(CHECKOUT_ATTEMPT_STORAGE_KEY) } catch { /* storage can be unavailable */ }
+  }
+
   async function handleCheckout() {
     if (loading) return // guard against double-submit before the disabled state paints
     if (!isPickup) {
@@ -364,11 +399,15 @@ export default function CartPage() {
       if (guestPhone.trim().length < 7) { setError('Enter your WhatsApp phone number'); return }
     }
     setError(''); setLoading(true)
-    if (!checkoutAttemptKeyRef.current) {
-      checkoutAttemptKeyRef.current = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    }
+    const attemptFingerprint = checkoutFingerprint({
+      vendorId: cart.vendor_id,
+      items: cart.items.map((item) => ({ id: item.id, menuItemId: item.menu_item_id, quantity: item.quantity, notes: item.special_instructions, addons: item.addons.map((addon) => addon.id).sort() })),
+      deliveryType, address: isPickup ? null : composedAddress, coords: isPickup ? null : coords,
+      instructions, tip, paymentMethod: effectivePaymentMethod, walletAmount, applyReward,
+      scheduledFor: scheduleOn ? scheduleAt : null, guestName: authChecked && isGuest ? guestName.trim() : null,
+      guestPhone: authChecked && isGuest ? guestPhone.trim() : null,
+    })
+    const attemptKey = resolveCheckoutAttemptKey(attemptFingerprint)
     if (campaignId && cart.vendor_id) {
       trackCampaignEvent({
         campaignId,
@@ -389,7 +428,7 @@ export default function CartPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'idempotency-key': checkoutAttemptKeyRef.current,
+          'idempotency-key': attemptKey,
         },
         body: JSON.stringify({
           vendor_id:             cart.vendor_id,
@@ -434,12 +473,15 @@ export default function CartPage() {
       }
 
       if (!res.ok) {
-        checkoutAttemptKeyRef.current = null
+        // A conflict or server/network failure may mean the original request
+        // reached the server. Keep its key so retry/reload resumes safely.
+        if (res.status >= 400 && res.status < 500 && res.status !== 409) clearCheckoutAttempt()
         if (res.status === 401) { router.push('/auth?next=/cart'); return }
-        setError(data.error ?? 'Failed to create order')
+        setError(data.error ?? (res.status >= 500 ? 'We could not start your order. Your cart is still saved; please retry.' : 'Failed to create order'))
         return
       }
 
+      clearCheckoutAttempt()
       clearCart()
       try { sessionStorage.removeItem('lx_group_id') } catch { /* ignore */ }
 
@@ -457,7 +499,7 @@ export default function CartPage() {
       }
       setError('Could not complete checkout. Please try again.')
     } catch {
-      setError('Network error. Please try again.')
+      setError('Network error. Your cart is still saved; please retry.')
     } finally {
       setLoading(false)
     }

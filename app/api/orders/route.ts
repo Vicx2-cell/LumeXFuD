@@ -656,7 +656,19 @@ export async function POST(req: NextRequest) {
       // Original is still being created (auth not stored yet) — ask the client to retry.
       return json({ error: 'Order is being created, please retry' }, { status: 409 })
     }
-    return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
+    // Keep database diagnostics in server logs only. The customer gets a
+    // recoverable message and their idempotency key can safely be retried.
+    console.error('[orders] order insert failed', {
+      code: orderError?.code,
+      message: orderError?.message,
+      details: orderError?.details,
+      hint: orderError?.hint,
+      requestId: context.requestId,
+      correlationId: context.correlationId,
+      isGuest,
+      vendorId: vendor_id,
+    })
+    return json({ error: 'We could not start your order. Your cart is still saved; please retry.' }, { status: 500 })
   }
 
   // Insert order items with price SNAPSHOTS — every payment path needs these,

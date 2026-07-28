@@ -77,3 +77,9 @@
 
 - Production verification exposed a product-entry gap rather than a checkout defect: `/cart` and storefronts were public, but the landing page's Start ordering route pointed to registration and the marketplace `/home` was protected by the edge proxy.
 - The existing marketplace server component is guest-safe: it already accepts a missing session and only loads customer favorites/location preference for a customer session. The repair therefore opens browse access without widening any authenticated API route.
+
+## 2026-07-28 Guest Checkout Incident
+
+- Reported production symptom: checkout returned the generic `Failed to create order` message. The order route returned that `500` without logging the database error, so the initial Vercel error-log query could not identify its exact insert failure.
+- A zero-row, read-only production Supabase schema check returned HTTP 200 for `guest_name`, `guest_access_token_hash`, and `order_intent_hash`; migration `145_guest_order_access.sql` is therefore present and is not the immediate cause.
+- The client persisted the cart in local storage and cleared it only after a successful order response, so a failed creation did not remove the cart. However, its in-memory-only idempotency key was discarded on every non-success response, including retryable server failures and concurrent-create conflicts. A reload during an uncertain request could therefore create a fresh order attempt rather than safely resume the existing one.
