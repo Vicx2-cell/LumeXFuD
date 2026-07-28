@@ -6,7 +6,6 @@ import { getCurrentUser } from '@/lib/session'
 import { BottomNav } from '@/components/nav-bottom'
 import { vendorPath } from '@/lib/seo/config'
 import { VendorMenuClient } from './vendor-menu-client'
-import { VendorProfileHeader } from './vendor-profile-header'
 
 // Always render fresh — a vendor's menu, prices and open/closed status must not
 // be served stale from a cached page.
@@ -41,44 +40,17 @@ export default async function VendorPage({
 
   const { data: vendorProfile } = await db
     .from('social_profiles')
-    .select('id, handle, display_name, avatar_url, is_verified, official_badge_kind')
+    .select('id')
     .eq('vendor_id', id)
     .maybeSingle()
 
   const vendorProfileId = (vendorProfile as { id?: string } | null)?.id ?? null
-  const [followerResult, followingResult, postResult, recentPostResult] = vendorProfileId
-    ? await Promise.all([
-        db.from('follows').select('id', { count: 'exact', head: true }).eq('followed_profile_id', vendorProfileId),
-        db.from('follows').select('id', { count: 'exact', head: true }).eq('follower_profile_id', vendorProfileId),
-        db.from('posts').select('id', { count: 'exact', head: true }).eq('author_profile_id', vendorProfileId).eq('status', 'published').is('deleted_at', null),
-        db.from('posts').select('id, body, post_kind, published_at').eq('author_profile_id', vendorProfileId).eq('status', 'published').eq('is_archived', false).is('deleted_at', null).order('published_at', { ascending: false }).limit(3),
-      ])
-    : [{ count: 0 }, { count: 0 }, { count: 0 }, { data: [] }]
-  const followerCount = followerResult.count ?? 0
-  const followingCount = followingResult.count ?? 0
-  const postCount = postResult.count ?? 0
-  const recentPosts = (recentPostResult.data ?? []) as Array<{ id: string; body: string | null; post_kind: string; published_at: string | null }>
+  const { data: recentPostRows } = vendorProfileId
+    ? await db.from('posts').select('id, body, post_kind, published_at').eq('author_profile_id', vendorProfileId).eq('status', 'published').eq('is_archived', false).is('deleted_at', null).order('published_at', { ascending: false }).limit(3)
+    : { data: [] }
+  const recentPosts = (recentPostRows ?? []) as Array<{ id: string; body: string | null; post_kind: string; published_at: string | null }>
 
   const session = await getCurrentUser()
-  let viewerFollowsVendor = false
-  if (session && vendorProfileId) {
-    const viewerProfile = session.role === 'vendor'
-      ? await db.from('social_profiles').select('id').eq('vendor_id', session.userId ?? '').maybeSingle()
-      : session.role === 'customer'
-        ? await db.from('social_profiles').select('id').eq('customer_id', session.userId ?? '').maybeSingle()
-        : session.role === 'rider'
-          ? await db.from('social_profiles').select('id').eq('rider_id', session.userId ?? '').maybeSingle()
-          : await db.from('social_profiles').select('id').or(`customer_id.eq.${session.userId ?? ''},admin_id.eq.${session.userId ?? ''}`).maybeSingle()
-    if (viewerProfile.data?.id) {
-      const { data: followRow } = await db
-        .from('follows')
-        .select('id')
-        .eq('follower_profile_id', viewerProfile.data.id)
-        .eq('followed_profile_id', vendorProfileId)
-        .maybeSingle()
-      viewerFollowsVendor = Boolean(followRow)
-    }
-  }
 
   // Fully KYC-verified? (one tiny marker check) — drives the customer Verified badge.
   let kyc_verified = false
@@ -131,25 +103,6 @@ export default async function VendorPage({
 
   return (
     <main className="lx-page feed-dark pb-32">
-      <div className="mx-auto max-w-5xl px-4 pt-4 sm:px-6 lg:px-8">
-        <VendorProfileHeader
-          vendorId={vendor.id}
-          shopName={vendor.shop_name}
-          handle={(vendorProfile as { handle?: string | null } | null)?.handle ?? null}
-          category={vendor.category}
-          logoUrl={vendor.logo_url}
-          verified={Boolean((vendorProfile as { is_verified?: boolean | null } | null)?.is_verified)}
-          status={vendor.status}
-          isPaused={Boolean(vendor.paused_until && new Date(vendor.paused_until) > new Date())}
-          avgRating={Number(vendor.avg_rating ?? 0)}
-          totalRatings={Number(vendor.total_ratings ?? 0)}
-          followerCount={followerCount}
-          followingCount={followingCount}
-          postCount={postCount}
-          viewerFollowsVendor={viewerFollowsVendor}
-          vendorProfileId={vendorProfileId}
-        />
-      </div>
       <VendorMenuClient
         vendor={{ ...vendor, kyc_verified } as VendorInfo}
         menu={menuWithAddons}
@@ -209,6 +162,7 @@ export interface MenuAddon {
 
 export interface VendorInfo {
   id: string
+  slug: string | null
   shop_name: string
   owner_name: string
   logo_url: string | null

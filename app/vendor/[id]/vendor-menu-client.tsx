@@ -13,6 +13,7 @@ import { Pill } from '@/components/ui/pill'
 import { FindStoreCard } from '@/components/find-store-card'
 import { getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
 import { recordFeedCommerceEvent } from '@/lib/feed/client-attribution'
+import { ArrowLeft, Clock3, MapPin, Search, Share2, Star, Users } from 'lucide-react'
 import type { VendorInfo, MenuAddon, MenuItem, VendorReview } from './page'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks', 'Other']
@@ -55,6 +56,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
   const [showGroupForm, setShowGroupForm] = useState(false)
   const [groupBusy, setGroupBusy] = useState(false)
   const [groupError, setGroupError] = useState('')
+  const [shareFeedback, setShareFeedback] = useState('')
   const [groupForm, setGroupForm] = useState(() => ({
     name: '',
     delivery_address: '',
@@ -249,6 +251,20 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
     } catch { setGroupError('Connection lost. Try again.') } finally { setGroupBusy(false) }
   }
 
+  async function shareStore() {
+    const path = vendor.slug ? `/store/${encodeURIComponent(vendor.slug)}` : `/vendor/${vendor.id}`
+    const url = `${window.location.origin}${path}`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: vendor.shop_name, text: `Order from ${vendor.shop_name} on LumeX Fud`, url })
+        return
+      }
+      await navigator.clipboard.writeText(url)
+      setShareFeedback('Link copied')
+      window.setTimeout(() => setShareFeedback(''), 1800)
+    } catch { /* Sharing can be cancelled or unavailable. */ }
+  }
+
   // Total quantity of this menu item across all its add-on variants.
   const qtyForItem = (menuItemId: string) =>
     cart.items.filter((i) => i.menu_item_id === menuItemId).reduce((s, i) => s + i.quantity, 0)
@@ -390,24 +406,50 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
 
       {/* Cover hero — the vendor's cover photo (or a branded gradient) with the
           logo overlaid, so the storefront never opens on a blank header. */}
-      {(vendor.shop_photo_url || vendor.logo_url) && (
-        <div className="relative w-full" style={{ aspectRatio: '16 / 7' }}>
-          {vendor.shop_photo_url ? (
-            <Image src={vendor.shop_photo_url} alt="" fill priority className="object-cover" sizes="100vw" placeholder="blur" blurDataURL={FOOD_BLUR} />
-          ) : (
-            <div className="w-full h-full" style={{ background: 'linear-gradient(135deg, rgba(245,166,35,0.30), rgba(99,102,241,0.18))' }} />
-          )}
-          <div aria-hidden="true" className="absolute inset-0" style={{ background: 'linear-gradient(to top, #0A0A0B 2%, rgba(10,10,11,0.25) 55%, transparent)' }} />
-          {vendor.logo_url && (
-            <div className="absolute bottom-3 left-4 w-16 h-16 rounded-2xl overflow-hidden" style={{ border: '2px solid rgba(255,255,255,0.25)', boxShadow: '0 6px 20px rgba(0,0,0,0.45)' }}>
-              <Image src={vendor.logo_url} alt="" fill className="object-cover" sizes="64px" />
-            </div>
-          )}
+      <section className="border-b border-white/10 bg-[#10120f]">
+        <div className="relative h-48 overflow-hidden bg-[#252a22] sm:h-64">
+          {vendor.shop_photo_url ? <Image src={vendor.shop_photo_url} alt={`${vendor.shop_name} food`} fill priority className="object-cover" sizes="100vw" placeholder="blur" blurDataURL={FOOD_BLUR} /> : null}
+          <div aria-hidden="true" className="absolute inset-0 bg-black/35" />
+          <div className="absolute inset-x-0 top-0 mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+            <button type="button" onClick={() => router.back()} className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm" aria-label="Go back"><ArrowLeft size={20} /></button>
+            <button type="button" onClick={() => void shareStore()} className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm" aria-label="Share store"><Share2 size={19} /></button>
+          </div>
         </div>
-      )}
+        <div className="mx-auto max-w-5xl px-4 pb-5 sm:px-6 lg:px-8">
+          <div className="flex items-end gap-4">
+            <div className="relative -mt-11 flex h-[88px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded-lg border-4 border-[#10120f] bg-[#252a22]">
+              {vendor.logo_url ? <Image src={vendor.logo_url} alt={vendor.shop_name} fill className="object-cover" sizes="88px" /> : <span className="text-2xl font-bold text-white/70">{vendor.shop_name.slice(0, 1)}</span>}
+            </div>
+            <div className="min-w-0 pb-1">
+              <div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-bold leading-tight text-white sm:text-2xl">{vendor.shop_name}</h1>{vendor.kyc_verified && <VerifiedBadge kind="vendor" />}</div>
+              <p className="mt-1 text-sm text-white/55">{vendor.category || 'Food vendor'}</p>
+            </div>
+          </div>
+          {vendor.description ? <p className="mt-4 max-w-3xl text-sm leading-6 text-white/70">{vendor.description}</p> : null}
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/65">
+            <span className={`inline-flex items-center gap-1.5 font-semibold ${isClosed ? 'text-red-300' : 'text-emerald-300'}`}><span className={`h-2 w-2 rounded-full ${isClosed ? 'bg-red-400' : 'bg-emerald-400'}`} />{isPaused ? 'Temporarily paused' : vendor.status === 'CLOSED' ? `Closed${vendor.opening_time ? ` - opens ${vendor.opening_time}` : ''}` : 'Open for orders'}</span>
+            <span className="inline-flex items-center gap-1.5"><Clock3 size={14} />{vendor.prep_time_minutes}-{vendor.prep_time_minutes + 10} min</span>
+            {vendor.total_ratings > 0 ? <span className="inline-flex items-center gap-1.5"><Star size={14} className="fill-[#F5A623] text-[#F5A623]" />{vendor.avg_rating.toFixed(1)} ({vendor.total_ratings})</span> : null}
+            {vendor.address_text ? <span className="inline-flex min-w-0 items-center gap-1.5 truncate"><MapPin size={14} />{vendor.address_text}</span> : null}
+          </div>
+          <div className="mt-5 flex gap-3">
+            <button type="button" onClick={() => { setGroupError(''); setShowGroupForm(true) }} disabled={isClosed} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/15 px-4 text-sm font-semibold text-white/85 disabled:opacity-50"><Users size={16} />Start group order</button>
+            {shareFeedback ? <span role="status" className="self-center text-sm text-emerald-300">{shareFeedback}</span> : null}
+          </div>
+        </div>
+      </section>
+
+      <div className="sticky top-0 z-40 border-b border-white/10 bg-[#10120f]/95 backdrop-blur">
+        <div className="mx-auto max-w-5xl px-4 py-3 sm:px-6 lg:px-8">
+          <div className="relative"><Search aria-hidden="true" size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/40" /><input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${vendor.shop_name}'s menu`} aria-label="Search menu" className="lx-field w-full py-2.5 pl-10 pr-4 text-sm outline-none" /></div>
+          <div className="mt-3 flex gap-2 overflow-x-auto scrollbar-none">
+            {CATEGORIES.map((cat) => <Pill key={cat} active={activeCategory === cat} onClick={() => setActiveCategory(cat)} className="shrink-0 px-3 py-1.5 text-xs">{cat}</Pill>)}
+          </div>
+        </div>
+      </div>
 
       {/* Sticky header */}
-      <div className="sticky top-0 z-40 glass-thin" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
+      <div className="hidden" aria-hidden="true">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <button type="button" onClick={() => router.back()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/70 transition-transform hover:bg-white/10 hover:text-white active:scale-90" aria-label="Go back">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
@@ -460,7 +502,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       </div>
 
       {/* Find this store — address, landmark, storefront photo + one-tap directions */}
-      <div className="mx-auto max-w-5xl px-4 pt-4 sm:px-6 lg:px-8">
+      <div className="hidden" aria-hidden="true">
         <FindStoreCard vendor={vendor} shopName={vendor.shop_name} />
         <button type="button" onClick={() => { setGroupError(''); setShowGroupForm(true) }} disabled={isClosed} className="mt-3 min-h-12 w-full rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 text-sm font-semibold text-amber-200 disabled:opacity-50">
           Start group order
@@ -468,7 +510,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
       </div>
 
       {menu.length > 10 && (
-        <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 lg:px-8">
+        <div className="hidden">
           <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search menu..." aria-label="Search menu"
             className="lx-field w-full px-4 py-2.5 text-sm outline-none" />
         </div>
