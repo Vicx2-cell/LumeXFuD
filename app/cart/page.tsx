@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import Script from 'next/script'
 import { ArrowLeft, Timer, Users } from 'lucide-react'
 import Image from 'next/image'
 import { FOOD_BLUR } from '@/lib/blur'
@@ -29,6 +30,12 @@ type DeliveryEstimate = {
 }
 
 type StoredCheckoutAttempt = { key: string; fingerprint: string }
+
+declare global {
+  interface Window {
+    PaystackPop?: new () => { resumeTransaction: (accessCode: string) => void }
+  }
+}
 
 function checkoutFingerprint(input: Record<string, unknown>): string {
   return JSON.stringify(input)
@@ -468,6 +475,7 @@ export default function CartPage() {
       const data = await res.json() as {
         error?: string
         authorization_url?: string
+        access_code?: string
         order_number?: string
         order_id?: string
       }
@@ -490,7 +498,11 @@ export default function CartPage() {
       // the balance dropped. A Paystack URL means there's still an amount to pay;
       // its absence means the wallet covered the whole order.
       if (data.authorization_url) {
-        window.location.href = data.authorization_url
+        if (!data.access_code || !window.PaystackPop) {
+          setError('Secure payment is loading. Please refresh and try again.')
+          return
+        }
+        new window.PaystackPop().resumeTransaction(data.access_code)
         return
       }
       if (data.order_number) {
@@ -528,6 +540,7 @@ export default function CartPage() {
 
   return (
     <main className="lx-page pb-48 overflow-hidden">
+      <Script src="https://js.paystack.co/v2/inline.js" strategy="afterInteractive" />
       {/* Header */}
       <div className="sticky top-0 z-40 glass-thin px-4 py-3" style={{ borderRadius: 0, boxShadow: 'none', borderLeft: 0, borderRight: 0, borderTop: 0 }}>
         <div className="mx-auto flex max-w-3xl items-center gap-3">

@@ -123,6 +123,7 @@ export async function POST(req: NextRequest) {
   trackFeature('wallet_topup', 'customer')
   return NextResponse.json({
     authorization_url: psData.data.authorization_url,
+    access_code:       psData.data.access_code,
     reference,
     amount_kobo:       amountKobo,
     bonus_kobo:        bonusKobo,

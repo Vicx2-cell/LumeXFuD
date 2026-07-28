@@ -6,6 +6,13 @@ import { downloadReceiptPng } from '@/lib/receipt-download'
 import { useFeatures } from '@/lib/use-features'
 import { formatPrice } from '@/lib/money'
 import { CountUp } from '@/components/fx'
+import Script from 'next/script'
+
+declare global {
+  interface Window {
+    PaystackPop?: new () => { resumeTransaction: (accessCode: string) => void }
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -177,9 +184,16 @@ export default function CustomerWalletClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount_naira: amountNaira }),
       })
-      const d = await res.json() as { error?: string; authorization_url?: string }
+      const d = await res.json() as { error?: string; access_code?: string }
       if (!res.ok) { setTopupError(d.error ?? 'Failed'); return }
-      window.location.href = d.authorization_url!
+      if (!d.access_code || !window.PaystackPop) {
+        setTopupError('Secure payment is not ready. Please refresh and try again.')
+        return
+      }
+      setTopupOpen(false)
+      new window.PaystackPop().resumeTransaction(d.access_code)
+      showToast('Complete payment in the secure Paystack window. Your balance updates after confirmation.')
+      window.setTimeout(() => { void loadWallet(); void loadTxs(1) }, 4_000)
     } catch {
       setTopupError('Network error. Try again.')
     } finally {
@@ -194,6 +208,7 @@ export default function CustomerWalletClient() {
 
   return (
     <main className="lx-page min-h-dvh pb-28 text-[var(--lx-text)]">
+      <Script src="https://js.paystack.co/v2/inline.js" strategy="afterInteractive" />
       {/* Toast */}
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl text-sm font-medium shadow-xl max-w-xs text-center"
