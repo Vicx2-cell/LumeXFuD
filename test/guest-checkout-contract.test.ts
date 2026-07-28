@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const cart = readFileSync(join(process.cwd(), 'app', 'cart', 'page.tsx'), 'utf8')
 const ordersRoute = readFileSync(join(process.cwd(), 'app', 'api', 'orders', 'route.ts'), 'utf8')
+const orderPage = readFileSync(join(process.cwd(), 'app', 'order', '[orderNumber]', 'page.tsx'), 'utf8')
 
 describe('guest checkout contract', () => {
   it('persists an idempotency key across a reload for an unchanged checkout attempt', () => {
@@ -20,5 +21,14 @@ describe('guest checkout contract', () => {
     expect(cart).toContain('Privacy Policy')
     expect(ordersRoute).toContain('guest_terms_accepted !== true')
     expect(ordersRoute).toContain('Terms and Privacy Policy')
+  })
+
+  it('keeps a guest order recoverable after payment redirects and refreshes', () => {
+    expect(ordersRoute).toContain('guestOrderCookieName(orderNumber)')
+    expect(ordersRoute).toContain('httpOnly: true')
+    expect(ordersRoute).toContain("sameSite: 'lax'")
+    expect(ordersRoute).toContain("callback_url: `${appUrl}/order/${orderNumber}${campaignQuery}`")
+    expect(orderPage).toContain('cookies()')
+    expect(orderPage).toContain('guestOrderCookieName(orderNumber)')
   })
 })

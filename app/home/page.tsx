@@ -166,7 +166,6 @@ export default async function CustomerHomePage() {
   ])
 
   let favorites: string[] = []
-  let firstName = ''
   try {
     if (session?.userId && session.role === 'customer') {
       const db = createSupabaseAdmin()
@@ -175,15 +174,11 @@ export default async function CustomerHomePage() {
         db.from('customers').select('name').eq('id', session.userId).maybeSingle(),
       ])
       favorites = (favs ?? []).map((r) => r.vendor_id as string)
-      firstName = ((me?.name as string | null) ?? '').trim().split(' ')[0] ?? ''
+      void me
     }
   } catch {
     // Non-critical - never block the home render.
   }
-
-  const lagosHour = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'Africa/Lagos' }).format(new Date()))
-  const partOfDay = lagosHour < 12 ? 'morning' : lagosHour < 17 ? 'afternoon' : 'evening'
-  const greeting = `Good ${partOfDay}${firstName ? `, ${firstName}` : ''}`
 
   return (
     <main className="lx-page pb-24">
@@ -192,10 +187,7 @@ export default async function CustomerHomePage() {
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <BrandLogo size={34} rounded={10} />
-            <div className="min-w-0">
-              <span className="text-xs text-[var(--lx-text-muted)]">{greeting}</span>
-              <p className="truncate text-sm font-semibold leading-tight text-[var(--lx-text)]">LumeX Fud</p>
-            </div>
+            <p className="truncate text-sm font-semibold text-[var(--lx-text)]">LumeX Fud</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {walletOn && session?.role === 'customer' && (
@@ -228,11 +220,6 @@ export default async function CustomerHomePage() {
       </div>
 
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="mb-5 max-w-2xl">
-        <p className="lx-mono mb-2 text-[var(--color-amber)]">Restaurants near you</p>
-        <h1 className="text-2xl font-bold leading-tight text-[var(--lx-text)] sm:text-3xl">What are you eating today?</h1>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--lx-text-muted)]">Browse what&apos;s open, compare prep times, and order from trusted campus kitchens.</p>
-      </div>
       <Suspense fallback={<SkeletonGrid />}>
         <HomepageClient
           initialVendors={vendors as VendorData[]}

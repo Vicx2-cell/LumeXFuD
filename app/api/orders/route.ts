@@ -27,7 +27,7 @@ import { sendOrderConfirmationEmail } from '@/lib/transactional-email'
 import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { evaluateOrderCreationRisk, hashOrderDestination, hashOrderIntent, normalizeIdempotencyKey } from '@/lib/order-fraud'
-import { createGuestOrderToken, hashGuestOrderToken } from '@/lib/guest-order-access'
+import { createGuestOrderToken, guestOrderCookieName, hashGuestOrderToken } from '@/lib/guest-order-access'
 import { normalizePhone } from '@/lib/phone'
 import { validateMenuAddonSelection, type MenuAddonChoice } from '@/lib/menu-addon-selection'
 import { normalizeGroupOrderAddons } from '@/lib/group-order-addons'
@@ -991,7 +991,9 @@ export async function POST(req: NextRequest) {
       email: customerEmail,
       amount: paystackAmount,
       reference: orderNumber,
-      callback_url: `${appUrl}/order/${orderNumber}${guestAccessToken ? `?guest=${guestAccessToken}${campaign_id ? `&campaign=${encodeURIComponent(campaign_id)}` : ''}` : campaignQuery}`,
+      // Guest access is kept in an HttpOnly, order-scoped browser cookie below.
+      // Keeping it out of the callback URL prevents referrer/history leakage.
+      callback_url: `${appUrl}/order/${orderNumber}${campaignQuery}`,
       metadata: {
         order_number: orderNumber,
         customer_phone: customerPhone,
@@ -1016,12 +1018,23 @@ export async function POST(req: NextRequest) {
     })
     .eq('id', order.id)
 
-  return NextResponse.json({
+  const response = json({
     order_number: orderNumber,
     authorization_url: paystackResult.authorization_url,
     access_code: paystackResult.access_code,
-    guest_access_token: guestAccessToken ?? undefined,
   })
+  if (guestAccessToken) {
+    response.cookies.set({
+      name: guestOrderCookieName(orderNumber),
+      value: guestAccessToken,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+    })
+  }
+  return response
 }
 
 // Notify the vendor of a freshly-paid order. Mirrors the charge.success webhook

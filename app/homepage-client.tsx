@@ -126,12 +126,8 @@ export function HomepageClient({
   return (
     <div className="space-y-5">
       {locations.length > 0 && (
-        <div className="lx-surface p-4 sm:p-5">
+        <div>
           <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-white/40">Delivery area</p>
-              <p className="mt-0.5 text-[11px] text-white/50">Pick the zone you are in right now.</p>
-            </div>
             <label className="block w-full sm:w-[340px]">
               <span className="sr-only">Select delivery zone</span>
               <select
@@ -166,7 +162,7 @@ export function HomepageClient({
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search vendors..."
+          placeholder="Search restaurants"
           className="lx-field min-h-13 w-full px-4 py-3 pl-11 text-sm outline-none"
         />
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--lx-text-faint)]" size={17} aria-hidden="true" />
@@ -211,10 +207,7 @@ export function HomepageClient({
       ) : (
         <div>
           <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold text-[var(--lx-text)]">Vendors in your zone</h2>
-              <p className="mt-0.5 text-xs text-white/40">Compare nearby options at a glance</p>
-            </div>
+            <h1 className="text-base font-semibold text-[var(--lx-text)]">Restaurants</h1>
             <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-xs text-white/55 tabular-nums">{filtered.length}</span>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

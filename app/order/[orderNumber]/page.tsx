@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/session'
 import { getFeature } from '@/lib/features'
@@ -6,7 +7,7 @@ import { BottomNav } from '@/components/nav-bottom'
 import { OrderStatusClient } from './order-status-client'
 import { settleOrderIfDue, type SettleableOrder } from '@/lib/order-settle'
 import { callPhoneMap } from '@/lib/call-phone'
-import { hashGuestOrderToken, isValidGuestOrderToken } from '@/lib/guest-order-access'
+import { guestOrderCookieName, hashGuestOrderToken, isValidGuestOrderToken } from '@/lib/guest-order-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,7 +75,11 @@ export default async function OrderPage({
   // enumerable, so this page must bind the viewer to THIS order — not merely
   // require any session. Previously a guest order rendered to anyone, and any
   // vendor/rider session could read any order by number; both are closed here.
-  const guestToken = isValidGuestOrderToken(search.guest) ? search.guest : null
+  const cookieStore = await cookies()
+  const cookieToken = cookieStore.get(guestOrderCookieName(orderNumber))?.value
+  const guestToken = isValidGuestOrderToken(search.guest)
+    ? search.guest
+    : isValidGuestOrderToken(cookieToken) ? cookieToken : null
   const guestTokenHash = guestToken ? hashGuestOrderToken(guestToken) : null
   const guestAuthorized = !!guestTokenHash && !!order.guest_phone && (order as { guest_access_token_hash?: string | null }).guest_access_token_hash === guestTokenHash
 

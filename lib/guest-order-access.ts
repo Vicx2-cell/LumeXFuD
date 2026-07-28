@@ -12,3 +12,6 @@ export function isValidGuestOrderToken(token: string | null | undefined): token 
   return typeof token === 'string' && /^[A-Za-z0-9_-]{32,80}$/.test(token)
 }
 
+export function guestOrderCookieName(orderNumber: string): string {
+  return `lx_guest_order_${orderNumber.replace(/[^A-Za-z0-9_-]/g, '_')}`
+}
