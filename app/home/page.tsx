@@ -166,6 +166,7 @@ export default async function CustomerHomePage() {
   ])
 
   let favorites: string[] = []
+  let customerName: string | null = null
   try {
     if (session?.userId && session.role === 'customer') {
       const db = createSupabaseAdmin()
@@ -174,7 +175,7 @@ export default async function CustomerHomePage() {
         db.from('customers').select('name').eq('id', session.userId).maybeSingle(),
       ])
       favorites = (favs ?? []).map((r) => r.vendor_id as string)
-      void me
+      customerName = (me as { name?: string | null } | null)?.name?.trim() || null
     }
   } catch {
     // Non-critical - never block the home render.
@@ -187,7 +188,10 @@ export default async function CustomerHomePage() {
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <BrandLogo size={34} rounded={10} />
-            <p className="truncate text-sm font-semibold text-[var(--lx-text)]">LumeX Fud</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-[var(--lx-text)]">LumeX Fud</p>
+              {customerName && <p className="truncate text-xs text-[var(--lx-text-muted)]">Hi, {customerName.split(/\s+/)[0]}</p>}
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {walletOn && session?.role === 'customer' && (

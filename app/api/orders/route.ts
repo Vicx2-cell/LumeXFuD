@@ -23,7 +23,7 @@ import { estimateOrderPrepMinutes } from '@/lib/prep-time'
 import { getBusyModeThrottle } from '@/lib/busy-mode'
 import { captureCustomerLocation } from '@/lib/location-intelligence'
 import { computeDeliveryPriceEstimate, getDeliveryPricingConfig, haversineDistanceMeters } from '@/lib/delivery-pricing'
-import { sendOrderConfirmationEmail } from '@/lib/transactional-email'
+import { sendAccountNotificationEmail, sendOrderConfirmationEmail } from '@/lib/transactional-email'
 import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { evaluateOrderCreationRisk, hashOrderDestination, hashOrderIntent, normalizeIdempotencyKey } from '@/lib/order-fraud'
@@ -1049,7 +1049,7 @@ async function notifyVendorNewOrder(
 ): Promise<void> {
   const { data: vendor } = await db
     .from('vendors')
-    .select('phone, shop_name')
+    .select('phone, whatsapp_number, shop_name')
     .eq('id', vendorId)
     .single()
   if (!vendor) return
@@ -1064,7 +1064,7 @@ async function notifyVendorNewOrder(
     .join(', ')
 
   void sendWhatsAppWithFallback({
-    to: vendor.phone as string,
+    to: (vendor.whatsapp_number ?? vendor.phone) as string,
     message: renderTemplate('ORDER_PENDING', {
       order_number: orderNumber,
       total: Math.round(totalAmount / 100),
@@ -1080,4 +1080,13 @@ async function notifyVendorNewOrder(
   const body = `${itemsSummary || 'A new order'} — ₦${Math.round(totalAmount / 100).toLocaleString('en-NG')} (${orderNumber}).`
   await notifyInApp({ userId: vendorId, userType: 'VENDOR', title, body, link: '/vendor-dashboard' })
   void sendPushToUser(vendorId, { title, body, url: '/vendor-dashboard', tag: `neworder-${orderNumber}` })
+  void sendAccountNotificationEmail(db, {
+    role: 'vendor',
+    accountId: vendorId,
+    eventKey: `vendor-order-pending:${orderId}`,
+    title: `New order ${orderNumber}`,
+    body: `${itemsSummary || 'A new customer order'} is ready for your kitchen.`,
+    actionLabel: 'Open orders',
+    actionUrl: `${appUrl}/vendor-dashboard/orders`,
+  }).catch(() => {})
 }

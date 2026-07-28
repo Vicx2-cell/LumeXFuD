@@ -136,7 +136,7 @@ export const CUSTOMER_ORDER_STATUS = {
 export type CustomerEmailStatus = keyof typeof CUSTOMER_ORDER_STATUS
 
 export function isCustomerEmailStatus(status: string): status is CustomerEmailStatus {
-  return status === 'PICKED_UP' || status === 'DELIVERED' || status === 'COMPLETED'
+  return status in CUSTOMER_ORDER_STATUS
 }
 
 export function renderOrderStatusEmail(input: {
@@ -147,7 +147,8 @@ export function renderOrderStatusEmail(input: {
   orderUrl: string
 }) {
   if (input.status === 'PICKED_UP') return renderOutForDeliveryEmail(input)
-  return renderDeliveredEmail(input)
+  if (input.status === 'DELIVERED' || input.status === 'COMPLETED') return renderDeliveredEmail(input)
+  return renderLegacyOrderStatusEmail(input)
 }
 
 export function renderOutForDeliveryEmail(input: {
@@ -232,5 +233,24 @@ export function renderLegacyOrderStatusEmail(input: {
     <p style="margin:0 0 14px">${escapeHtml(copy.message)}</p>
     <p style="margin:0;color:#806B58">${escapeHtml(input.orderNumber)}${escapeHtml(vendor)}</p>
     ${button('View order', input.orderUrl)}`)
+  return { subject, text, html }
+}
+
+export function renderAccountNotificationEmail(input: {
+  name?: string | null
+  title: string
+  body: string
+  actionLabel: string
+  actionUrl: string
+}) {
+  const name = firstName(input.name)
+  const subject = input.title
+  const text = [`Hi ${name},`, '', input.body, '', `${input.actionLabel}: ${input.actionUrl}`, '', 'LumeX Fud'].join('\n')
+  const html = layout(input.title, `
+    <p style="margin:0 0 8px">Hi ${escapeHtml(name)},</p>
+    <h1 style="margin:0 0 12px;font-size:25px;line-height:1.25">${escapeHtml(input.title)}</h1>
+    <p style="margin:0;color:#806B58">${escapeHtml(input.body)}</p>
+    ${button(input.actionLabel, input.actionUrl)}
+    <p style="margin:20px 0 0"><strong>LumeX Fud</strong><br>Questions? Reply to ${SUPPORT_EMAIL}.</p>`)
   return { subject, text, html }
 }

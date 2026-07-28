@@ -8,6 +8,7 @@ vi.mock('./email/send-email', async (importOriginal) => {
 })
 
 import {
+  sendAccountNotificationEmail,
   sendOrderConfirmationEmail,
   sendDelayedOrderEmail,
   sendOrderStatusEmail,
@@ -42,7 +43,7 @@ class Query implements PromiseLike<{ data: Row[] | null; error: null }> {
 }
 
 class FakeDb {
-  tables: Record<string, Row[]> = { customers: [], orders: [], vendors: [], order_items: [] }
+  tables: Record<string, Row[]> = { customers: [], orders: [], vendors: [], riders: [], order_items: [] }
   events = new Map<string, Event>()
   from(table: string): Query { return new Query(this, table) }
   async rpc(name: string, params: Row): Promise<{ data: Row[] | null; error: null }> {
@@ -66,7 +67,8 @@ class FakeDb {
 function emailDb(): FakeDb {
   const db = new FakeDb()
   db.tables.customers.push({ id: 'customer-1', email: 'ada@example.com', email_verified: true, name: 'Ada Nwosu', welcome_email_sent_at: null })
-  db.tables.vendors.push({ id: 'vendor-1', shop_name: 'Mama K’s Kitchen' })
+  db.tables.vendors.push({ id: 'vendor-1', shop_name: 'Mama K’s Kitchen', email: 'kitchen@example.com', email_verified: true })
+  db.tables.riders.push({ id: 'rider-1', full_name: 'Chidi Rider', email: 'rider@example.com', email_verified: true })
   db.tables.orders.push({
     id: 'order-1', order_number: 'LXF-2026-000001', customer_id: 'customer-1', vendor_id: 'vendor-1',
     subtotal: 250000, delivery_fee: 50000, platform_markup: 15000, tip_amount: 0, reward_discount_kobo: 10000,
@@ -117,6 +119,29 @@ describe('transactional email behavior', () => {
     expect(shouldSendWelcomeForEmailChange({ previousEmail: null, nextEmail: 'new@example.com', welcomeEmailSentAt: '2026-01-01' })).toBe(false)
   })
 
+  it('delivers verified vendor and rider operational alerts once per event', async () => {
+    const db = emailDb()
+    const vendor = await sendAccountNotificationEmail(db as unknown as ServiceDb, {
+      role: 'vendor', accountId: 'vendor-1', eventKey: 'vendor-order-pending:order-1',
+      title: 'New order LXF-2026-000001', body: 'A customer order is ready for your kitchen.',
+      actionLabel: 'Open orders', actionUrl: 'https://lumexfud.com.ng/vendor-dashboard/orders',
+    })
+    const rider = await sendAccountNotificationEmail(db as unknown as ServiceDb, {
+      role: 'rider', accountId: 'rider-1', eventKey: 'rider-order-assigned:order-1',
+      title: 'Delivery assigned', body: 'Open the rider desk for delivery details.',
+      actionLabel: 'Open delivery', actionUrl: 'https://lumexfud.com.ng/rider',
+    })
+    const repeat = await sendAccountNotificationEmail(db as unknown as ServiceDb, {
+      role: 'vendor', accountId: 'vendor-1', eventKey: 'vendor-order-pending:order-1',
+      title: 'New order LXF-2026-000001', body: 'A customer order is ready for your kitchen.',
+      actionLabel: 'Open orders', actionUrl: 'https://lumexfud.com.ng/vendor-dashboard/orders',
+    })
+    expect(vendor.status).toBe('sent')
+    expect(rider.status).toBe('sent')
+    expect(repeat).toEqual({ status: 'skipped', reason: 'already_processed' })
+    expect(transport).toHaveBeenCalledTimes(2)
+  })
+
   it('sends order confirmation once even when payment processing repeats', async () => {
     const db = emailDb()
     const first = await sendOrderConfirmationEmail(db as unknown as ServiceDb, { orderId: 'order-1' })
@@ -129,15 +154,15 @@ describe('transactional email behavior', () => {
     expect(transport.mock.calls[0][0].html).not.toContain('Private room')
   })
 
-  it('sends relevant status changes once and ignores irrelevant updates', async () => {
+  it('sends each customer-relevant status once', async () => {
     const db = emailDb()
     const sent = await sendOrderStatusEmail(db as unknown as ServiceDb, { orderId: 'order-1', newStatus: 'PICKED_UP', statusEventId: 'status-1' })
     const duplicate = await sendOrderStatusEmail(db as unknown as ServiceDb, { orderId: 'order-1', newStatus: 'PICKED_UP', statusEventId: 'status-2' })
-    const irrelevant = await sendOrderStatusEmail(db as unknown as ServiceDb, { orderId: 'order-1', newStatus: 'RIDER_ASSIGNED', statusEventId: 'status-3' })
+    const assigned = await sendOrderStatusEmail(db as unknown as ServiceDb, { orderId: 'order-1', newStatus: 'RIDER_ASSIGNED', statusEventId: 'status-3' })
     expect(sent.status).toBe('sent')
     expect(duplicate.status).toBe('skipped')
-    expect(irrelevant).toEqual({ status: 'skipped', reason: 'irrelevant_status' })
-    expect(transport).toHaveBeenCalledTimes(1)
+    expect(assigned.status).toBe('sent')
+    expect(transport).toHaveBeenCalledTimes(2)
     expect(transport.mock.calls[0][0].text).toContain('out for delivery')
   })
 

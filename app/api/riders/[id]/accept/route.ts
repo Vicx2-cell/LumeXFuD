@@ -7,6 +7,7 @@ import { audit } from '@/lib/audit'
 import { isBankVerified, BANK_GATE_MESSAGE } from '@/lib/wallet'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { emailCommittedOrderStatus } from '@/lib/order-status-email'
+import { sendAccountNotificationEmail } from '@/lib/transactional-email'
 import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 
 const acceptInput = z.object({ order_id: z.string().uuid() })
@@ -119,6 +120,15 @@ export async function POST(
     actorType: session.role,
     actorId: session.userId ?? session.phone,
   })
+  void sendAccountNotificationEmail(db, {
+    role: 'rider',
+    accountId: id,
+    eventKey: `rider-order-assigned:${parsed.data.order_id}`,
+    title: `Delivery assigned: ${updated.order_number}`,
+    body: 'You accepted this delivery. Open the rider desk for the pickup and drop-off details.',
+    actionLabel: 'Open delivery',
+    actionUrl: 'https://lumexfud.com.ng/rider',
+  }).catch(() => {})
 
   return json({ success: true, order_number: updated.order_number })
 }

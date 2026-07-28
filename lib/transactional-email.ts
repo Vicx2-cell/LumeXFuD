@@ -8,12 +8,15 @@ import {
   renderDelayedOrderEmail,
   renderOrderConfirmationEmail,
   renderOrderStatusEmail,
+  renderAccountNotificationEmail,
   renderWelcomeEmail,
 } from './email-templates'
 
 type DB = ReturnType<typeof createSupabaseAdmin>
-type EmailKind = 'WELCOME' | 'ORDER_CONFIRMATION' | 'ORDER_OUT_FOR_DELIVERY' | 'ORDER_DELIVERED' | 'ORDER_DELAYED'
+type EmailKind = 'WELCOME' | 'ORDER_CONFIRMATION' | 'ORDER_OUT_FOR_DELIVERY' | 'ORDER_DELIVERED' | 'ORDER_DELAYED' | 'ORDER_STATUS' | 'ACCOUNT_NOTIFICATION'
 export type TransactionalEmailResult = EmailSendResult | { status: 'skipped'; reason: 'already_processed' | 'no_recipient' | 'email_unverified' | 'irrelevant_status' | 'event_claim_failed' | 'order_not_found' }
+
+type AccountRole = 'customer' | 'vendor' | 'rider'
 
 export function shouldSendWelcomeForEmailChange(input: {
   previousEmail?: string | null
@@ -141,10 +144,10 @@ async function sendOrderStatusEmailInternal(db: DB, input: { orderId: string; ne
     status: input.newStatus,
     orderUrl: `${appBaseUrl()}/order/${encodeURIComponent(String(order.order_number))}`,
   })
-  const delivered = input.newStatus === 'DELIVERED' || input.newStatus === 'COMPLETED'
+  const notificationStatus = input.newStatus === 'COMPLETED' ? 'DELIVERED' : input.newStatus
   return deliver(db, {
-    eventKey: delivered ? `order-delivered:${input.orderId}` : `order-out-for-delivery:${input.orderId}`,
-    kind: delivered ? 'ORDER_DELIVERED' : 'ORDER_OUT_FOR_DELIVERY',
+    eventKey: `order-status:${input.orderId}:${notificationStatus}`,
+    kind: 'ORDER_STATUS',
     workflow: 'delivery_status',
     recipient,
     ...template,
@@ -169,6 +172,27 @@ async function sendDelayedOrderEmailInternal(db: DB, input: { orderId: string; p
     orderUrl: `${appBaseUrl()}/order/${encodeURIComponent(String(order.order_number))}`,
   })
   return deliver(db, { eventKey: `order-delayed:${order.id}`, kind: 'ORDER_DELAYED', workflow: 'delivery_status', recipient, ...template })
+}
+
+async function sendAccountNotificationEmailInternal(db: DB, input: {
+  role: AccountRole
+  accountId: string
+  eventKey: string
+  title: string
+  body: string
+  actionLabel: string
+  actionUrl: string
+}): Promise<TransactionalEmailResult> {
+  const table = input.role === 'customer' ? 'customers' : input.role === 'vendor' ? 'vendors' : 'riders'
+  const nameColumn = input.role === 'customer' ? 'name' : input.role === 'vendor' ? 'shop_name' : 'full_name'
+  const { data } = await db.from(table).select(`email, email_verified, ${nameColumn}`).eq('id', input.accountId).maybeSingle()
+  const row = data as { email?: string | null; email_verified?: boolean | null; name?: string | null; shop_name?: string | null; full_name?: string | null } | null
+  const recipient = normalizeEmail(row?.email)
+  if (!recipient) return { status: 'skipped', reason: 'no_recipient' }
+  if (row?.email_verified !== true) return { status: 'skipped', reason: 'email_unverified' }
+  const name = row?.name ?? row?.shop_name ?? row?.full_name ?? null
+  const template = renderAccountNotificationEmail({ name, title: input.title, body: input.body, actionLabel: input.actionLabel, actionUrl: input.actionUrl })
+  return deliver(db, { eventKey: input.eventKey, kind: 'ACCOUNT_NOTIFICATION', workflow: 'account_system', recipient, ...template })
 }
 
 export async function sendWelcomeEmail(db: DB, input: { customerId: string; email?: string | null; name?: string | null }): Promise<TransactionalEmailResult> {
@@ -200,5 +224,22 @@ export async function sendDelayedOrderEmail(db: DB, input: { orderId: string; pr
     return await sendDelayedOrderEmailInternal(db, input)
   } catch {
     return { ok: false, status: 'failed', workflow: 'delivery_status', providerMessageId: null, attempts: 0, errorCode: 'order_delayed_email_error', retryable: false }
+  }
+}
+
+/** Delivers a verified account's operational alert with durable event idempotency. */
+export async function sendAccountNotificationEmail(db: DB, input: {
+  role: AccountRole
+  accountId: string
+  eventKey: string
+  title: string
+  body: string
+  actionLabel: string
+  actionUrl: string
+}): Promise<TransactionalEmailResult> {
+  try {
+    return await sendAccountNotificationEmailInternal(db, input)
+  } catch {
+    return { ok: false, status: 'failed', workflow: 'account_system', providerMessageId: null, attempts: 0, errorCode: 'account_notification_email_error', retryable: false }
   }
 }
