@@ -6,6 +6,7 @@ import { CartProvider } from './cart-context'
 import { BrandSplash } from './brand-splash'
 import { ThemeProvider } from './theme-provider'
 import { AutoRefresh } from './auto-refresh'
+import { ShakeIssueReporter } from './shake-issue-reporter'
 
 const PWA = dynamic(() => import('./pwa').then((mod) => mod.PWA), { ssr: false })
 const Announcement = dynamic(() => import('./announcement').then((mod) => mod.Announcement), { ssr: false })
@@ -18,6 +19,7 @@ export function Providers({ children }: { children: ReactNode }) {
         <AutoRefresh />
         <PWA />
         <Announcement />
+        <ShakeIssueReporter />
         <BrandSplash />
       </CartProvider>
     </ThemeProvider>

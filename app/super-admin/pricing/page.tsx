@@ -13,6 +13,19 @@ type Pricing = {
   min_order_kobo: number
 }
 
+type LaunchPricing = {
+  minimumCustomerDeliveryFeeKobo: number
+  minimumRiderPayoutKobo: number
+  deliveryMarginKobo: number
+  customerPlatformFeeKobo: number
+  vendorCommissionBps: number
+  guestFeeKobo: number
+  fuelPriceKoboPerLitre: number
+  bikeEfficiencyMetresPerLitre: number
+  maintenanceKoboPerKm: number
+  roadDistanceMultiplierBps: number
+}
+
 type PricingRuleRow = {
   id?: string
   name: string
@@ -125,6 +138,17 @@ function MeterInput({ label, value, onChange, hint }: { label: string; value: nu
   )
 }
 
+function NumberInput({ label, value, onChange, suffix, hint, min = 0 }: { label: string; value: number; onChange: (n: number) => void; suffix?: string; hint?: string; min?: number }) {
+  return <label className="block">
+    <span className="text-xs text-white/55">{label}</span>
+    <div className="mt-1 flex items-center overflow-hidden rounded-xl border border-white/10 bg-white/5">
+      <input type="number" min={min} inputMode="decimal" value={Number.isFinite(value) ? value : min} onChange={(e) => onChange(Math.max(min, Number(e.target.value) || 0))} className="flex-1 bg-transparent px-3 py-3 text-base tabular-nums text-white outline-none" />
+      {suffix ? <span className="px-3 text-sm text-white/40">{suffix}</span> : null}
+    </div>
+    {hint ? <span className="mt-1 block text-xs text-white/35">{hint}</span> : null}
+  </label>
+}
+
 function TextInput({ label, value, onChange, hint }: { label: string; value: string; onChange: (v: string) => void; hint?: string }) {
   return (
     <label className="block">
@@ -156,6 +180,8 @@ function StatusInput({ label, value, onChange }: { label: string; value: Locatio
 
 export default function SuperAdminPricing() {
   const [naira, setNaira] = useState<Record<keyof Pricing, number> | null>(null)
+  const [launchPricing, setLaunchPricing] = useState<LaunchPricing | null>(null)
+  const [affordableThresholdsKobo, setAffordableThresholdsKobo] = useState<number[] | null>(null)
   const [locations, setLocations] = useState<LocationRow[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -168,11 +194,13 @@ export default function SuperAdminPricing() {
 
   async function load() {
     const res = await fetch('/api/super-admin/pricing')
-    const d = res.ok ? await res.json() as { pricing: Pricing; locations?: LocationRow[] } : null
+    const d = res.ok ? await res.json() as { pricing: Pricing; launchPricing: LaunchPricing; affordableThresholdsKobo: number[]; locations?: LocationRow[] } : null
     if (d) {
       const next = {} as Record<keyof Pricing, number>
       for (const key of Object.keys(d.pricing) as Array<keyof Pricing>) next[key] = toNaira(d.pricing[key])
       setNaira(next)
+      setLaunchPricing(d.launchPricing)
+      setAffordableThresholdsKobo(d.affordableThresholdsKobo)
       setLocations(d.locations ?? [])
       setNewLocation({
         zone_name: '',
@@ -207,6 +235,11 @@ export default function SuperAdminPricing() {
 
   function setPricing(key: keyof Pricing, n: number) {
     setNaira((prev) => prev ? { ...prev, [key]: n } : prev)
+    setError('')
+  }
+
+  function setLaunchPricingValue<K extends keyof LaunchPricing>(key: K, value: LaunchPricing[K]) {
+    setLaunchPricing((current) => current ? { ...current, [key]: value } : current)
     setError('')
   }
 
@@ -251,6 +284,36 @@ export default function SuperAdminPricing() {
     const d = await res.json() as { error?: string }
     if (res.ok) showToast('Default pricing updated')
     else setError(d.error ?? 'Save failed')
+    setSaving(false)
+  }
+
+  async function saveLaunchPricing() {
+    if (!launchPricing) return
+    setSaving(true)
+    setError('')
+    const res = await fetch('/api/super-admin/pricing', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ launchPricing }),
+    })
+    const data = await res.json() as { error?: string }
+    if (res.ok) showToast('Launch checkout pricing updated for new orders')
+    else setError(data.error ?? 'Could not save launch checkout pricing')
+    setSaving(false)
+  }
+
+  async function saveAffordableThresholds() {
+    if (!affordableThresholdsKobo) return
+    setSaving(true)
+    setError('')
+    const res = await fetch('/api/super-admin/pricing', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ affordableThresholdsKobo }),
+    })
+    const data = await res.json() as { error?: string }
+    if (res.ok) showToast('Affordable discovery bands updated')
+    else setError(data.error ?? 'Could not save affordable discovery bands')
     setSaving(false)
   }
 
@@ -393,6 +456,41 @@ export default function SuperAdminPricing() {
                 {saving ? 'Saving…' : 'Save default pricing'}
               </button>
             </div>
+
+            {launchPricing ? <div className="lx-surface space-y-4 p-4">
+              <div>
+                <h2 className="text-sm font-semibold text-white/80">Launch checkout pricing</h2>
+                <p className="mt-1 text-xs text-white/45">Used by live checkout. These values affect new quotes only; accepted orders keep their saved prices.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <NairaInput label="Minimum customer delivery fee" value={toNaira(launchPricing.minimumCustomerDeliveryFeeKobo)} onChange={(n) => setLaunchPricingValue('minimumCustomerDeliveryFeeKobo', n * 100)} hint="Default: 400 naira." />
+                <NairaInput label="Minimum rider payout" value={toNaira(launchPricing.minimumRiderPayoutKobo)} onChange={(n) => setLaunchPricingValue('minimumRiderPayoutKobo', n * 100)} hint="Default: 300 naira." />
+                <NairaInput label="LumeX delivery margin" value={toNaira(launchPricing.deliveryMarginKobo)} onChange={(n) => setLaunchPricingValue('deliveryMarginKobo', n * 100)} hint="Default: 100 naira, added above rider payout when needed." />
+                <NairaInput label="Customer platform fee" value={toNaira(launchPricing.customerPlatformFeeKobo)} onChange={(n) => setLaunchPricingValue('customerPlatformFeeKobo', n * 100)} hint="Default: 100 naira, shown separately at checkout." />
+                <NumberInput label="Vendor commission" value={launchPricing.vendorCommissionBps / 100} onChange={(n) => setLaunchPricingValue('vendorCommissionBps', Math.round(n * 100))} suffix="%" hint="Default: 3% of food subtotal; deducted from the vendor settlement, not added to the customer bill." />
+                <NairaInput label="Guest checkout fee" value={toNaira(launchPricing.guestFeeKobo)} onChange={(n) => setLaunchPricingValue('guestFeeKobo', n * 100)} hint="Default: 50 naira. It is separate from delivery, so a guest can see 400 naira delivery plus 50 naira guest fee." />
+                <NairaInput label="Fuel price" value={toNaira(launchPricing.fuelPriceKoboPerLitre)} onChange={(n) => setLaunchPricingValue('fuelPriceKoboPerLitre', n * 100)} hint="Per litre; used in delivery quotes." />
+                <NumberInput label="Bike efficiency" value={launchPricing.bikeEfficiencyMetresPerLitre / 1_000} onChange={(n) => setLaunchPricingValue('bikeEfficiencyMetresPerLitre', Math.round(n * 1_000))} suffix="km/L" min={1} />
+                <NairaInput label="Maintenance cost" value={toNaira(launchPricing.maintenanceKoboPerKm)} onChange={(n) => setLaunchPricingValue('maintenanceKoboPerKm', n * 100)} hint="Per kilometre; used in rider payout." />
+                <NumberInput label="Road distance multiplier" value={launchPricing.roadDistanceMultiplierBps / 10_000} onChange={(n) => setLaunchPricingValue('roadDistanceMultiplierBps', Math.round(n * 10_000))} suffix="x" min={1} hint="MVP estimate from straight-line distance. Default: 1.35x." />
+              </div>
+              <button onClick={saveLaunchPricing} disabled={saving} className="lx-btn-amber w-full py-4" style={{ minHeight: 56 }}>
+                {saving ? 'Saving...' : 'Save launch checkout pricing'}
+              </button>
+            </div> : null}
+
+            {affordableThresholdsKobo ? <div className="lx-surface space-y-4 p-4">
+              <div>
+                <h2 className="text-sm font-semibold text-white/80">Affordable discovery</h2>
+                <p className="mt-1 text-xs text-white/45">Only available menu items from approved, open vendors are shown. Price bands must stay in ascending order.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {affordableThresholdsKobo.map((threshold, index) => <NairaInput key={index} label={`Price band ${index + 1}`} value={toNaira(threshold)} onChange={(naira) => setAffordableThresholdsKobo((current) => current?.map((value, currentIndex) => currentIndex === index ? naira * 100 : value) ?? current)} hint={index === 0 ? 'The first band is used when no filter is selected.' : undefined} />)}
+              </div>
+              <button onClick={saveAffordableThresholds} disabled={saving} className="lx-btn-amber w-full py-4" style={{ minHeight: 56 }}>
+                {saving ? 'Saving...' : 'Save affordable discovery bands'}
+              </button>
+            </div> : null}
 
             <div className="lx-surface space-y-4 p-4">
               <div>

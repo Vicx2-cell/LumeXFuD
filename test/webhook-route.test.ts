@@ -57,7 +57,7 @@ describe('webhook route — signature + fail-closed dedup', () => {
   it('FAIL-OPEN PATH CLOSED: non-23505 dedup insert error → processor does NOT run (root-cause fix)', async () => {
     h.insertError = { code: '23502', message: 'not-null' } // anything but 23505
     const res = await POST(webhookReq())
-    expect(res.status).toBe(200)               // 200 so Paystack retries
+    expect(res.status).toBe(503)               // non-2xx asks Paystack to retry
     expect(h.processSpy).not.toHaveBeenCalled() // the bug: it used to run here
     const ev = h.recordSpy.mock.calls[0][0] as any
     expect(ev.eventType).toBe('webhook_reject')

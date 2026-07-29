@@ -11,13 +11,16 @@ import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 import type { WalletBalance } from '@/lib/wallet'
+import { WALLET_WITHDRAWAL_LIMITS_NAIRA } from '@/lib/business-config'
 import crypto from 'crypto'
 
 const DAILY_LIMIT_KOBO  = 5_000_000  // ₦50,000
 const WEEKLY_LIMIT_KOBO = 20_000_000 // ₦200,000
 
 const schema = z.object({
-  amount_naira: z.number().int().min(500).max(25_000),
+  amount_naira: z.number().int()
+    .min(WALLET_WITHDRAWAL_LIMITS_NAIRA.minimum)
+    .max(WALLET_WITHDRAWAL_LIMITS_NAIRA.maximumPerTransaction),
   wallet_pin:   z.string().length(4).regex(/^\d{4}$/),
 })
 

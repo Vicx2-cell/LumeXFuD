@@ -9,6 +9,7 @@ import { applyRequestContext, createRequestContext } from '@/lib/request-context
 const clientIp = (req: NextRequest) => req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 30
 
 export async function POST(req: NextRequest) {
   const requestContext = createRequestContext(req.headers)
@@ -38,14 +39,10 @@ export async function POST(req: NextRequest) {
   // KEY (sk_live_… / sk_test_…) — there is NO separate "webhook secret" in
   // Paystack's model. We therefore verify against PAYSTACK_SECRET_KEY (which is
   // already proven correct in prod because transaction initialization uses it).
-  // PAYSTACK_WEBHOOK_SECRET is kept as an optional override/fallback for any
-  // environment that deliberately configured a distinct value; a match on EITHER
-  // is accepted. (Previously this checked ONLY PAYSTACK_WEBHOOK_SECRET, which was
-  // unset/mismatched in prod, so EVERY real webhook failed signature and no paid
-  // Paystack order ever finalized.)
-  const candidateSecrets = [process.env.PAYSTACK_SECRET_KEY, process.env.PAYSTACK_WEBHOOK_SECRET]
-    .filter((s): s is string => !!s)
-  const signatureOk = candidateSecrets.some((s) => verifyHMAC(rawBody, signature, s))
+  // No additional signing key is accepted: a stale secondary secret would
+  // unnecessarily expand the trust boundary for payment events.
+  const signingSecret = process.env.PAYSTACK_SECRET_KEY
+  const signatureOk = Boolean(signingSecret && verifyHMAC(rawBody, signature, signingSecret))
   if (!signatureOk) {
     console.warn('[webhook] invalid Paystack signature')
     // DETECT: a forged/garbled signature is a critical security event.
@@ -131,7 +128,7 @@ export async function POST(req: NextRequest) {
       // process — so if the idempotency key could not be recorded, the money
       // handlers ran with NO replay guard and every Paystack retry re-ran them
       // (double-booked subscriptions/earnings). Now: if we cannot record the
-      // dedup key, we do NOT process. Return 200 so Paystack RETRIES; on a retry
+      // dedup key, we do NOT process. Return non-2xx so Paystack retries; once
       // the insert may succeed and we process exactly once. Same fail-closed
       // principle as isSessionLive (#2).
       console.error('[webhook] processed_webhooks insert error (NOT processing):', insErr.message)
@@ -139,19 +136,34 @@ export async function POST(req: NextRequest) {
         eventType: 'webhook_reject', severity: 'warn', surface: 'paystack_webhook',
         ...eventContext, outcome: 'deferred', detail: { reason: 'dedup_record_failed', event, code: insErr.code },
       })
-      return respond(null, 200)
+      return respond({ error: 'Webhook processing deferred' }, 503)
     }
   } catch {
-    // Thrown (network) error recording the webhook — treat as already-processed
-    // and let Paystack retry rather than risk double side effects this attempt.
-    return respond(null, 200)
+    // A network error recording the replay guard also defers processing.
+    return respond({ error: 'Webhook processing deferred' }, 503)
   }
 
-  // 5. Return 200 to Paystack IMMEDIATELY (within 30s requirement)
-  // 6. Process async — do not await
-  void processWebhookAsync(payload).catch((err: unknown) => {
-    console.error('[webhook] async processing error:', err)
-  })
+  // Process within the provider response window. Acknowledgement is withheld
+  // until the idempotent money handler has completed.
+  try {
+    await processWebhookAsync(payload)
+  } catch (err) {
+    const { error: releaseError } = await db.from('processed_webhooks')
+      .delete()
+      .eq('reference', dedupeRef)
+      .eq('event', event)
+    if (releaseError) {
+      console.error('[webhook] failed to release failed processing claim:', releaseError.message)
+    }
+    console.error('[webhook] processing error:', err)
+    await recordSecurityEvent({
+      eventType: 'webhook_reject', severity: 'critical', surface: 'paystack_webhook',
+      ...eventContext, outcome: 'processing_failed',
+      resourceType: 'paystack_event', resourceId: dedupeRef || undefined,
+      detail: { event, claimReleased: !releaseError },
+    })
+    return respond({ error: 'Webhook processing failed' }, 500)
+  }
 
   return respond(null, 200)
 }

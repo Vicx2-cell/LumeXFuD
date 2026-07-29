@@ -5,6 +5,8 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { superAudit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { CONTROL_IDS } from '@/lib/controls'
+import { LAUNCH_DELIVERY_SETTING_KEYS } from '@/lib/launch-delivery-pricing'
+import { AFFORDABLE_THRESHOLDS_SETTING_ID } from '@/lib/commerce-discovery'
 
 // settings is id-keyed (TEXT PK) with a JSONB `value`. `value` can be any JSON
 // shape (e.g. {"amount_kobo": N}, {"value": N}, {"open":"07:00"}), so it's
@@ -26,6 +28,8 @@ const PRICING_IDS = [
 ]
 const RESERVED_SETTING_IDS = new Set<string>([
   ...PRICING_IDS,
+  ...Object.values(LAUNCH_DELIVERY_SETTING_KEYS),
+  AFFORDABLE_THRESHOLDS_SETTING_ID,
   ...Object.values(CONTROL_IDS),
 ])
 // Feature flags all live under the `feature.<key>` id prefix (lib/features.ts).

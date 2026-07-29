@@ -13,6 +13,7 @@
     { "path": "/api/cron/reset-weekly-leaderboard", "schedule": "0 23 * * 0" },
     { "path": "/api/cron/sentinel", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/official-feed", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/expire-group-orders", "schedule": "*/15 * * * *" }
+    { "path": "/api/cron/expire-group-orders", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/release-promo-reservations", "schedule": "*/5 * * * *" }
   ]
 }

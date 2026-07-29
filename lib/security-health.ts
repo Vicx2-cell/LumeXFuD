@@ -29,7 +29,7 @@ const isProd = () => process.env.VERCEL_ENV === 'production' || process.env.NODE
 function checkSecretsPresent(): SecurityCheck {
   const required = [
     'NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY',
-    'JWT_SECRET', 'PAYSTACK_SECRET_KEY', 'PAYSTACK_WEBHOOK_SECRET', 'NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY',
+    'JWT_SECRET', 'PAYSTACK_SECRET_KEY', 'NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY',
     'SENDCHAMP_API_KEY', 'CRON_SECRET', 'ENCRYPTION_KEY', 'SUPER_ADMIN_PHONE',
   ]
   const missing = required.filter((k) => !process.env[k])

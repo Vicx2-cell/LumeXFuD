@@ -33,6 +33,13 @@ export interface PaystackWebhookPayload {
   data: Record<string, unknown>
 }
 
+export function dedicatedAccountNumber(data: Record<string, unknown>): string | null {
+  const authorization = data.authorization as Record<string, unknown> | undefined
+  const dedicated = data.dedicated_account as Record<string, unknown> | undefined
+  const value = authorization?.receiver_bank_account_number ?? dedicated?.account_number ?? data.account_number
+  return typeof value === 'string' && /^\d{10}$/.test(value) ? value : null
+}
+
 export interface RefundWebhookCandidate {
   id: string
   paystack_refund_reference: string | null
@@ -97,6 +104,28 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
       if ((metadata.type as string) === 'WALLET_TOPUP') {
         await handleWalletTopup(reference, data, metadata)
         break
+      }
+
+      // A DVA is only a payment rail. Persist the independently verified
+      // receipt for reconciliation, but never turn it into stored value.
+      const receiverAccount = dedicatedAccountNumber(data)
+      if (receiverAccount) {
+        const { data: virtualAccount } = await db.from('customer_virtual_accounts')
+          .select('id').eq('account_number', receiverAccount).eq('status', 'ACTIVE').maybeSingle()
+        if (virtualAccount) {
+          const verified = await verifyPaystackTransaction(reference)
+          if (verified.status !== 'success' || Number(verified.amount) <= 0) break
+          await db.from('virtual_account_receipts').insert({
+            customer_virtual_account_id: virtualAccount.id,
+            paystack_reference: reference,
+            paystack_transaction_id: data.id != null ? String(data.id) : null,
+            amount_kobo: Number(verified.amount),
+            currency: String(data.currency ?? 'NGN'),
+            status: 'UNALLOCATED',
+            provider_payload: data,
+          })
+          break
+        }
       }
 
       // Regular order payment.
@@ -520,6 +549,36 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
           message: `❌ Refund failed for transaction ${orderRef}\nReason: ${(data.reason as string) ?? 'Unknown'}\nManual intervention needed.`,
         }).catch(() => {})
       }
+      break
+    }
+
+    case 'dedicatedaccount.assign.success':
+    case 'assigndedicatedaccount.success': {
+      const accountNumber = dedicatedAccountNumber(data)
+      const customer = (data.customer as Record<string, unknown> | undefined) ?? {}
+      const bank = (data.bank as Record<string, unknown> | undefined) ?? {}
+      const customerCode = String(customer.customer_code ?? data.customer_code ?? '')
+      if (!accountNumber || !customerCode) break
+      await db.from('customer_virtual_accounts').update({
+        status: 'ACTIVE', account_number: accountNumber,
+        account_name: String(data.account_name ?? ''),
+        bank_name: String(bank.name ?? data.bank_name ?? ''),
+        provider_slug: String(bank.slug ?? data.provider_slug ?? ''),
+        failure_reason: null, updated_at: new Date().toISOString(),
+      }).eq('paystack_customer_code', customerCode).in('status', ['PENDING', 'PROVISIONING', 'FAILED'])
+      break
+    }
+
+    case 'dedicatedaccount.assign.failed':
+    case 'assigndedicatedaccount.failed':
+    case 'customeridentification.failed': {
+      const customer = (data.customer as Record<string, unknown> | undefined) ?? {}
+      const customerCode = String(customer.customer_code ?? data.customer_code ?? '')
+      if (!customerCode) break
+      await db.from('customer_virtual_accounts').update({
+        status: 'FAILED', failure_reason: String(data.message ?? 'Provider assignment failed').slice(0, 300),
+        updated_at: new Date().toISOString(),
+      }).eq('paystack_customer_code', customerCode).in('status', ['PENDING', 'PROVISIONING'])
       break
     }
   }

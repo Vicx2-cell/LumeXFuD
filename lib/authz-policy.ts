@@ -48,6 +48,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'admin/users/[id]/reset-pin', 'admin/vendors', 'admin/vendors/[id]',
     'admin/vendors/create', 'admin/vendors/[id]/inspection', 'admin/verify-receipt', 'admin/wallets',
     'admin/customer-locations', 'admin/verified-places', 'admin/verified-places/[id]', 'admin/email-operations', 'admin/contact-cases/[id]',
+    'admin/promotions', 'admin/promotions/fund',
     'wallet/freeze', 'wallet/unfreeze', 'paystack/refund',
   ], role(A_S)),
 
@@ -113,7 +114,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'order-communications/unread',
     'rewards', 'rewards/surprise/[id]/open', 'streak/nudge',
     'lumi', 'lumi/confirm', 'lumi/badge', 'lumi/memory', 'chow-ai', 'push/subscribe', 'notifications',
-    'study/ingest', 'sponsor-wallet/topup', 'sponsor-wallet/receipt', 'launch-counter',
+    'study/ingest', 'sponsor-wallet/topup', 'sponsor-wallet/receipt', 'launch-counter', 'customer/virtual-account',
   ], { kind: 'self' }),
 
   ...map([
@@ -135,14 +136,14 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'cron/order-delay-watch', 'cron/recalculate-vendor-scores', 'cron/release-payments', 'cron/release-scheduled',
     'cron/reset-daily-limits', 'cron/reset-weekly-leaderboard', 'cron/sentinel',
     'cron/official-feed', 'cron/subscription-check', 'cron/vendor-auto-cancel', 'cron/wallet-reconciliation',
-    'cron/wallet-release-held', 'cron/wallet-sweep', 'cron/expire-group-orders',
+    'cron/wallet-release-held', 'cron/wallet-sweep', 'cron/expire-group-orders', 'cron/release-promo-reservations',
   ], { kind: 'cron' }),
 
   'paystack/webhook': { kind: 'webhook' },
   'webhooks/resend': { kind: 'webhook' },
   'whatsapp': { kind: 'webhook' },
 
-  ...map(['announcement', 'applications', 'contact', 'delivery-locations', 'features', 'vendors', 'vendors/[id]', 'lodges', 'settings/fees', 'orders/estimate', 'health'],
+  ...map(['announcement', 'applications', 'contact', 'delivery-locations', 'features', 'vendors', 'vendors/[id]', 'lodges', 'settings/fees', 'orders/estimate', 'health', 'discovery/affordable'],
     { kind: 'public' }),
 }
 

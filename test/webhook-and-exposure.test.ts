@@ -32,9 +32,10 @@ function webhookReq(payload: unknown, signature: string) {
 
 describe('Paystack webhook — HMAC + idempotency', () => {
   beforeEach(() => {
-    process.env.PAYSTACK_WEBHOOK_SECRET = WEBHOOK_SECRET
+    process.env.PAYSTACK_SECRET_KEY = WEBHOOK_SECRET
     h.rows = {}
-    processSpy.fn.mockClear()
+    processSpy.fn.mockReset()
+    processSpy.fn.mockResolvedValue(undefined)
   })
 
   const payload = { event: 'charge.success', data: { id: 12345, reference: 'LXF-TEST-1', amount: 100000 } }
@@ -64,6 +65,16 @@ describe('Paystack webhook — HMAC + idempotency', () => {
     const res = await mod.POST(webhookReq(payload, sign(raw)))
     expect(res.status).toBe(200)
     expect(processSpy.fn).not.toHaveBeenCalled()
+  })
+
+  it('returns non-2xx and releases the replay claim when processing fails', async () => {
+    h.rows = { processed_webhooks: { data: { id: 'w1' }, error: null } }
+    processSpy.fn.mockRejectedValueOnce(new Error('temporary processing failure'))
+    const raw = JSON.stringify(payload)
+    const mod: any = await import('@/app/api/paystack/webhook/route')
+    const res = await mod.POST(webhookReq(payload, sign(raw)))
+    expect(res.status).toBe(500)
+    expect(processSpy.fn).toHaveBeenCalledTimes(1)
   })
 })
 

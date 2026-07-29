@@ -12,6 +12,7 @@
 import { createSupabaseAdmin } from './supabase/server'
 
 export type PlatformEarningType =
+  | 'VENDOR_COMMISSION'
   | 'FOOD_MARKUP'         // +₦250 per completed order
   | 'DELIVERY_CUT'        // +₦100 bike / +₦200 door per completed order
   | 'VENDOR_SUBSCRIPTION' // +subscription amount when vendor pays monthly fee
@@ -62,6 +63,9 @@ export async function recordOrderCompletedEarnings(params: {
 }): Promise<void> {
   const db = createSupabaseAdmin()
   const rows = []
+  const { data: commissionRow } = await db.from('orders')
+    .select('vendor_commission_kobo').eq('id', params.order_id).maybeSingle()
+  const vendorCommissionKobo = Math.max(0, Number((commissionRow as { vendor_commission_kobo?: unknown } | null)?.vendor_commission_kobo) || 0)
 
   if (params.platform_markup_kobo > 0) {
     rows.push({
@@ -69,6 +73,15 @@ export async function recordOrderCompletedEarnings(params: {
       amount_kobo: params.platform_markup_kobo,
       order_id:    params.order_id,
       description: `Food markup — order ${params.order_number}`,
+    })
+  }
+
+  if (vendorCommissionKobo > 0) {
+    rows.push({
+      type: 'VENDOR_COMMISSION' as PlatformEarningType,
+      amount_kobo: vendorCommissionKobo,
+      order_id: params.order_id,
+      description: `Vendor commission for order ${params.order_number}`,
     })
   }
 

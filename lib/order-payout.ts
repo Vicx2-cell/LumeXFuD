@@ -72,6 +72,39 @@ export async function completeOrderPayout(order: PayoutOrder): Promise<void> {
       .eq('active_order_id', order.id)
   }
 
+  // Read the immutable settlement inputs before claiming the payout. Missing
+  // snapshots must fail closed: silently treating a schema/query failure as
+  // zero commission would overpay the vendor.
+  const { data: payoutRow, error: payoutError } = await db.from('orders')
+    .select('subtotal, vendor_commission_kobo, promo_discount_kobo, promotion_id')
+    .eq('id', order.id)
+    .maybeSingle()
+  if (payoutError || !payoutRow) {
+    throw new Error(`Unable to load payout snapshot for order ${order.id}`)
+  }
+
+  const snapshot = payoutRow as {
+    subtotal?: unknown
+    vendor_commission_kobo?: unknown
+    promo_discount_kobo?: unknown
+    promotion_id?: string | null
+  }
+  const subtotal = Math.max(0, Number(snapshot.subtotal) || 0)
+  const vendorCommission = Math.max(0, Number(snapshot.vendor_commission_kobo) || 0)
+  let vendorPromoDiscount = 0
+  if (snapshot.promotion_id) {
+    const { data: promotion, error: promotionError } = await db.from('promotions')
+      .select('funding_source')
+      .eq('id', snapshot.promotion_id)
+      .maybeSingle()
+    if (promotionError || !promotion) {
+      throw new Error(`Unable to load promotion funding source for order ${order.id}`)
+    }
+    if ((promotion as { funding_source?: unknown }).funding_source === 'VENDOR') {
+      vendorPromoDiscount = Math.max(0, Number(snapshot.promo_discount_kobo) || 0)
+    }
+  }
+
   // 2. Credit earnings at most once (claim wallet_released atomically).
   const { data: claimed } = await db.from('orders')
     .update({ wallet_released: true })
@@ -81,7 +114,7 @@ export async function completeOrderPayout(order: PayoutOrder): Promise<void> {
   if (!claimed || claimed.length === 0) return // already settled
 
   const now = new Date()
-  const vendorAmount = Number(order.subtotal) || 0
+  const vendorAmount = Math.max(0, subtotal - vendorCommission - vendorPromoDiscount)
   const riderAmount = (Number(order.rider_delivery_cut) || 0) + (Number(order.tip_amount) || 0)
 
   try {

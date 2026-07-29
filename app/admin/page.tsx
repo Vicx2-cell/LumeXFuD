@@ -53,6 +53,7 @@ const NAV_ACTIONS = [
   { href: '/admin/vendors/new', label: 'Add Vendor', icon: ICONS.plus, desc: 'Create vendor with temp PIN' },
   { href: '/admin/riders/new', label: 'Add Rider', icon: ICONS.plus, desc: 'Onboard a new rider' },
   { href: '/admin/wallets', label: 'Wallets', icon: ICONS.wallet, desc: 'Freeze/unfreeze, float status' },
+  { href: '/admin/promotions', label: 'Promotions', icon: ICONS.star, desc: 'Create codes and control the promo fund' },
   { href: '/admin/audit', label: 'Audit Log', icon: ICONS.log, desc: 'All admin actions' },
 ]
 
@@ -70,7 +71,7 @@ const NAV_GROUPS = [
   {
     title: 'Platform support',
     description: 'Supporting data, moderation, and audit trails.',
-    hrefs: ['/admin/accounts', '/admin/wallets', '/admin/lodges', '/admin/customer-locations', '/admin/verified-places', '/admin/reviews', '/admin/audit'],
+    hrefs: ['/admin/accounts', '/admin/wallets', '/admin/promotions', '/admin/lodges', '/admin/customer-locations', '/admin/verified-places', '/admin/reviews', '/admin/audit'],
   },
 ] as const
 

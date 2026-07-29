@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { WALLET_WITHDRAWAL_LIMITS_NAIRA } from '@/lib/business-config'
 
 interface Props {
   open: boolean
@@ -44,7 +45,9 @@ export default function WithdrawSheet({
   function handleClose() { reset(); onClose() }
 
   function canProceedAmount() {
-    return amountNaira >= 500 && amountNaira <= 25_000 && amountNaira <= availableNaira
+    return amountNaira >= WALLET_WITHDRAWAL_LIMITS_NAIRA.minimum
+      && amountNaira <= WALLET_WITHDRAWAL_LIMITS_NAIRA.maximumPerTransaction
+      && amountNaira <= availableNaira
   }
 
   async function handleWithdraw() {
@@ -173,8 +176,8 @@ export default function WithdrawSheet({
               />
             </div>
             <div className="flex justify-between text-white/50 text-xs mb-1">
-              <span>Min: ₦500</span>
-              <span>Max per transaction: ₦25,000</span>
+              <span>Min: ₦{WALLET_WITHDRAWAL_LIMITS_NAIRA.minimum.toLocaleString()}</span>
+              <span>Max per transaction: ₦{WALLET_WITHDRAWAL_LIMITS_NAIRA.maximumPerTransaction.toLocaleString()}</span>
             </div>
             <p className="text-white/60 text-sm mb-6">
               Available: <span className="text-white font-medium">₦{availableNaira.toLocaleString()}</span>
@@ -182,8 +185,8 @@ export default function WithdrawSheet({
             {amountNaira > availableNaira && (
               <p className="text-red-400 text-sm mb-3">Insufficient available balance</p>
             )}
-            {amountNaira > 25_000 && (
-              <p className="text-red-400 text-sm mb-3">Maximum ₦25,000 per transaction</p>
+            {amountNaira > WALLET_WITHDRAWAL_LIMITS_NAIRA.maximumPerTransaction && (
+              <p className="text-red-400 text-sm mb-3">Maximum ₦{WALLET_WITHDRAWAL_LIMITS_NAIRA.maximumPerTransaction.toLocaleString()} per transaction</p>
             )}
             <button
               className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold py-4 rounded-xl disabled:opacity-40 transition-colors active:scale-[0.98]"

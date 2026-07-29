@@ -101,6 +101,7 @@ export default function CartPage() {
   const [gpsBusy,          setGpsBusy]          = useState(false)
   const [gpsMessage,       setGpsMessage]       = useState('')
   const [campaignId,       setCampaignId]       = useState('')
+  const [promoCode,        setPromoCode]        = useState('')
   const [authChecked,      setAuthChecked]      = useState(false)
   const [isGuest,          setIsGuest]          = useState(false)
   const [guestName,        setGuestName]        = useState('')
@@ -413,6 +414,7 @@ export default function CartPage() {
       instructions, tip, paymentMethod: effectivePaymentMethod, walletAmount, applyReward,
       scheduledFor: scheduleOn ? scheduleAt : null, guestName: authChecked && isGuest ? guestName.trim() : null,
       guestPhone: authChecked && isGuest ? guestPhone.trim() : null,
+      promoCode: promoCode.trim().toUpperCase() || null,
     })
     const attemptKey = resolveCheckoutAttemptKey(attemptFingerprint)
     if (campaignId && cart.vendor_id) {
@@ -459,6 +461,7 @@ export default function CartPage() {
           payment_method:        effectivePaymentMethod,
           wallet_amount_kobo:    effectivePaymentMethod !== 'PAYSTACK' ? walletAmount : 0,
           apply_reward:          applyReward,
+          promo_code:            promoCode.trim().toUpperCase() || undefined,
           scheduled_for:         !isPickup && scheduleOn && scheduleAt ? new Date(scheduleAt).toISOString() : undefined,
           delivery_latitude:     isPickup ? undefined : coords?.lat,
           delivery_longitude:    isPickup ? undefined : coords?.lng,
@@ -825,6 +828,12 @@ export default function CartPage() {
         {!walletLoading && (
           <div ref={checkoutSurfaceRef}>
           <CartSection title="Checkout" subtitle="Pick how you want to pay and confirm the final breakdown.">
+            <div className="mb-4">
+              <label htmlFor="promo-code" className="mb-1 block text-xs font-medium text-white/55">Promotion code</label>
+              <input id="promo-code" value={promoCode} onChange={(e) => setPromoCode(e.target.value.slice(0, 40).toUpperCase())}
+                placeholder="Optional" className="lx-field w-full px-3 py-2.5 text-sm uppercase outline-none" autoComplete="off" />
+              <p className="mt-1 text-xs text-white/35">Eligibility and the final discount are verified securely when you pay.</p>
+            </div>
             {authChecked && isGuest && (
               <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="grid gap-3 sm:grid-cols-2">

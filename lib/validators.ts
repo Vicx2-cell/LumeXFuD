@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { WALLET_WITHDRAWAL_LIMITS_NAIRA } from './business-config'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ export const createOrderInput = z.object({
   // Defaults to false so customers can save rewards for later. The server still
   // validates eligibility and computes the discount; a client-sent amount is never trusted.
   apply_reward: z.boolean().optional().default(false),
+  promo_code: z.string().trim().min(2).max(40).regex(/^[A-Za-z0-9_-]+$/).transform((v) => v.toUpperCase()).optional(),
   campaign_id: z.string().min(1).max(200).optional(),
 })
 
@@ -160,7 +162,9 @@ export const businessHoursInput = z.object({
 // ─── Wallet ───────────────────────────────────────────────────────────────────
 
 export const withdrawInput = z.object({
-  amount_naira: z.number().int().min(500).max(25_000),
+  amount_naira: z.number().int()
+    .min(WALLET_WITHDRAWAL_LIMITS_NAIRA.minimum)
+    .max(WALLET_WITHDRAWAL_LIMITS_NAIRA.maximumPerTransaction),
   wallet_pin:   z.string().length(4).regex(/^\d{4}$/),
 })
 

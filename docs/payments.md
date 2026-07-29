@@ -56,7 +56,7 @@ This is the most security-critical endpoint in the app.
 
 ```
 1. READ raw body BEFORE parsing JSON (HMAC verification needs raw bytes)
-2. VERIFY HMAC signature using PAYSTACK_WEBHOOK_SECRET:
+2. VERIFY HMAC signature using PAYSTACK_SECRET_KEY:
    const hash = crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
    if (hash !== req.headers['x-paystack-signature']) return 400;
 3. PARSE body as JSON
@@ -64,8 +64,8 @@ This is the most security-critical endpoint in the app.
 5. CHECK idempotency: SELECT 1 FROM processed_webhooks WHERE reference = $1 AND event = $2
    - If exists: return 200 immediately (don't reprocess)
 6. INSERT into processed_webhooks (race-condition safe with UNIQUE constraint)
-7. RETURN 200 to Paystack IMMEDIATELY (within 30 seconds is required)
-8. PROCESS event ASYNC (don't block the response)
+7. PROCESS the idempotent event handler within the provider response window
+8. RETURN 200 only after processing succeeds; release the claim and return non-2xx on failure
 ```
 
 ### Event Handlers
@@ -168,7 +168,7 @@ Body: {
 1. **NEVER** trust client amounts. All prices calculated server-side from menu_items table.
 2. **ALWAYS** verify HMAC. Without it, anyone can fake a payment notification.
 3. **ALWAYS** check idempotency. Paystack retries webhooks if they don't get 200 fast enough.
-4. **ALWAYS** return 200 within 30 seconds. Process async if needed.
+4. **NEVER** return 200 before a money event is durably processed.
 5. **NEVER** use `===` for HMAC comparison. Use `crypto.timingSafeEqual`.
 6. **NEVER** log full reference numbers or transaction codes to general logs (audit_logs only).
 
@@ -178,7 +178,7 @@ Body: {
 import crypto from 'crypto';
 
 function verifyPaystackSignature(rawBody: string, signature: string): boolean {
-  const secret = process.env.PAYSTACK_WEBHOOK_SECRET!;
+  const secret = process.env.PAYSTACK_SECRET_KEY!;
   const hash = crypto
     .createHmac('sha512', secret)
     .update(rawBody)

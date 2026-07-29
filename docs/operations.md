@@ -46,7 +46,7 @@ supabase db dump --db-url "$SUPABASE_DB_URL" --file "lumex-prod-$(date +%Y%m%d-%
 - Required operational variables: `NEXT_PUBLIC_APP_URL`, `SUPABASE_URL`,
   `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `UPSTASH_REDIS_REST_URL`,
   `UPSTASH_REDIS_REST_TOKEN`, `PAYSTACK_SECRET_KEY`,
-  `PAYSTACK_WEBHOOK_SECRET`, `SUPER_ADMIN_PHONE`, and notification/email
+  `SUPER_ADMIN_PHONE`, and notification/email
   provider keys.
 
 ## Restore Procedure
@@ -145,4 +145,3 @@ supabase db dump --db-url "$SUPABASE_DB_URL" --file "lumex-prod-$(date +%Y%m%d-%
   corruption, follow the restore procedure.
 - Feature rollback: use `/super-admin/features` and `/super-admin/controls`
   before code rollback when the issue is isolated to a feature or provider.
-

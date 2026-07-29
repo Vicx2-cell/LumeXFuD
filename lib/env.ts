@@ -5,7 +5,6 @@ const REQUIRED_VARS = [
   'JWT_SECRET',
   'PAYSTACK_SECRET_KEY',
   'NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY',
-  'PAYSTACK_WEBHOOK_SECRET',
   'NEXT_PUBLIC_APP_URL',
   'CRON_SECRET',
   'ENCRYPTION_KEY', // 32 bytes (64 hex) — field-level encryption for bank details

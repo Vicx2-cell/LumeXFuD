@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { orderEstimateInput } from '@/lib/validators'
 import {
-  computeDeliveryPriceEstimate,
   getDeliveryPricingConfig,
   haversineDistanceMeters,
 } from '@/lib/delivery-pricing'
+import { computeLaunchDeliveryQuote, estimateRoadDistanceMeters, getLaunchDeliveryPricing } from '@/lib/launch-delivery-pricing'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   }
 
   const db = createSupabaseAdmin()
-  const { vendor_id, delivery_type, city_id, zone_id, delivery_latitude, delivery_longitude } = parsed.data
+  const { vendor_id, city_id, zone_id, delivery_latitude, delivery_longitude } = parsed.data
 
   const { data: vendor } = await db
     .from('vendors')
@@ -58,24 +58,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'That city does not match the chosen delivery area.' }, { status: 400 })
   }
 
-  const distanceMeters = haversineDistanceMeters(
-    { lat: vendorLat, lng: vendorLng },
-    { lat: delivery_latitude, lng: delivery_longitude },
+  const launchPricing = await getLaunchDeliveryPricing(db)
+  const distanceMeters = estimateRoadDistanceMeters(
+    haversineDistanceMeters({ lat: vendorLat, lng: vendorLng }, { lat: delivery_latitude, lng: delivery_longitude }),
+    launchPricing.roadDistanceMultiplierBps,
   )
-  const estimate = computeDeliveryPriceEstimate({
-    pricing,
-    deliveryType: delivery_type,
-    distanceMeters,
+  const estimate = computeLaunchDeliveryQuote({
+    pricing: launchPricing, roadDistanceMeters: distanceMeters, isGuest: false,
   })
 
-  if (estimate.distanceMeters > estimate.maxDeliveryDistanceMeters) {
+  if (estimate.roadDistanceMeters > pricing.maxDeliveryDistanceMeters) {
     return NextResponse.json({
       error: 'Delivery distance is outside the configured service area.',
       code: 'max_distance_exceeded',
       estimate,
     }, { status: 400 })
   }
-  if (estimate.distanceMeters > estimate.vendorDeliveryRadiusMeters) {
+  if (estimate.roadDistanceMeters > pricing.vendorDeliveryRadiusMeters) {
     return NextResponse.json({
       error: 'This vendor does not deliver that far yet.',
       code: 'vendor_radius_exceeded',

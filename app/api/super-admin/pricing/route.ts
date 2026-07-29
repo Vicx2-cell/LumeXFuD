@@ -5,6 +5,8 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { superAudit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { getDeliveryZonePricing, getMinimumOrderKobo } from '@/lib/delivery-zones'
+import { getLaunchDeliveryPricing, LAUNCH_DELIVERY_SETTING_KEYS, type LaunchDeliveryPricing } from '@/lib/launch-delivery-pricing'
+import { AFFORDABLE_THRESHOLDS_SETTING_ID, getAffordableThresholdsKobo } from '@/lib/commerce-discovery'
 
 export const runtime = 'nodejs'
 
@@ -187,6 +189,8 @@ export async function GET() {
   const db = createSupabaseAdmin()
   const zone = await getDeliveryZonePricing({ db })
   const minOrder = await getMinimumOrderKobo(db)
+  const launchPricing = await getLaunchDeliveryPricing(db)
+  const affordableThresholdsKobo = await getAffordableThresholdsKobo(db)
   const pricing: Pricing = {
     platform_markup_kobo: zone?.platformMarkup ?? 0,
     delivery_fee_bike_kobo: zone?.bikeFee ?? 0,
@@ -196,7 +200,7 @@ export async function GET() {
     min_order_kobo: minOrder ?? 0,
   }
   const locations = await loadLocations(db)
-  return NextResponse.json({ pricing, locations })
+  return NextResponse.json({ pricing, launchPricing, affordableThresholdsKobo, locations })
 }
 
 const kobo = z.number().int().min(0).max(10_000_000)
@@ -207,6 +211,27 @@ const patchInput = z.object({
   delivery_fee_door_kobo: kobo,
   rider_cut_door_kobo:    kobo,
   min_order_kobo:         kobo,
+})
+
+const launchPricingInput = z.object({
+  minimumCustomerDeliveryFeeKobo: kobo,
+  minimumRiderPayoutKobo: kobo,
+  deliveryMarginKobo: kobo,
+  customerPlatformFeeKobo: kobo,
+  vendorCommissionBps: z.number().int().min(0).max(10_000),
+  guestFeeKobo: kobo,
+  fuelPriceKoboPerLitre: kobo,
+  bikeEfficiencyMetresPerLitre: z.number().int().min(1_000).max(200_000),
+  maintenanceKoboPerKm: kobo,
+  roadDistanceMultiplierBps: z.number().int().min(10_000).max(30_000),
+})
+const launchPricingPatchInput = z.object({ launchPricing: launchPricingInput })
+const affordableThresholdsPatchInput = z.object({
+  affordableThresholdsKobo: z.array(kobo).length(4).superRefine((thresholds, ctx) => {
+    for (let index = 1; index < thresholds.length; index++) {
+      if (thresholds[index] <= thresholds[index - 1]) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Affordable price bands must be in ascending order.' })
+    }
+  }),
 })
 
 const statusField = z.enum(['ACTIVE', 'PAUSED', 'INACTIVE'])
@@ -326,6 +351,51 @@ export async function PATCH(req: NextRequest) {
 
   const db = createSupabaseAdmin()
   const now = new Date().toISOString()
+
+  const launchParsed = launchPricingPatchInput.safeParse(body)
+  if (launchParsed.success) {
+    const launchPricing = launchParsed.data.launchPricing
+    const rows = (Object.entries(LAUNCH_DELIVERY_SETTING_KEYS) as Array<[keyof LaunchDeliveryPricing, string]>).map(([field, id]) => ({
+      id,
+      value: { value: launchPricing[field] },
+      updated_by: session.phone,
+      updated_at: now,
+    }))
+    const { error } = await db.from('settings').upsert(rows, { onConflict: 'id' })
+    if (error) return NextResponse.json({ error: 'Failed to save launch pricing.' }, { status: 500 })
+    await superAudit({
+      actor_id: session.phone,
+      actor_role: session.role,
+      action: 'launch_pricing_update',
+      target_table: 'settings',
+      target_id: 'launch_delivery_pricing',
+      new_value: launchPricing,
+      ip_address: req.headers.get('x-forwarded-for') ?? undefined,
+    })
+    return NextResponse.json({ success: true })
+  }
+
+  const affordableParsed = affordableThresholdsPatchInput.safeParse(body)
+  if (affordableParsed.success) {
+    const thresholds = affordableParsed.data.affordableThresholdsKobo
+    const { error } = await db.from('settings').upsert({
+      id: AFFORDABLE_THRESHOLDS_SETTING_ID,
+      value: { values_kobo: thresholds },
+      updated_by: session.phone,
+      updated_at: now,
+    }, { onConflict: 'id' })
+    if (error) return NextResponse.json({ error: 'Failed to save affordable discovery bands.' }, { status: 500 })
+    await superAudit({
+      actor_id: session.phone,
+      actor_role: session.role,
+      action: 'affordable_discovery_pricing_update',
+      target_table: 'settings',
+      target_id: AFFORDABLE_THRESHOLDS_SETTING_ID,
+      new_value: { values_kobo: thresholds },
+      ip_address: req.headers.get('x-forwarded-for') ?? undefined,
+    })
+    return NextResponse.json({ success: true })
+  }
 
   if (body && typeof body === 'object' && 'zone_id' in (body as Record<string, unknown>)) {
     const parsed = zonePatchInput.safeParse(body)

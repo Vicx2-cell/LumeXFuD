@@ -22,7 +22,8 @@ import { getMinimumOrderKobo } from '@/lib/delivery-zones'
 import { estimateOrderPrepMinutes } from '@/lib/prep-time'
 import { getBusyModeThrottle } from '@/lib/busy-mode'
 import { captureCustomerLocation } from '@/lib/location-intelligence'
-import { computeDeliveryPriceEstimate, getDeliveryPricingConfig, haversineDistanceMeters } from '@/lib/delivery-pricing'
+import { getDeliveryPricingConfig, haversineDistanceMeters } from '@/lib/delivery-pricing'
+import { computeLaunchDeliveryQuote, estimateRoadDistanceMeters, getLaunchDeliveryPricing } from '@/lib/launch-delivery-pricing'
 import { sendAccountNotificationEmail, sendOrderConfirmationEmail } from '@/lib/transactional-email'
 import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 import { recordSecurityEvent } from '@/lib/security-events'
@@ -31,6 +32,7 @@ import { createGuestOrderToken, guestOrderCookieName, hashGuestOrderToken } from
 import { normalizePhone } from '@/lib/phone'
 import { validateMenuAddonSelection, type MenuAddonChoice } from '@/lib/menu-addon-selection'
 import { normalizeGroupOrderAddons } from '@/lib/group-order-addons'
+import { guestPaystackChannels } from '@/lib/promotion'
 
 function groupCheckoutLineKey(menuItemId: string, quantity: number, addonIds: string[], notes: string | null | undefined): string {
   return `${menuItemId}|${quantity}|${addonIds.slice().sort().join(',')}|${(notes ?? '').trim()}`
@@ -126,7 +128,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { vendor_id, items, delivery_type, delivery_address, city_id, zone_id, delivery_lodge, delivery_block, delivery_room, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate, apply_reward, campaign_id, guest_name } = parsed.data
+  const { vendor_id, items, delivery_type, delivery_address, city_id, zone_id, delivery_lodge, delivery_block, delivery_room, delivery_instructions, tip_amount, payment_method, scheduled_for, delivery_latitude, delivery_longitude, group_order_id, pickup_agreement, leave_at_gate, apply_reward, promo_code, campaign_id, guest_name } = parsed.data
   const isGuest = !session
   const isScheduled = !!scheduled_for
   const isPickup = delivery_type === 'PICKUP'
@@ -167,7 +169,7 @@ export async function POST(req: NextRequest) {
   // Validate vendor
   const { data: vendor, error: vendorError } = await db
     .from('vendors')
-    .select('id, shop_name, status, is_active, approval_state, subscription_paid_until, prep_time_minutes, pickup_enabled, pickup_max_concurrent, city_id, zone_id, official_latitude, official_longitude, latitude, longitude')
+    .select('id, shop_name, category, status, is_active, approval_state, subscription_paid_until, prep_time_minutes, pickup_enabled, pickup_max_concurrent, city_id, zone_id, official_latitude, official_longitude, latitude, longitude')
     .eq('id', vendor_id)
     .is('deleted_at', null)
     .single()
@@ -303,13 +305,14 @@ export async function POST(req: NextRequest) {
   // is ₦0 and there's no rider/tip. Keeping it in platform_markup means the
   // existing earnings + payout code (platform_markup → platform, subtotal →
   // vendor) works unchanged.
-  const platformMarkup: number = pricingConfig.platformMarkup
+  const launchPricing = await getLaunchDeliveryPricing(db)
+  const platformMarkup: number = launchPricing.customerPlatformFeeKobo
   let deliveryFee = 0
   let riderCut = 0
   let platformDeliveryCut = 0
   let deliveryDistanceMeters: number | null = null
-  let activeSurchargeTotalKobo = 0
-  let riderBonusTotalKobo = 0
+  const activeSurchargeTotalKobo = 0
+  const riderBonusTotalKobo = 0
   let deliveryPricingBreakdown: Record<string, unknown> | null = null
   if (!isPickup) {
     const vendorLat = Number((vendor as { official_latitude?: number | null; latitude?: number | null }).official_latitude ?? (vendor as { latitude?: number | null }).latitude)
@@ -318,39 +321,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vendor location is not configured yet.' }, { status: 409 })
     }
 
-    deliveryDistanceMeters = haversineDistanceMeters(
-      { lat: vendorLat, lng: vendorLng },
-      { lat: delivery_latitude as number, lng: delivery_longitude as number },
+    deliveryDistanceMeters = estimateRoadDistanceMeters(
+      haversineDistanceMeters({ lat: vendorLat, lng: vendorLng }, { lat: delivery_latitude as number, lng: delivery_longitude as number }),
+      launchPricing.roadDistanceMultiplierBps,
     )
-    const estimate = computeDeliveryPriceEstimate({
-      pricing: pricingConfig,
-      deliveryType: delivery_type as 'BIKE' | 'DOOR',
-      distanceMeters: deliveryDistanceMeters,
-    })
-    if (estimate.distanceMeters > estimate.maxDeliveryDistanceMeters) {
+    const estimate = computeLaunchDeliveryQuote({ pricing: launchPricing, roadDistanceMeters: deliveryDistanceMeters, isGuest })
+    if (estimate.roadDistanceMeters > pricingConfig.maxDeliveryDistanceMeters) {
       return NextResponse.json({ error: 'Delivery distance is outside the configured service area.' }, { status: 400 })
     }
-    if (estimate.distanceMeters > estimate.vendorDeliveryRadiusMeters) {
+    if (estimate.roadDistanceMeters > pricingConfig.vendorDeliveryRadiusMeters) {
       return NextResponse.json({ error: 'This vendor does not deliver that far yet.' }, { status: 400 })
     }
 
     deliveryFee = estimate.deliveryFeeKobo
-    riderCut = estimate.riderTotalCutKobo
-    platformDeliveryCut = estimate.platformDeliveryCutKobo
-    activeSurchargeTotalKobo = estimate.activeSurchargeTotalKobo
-    riderBonusTotalKobo = estimate.riderDistanceBonusKobo + estimate.riderRuleBonusKobo
+    riderCut = estimate.riderPayoutKobo
+    platformDeliveryCut = estimate.platformDeliveryMarginKobo
     deliveryPricingBreakdown = {
-      distance_meters: estimate.distanceMeters,
-      distance_km: estimate.distanceKm,
-      segment_count: estimate.segmentCount,
-      base_delivery_fee_kobo: estimate.baseDeliveryFeeKobo,
-      distance_surcharge_kobo: estimate.distanceSurchargeKobo,
-      active_surcharge_total_kobo: estimate.activeSurchargeTotalKobo,
-      service_fee_kobo: estimate.serviceFeeKobo,
-      rider_base_cut_kobo: estimate.riderBaseCutKobo,
-      rider_distance_bonus_kobo: estimate.riderDistanceBonusKobo,
-      rider_rule_bonus_kobo: estimate.riderRuleBonusKobo,
-      active_adjustments: estimate.activeAdjustments,
+      road_distance_meters: estimate.roadDistanceMeters,
+      fuel_kobo: estimate.fuelKobo,
+      maintenance_kobo: estimate.maintenanceKobo,
+      rider_payout_kobo: estimate.riderPayoutKobo,
+      platform_delivery_margin_kobo: estimate.platformDeliveryMarginKobo,
     }
   }
   const tipKobo: number = isPickup ? 0 : Math.max(0, Math.min(tip_amount ?? 0, 50000))
@@ -373,7 +364,9 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const totalAmount = subtotal + platformMarkup + deliveryFee + tipKobo
+  const guestFeeKobo = isGuest ? launchPricing.guestFeeKobo : 0
+  const vendorCommissionKobo = Math.floor((subtotal * launchPricing.vendorCommissionBps) / 10_000)
+  const totalAmount = subtotal + platformMarkup + deliveryFee + tipKobo + guestFeeKobo
 
   const basePrepMinutes = estimateOrderPrepMinutes(
     items.map((item) => ({ prepTimeMinutes: itemMap.get(item.menu_item_id)?.prep_time_minutes ?? null })),
@@ -552,6 +545,8 @@ export async function POST(req: NextRequest) {
     delivery_instructions: delivery_instructions ?? null,
     subtotal,
     platform_markup: platformMarkup,
+    vendor_commission_kobo: vendorCommissionKobo,
+    guest_fee_kobo: guestFeeKobo,
     delivery_fee: deliveryFee,
     platform_delivery_cut: platformDeliveryCut,
     rider_delivery_cut: riderCut,
@@ -690,6 +685,37 @@ export async function POST(req: NextRequest) {
   })
   await db.from('order_items').insert(orderItems)
 
+  // Promotion reservations are atomic in Postgres: eligibility, usage limits,
+  // campaign budget and the LumeX fund are checked while locked. The client
+  // supplies only a code; all discount money is recomputed here.
+  let promoApplied = 0
+  let promotionId: string | null = null
+  if (promo_code) {
+    const { data: reserved, error: promoError } = await db.rpc('reserve_launch_promotion', {
+      p_code: promo_code,
+      p_customer: customerId,
+      p_order: order.id,
+      p_vendor: vendor_id,
+      p_category: (vendor as { category?: string | null }).category ?? null,
+      p_campus: city_id ?? (vendor as { city_id?: string | null }).city_id ?? null,
+      p_subtotal: subtotal,
+      p_delivery: deliveryFee,
+      p_platform_fee: platformMarkup + guestFeeKobo,
+      p_vendor_settlement: Math.max(0, subtotal - vendorCommissionKobo),
+      p_is_group: Boolean(linkedGroupId),
+      p_key: `promo:${idempotencyKey}`,
+      p_expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
+    })
+    const row = (reserved as Array<{ promotion_id: string; discount_kobo: number }> | null)?.[0]
+    if (promoError || !row) {
+      await db.from('order_items').delete().eq('order_id', order.id)
+      await db.from('orders').delete().eq('id', order.id)
+      return json({ error: promoError?.message ?? 'Promotion is not available.' }, { status: 409 })
+    }
+    promotionId = row.promotion_id
+    promoApplied = Number(row.discount_kobo)
+  }
+
   // ── Reward credit (promo) reservation + payment split ───────────────────────
   // A reward credit is redeemed as an ORDER-LEVEL DISCOUNT the platform absorbs:
   // capped at the platform fee + delivery (never the food or tip), so the vendor
@@ -699,7 +725,7 @@ export async function POST(req: NextRequest) {
   // group orders (their split accounting is separate).
   let rewardApplied = 0
   let rewardCreditId: string | null = null
-  if (!linkedGroupId && customerId && apply_reward === true && (await anyRewardFeatureOn())) {
+  if (!promo_code && !linkedGroupId && customerId && apply_reward === true && (await anyRewardFeatureOn())) {
     // Cap so EVERY order still clears a guaranteed minimum platform profit
     // (Failure Prevention Rule #1: profitable on every order, never subsidize).
     // Our margin = our markup + OUR share of the delivery fee (the rider's cut is
@@ -726,7 +752,7 @@ export async function POST(req: NextRequest) {
       // Reward tables absent (migration 082 not run) or RPC error → charge full price.
     }
   }
-  const netTotal = totalAmount - rewardApplied
+  const netTotal = totalAmount - rewardApplied - promoApplied
 
   // Resolve the wallet/card split on the NET (post-discount) amount. Never trust
   // a client wallet amount (rule #4/#19) — we read the live balance ourselves.
@@ -754,7 +780,10 @@ export async function POST(req: NextRequest) {
   // The order's total_amount is now what the customer actually pays, so the
   // Paystack webhook's amount check and vendor/rider payouts need NO changes.
   await db.from('orders')
-    .update({ total_amount: netTotal, payment_method: resolvedMethod, wallet_amount_kobo: walletApply })
+    .update({
+      total_amount: netTotal, payment_method: resolvedMethod, wallet_amount_kobo: walletApply,
+      promotion_id: promotionId, promo_code: promo_code ?? null, promo_discount_kobo: promoApplied,
+    })
     .eq('id', order.id)
   // Reward columns in a SEPARATE non-fatal update so an order can't fail if
   // migration 082 hasn't run (rewardApplied is 0 in that case anyway).
@@ -999,7 +1028,11 @@ export async function POST(req: NextRequest) {
         customer_phone: customerPhone,
         vendor_id,
         campaign_id: campaign_id ?? undefined,
+        payment_context: isGuest ? 'GUEST_TRANSACTION_TRANSFER' : 'REGISTERED_CHECKOUT',
       },
+      // Guests receive a transaction-specific, expiring Pay with Transfer
+      // account in Paystack Checkout. They never get a permanent DVA.
+      channels: guestPaystackChannels(isGuest),
     })
   } catch (err) {
     // No charge was created — drop the reserved order + items so the customer can retry.

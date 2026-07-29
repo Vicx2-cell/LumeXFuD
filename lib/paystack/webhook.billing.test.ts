@@ -1,9 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { processWebhookAsync } from './webhook'
+import { dedicatedAccountNumber, processWebhookAsync } from './webhook'
 
 const mocks = vi.hoisted(() => ({
   processPremiumOrBoostWebhook: vi.fn(async () => undefined),
 }))
+
+describe('dedicated virtual account webhook parsing', () => {
+  it('extracts only a valid receiver account number', () => {
+    expect(dedicatedAccountNumber({ authorization: { receiver_bank_account_number: '0123456789' } })).toBe('0123456789')
+    expect(dedicatedAccountNumber({ authorization: { receiver_bank_account_number: 'bad' } })).toBeNull()
+  })
+})
 
 vi.mock('./billing', () => ({
   processPremiumOrBoostWebhook: mocks.processPremiumOrBoostWebhook,

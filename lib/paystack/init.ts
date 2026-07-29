@@ -4,6 +4,7 @@ interface PaystackInitParams {
   reference: string
   callback_url: string
   metadata?: Record<string, unknown>
+  channels?: Array<'card' | 'bank' | 'ussd' | 'qr' | 'mobile_money' | 'bank_transfer' | 'eft'>
 }
 
 interface PaystackInitResponse {
