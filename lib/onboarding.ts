@@ -39,6 +39,37 @@ export type RiderReviewAction =
   | 'suspend'
   | 'unsuspend'
 
+export const VENDOR_VERIFICATION_CHECKS = [
+  'contact_ownership',
+  'government_identity',
+  'business_ownership',
+  'payout_account_match',
+  'food_handler_clearance',
+  'premises_hygiene',
+  'safe_storage',
+  'packaging_capacity',
+  'menu_accuracy',
+  'test_order',
+] as const
+
+export const RIDER_VERIFICATION_CHECKS = [
+  'contact_ownership',
+  'government_identity',
+  'guarantor_confirmed',
+  'payout_account_match',
+  'vehicle_roadworthy',
+  'safety_equipment',
+  'smartphone_gps',
+  'route_training',
+  'test_delivery',
+] as const
+
+export type VerificationChecks = Record<string, boolean>
+
+export function requiredChecksPassed(required: readonly string[], checks: VerificationChecks | null | undefined): boolean {
+  return !!checks && required.every((key) => checks[key] === true)
+}
+
 export function normalizeVendorReviewState(state: string | null | undefined): VendorReviewState {
   switch (state) {
     case 'draft':
@@ -80,6 +111,8 @@ export function vendorReadyForApproval(input: {
   official_longitude?: number | null
   storefront_photo_url?: string | null
   site_inspected?: boolean | null
+  verification_status?: string | null
+  verification_checks?: VerificationChecks | null
 }): boolean {
   return !!(
     input.site_inspected &&
@@ -88,7 +121,9 @@ export function vendorReadyForApproval(input: {
     typeof input.official_longitude === 'number' &&
     Number.isFinite(input.official_longitude) &&
     input.storefront_photo_url &&
-    input.storefront_photo_url.trim()
+    input.storefront_photo_url.trim() &&
+    input.verification_status === 'verified' &&
+    requiredChecksPassed(VENDOR_VERIFICATION_CHECKS, input.verification_checks)
   )
 }
 
@@ -99,6 +134,8 @@ export function riderReadyForApproval(input: {
   guarantor_name?: string | null
   guarantor_phone?: string | null
   vehicle_type?: string | null
+  verification_status?: string | null
+  verification_checks?: VerificationChecks | null
 }): boolean {
   return !!(
     input.nin && input.nin.trim() &&
@@ -106,7 +143,9 @@ export function riderReadyForApproval(input: {
     input.live_selfie_url && input.live_selfie_url.trim() &&
     input.guarantor_name && input.guarantor_name.trim() &&
     input.guarantor_phone && input.guarantor_phone.trim() &&
-    input.vehicle_type && input.vehicle_type.trim()
+    input.vehicle_type && input.vehicle_type.trim() &&
+    input.verification_status === 'verified' &&
+    requiredChecksPassed(RIDER_VERIFICATION_CHECKS, input.verification_checks)
   )
 }
 

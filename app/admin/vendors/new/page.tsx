@@ -2,9 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useFeatures } from '@/lib/use-features'
-import PhoneVerifyInline from '@/components/auth/PhoneVerifyInline'
-import EmailVerifyInline from '@/components/auth/EmailVerifyInline'
 import { PageHeader } from '@/components/ui/page-header'
 import { GlassSheen } from '@/components/fx'
 
@@ -20,10 +17,6 @@ const TIERS = ['FOUNDING', 'EARLY', 'STANDARD'] as const
 
 export default function NewVendorPage() {
   const router = useRouter()
-  // OTP gate mirrors customer sign-up; a super admin can disable it (phone_verification)
-  // while OTP delivery is down. Defaults to required until flags load.
-  const features = useFeatures()
-  const verificationRequired = features.phone_verification !== false
   const [form, setForm] = useState({
     owner_name: '',
     shop_name: '',
@@ -37,15 +30,11 @@ export default function NewVendorPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState<SuccessData | null>(null)
   const [copied, setCopied] = useState(false)
-  const [phoneVerified, setPhoneVerified] = useState(false)
-  const [emailVerified, setEmailVerified] = useState(false)
 
   const set = (k: keyof typeof form, v: string) => {
     setForm((f) => ({ ...f, [k]: v }))
     setError('')
     // The verified cookie is bound to a specific number — changing it invalidates it.
-    if (k === 'phone') setPhoneVerified(false)
-    if (k === 'email') setEmailVerified(false)
   }
 
   const handleSubmit = async () => {
@@ -53,11 +42,6 @@ export default function NewVendorPage() {
       setError('Please fill in all required fields.')
       return
     }
-    if (verificationRequired && !phoneVerified) {
-      setError('Verify the vendor’s phone number first.')
-      return
-    }
-    if (!emailVerified) { setError('Verify the vendor email address first.'); return }
     setLoading(true)
     try {
       const res = await fetch('/api/admin/vendors/create', {
@@ -178,7 +162,7 @@ export default function NewVendorPage() {
           <Field label="Email address">
             <input value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="vendor@example.com" type="email" autoComplete="email" required className={inputCls} />
           </Field>
-          <EmailVerifyInline email={form.email} purpose="admin_create" verified={emailVerified} onVerified={() => setEmailVerified(true)} />
+          <p className="text-xs leading-5 text-white/50">Contact ownership remains unverified until inspection. Creating this record does not activate it.</p>
 
           <Field label="WhatsApp number (+234) — for messages & login">
             <input
@@ -193,14 +177,6 @@ export default function NewVendorPage() {
               className={inputCls}
             />
           </Field>
-
-          {verificationRequired && (
-            <PhoneVerifyInline
-              phone={form.phone}
-              verified={phoneVerified}
-              onVerified={() => setPhoneVerified(true)}
-            />
-          )}
 
           <Field label="Phone number for calls (leave blank if same as WhatsApp)">
             <input
@@ -235,11 +211,11 @@ export default function NewVendorPage() {
 
           <button
             onClick={handleSubmit}
-            disabled={loading || (verificationRequired && !phoneVerified) || !emailVerified}
+            disabled={loading}
             className="lx-btn-amber w-full py-4 text-sm disabled:opacity-50"
             style={{ minHeight: 52 }}
           >
-            {loading ? 'Creating…' : (verificationRequired && !phoneVerified) ? 'Verify phone to continue' : 'Create Vendor Account'}
+            {loading ? 'Creating…' : 'Create pending vendor'}
           </button>
         </div>
       </div>

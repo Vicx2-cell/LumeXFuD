@@ -4,14 +4,18 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
-import { nextVendorReviewState, vendorReadyForApproval } from '@/lib/onboarding'
+import { nextVendorReviewState, requiredChecksPassed, VENDOR_VERIFICATION_CHECKS, vendorReadyForApproval } from '@/lib/onboarding'
 import { createOfficialEventCollection, getOfficialAreaSettingByScope } from '@/lib/feed/official-scheduler'
 import { renderApplicationEmail } from '@/lib/email/templates'
 import { deliverWorkflowEmail } from '@/lib/email/workflow-email'
 
 const updateInput = z.object({
-  action: z.enum(['review', 'schedule_inspection', 'mark_inspected', 'approve', 'reject', 'suspend', 'unsuspend', 'activate_premium']),
+  action: z.enum(['review', 'schedule_inspection', 'mark_inspected', 'verify', 'approve', 'reject', 'suspend', 'unsuspend']),
   reason: z.string().max(500).optional(),
+  checks: z.record(z.string(), z.boolean()).optional(),
+  official_latitude: z.number().min(-90).max(90).optional(),
+  official_longitude: z.number().min(-180).max(180).optional(),
+  storefront_photo_url: z.string().trim().url().max(500).optional(),
 })
 
 export async function PATCH(
@@ -37,7 +41,7 @@ export async function PATCH(
   const db = createSupabaseAdmin()
   const { data: vendor } = await db
     .from('vendors')
-  .select('id, shop_name, is_active, is_premium, approval_state, official_latitude, official_longitude, storefront_photo_url, site_inspected, business_verified, city_id, zone_id, logo_url, shop_photo_url, avg_rating, total_ratings')
+  .select('id, shop_name, is_active, approval_state, official_latitude, official_longitude, storefront_photo_url, site_inspected, business_verified, verification_status, verification_checks, city_id, zone_id, logo_url, shop_photo_url, avg_rating, total_ratings')
     .eq('id', id)
     .single()
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
@@ -45,7 +49,7 @@ export async function PATCH(
 
   const now = new Date().toISOString()
   const updates: Record<string, unknown> = { updated_at: now }
-  if (parsed.data.action !== 'activate_premium') {
+  if (parsed.data.action !== 'verify') {
     updates.approval_state = nextVendorReviewState(vendor.approval_state, parsed.data.action)
   }
 
@@ -54,9 +58,39 @@ export async function PATCH(
   } else if (parsed.data.action === 'schedule_inspection') {
     updates.is_active = false
   } else if (parsed.data.action === 'mark_inspected') {
+    updates.is_active = false
+  } else if (parsed.data.action === 'verify') {
+    if (session.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Verification requires a super admin.' }, { status: 403 })
+    }
+    if (
+      !requiredChecksPassed(VENDOR_VERIFICATION_CHECKS, parsed.data.checks) ||
+      parsed.data.official_latitude === undefined ||
+      parsed.data.official_longitude === undefined ||
+      !parsed.data.storefront_photo_url
+    ) {
+      return NextResponse.json({ error: 'Complete every required check, GPS pin, and storefront photo.' }, { status: 409 })
+    }
+    updates.official_latitude = parsed.data.official_latitude
+    updates.official_longitude = parsed.data.official_longitude
+    updates.storefront_photo_url = parsed.data.storefront_photo_url
+    updates.verification_checks = parsed.data.checks
+    updates.verification_notes = parsed.data.reason ?? null
+    updates.verification_status = 'verified'
+    updates.verified_at = now
+    updates.verified_by = session.phone
+    updates.email_verified = true
+    updates.email_verified_at = now
+    updates.whatsapp_verified = true
+    updates.id_verified = true
+    updates.business_verified = true
     updates.site_inspected = true
+    updates.approval_state = 'shop_inspected'
     updates.is_active = false
   } else if (parsed.data.action === 'approve') {
+    if (session.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Final approval requires a super admin.' }, { status: 403 })
+    }
     if (!vendorReadyForApproval(vendor)) {
       return NextResponse.json(
         { error: 'Capture the official GPS pin and storefront photo before approval.' },
@@ -86,8 +120,6 @@ export async function PATCH(
     updates.is_active = true
     updates.status = 'OPEN'
     updates.approval_state = 'approved'
-  } else if (parsed.data.action === 'activate_premium') {
-    updates.is_premium = true
   }
 
   if (parsed.data.action === 'approve') {
@@ -132,7 +164,8 @@ export async function PATCH(
     }
   }
 
-  await db.from('vendors').update(updates).eq('id', id)
+  const { error: updateError } = await db.from('vendors').update(updates).eq('id', id)
+  if (updateError) return NextResponse.json({ error: 'Could not update vendor review.' }, { status: 500 })
 
   if (['review', 'schedule_inspection', 'mark_inspected', 'approve', 'reject'].includes(parsed.data.action)) {
     const applicationStatus = parsed.data.action === 'approve' ? 'approved' : parsed.data.action === 'reject' ? 'rejected' : parsed.data.action === 'schedule_inspection' ? 'inspection_scheduled' : parsed.data.action === 'mark_inspected' ? 'shop_inspected' : 'under_review'

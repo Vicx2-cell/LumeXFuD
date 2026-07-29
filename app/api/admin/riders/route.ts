@@ -14,11 +14,11 @@ export async function GET() {
     .from('riders')
     .select(`
       id, full_name, phone, status, is_active, approval_state,
-      id_verified, vehicle_inspected,
+      id_verified, vehicle_inspected, verification_status, verification_checks,
       avg_rating, total_ratings, total_deliveries, created_at
     `)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
-  return NextResponse.json({ riders: riders ?? [] })
+  return NextResponse.json({ riders: riders ?? [], can_approve: session.role === 'super_admin' })
 }

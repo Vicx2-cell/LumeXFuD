@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { GlassSheen } from '@/components/fx'
+import { PartnerVerificationPanel } from '@/components/admin/partner-verification-panel'
 
 interface RiderRow {
   id: string
@@ -13,6 +14,7 @@ interface RiderRow {
   status: string
   approval_state: string
   is_active: boolean
+  verification_status: string
   approved_at: string | null
   avg_rating: number
   total_deliveries: number
@@ -49,6 +51,8 @@ export default function AdminRiders() {
   const [toast, setToast] = useState('')
   const [removeTarget, setRemoveTarget] = useState<RiderRow | null>(null)
   const [removing, setRemoving] = useState(false)
+  const [verificationTarget, setVerificationTarget] = useState<RiderRow | null>(null)
+  const [canApprove, setCanApprove] = useState(false)
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -58,8 +62,9 @@ export default function AdminRiders() {
   async function fetchRiders() {
     const res = await fetch('/api/admin/riders')
     if (res.ok) {
-      const d = await res.json() as { riders: RiderRow[] }
+      const d = await res.json() as { riders: RiderRow[]; can_approve: boolean }
       setRiders(d.riders)
+      setCanApprove(d.can_approve)
     }
     setLoading(false)
   }
@@ -102,6 +107,7 @@ export default function AdminRiders() {
   return (
     <div className="lx-page lx-console px-4 py-8 overflow-hidden">
       <GlassSheen />
+      {verificationTarget && <PartnerVerificationPanel kind="rider" id={verificationTarget.id} name={verificationTarget.full_name} onClose={() => setVerificationTarget(null)} onVerified={fetchRiders} />}
       {/* Remove confirmation */}
       {removeTarget && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center lx-scrim px-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => !removing && setRemoveTarget(null)}>
@@ -184,6 +190,15 @@ export default function AdminRiders() {
                 </div>
 
                 <div className="flex gap-2 flex-wrap">
+                  {!r.is_active && r.verification_status !== 'verified' && (
+                    <button onClick={() => canApprove && setVerificationTarget(r)}
+                      disabled={!canApprove}
+                      title={canApprove ? 'Open the inspection checklist' : 'A super admin must verify inspection evidence'}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+                      style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
+                      {canApprove ? 'Inspect & verify' : 'Await super-admin verification'}
+                    </button>
+                  )}
                   {(r.approval_state === 'application_submitted' || r.approval_state === 'pending_review' || r.approval_state === 'draft') && (
                     <button onClick={() => doAction(r.id, 'review')}
                       disabled={actionLoading === r.id + 'review'}
@@ -192,10 +207,11 @@ export default function AdminRiders() {
                       {actionLoading === r.id + 'review' ? '…' : 'Under review'}
                     </button>
                   )}
-                  {r.approval_state === 'under_review' && (
+                  {r.verification_status === 'verified' && r.approval_state !== 'approved' && (
                     <>
                       <button onClick={() => doAction(r.id, 'approve')}
-                        disabled={actionLoading === r.id + 'approve'}
+                        disabled={!canApprove || actionLoading === r.id + 'approve'}
+                        title={canApprove ? 'Make rider active' : 'A super admin must give final approval'}
                         className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
                         style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
                         {actionLoading === r.id + 'approve' ? '…' : 'Approve'}
