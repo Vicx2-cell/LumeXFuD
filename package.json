@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/gen-route-manifest.mjs",
+    "prebuild": "node gen-route-manifest.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
