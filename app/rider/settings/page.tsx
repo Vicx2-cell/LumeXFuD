@@ -4,6 +4,7 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { GlassSheen } from '@/components/fx'
 import { PageHeader } from '@/components/ui/page-header'
 import { RiderSettings } from './settings-client'
+import type { RiderSettable } from './types'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,12 +32,4 @@ export default async function RiderSettingsPage() {
       </div>
     </div>
   )
-}
-
-export interface RiderSettable {
-  id: string
-  full_name: string
-  avatar_url: string | null
-  total_deliveries: number
-  avg_rating: number | null
 }

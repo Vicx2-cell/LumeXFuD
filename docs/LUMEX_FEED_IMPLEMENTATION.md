@@ -1,5 +1,11 @@
 # LumeX Feed Implementation
 
+> Historical implementation record. File lists and completion checkboxes below
+> describe earlier iterations and are not a current architecture or release
+> statement. Use `docs/launch/REPOSITORY_MAP.md`,
+> `docs/launch/MVP_SCOPE.md` and `docs/launch/MVP_CERTIFICATION.md` for the
+> current repository and launch state.
+
 This document is the living implementation checklist for the social-commerce expansion requested in the brief.
 
 ## Purpose

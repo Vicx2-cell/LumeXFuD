@@ -12,16 +12,7 @@ import { VendorCardSkeleton } from '@/components/ui/skeleton'
 import { HomepageClient } from '../homepage-client'
 import { SmoothScroll } from '@/components/fx'
 import { mapVendorSignals, rankVendorFeed } from '@/lib/vendor-feed-fairness'
-
-type HomeLocationRow = {
-  city_id: string
-  city_name: string
-  city_state: string
-  city_slug: string
-  zone_id: string
-  zone_name: string
-  uses_lodge_catalog: boolean
-}
+import type { HomeLocationRow, VendorData } from './types'
 
 // Always render fresh - vendor open/closed status and the ranked list must never
 // be served stale from a cached page. (Realtime keeps it live after first paint.)
@@ -72,7 +63,6 @@ async function getLocations() {
     }]
   })
 }
-
 async function getPreferredZoneId(session: Awaited<ReturnType<typeof getCurrentUser>>): Promise<string | null> {
   if (!session || session.role !== 'customer') return null
   const db = createSupabaseAdmin()
@@ -248,20 +238,4 @@ function SkeletonGrid() {
       {[1, 2, 3].map((i) => <VendorCardSkeleton key={i} />)}
     </div>
   )
-}
-
-export interface VendorData {
-  id: string
-  slug: string | null
-  shop_name: string
-  logo_url: string | null
-  shop_photo_url: string | null
-  prep_time_minutes: number
-  status: 'OPEN' | 'BUSY' | 'CLOSED'
-  paused_until: string | null
-  category: string
-  avg_rating: number
-  total_ratings: number
-  vendor_scores: Array<{ composite_score: number; visibility_tier: string }> | null
-  kyc_verified?: boolean
 }

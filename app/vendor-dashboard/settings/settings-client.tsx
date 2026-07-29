@@ -10,7 +10,7 @@ import { FaceIdSetup } from '@/components/face-id-setup'
 import { ConfirmSheet } from '@/components/ui/confirm-sheet'
 import { Badge } from '@/components/ui/badge'
 import { UtensilsCrossed, Wallet, LifeBuoy, ChevronRight } from 'lucide-react'
-import type { VendorSettable } from './page'
+import type { VendorSettable } from './types'
 
 const LINKS = [
   { href: '/vendor-dashboard/menu',     Icon: UtensilsCrossed, label: 'Menu & items',     desc: 'Add, edit and price your food' },

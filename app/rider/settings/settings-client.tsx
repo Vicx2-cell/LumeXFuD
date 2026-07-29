@@ -7,7 +7,7 @@ import { FaceIdSetup } from '@/components/face-id-setup'
 import { KycPanel } from '@/components/kyc-panel'
 import { ConfirmSheet } from '@/components/ui/confirm-sheet'
 import { Wallet, Star, ChevronRight } from 'lucide-react'
-import type { RiderSettable } from './page'
+import type { RiderSettable } from './types'
 
 const LINKS = [
   { href: '/rider/wallet',  Icon: Wallet, label: 'Wallet & payout', desc: 'Balance, withdrawals & bank account' },

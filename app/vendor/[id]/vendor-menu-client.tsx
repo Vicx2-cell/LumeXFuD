@@ -14,7 +14,7 @@ import { FindStoreCard } from '@/components/find-store-card'
 import { getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
 import { recordFeedCommerceEvent } from '@/lib/feed/client-attribution'
 import { ArrowLeft, Clock3, MapPin, Search, Share2, Star, Users } from 'lucide-react'
-import type { VendorInfo, MenuAddon, MenuItem, VendorReview } from './page'
+import type { VendorInfo, MenuAddon, MenuItem, VendorReview } from './types'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks', 'Other']
 

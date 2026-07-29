@@ -3,9 +3,6 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { withCronHealth, verifyCronSecret } from '@/lib/cron-health'
 import {
   creditWalletHeld,
-  getTierAndCount,
-  calculateReleaseTime,
-  getHoldPolicy,
   formatPrice,
 } from '@/lib/wallet'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
@@ -226,9 +223,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ processed: 0, healed })
   }
 
-  // Prefetch settings + hold policy once
+  // Prefetch non-settlement settings once. Order settlement itself is delegated
+  // to completeOrderPayout, the sole owner of commission/promotion deductions.
   const settings = await getSettings(db)
-  const holdPolicy = await getHoldPolicy()
 
   let processed = 0
   let failed = 0
@@ -237,52 +234,15 @@ export async function POST(req: NextRequest) {
     try {
       const deliveredAt = order.delivered_at ? new Date(order.delivered_at) : new Date()
 
-      // Tier + completed count drive the Fast & Fair hold (new accounts held longer)
-      const [vendor, rider] = await Promise.all([
-        getTierAndCount(order.vendor_id, 'VENDOR'),
-        getTierAndCount(order.rider_id, 'RIDER'),
-      ])
-
-      const vendorReleaseCalc = calculateReleaseTime('VENDOR', vendor.tier, vendor.count, deliveredAt, holdPolicy)
-      const riderReleaseCalc  = calculateReleaseTime('RIDER',  rider.tier,  rider.count,  deliveredAt, holdPolicy)
-      const vendorReleaseAt   = new Date(Math.max(Date.now(), vendorReleaseCalc.getTime()))
-      const riderReleaseAt    = new Date(Math.max(Date.now(), riderReleaseCalc.getTime()))
-
-      const vendorAmount = Number(order.subtotal)
       const riderAmount  = Number(order.rider_delivery_cut) + Number(order.tip_amount)
 
-      // Credit vendor wallet (held)
-      if (vendorAmount > 0) {
-        await creditWalletHeld({
-          userId:      order.vendor_id,
-          userType:    'VENDOR',
-          amount:      vendorAmount,
-          orderId:     order.id,
-          description: `Payment for order #${order.order_number}`,
-          releaseAt:   vendorReleaseAt,
-          reference:   `VENDOR-${order.id}`,
-        })
-      }
-
-      // Credit rider wallet (held)
-      if (riderAmount > 0) {
-        await creditWalletHeld({
-          userId:      order.rider_id,
-          userType:    'RIDER',
-          amount:      riderAmount,
-          orderId:     order.id,
-          description: `Delivery earnings for order #${order.order_number}`,
-          releaseAt:   riderReleaseAt,
-          reference:   `RIDER-${order.id}`,
-        })
-      }
-
-      // Mark order COMPLETED and wallet_released
+      // Claim completion before moving money. completeOrderPayout then atomically
+      // claims wallet_released and calculates both credits from immutable order
+      // snapshots, including commission and vendor-funded promotion deductions.
       const { data: completedRows } = await db
         .from('orders')
         .update({
           status:          'COMPLETED',
-          wallet_released: true,
           completed_at:    new Date().toISOString(),
         })
         .eq('id', order.id)
@@ -293,6 +253,16 @@ export async function POST(req: NextRequest) {
         // Order status changed concurrently — skip silently
         continue
       }
+
+      await completeOrderPayout({
+        id: order.id,
+        order_number: order.order_number,
+        vendor_id: order.vendor_id,
+        rider_id: order.rider_id,
+        subtotal: Number(order.subtotal) || 0,
+        rider_delivery_cut: Number(order.rider_delivery_cut) || 0,
+        tip_amount: Number(order.tip_amount) || 0,
+      })
 
       // ── Rider wallet notification + milestone check ─────────────────────────
       await emailCommittedOrderStatus(db, {
@@ -311,15 +281,10 @@ export async function POST(req: NextRequest) {
         const rider = riderRow as unknown as Pick<RiderRow, 'phone' | 'total_deliveries'> | null
 
         if (rider?.phone) {
-          const riderHoldHours = Math.round(
-            (riderReleaseAt.getTime() - Date.now()) / 3_600_000
-          )
           const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lumexfud.com.ng'
           sendWhatsAppWithFallback({
             to: rider.phone,
-            message: riderHoldHours > 0
-              ? `💰 ${formatPrice(riderAmount)} added to your LumeX Wallet for order #${order.order_number}.\nAvailable for withdrawal in ${riderHoldHours} hour${riderHoldHours === 1 ? '' : 's'}.\n${appUrl}/rider/wallet`
-              : `💰 ${formatPrice(riderAmount)} is now available in your LumeX Wallet for order #${order.order_number}.\nWithdraw anytime: ${appUrl}/rider/wallet`,
+            message: `💰 ${formatPrice(riderAmount)} added to your LumeX Wallet for order #${order.order_number}.\nYour wallet shows when held earnings become withdrawable.\n${appUrl}/rider/wallet`,
           }).catch(() => {})
 
           // ── Check milestone bonuses ─────────────────────────────────────────

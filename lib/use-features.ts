@@ -14,12 +14,22 @@ import { createContext, createElement, useContext, useEffect, useState, type Rea
 
 export type Features = Record<string, boolean>
 
-// Fallback for the rare component that renders outside the provider (and for
-// SSR safety). Everything on, except nothing that would skip a security step —
-// phone_verification defaults true so OTP shows until flags resolve.
+// Fail-closed fallback for the rare component rendered outside the provider.
+// Phone verification stays on because omitting that control would weaken
+// signup; optional product capabilities stay hidden until server flags resolve.
 const DEFAULTS: Features = {
-  ordering: true, signups: true, wallet: true, leaderboard: true, face_id: true,
+  ordering: false,
+  signups: false,
   phone_verification: true,
+  google_login: false,
+  customer_wallet_enabled: false,
+  customer_virtual_accounts: false,
+  leaderboard: false,
+  group_orders: false,
+  pickup_v1: false,
+  delivery_handover_v1: false,
+  sponsor_topup: false,
+  feed_enabled: false,
 }
 
 const FeaturesContext = createContext<Features | null>(null)

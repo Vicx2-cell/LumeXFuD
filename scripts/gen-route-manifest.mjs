@@ -33,6 +33,6 @@ const routes = walk(apiDir)
 
 writeFileSync(
   join(root, 'lib', 'route-manifest.json'),
-  JSON.stringify({ generated_at: new Date().toISOString(), count: routes.length, routes }, null, 2) + '\n'
+  JSON.stringify({ count: routes.length, routes }, null, 2) + '\n'
 )
 console.log(`route-manifest: ${routes.length} API routes`)

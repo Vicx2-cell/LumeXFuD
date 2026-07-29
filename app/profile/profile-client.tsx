@@ -13,7 +13,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { useFeatures } from '@/lib/use-features'
 import EmailVerifyInline from '@/components/auth/EmailVerifyInline'
 import { CountUp } from '@/components/fx'
-import type { CustomerProfile, StreakData, BadgeItem } from './page'
+import type { CustomerProfile, StreakData, BadgeItem } from './types'
 
 const KEYPAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'] as const
 

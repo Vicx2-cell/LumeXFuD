@@ -32,12 +32,12 @@ export const FEATURES: FeatureDef[] = [
   { key: 'dispute_concierge', label: 'Dispute concierge', description: 'When a customer reports a problem, Lumi replies empathetically and pre-triages the case for the admin. Advisory only — never moves money. Off = plain confirmation, no AI triage.', default: true, enforced: false },
   { key: 'reviews',      label: 'Vendor reviews',  description: 'Let customers rate vendors (1–5 stars) and leave a public written review after a completed order. Off = the rating prompt and public reviews are hidden.', default: true, enforced: true },
   { key: 'face_id',      label: 'Face ID login',   description: 'Allow users to enrol Face ID / Touch ID as a second factor, and require it at login for enrolled accounts. Off = Face ID disabled platform-wide (PIN alone logs in).', default: false, enforced: true },
-  { key: 'study',        label: 'Study (beta)',    description: 'Show the course-catalog study tool (faculty → programme → level → semester selector, then ask/practice). In development — off hides the /study section entirely.', default: true, enforced: true },
+  { key: 'study',        label: 'Study (beta)',    description: 'Show the course-catalog study tool (faculty → programme → level → semester selector, then ask/practice). In development — off hides the /study section entirely.', default: false, enforced: true },
   { key: 'group_orders', label: 'Group ordering',   description: 'Let customers start a shared "order with friends" basket (host pays, one delivery). Off = the cart button and the group pages are hidden and no new group can be started.', default: true, enforced: true },
   { key: 'partner_applications', label: 'Vendor / rider applications', description: 'Show public "apply as a vendor" / "apply as a rider" entry points and accept new application forms. Off = those public pages are hidden and submissions are rejected. Admin-created vendor/rider accounts still work.', default: true, enforced: true },
   { key: 'pickup_v1',    label: 'Pickup (Order Ahead)', description: 'Let customers order ahead and skip the queue — pay upfront (food + platform fee + ₦0 delivery), get a private 6-char collection code, and collect from the vendor. No riders needed. Held 1h25m once ready, then forfeited. Off = the Pickup option is hidden and pickup checkout is rejected.', default: false, enforced: true },
   { key: 'delivery_handover_v1', label: 'Delivery handover code', description: 'Require the rider to enter the customer’s private 6-char code at the door to confirm delivery and release funds (or an opt-in leave-at-gate drop with photo proof). Off = delivery completes the old way (no handover code).', default: false, enforced: true },
-  { key: 'sponsor_topup', label: 'Parent / sponsor top-up', description: 'Public page where a parent/sponsor funds a student’s wallet, plus the "ask family to top up" share button on the wallet. Off = both are hidden and the page is disabled.', default: true, enforced: true },
+  { key: 'sponsor_topup', label: 'Parent / sponsor top-up', description: 'Public page where a parent/sponsor funds a student’s wallet, plus the "ask family to top up" share button on the wallet. Off = both are hidden and the page is disabled.', default: false, enforced: true },
   { key: 'founder', label: 'Founder spotlight', description: 'Show the "Why I built LumeX" founder section on the public landing page. Off = the section is removed from the page entirely.', default: true, enforced: true },
   { key: 'whatsapp_bot', label: 'WhatsApp bot', description: 'MASTER switch for the WhatsApp Cloud API bot (ordering, AI FAQ, human handoff, vendor/rider applications). OFF = the webhook still verifies and returns 200 to Meta, but the bot does NOT process or reply to any message — so you can ship without it and flip it on when ready. Existing human-handoff threads in the inbox are unaffected.', default: false, enforced: true },
   { key: 'feed_enabled', label: 'Feed', description: 'Show the LumeX Feed experience.', default: true, enforced: true },
@@ -107,7 +107,9 @@ const FLAG_TTL_MS = 20_000
 export async function getFeature(key: string): Promise<boolean> {
   const all = await getAllFeatures()
   if (key in all) return all[key]
-  return FEATURES.find((f) => f.key === key)?.default ?? true
+  // Unknown flags fail closed. A typo or partially removed feature must never
+  // make an unregistered capability visible or executable by default.
+  return FEATURES.find((f) => f.key === key)?.default ?? false
 }
 
 /** Read every catalog flag merged with stored overrides (cached ~20s). */
@@ -125,7 +127,7 @@ export async function getAllFeatures(): Promise<Record<string, boolean>> {
     for (const row of data ?? []) {
       const key = String(row.id).replace(/^feature\./, '')
       const def = FEATURES.find((f) => f.key === key)
-      out[key] = coerce(row.value, def?.default ?? true)
+      out[key] = coerce(row.value, def?.default ?? false)
     }
     _flagCache = { at: Date.now(), values: out } // cache only a successful read
   } catch {

@@ -1,243 +1,79 @@
-# Payments & Paystack Integration
+# Payments, promotions and settlement
 
-## Payment Channels (enable in Paystack dashboard)
-- **Cards**: Visa, Mastercard, Verve
-- **Bank Transfer**: OPay, Moniepoint, PalmPay, Kuda, all Nigerian banks
-- **USSD**: For students without smartphones
-- **NO cash on delivery** (Jumia Food died because of cash rejection)
+Last verified: 2026-07-29
 
-## Order Creation Flow
+All provider and persisted amounts are integer kobo. Client totals, redirects,
+screenshots and webhook JSON are untrusted.
 
-### POST /api/orders
-```json
-Body: {
-  vendor_id: string,
-  items: Array<{ 
-    menu_item_id: string, 
-    quantity: number, 
-    special_instructions?: string 
-  }>,
-  delivery_type: 'BIKE' | 'DOOR',
-  delivery_address: string,
-  delivery_instructions?: string,
-  tip_amount?: number // in kobo
-}
-```
+## Checkout
 
-### Processing Steps
-```
-1. Verify auth (or guest with phone)
-2. Validate vendor: exists, is_active, status='OPEN' (or 'BUSY')
-3. Validate cart: all items belong to vendor, all available, daily limits not exceeded
-4. SERVER-SIDE PRICE CALCULATION — never trust client amounts:
-   - subtotal = sum(menu_item.price * quantity for each item)
-   - platform_markup = settings.platform_markup (₦250)
-   - delivery_fee = settings.bike_fee (₦500) OR settings.door_fee (₦1,000)
-   - tip = clamp(body.tip_amount, 0, 50000)
-   - total = subtotal + platform_markup + delivery_fee + tip
-5. Generate order number: LXF-{YEAR}-{6-digit}
-6. Generate idempotency key (UUID)
-7. Initialize Paystack transaction:
-   - amount: total (in kobo)
-   - email: phone + '@lumex.fud' (Paystack requires email)
-   - reference: order number
-   - metadata: order_id, customer_phone, vendor_id
-   - split: configure subaccount split (vendor gets subtotal, platform gets rest)
-   - callback_url: APP_URL + '/order/' + order_number
-8. INSERT order with status='PENDING_PAYMENT', store all amounts in kobo
-9. INSERT order_items snapshot (capture name + price at time of order)
-10. Return { order_number, paystack_authorization_url, access_code }
-```
+`POST /api/orders` supports a registered customer or guest. It validates one
+approved vendor, reloads available menu items/add-ons, obtains the current
+server-side delivery quote, calculates platform/guest fees and vendor
+commission, evaluates/reserves a promotion, and writes immutable order/item
+snapshots under an idempotency key. It then initializes a Paystack transaction.
+Guests are restricted to transaction-specific Pay with Transfer and receive an
+order-scoped HttpOnly access token; they never receive a permanent DVA.
 
-## Paystack Webhook (CRITICAL)
+`POST /api/orders/estimate` uses the same launch delivery quote implementation
+for display. The order-create route remains authoritative.
 
-### POST /api/paystack/webhook
-This is the most security-critical endpoint in the app.
+## Payment webhook
 
-```
-1. READ raw body BEFORE parsing JSON (HMAC verification needs raw bytes)
-2. VERIFY HMAC signature using PAYSTACK_SECRET_KEY:
-   const hash = crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
-   if (hash !== req.headers['x-paystack-signature']) return 400;
-3. PARSE body as JSON
-4. Extract event reference: data.reference
-5. CHECK idempotency: SELECT 1 FROM processed_webhooks WHERE reference = $1 AND event = $2
-   - If exists: return 200 immediately (don't reprocess)
-6. INSERT into processed_webhooks (race-condition safe with UNIQUE constraint)
-7. PROCESS the idempotent event handler within the provider response window
-8. RETURN 200 only after processing succeeds; release the claim and return non-2xx on failure
-```
+`POST /api/paystack/webhook`:
 
-### Event Handlers
-```
-CASE 'charge.success':
-  - UPDATE order: payment_status='SUCCESS', status='PENDING' (vendor needs to accept)
-  - Send Sendchamp WhatsApp to vendor: "New order #XXX! Accept in 5 mins."
-  - Set vendor 5-min auto-cancel timer (cron picks this up)
+1. reads the raw request body;
+2. verifies HMAC-SHA512 with `PAYSTACK_SECRET_KEY`;
+3. derives a stable provider resource/event key;
+4. inserts the replay claim into `processed_webhooks`;
+5. fails closed with non-2xx if that claim cannot be recorded;
+6. awaits the idempotent handler;
+7. releases a failed claim so Paystack may retry;
+8. acknowledges only after successful processing.
 
-CASE 'charge.failed':
-  - UPDATE order: payment_status='FAILED', status='CANCELLED'
-  - Send Sendchamp notification to customer: "Payment didn't go through. Your cart is saved — try again?"
+The handler verifies the stored reference, amount and payment context before
+committing order/payment/promotion state. Webhook reconciliation must continue
+during maintenance because an in-flight customer may already have paid.
 
-CASE 'transfer.success':
-  - Find wallet_transaction by paystack_transfer_code
-  - UPDATE wallet_transaction: status='COMPLETED'
-  - Send WhatsApp to user
+## Promotion fund
 
-CASE 'transfer.failed':
-  - Find wallet_transaction by paystack_transfer_code
-  - UPDATE wallet_transaction: status='FAILED', failure_reason
-  - Refund balance to user's wallet
-  - Send WhatsApp to user + alert admin
+The promo fund is a marketing ledger, not customer stored value. Recharge,
+reservation, commit and release use locked database RPCs and idempotency keys.
+Credits/debits are immutable. LumeX campaigns reserve available balance and
+commit a debit only after payment; failure/expiry releases the reservation.
+Vendor-funded campaigns never debit the fund and their discount is deducted
+from vendor settlement. Keep the campaign kill switch on until production
+funding/reconciliation drills pass.
 
-CASE 'transfer.reversed':
-  - Find wallet_transaction
-  - Reverse the withdrawal: credit balance back
-  - WhatsApp user + admin alert
+## Settlement and withdrawals
 
-CASE 'refund.processed':
-  - UPDATE refund record: status='COMPLETED'
-  - Send WhatsApp to customer
+`lib/order-payout.ts` is the order payout authority:
 
-CASE 'refund.failed':
-  - UPDATE refund: status='FAILED'
-  - Alert admin (URGENT)
-```
+- vendor = subtotal snapshot − vendor commission snapshot − vendor-funded
+  promotion discount;
+- rider = delivery-cut snapshot + tip.
 
-## Refund Flow
+It atomically claims `orders.wallet_released`, creates idempotent held earnings
+and frees only the rider attached to the completed order. The release-payment
+cron and on-demand settlement backstop delegate to it. Payout and withdrawal
+controls fail closed and remain frozen until production transfer/reconciliation
+gates pass.
 
-### POST /api/paystack/refund
-Admin-triggered only. Used when dispute resolved in customer's favor.
+## Refunds and DVA
 
-```json
-Body: { 
-  order_id: string, 
-  reason: string, 
-  amount?: number 
-}
-```
+Refund APIs re-authorize the actor, cap against recorded payment/refundable
+state, call Paystack and reconcile signed refund events idempotently. A refund
+redirect or screenshot is not proof.
 
-### Processing Steps
-```
-1. Verify admin role (or super admin)
-2. Look up order, get Paystack transaction reference
-3. Validate: refund.amount <= order.total_amount
-4. Default amount = order.total_amount (full refund)
-5. Call Paystack Refund API:
-   POST https://api.paystack.co/refund
-   { transaction: reference, amount: amount, currency: 'NGN' }
-6. INSERT refunds record: status='PROCESSING'
-7. UPDATE order: status='REFUNDED'
-8. Audit log
-9. Send WhatsApp to customer: "Refund of ₦X being processed. Should arrive in 24 hours."
-10. Webhook will finalize (refund.processed event)
-```
+Dedicated Virtual Accounts require customer consent, identity/provider
+eligibility, the application feature and `PAYSTACK_DVA_ENABLED`. Signed/requeried
+transfers become unallocated receipts and never credit a customer wallet. DVA
+must remain disabled for launch.
 
-## Vendor Subscription Payment
+## Production gates
 
-### POST /api/vendors/subscription/pay
-```
-1. Verify vendor auth
-2. Determine subscription amount based on vendor tier
-3. Initialize Paystack transaction:
-   - amount: subscription_amount (kobo)
-   - reference: 'SUB-' + vendor_id + '-' + timestamp
-   - metadata: { type: 'SUBSCRIPTION', vendor_id }
-4. Return paystack_authorization_url
-5. On webhook charge.success with metadata.type='SUBSCRIPTION':
-   - INSERT vendor_subscriptions record (paid_at, period_start, period_end)
-   - UPDATE vendors: subscription_paid_until = period_end
-   - WhatsApp confirmation to vendor
-```
-
-## Grace Period Logic
-
-### Cron Job: subscription-check (daily 9am)
-```
-1. Find vendors where subscription_paid_until < NOW()
-2. For each:
-   - days_overdue = (NOW - subscription_paid_until).days
-   - If days_overdue === 1: WhatsApp "Your subscription expired. Pay to stay active."
-   - If days_overdue === 2: WhatsApp "Second reminder."
-   - If days_overdue === 3: WhatsApp "FINAL: Platform access ends tonight."
-   - If days_overdue >= 4: UPDATE is_active = FALSE, hide from customers
-```
-
-## Critical Security Rules
-
-1. **NEVER** trust client amounts. All prices calculated server-side from menu_items table.
-2. **ALWAYS** verify HMAC. Without it, anyone can fake a payment notification.
-3. **ALWAYS** check idempotency. Paystack retries webhooks if they don't get 200 fast enough.
-4. **NEVER** return 200 before a money event is durably processed.
-5. **NEVER** use `===` for HMAC comparison. Use `crypto.timingSafeEqual`.
-6. **NEVER** log full reference numbers or transaction codes to general logs (audit_logs only).
-
-## HMAC Verification Example
-
-```typescript
-import crypto from 'crypto';
-
-function verifyPaystackSignature(rawBody: string, signature: string): boolean {
-  const secret = process.env.PAYSTACK_SECRET_KEY!;
-  const hash = crypto
-    .createHmac('sha512', secret)
-    .update(rawBody)
-    .digest('hex');
-
-  // Constant-time comparison (timing attack prevention)
-  if (hash.length !== signature.length) return false;
-  return crypto.timingSafeEqual(
-    Buffer.from(hash),
-    Buffer.from(signature)
-  );
-}
-```
-
-## Database Schema
-
-### processed_webhooks
-```sql
-CREATE TABLE processed_webhooks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  reference TEXT NOT NULL,
-  event TEXT NOT NULL,
-  payload JSONB,
-  processed_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (reference, event)
-);
-
-CREATE INDEX idx_processed_webhooks_lookup ON processed_webhooks(reference, event);
-```
-
-### refunds
-```sql
-CREATE TABLE refunds (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id TEXT NOT NULL REFERENCES orders(id),
-  paystack_transaction_reference TEXT NOT NULL,
-  paystack_refund_reference TEXT,
-  amount BIGINT NOT NULL,
-  reason TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('PROCESSING','COMPLETED','FAILED','NEEDS_ATTENTION')),
-  triggered_by TEXT NOT NULL, -- admin user_id
-  failure_reason TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  completed_at TIMESTAMPTZ
-);
-```
-
-### vendor_subscriptions
-```sql
-CREATE TABLE vendor_subscriptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  vendor_id TEXT NOT NULL REFERENCES vendors(id),
-  amount BIGINT NOT NULL,
-  paystack_reference TEXT UNIQUE NOT NULL,
-  paid_at TIMESTAMPTZ DEFAULT NOW(),
-  period_start TIMESTAMPTZ NOT NULL,
-  period_end TIMESTAMPTZ NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('ACTIVE','EXPIRED','CANCELLED'))
-);
-
-CREATE INDEX idx_vendor_subs_vendor ON vendor_subscriptions(vendor_id, period_end DESC);
-```
+Set live provider configuration outside Git, then execute low-value paid,
+failed, duplicate, replay, guest-transfer, refund, settlement and transfer
+reconciliation on the exact release commit. Compare every Paystack amount to
+the corresponding immutable order/ledger kobo snapshot. See
+`docs/launch/MVP_CERTIFICATION.md`.
