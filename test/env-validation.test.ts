@@ -4,7 +4,7 @@ import { validateEnv } from '@/lib/env'
 
 describe('environment validation', () => {
   it('allows an immutable host to compile before runtime secrets are attached', () => {
-    expect(() => validateEnv({ npm_lifecycle_event: 'build' })).not.toThrow()
+    expect(() => validateEnv({ NODE_ENV: 'production', npm_lifecycle_event: 'build' })).not.toThrow()
   })
 
   it('still fails closed when the deployed server starts without secrets', () => {

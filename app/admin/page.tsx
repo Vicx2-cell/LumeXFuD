@@ -54,6 +54,7 @@ const NAV_ACTIONS = [
   { href: '/admin/riders/new', label: 'Add Rider', icon: ICONS.plus, desc: 'Onboard a new rider' },
   { href: '/admin/wallets', label: 'Wallets', icon: ICONS.wallet, desc: 'Freeze/unfreeze, float status' },
   { href: '/admin/promotions', label: 'Promotions', icon: ICONS.star, desc: 'Create codes and control the promo fund' },
+  { href: '/admin/email-operations', label: 'Support inbox', icon: ICONS.receipt, desc: 'Review contact cases and email failures' },
   { href: '/admin/audit', label: 'Audit Log', icon: ICONS.log, desc: 'All admin actions' },
 ]
 
@@ -68,12 +69,12 @@ const NAV_GROUPS = [
     description: 'Review operators, KYC, and new account setup.',
     hrefs: ['/admin/vendors', '/admin/riders', '/admin/kyc', '/admin/vendors/new', '/admin/riders/new'],
   },
-  {
-    title: 'Platform support',
-    description: 'Supporting data, moderation, and audit trails.',
-    hrefs: ['/admin/accounts', '/admin/wallets', '/admin/promotions', '/admin/lodges', '/admin/customer-locations', '/admin/verified-places', '/admin/reviews', '/admin/audit'],
-  },
-] as const
+    {
+      title: 'Platform support',
+      description: 'Supporting data, moderation, and audit trails.',
+      hrefs: ['/admin/accounts', '/admin/wallets', '/admin/promotions', '/admin/email-operations', '/admin/lodges', '/admin/customer-locations', '/admin/verified-places', '/admin/reviews', '/admin/audit'],
+    },
+  ] as const
 
 export default function AdminDashboard() {
   const router = useRouter()

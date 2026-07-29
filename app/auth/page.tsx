@@ -171,7 +171,6 @@ function LoginForm() {
       // factor before any session is issued.
       if (data.webauthn_required) {
         setStep('mfa')
-        void runWebAuthn()
         return
       }
       // Success: play the unlock burst, then navigate. Use a FULL navigation
@@ -193,7 +192,7 @@ function LoginForm() {
     } finally {
       setLoading(false)
     }
-  }, [phone, nextPath, hasNext, runWebAuthn])
+  }, [phone, nextPath, hasNext])
 
   function handlePhoneContinue() {
     if (phone.length < 13) return
@@ -388,7 +387,7 @@ function LoginForm() {
                   disabled={mfaBusy}
                   className="lx-btn-amber w-full py-3.5"
                 >
-                  {mfaBusy ? 'Waiting for Face ID…' : 'Try Face ID again'}
+                  {mfaBusy ? 'Waiting for Face ID…' : 'Continue with Face ID'}
                 </button>
               )}
 

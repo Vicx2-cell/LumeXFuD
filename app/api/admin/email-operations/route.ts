@@ -12,7 +12,7 @@ export async function GET() {
   const db = createSupabaseAdmin()
   const [{ data: deliveries }, { data: cases }] = await Promise.all([
     db.from('email_operations_admin').select('*').order('created_at', { ascending: false }).limit(100),
-    db.from('contact_cases').select('id, reference_number, intent, status, owner_queue, acknowledgement_status, escalation_due_at, created_at').order('created_at', { ascending: false }).limit(100),
+    db.from('contact_cases').select('id, reference_number, requester_name, requester_email, intent, subject, message, status, owner_queue, acknowledgement_status, escalation_due_at, created_at').order('created_at', { ascending: false }).limit(100),
   ])
   return NextResponse.json({ deliveries: deliveries ?? [], cases: cases ?? [] })
 }
