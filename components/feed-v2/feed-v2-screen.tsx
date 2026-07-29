@@ -41,6 +41,7 @@ import type {
   FeedV2Tab,
 } from '@/app/feed-v2/types'
 import { recordFeedCommerceEvent, rememberFeedCommerceSource } from '@/lib/feed/client-attribution'
+import type { FeedFallbackCard } from '@/lib/feed/automation'
 
 type FeedV2ScreenProps = {
   posts: FeedV2Post[]
@@ -55,6 +56,7 @@ type FeedV2ScreenProps = {
   hasMore?: boolean
   nextOffset?: number
   activeTab?: 'for_you' | 'following' | 'nearby' | 'deals' | 'trending'
+  fallbackCards?: FeedFallbackCard[]
   menuOpenFor?: string | null
   isActionPending?: (postId: string, kind: string) => boolean
   onToggleMenu?: (post: FeedV2Post) => void
@@ -74,7 +76,7 @@ type FeedV2ScreenProps = {
 }
 
 type TimelineProps = Pick<FeedV2ScreenProps,
-  'posts' | 'menuOpenFor' | 'isActionPending' | 'onToggleMenu' | 'onLike' | 'onReply' | 'onRepost' |
+  'posts' | 'fallbackCards' | 'menuOpenFor' | 'isActionPending' | 'onToggleMenu' | 'onLike' | 'onReply' | 'onRepost' |
   'onQuote' | 'onSave' | 'onShare' | 'onFollow' | 'onReport' | 'onNotInterested' | 'onHideCreator' | 'onMute' | 'onBlock'>
 
 type FeedComment = {
@@ -924,6 +926,7 @@ function Header({
 
 function Timeline({
   posts,
+  fallbackCards = [],
   menuOpenFor,
   isActionPending,
   onToggleMenu,
@@ -954,9 +957,17 @@ function Timeline({
   return (
     <div className={styles.timeline}>
       {posts.length === 0 ? (
-        <div className="mx-4 my-8 rounded-lg border border-white/8 bg-white/[0.025] px-5 py-10 text-center">
-          <h2 className="text-lg font-semibold text-white">No posts here yet</h2>
-          <p className="mt-2 text-sm text-white/50">Try another feed tab or check again when vendors publish an update.</p>
+        <div className="mx-4 my-8 space-y-3 rounded-lg border border-white/8 bg-white/[0.025] px-5 py-6">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Explore what is available</h2>
+            <p className="mt-1 text-sm text-white/50">Live marketplace discovery while this feed is quiet.</p>
+          </div>
+          {fallbackCards.map((card) => (
+            <Link key={card.kind} href={card.href} className="flex min-h-12 items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white/80">
+              <span>{card.title}</span>
+              <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+          ))}
         </div>
       ) : null}
       {posts.map((post, index) => {
@@ -1403,6 +1414,7 @@ export function FeedV2Screen({
   hasMore: initialHasMore = false,
   nextOffset: initialNextOffset = initialPosts.length,
   activeTab = 'for_you',
+  fallbackCards = [],
   ...timelineProps
 }: FeedV2ScreenProps) {
   const router = useRouter()
@@ -1882,6 +1894,7 @@ export function FeedV2Screen({
           <main className={styles.center}>
             <Timeline
               posts={visiblePosts}
+              fallbackCards={fallbackCards}
               {...timelineProps}
               menuOpenFor={menuOpenFor}
               isActionPending={isPending}

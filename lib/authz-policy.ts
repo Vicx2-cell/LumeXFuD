@@ -31,6 +31,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'super-admin/financials', 'super-admin/lockdown', 'super-admin/pricing',
     'super-admin/premium', 'super-admin/campus-partners', 'super-admin/official-feed',
     'super-admin/payments', 'super-admin/feed-reports', 'super-admin/feed-stories',
+    'super-admin/feed-automation', 'super-admin/feed-pins',
     'super-admin/revoke-sessions', 'super-admin/rewards', 'super-admin/security-health',
     'super-admin/security-incidents', 'super-admin/security-incidents/[id]', 'super-admin/security-incidents/[id]/export',
     'super-admin/sentinel', 'super-admin/settings', 'super-admin/super-audit',
@@ -58,7 +59,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
   ], role(VR)),
 
   ...map([
-    'vendor/reviews', 'vendor/menu', 'vendor/menu/[id]', 'upload/menu-image',
+    'vendor/reviews', 'vendor/menu', 'vendor/menu/[id]', 'vendor/bundles', 'vendor/bundles/[id]', 'vendor/feed-automation', 'upload/menu-image',
     'vendor-ai/daily-summary', 'vendor-ai/describe', 'ai/menu-digitize', 'forecast/vendor',
   ], role(['vendor'])),
 

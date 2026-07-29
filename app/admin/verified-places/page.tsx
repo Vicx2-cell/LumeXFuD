@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { GlassSheen } from '@/components/fx'
+import { formatNullableNumber } from '@/lib/number-format'
 
 interface VerifiedPlaceRow {
   id: string
@@ -81,7 +82,7 @@ export default function AdminVerifiedPlacesPage() {
                         {place.city} · {place.confidence_count} confirmations
                       </p>
                       <p className="text-xs text-white/35 mt-2">
-                        {place.canonical_latitude.toFixed(5)}, {place.canonical_longitude.toFixed(5)}
+                        {formatNullableNumber(place.canonical_latitude, 5) ?? 'Coordinates unavailable'}, {formatNullableNumber(place.canonical_longitude, 5) ?? 'Coordinates unavailable'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

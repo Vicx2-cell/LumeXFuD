@@ -6,6 +6,7 @@ import {
   haversineDistanceMeters,
 } from '@/lib/delivery-pricing'
 import { computeLaunchDeliveryQuote, estimateRoadDistanceMeters, getLaunchDeliveryPricing } from '@/lib/launch-delivery-pricing'
+import { toDeliveryEstimateResponse } from '@/lib/delivery-estimate-response'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -63,18 +64,22 @@ export async function POST(req: NextRequest) {
     haversineDistanceMeters({ lat: vendorLat, lng: vendorLng }, { lat: delivery_latitude, lng: delivery_longitude }),
     launchPricing.roadDistanceMultiplierBps,
   )
-  const estimate = computeLaunchDeliveryQuote({
+  const launchQuote = computeLaunchDeliveryQuote({
     pricing: launchPricing, roadDistanceMeters: distanceMeters, isGuest: false,
   })
+  const estimate = toDeliveryEstimateResponse(launchQuote)
+  if (!estimate) {
+    return NextResponse.json({ error: 'Could not calculate a valid delivery quote.' }, { status: 503 })
+  }
 
-  if (estimate.roadDistanceMeters > pricing.maxDeliveryDistanceMeters) {
+  if (launchQuote.roadDistanceMeters > pricing.maxDeliveryDistanceMeters) {
     return NextResponse.json({
       error: 'Delivery distance is outside the configured service area.',
       code: 'max_distance_exceeded',
       estimate,
     }, { status: 400 })
   }
-  if (estimate.roadDistanceMeters > pricing.vendorDeliveryRadiusMeters) {
+  if (launchQuote.roadDistanceMeters > pricing.vendorDeliveryRadiusMeters) {
     return NextResponse.json({
       error: 'This vendor does not deliver that far yet.',
       code: 'vendor_radius_exceeded',

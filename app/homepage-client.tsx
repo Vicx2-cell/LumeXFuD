@@ -12,6 +12,7 @@ import { VerifiedBadge } from '@/components/verified-badge'
 import { Pill } from '@/components/ui/pill'
 import { campaignHref, getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
 import { storePath } from '@/lib/storefront'
+import { formatNullableNumber } from '@/lib/number-format'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks']
 
@@ -369,7 +370,7 @@ function VendorCard({
             {vendor.total_ratings >= 5 ? (
               <div className="lx-amber flex items-center gap-1">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                <span className="text-sm font-medium">{vendor.avg_rating.toFixed(1)}</span>
+                <span className="text-sm font-medium">{formatNullableNumber(vendor.avg_rating, 1) ?? 'Rating unavailable'}</span>
                 <span className="text-white/30 text-xs">({vendor.total_ratings})</span>
               </div>
             ) : (

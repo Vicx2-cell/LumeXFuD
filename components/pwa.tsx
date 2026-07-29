@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 // ─── Service worker registration ─────────────────────────────────────────────
 // Registered only in production — a SW caching navigations/_next assets in dev
@@ -103,6 +104,7 @@ function isIOS(): boolean {
 }
 
 function InstallPrompt() {
+  const pathname = usePathname()
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null)
   const [showIOSGuide, setShowIOSGuide] = useState(false)
   const [visible, setVisible] = useState(false)
@@ -157,7 +159,12 @@ function InstallPrompt() {
     setShowIOSGuide(true)
   }
 
-  if (!visible) return null
+  const commerceRoute = pathname === '/cart'
+    || pathname.startsWith('/store/')
+    || pathname.startsWith('/vendor/')
+    || pathname.startsWith('/order/')
+    || pathname.startsWith('/group/')
+  if (!visible || commerceRoute) return null
 
   return (
     <>

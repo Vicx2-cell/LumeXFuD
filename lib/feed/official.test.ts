@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { archiveOfficialPostsForSource, ensureOfficialAccount } from './official-service'
-import { buildOfficialCollectionPlan, formatOfficialMoney, selectFairOfficialItems, type OfficialAreaConfig, type OfficialSourceItem } from './official'
+import { buildOfficialCollectionPlan, formatOfficialMoney, isWithinOfficialDeliveryCoverage, selectFairOfficialItems, type OfficialAreaConfig, type OfficialSourceItem } from './official'
 
 function makeArea(overrides: Partial<OfficialAreaConfig> = {}): OfficialAreaConfig {
   return {
@@ -17,6 +17,9 @@ function makeArea(overrides: Partial<OfficialAreaConfig> = {}): OfficialAreaConf
     maxPostsPerDay: 2,
     maxCollectionItems: 5,
     picksMaxPerDay: 2,
+    coverageLatitude: 5.8301,
+    coverageLongitude: 7.3958,
+    coverageRadiusMeters: 10000,
     ...overrides,
   }
 }
@@ -151,6 +154,12 @@ function makeDb(initial: Record<string, Record<string, unknown>[]> = {}) {
 }
 
 describe('official feed', () => {
+  it('fails closed when delivery coverage is unknown and excludes distant vendors', () => {
+    expect(isWithinOfficialDeliveryCoverage(makeArea(), { latitude: 5.8302, longitude: 7.3959 })).toBe(true)
+    expect(isWithinOfficialDeliveryCoverage(makeArea({ coverageLatitude: null }), { latitude: 5.8302, longitude: 7.3959 })).toBe(false)
+    expect(isWithinOfficialDeliveryCoverage(makeArea({ coverageRadiusMeters: 100 }), { latitude: 6.1, longitude: 7.7 })).toBe(false)
+  })
+
   it('formats 380000 kobo as ₦3,800', () => {
     expect(formatOfficialMoney(380000)).toBe('\u20A63,800')
   })
@@ -248,14 +257,14 @@ describe('official feed', () => {
 
   it('respects the late-night gate', () => {
     const before = buildOfficialCollectionPlan({
-      collectionType: 'evening_collection',
+      collectionType: 'late_night_collection',
       area: makeArea({ lateNightStart: '22:00' }),
       source: [sourceItem({ id: 'a', sourceId: 'a', vendorId: 'v1' }), sourceItem({ id: 'b', sourceId: 'b', vendorId: 'v2' }), sourceItem({ id: 'c', sourceId: 'c', vendorId: 'v3' })],
       generationReason: 'night',
       now: new Date('2026-07-12T20:00:00.000Z'),
     })
     const after = buildOfficialCollectionPlan({
-      collectionType: 'evening_collection',
+      collectionType: 'late_night_collection',
       area: makeArea({ lateNightStart: '22:00' }),
       source: [sourceItem({ id: 'a', sourceId: 'a', vendorId: 'v1' }), sourceItem({ id: 'b', sourceId: 'b', vendorId: 'v2' }), sourceItem({ id: 'c', sourceId: 'c', vendorId: 'v3' })],
       generationReason: 'night',

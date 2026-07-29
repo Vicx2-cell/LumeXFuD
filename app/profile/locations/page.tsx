@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/back-button'
 import { AlertBanner } from '@/components/ui/alert-banner'
+import { formatNullableNumber } from '@/lib/number-format'
 
 type LocationSource = 'customer_locations' | 'saved_places'
 
@@ -218,7 +219,7 @@ export default function ProfileLocationsPage() {
                     {location.is_active && <span className="ml-2 text-xs" style={{ color: '#F5A623' }}>active</span>}
                   </p>
                   <p className="text-xs text-white/40 truncate">
-                    {location.delivery_note ?? '—'} · {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
+                    {location.delivery_note ?? '—'} · {formatNullableNumber(location.latitude, 5) ?? 'Coordinates unavailable'}, {formatNullableNumber(location.longitude, 5) ?? 'Coordinates unavailable'}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">

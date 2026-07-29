@@ -5,7 +5,6 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { nextVendorReviewState, vendorReadyForApproval } from '@/lib/onboarding'
-import { createOfficialEventCollection, getOfficialAreaSettingByScope } from '@/lib/feed/official-scheduler'
 import { renderApplicationEmail } from '@/lib/email/templates'
 import { deliverWorkflowEmail } from '@/lib/email/workflow-email'
 
@@ -41,7 +40,6 @@ export async function PATCH(
     .eq('id', id)
     .single()
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
-  const vendorRatings = vendor as typeof vendor & { total_ratings?: number; avg_rating?: number }
 
   const now = new Date().toISOString()
   const updates: Record<string, unknown> = { updated_at: now }
@@ -88,48 +86,6 @@ export async function PATCH(
     updates.approval_state = 'approved'
   } else if (parsed.data.action === 'activate_premium') {
     updates.is_premium = true
-  }
-
-  if (parsed.data.action === 'approve') {
-    try {
-      const areaScope = vendor.zone_id ? 'zone' : 'city'
-      const areaId = String(vendor.zone_id ?? vendor.city_id ?? '')
-      if (areaId) {
-        const area = await getOfficialAreaSettingByScope(db, areaScope, areaId)
-        if (area) {
-          await createOfficialEventCollection({
-            area,
-            collectionType: 'new_on_lumex',
-            reason: 'Recently approved vendor surfaced in New on LumeX.',
-            sourceId: `vendor:${id}`,
-            source: [{
-              id: `vendor:${id}`,
-              vendorId: id,
-              vendorName: String(vendor.shop_name ?? 'Vendor'),
-              itemName: String(vendor.shop_name ?? 'Vendor'),
-              priceKobo: 0,
-              imageUrl: String((vendor.shop_photo_url ?? vendor.logo_url ?? vendor.storefront_photo_url) ?? '') || null,
-              imageBelongsToItem: Boolean(vendor.shop_photo_url ?? vendor.logo_url ?? vendor.storefront_photo_url),
-              isAvailable: true,
-              vendorApproved: true,
-              vendorActive: true,
-              vendorVisible: true,
-              servesArea: true,
-              areaScope,
-              areaId,
-              sourceType: 'vendor',
-              sourceId: `vendor:${id}`,
-              popularityOrders30d: Number(vendorRatings.total_ratings ?? 0),
-              totalRatings: Number(vendorRatings.total_ratings ?? 0),
-              avgRating: Number(vendorRatings.avg_rating ?? 0),
-            } as never],
-            publish: !!area?.autoPublish,
-          })
-        }
-      }
-    } catch (err) {
-      console.error('[official-feed] vendor.approved failed:', err instanceof Error ? err.message : err)
-    }
   }
 
   await db.from('vendors').update(updates).eq('id', id)

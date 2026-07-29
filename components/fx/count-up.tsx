@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { formatNullableNumber } from '@/lib/number-format'
 
 interface CountUpProps {
   /** Target value to count up to. */
@@ -60,6 +61,8 @@ export function CountUp({ value, duration = 1100, decimals = 0, format, classNam
     return () => { io.disconnect(); cancelAnimationFrame(raf) }
   }, [value, duration])
 
-  const text = format ? format(display) : display.toFixed(decimals)
+  const text = Number.isFinite(display)
+    ? (format ? format(display) : formatNullableNumber(display, decimals) ?? '—')
+    : '—'
   return <span ref={ref} className={`tabular-nums ${className}`}>{text}</span>
 }

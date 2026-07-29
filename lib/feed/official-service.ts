@@ -1,5 +1,6 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { type OfficialAreaConfig, type OfficialCollectionPlan } from './official'
+import { FEED_AUTOMATION_TEMPLATE_VERSION } from './automation'
 
 export const OFFICIAL_SYSTEM_ACCOUNT_KEY = 'lumex_fud'
 export const OFFICIAL_SYSTEM_HANDLE = 'lumex-fud-official'
@@ -54,6 +55,9 @@ function mapAreaRow(row: Record<string, unknown>): OfficialAreaSettingRow {
     maxPostsPerDay: Number(row.max_posts_per_day ?? 2),
     maxCollectionItems: Number(row.max_collection_items ?? 5),
     picksMaxPerDay: Number(row.picks_max_per_day ?? 2),
+    coverageLatitude: row.coverage_latitude == null ? null : Number(row.coverage_latitude),
+    coverageLongitude: row.coverage_longitude == null ? null : Number(row.coverage_longitude),
+    coverageRadiusMeters: row.coverage_radius_meters == null ? null : Number(row.coverage_radius_meters),
     updatedBy: (row.updated_by as string | null) ?? null,
     updatedAt: String(row.updated_at ?? new Date().toISOString()),
     morningCron: String(row.morning_cron ?? '0 7 * * *'),
@@ -78,6 +82,7 @@ export async function ensureOfficialAccount(db: DB = createSupabaseAdmin()) {
         avatar_url: OFFICIAL_SYSTEM_AVATAR_URL,
         profile_kind: 'admin',
         is_system_account: true,
+        is_verified: true,
         official_badge_kind: 'official',
         profile_locked_at: now,
         deleted_at: null,
@@ -131,7 +136,7 @@ export async function ensureOfficialAccount(db: DB = createSupabaseAdmin()) {
 export async function loadOfficialAreaSettings(db: DB = createSupabaseAdmin()) {
   const { data } = await db
     .from('official_feed_area_settings')
-    .select('id, city_id, zone_id, area_scope, area_label, morning_enabled, evening_enabled, auto_publish, morning_cron, evening_cron, late_night_start, min_popularity_orders, price_threshold_kobo, max_posts_per_day, max_collection_items, picks_max_per_day, updated_by, updated_at')
+    .select('id, city_id, zone_id, area_scope, area_label, morning_enabled, evening_enabled, auto_publish, morning_cron, evening_cron, late_night_start, min_popularity_orders, price_threshold_kobo, max_posts_per_day, max_collection_items, picks_max_per_day, coverage_latitude, coverage_longitude, coverage_radius_meters, updated_by, updated_at')
     .order('area_scope', { ascending: true })
     .order('area_label', { ascending: true })
   return (data ?? []).map((row) => mapAreaRow(row as Record<string, unknown>))
@@ -155,6 +160,9 @@ export async function upsertOfficialAreaSetting(
     maxPostsPerDay?: number
     maxCollectionItems?: number
     picksMaxPerDay?: number
+    coverageLatitude?: number | null
+    coverageLongitude?: number | null
+    coverageRadiusMeters?: number | null
     updatedBy: string
   },
 ) {
@@ -175,6 +183,9 @@ export async function upsertOfficialAreaSetting(
     max_posts_per_day: Math.max(1, Math.round(input.maxPostsPerDay ?? 2)),
     max_collection_items: Math.max(1, Math.round(input.maxCollectionItems ?? 5)),
     picks_max_per_day: Math.max(1, Math.round(input.picksMaxPerDay ?? 2)),
+    coverage_latitude: input.coverageLatitude ?? null,
+    coverage_longitude: input.coverageLongitude ?? null,
+    coverage_radius_meters: input.coverageRadiusMeters ?? null,
     updated_by: input.updatedBy,
     updated_at: now,
   }
@@ -182,7 +193,7 @@ export async function upsertOfficialAreaSetting(
   const { data, error } = await db
     .from('official_feed_area_settings')
     .upsert(payload, { onConflict: 'area_scope,city_id,zone_id' })
-    .select('id, city_id, zone_id, area_scope, area_label, morning_enabled, evening_enabled, auto_publish, morning_cron, evening_cron, late_night_start, min_popularity_orders, price_threshold_kobo, max_posts_per_day, max_collection_items, picks_max_per_day, updated_by, updated_at')
+    .select('id, city_id, zone_id, area_scope, area_label, morning_enabled, evening_enabled, auto_publish, morning_cron, evening_cron, late_night_start, min_popularity_orders, price_threshold_kobo, max_posts_per_day, max_collection_items, picks_max_per_day, coverage_latitude, coverage_longitude, coverage_radius_meters, updated_by, updated_at')
     .single()
 
   if (error || !data) throw new Error(error?.message ?? 'Could not save official feed settings')
@@ -222,6 +233,11 @@ export async function persistOfficialCollection(
 
   const postStatus = input.publish ? 'published' : 'draft'
   const postPublishedAt = input.publish ? now : null
+  const timeSensitive = new Set([
+    'breakfast_picks', 'lunch_picks', 'dinner_picks', 'morning_collection',
+    'evening_collection', 'breakfast_collection', 'lunch_collection',
+    'late_night_collection', 'open_right_now', 'closing_soon',
+  ]).has(input.plan.collectionType)
   const { data: post, error: postError } = await db.from('posts').insert({
     author_profile_id: account.id,
     vendor_id: null,
@@ -240,6 +256,21 @@ export async function persistOfficialCollection(
     is_boosted: false,
     is_archived: false,
     is_pinned: false,
+    generation_mode: 'automatic',
+    automatic_post_type: input.plan.collectionType,
+    source_event_type: input.plan.sourceType,
+    source_entity_type: input.plan.sourceType,
+    source_entity_id: input.plan.sourceId,
+    idempotency_key: `official-feed:${input.plan.dedupeKey}`,
+    area_scope: input.plan.areaScope === 'zone' ? 'delivery_area' : 'city',
+    area_id: input.plan.areaId,
+    generated_at: now,
+    expires_at: timeSensitive ? new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString() : null,
+    template_version: FEED_AUTOMATION_TEMPLATE_VERSION,
+    moderation_status: input.publish ? 'approved' : 'pending',
+    link_target_type: 'collection',
+    link_target_id: input.plan.dedupeKey,
+    cta_enabled: true,
     updated_at: now,
   }).select('id').single()
 

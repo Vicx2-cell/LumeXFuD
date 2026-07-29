@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { GlassSheen } from '@/components/fx'
+import { formatNullableNumber } from '@/lib/number-format'
 
 interface VendorRow {
   id: string
@@ -172,7 +173,7 @@ export default function AdminVendors() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-xs text-white/40">{v.category}</p>
-                    <p className="text-xs text-white/40 mt-0.5">⭐ {v.avg_rating.toFixed(1)} ({v.total_ratings})</p>
+                    <p className="text-xs text-white/40 mt-0.5">⭐ {formatNullableNumber(v.avg_rating, 1) ?? 'Rating unavailable'} ({v.total_ratings})</p>
                   </div>
                 </div>
 

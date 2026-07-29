@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { GlassSheen } from '@/components/fx'
+import { formatNullableNumber } from '@/lib/number-format'
 
 interface LocationRow {
   id: string
@@ -62,7 +63,7 @@ export default function AdminCustomerLocationsPage() {
                       {row.customers?.name ?? 'Unknown customer'} · {row.customers?.phone ?? row.customer_id}
                     </p>
                     <p className="text-xs text-white/35 mt-2">
-                      {row.delivery_note ?? '—'} · {row.latitude.toFixed(5)}, {row.longitude.toFixed(5)}
+                      {row.delivery_note ?? '—'} · {formatNullableNumber(row.latitude, 5) ?? 'Coordinates unavailable'}, {formatNullableNumber(row.longitude, 5) ?? 'Coordinates unavailable'}
                     </p>
                   </div>
                   <div className="text-right shrink-0 text-xs text-white/35">

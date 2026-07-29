@@ -23,6 +23,13 @@ export type OfficialCollectionType =
   | 'active_deals'
   | 'sponsored'
   | 'event'
+  | 'cheap_eats'
+  | 'breakfast_collection'
+  | 'lunch_collection'
+  | 'late_night_collection'
+  | 'popular_near_you'
+  | 'back_in_stock'
+  | 'order_activity_collection'
 
 export interface OfficialAreaConfig {
   id: string
@@ -40,6 +47,9 @@ export interface OfficialAreaConfig {
   maxPostsPerDay: number
   maxCollectionItems: number
   picksMaxPerDay: number
+  coverageLatitude: number | null
+  coverageLongitude: number | null
+  coverageRadiusMeters: number | null
 }
 
 export interface OfficialSourceItem {
@@ -63,6 +73,7 @@ export interface OfficialSourceItem {
   createdAt?: string | null
   category?: string | null
   popularityOrders30d?: number
+  activityOrders?: number
   totalRatings?: number
   avgRating?: number
   dealEndsAt?: string | null
@@ -129,6 +140,22 @@ function slugify(value: string) {
 
 export function formatOfficialMoney(kobo: number): string {
   return isValidKoboAmount(kobo) && kobo >= 0 ? formatPrice(kobo) : 'Available near you'
+}
+
+export function isWithinOfficialDeliveryCoverage(
+  area: Pick<OfficialAreaConfig, 'coverageLatitude' | 'coverageLongitude' | 'coverageRadiusMeters'>,
+  vendor: { latitude: number | null | undefined; longitude: number | null | undefined },
+): boolean {
+  const values = [area.coverageLatitude, area.coverageLongitude, area.coverageRadiusMeters, vendor.latitude, vendor.longitude]
+  if (values.some((value) => typeof value !== 'number' || !Number.isFinite(value))) return false
+  const radians = (degrees: number) => degrees * Math.PI / 180
+  const lat1 = radians(area.coverageLatitude!)
+  const lat2 = radians(vendor.latitude!)
+  const deltaLat = lat2 - lat1
+  const deltaLng = radians(vendor.longitude! - area.coverageLongitude!)
+  const h = Math.sin(deltaLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2
+  const distanceMeters = 6_371_000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
+  return distanceMeters <= area.coverageRadiusMeters!
 }
 
 export function isSupportedPopularityClaim(input: Pick<OfficialSourceItem, 'popularityOrders30d' | 'totalRatings' | 'avgRating'>, threshold: number): boolean {
@@ -274,6 +301,14 @@ export function buildOfficialCollectionPlan(input: {
       'shawarma_picks',
       'pizza_friday',
       'drinks_around_you',
+      'cheap_eats',
+      'breakfast_collection',
+      'lunch_collection',
+      'evening_collection',
+      'late_night_collection',
+      'popular_near_you',
+      'back_in_stock',
+      'order_activity_collection',
     ].includes(input.collectionType)
       ? 2
       : 3,
@@ -286,7 +321,7 @@ export function buildOfficialCollectionPlan(input: {
   }
 
   const filteredSource = input.source.filter(() => {
-    if (input.collectionType === 'evening_collection') return isLateNight(now, rules.lateNightStart) ? true : false
+    if (input.collectionType === 'late_night_collection') return isLateNight(now, rules.lateNightStart) ? true : false
     return true
   })
 
@@ -295,7 +330,21 @@ export function buildOfficialCollectionPlan(input: {
   if (selection.items.length === 0) return null
 
   const title = input.forcedTitle ?? (
-    input.collectionType === 'morning_collection'
+    input.collectionType === 'cheap_eats'
+      ? `Affordable Picks Around ${input.area.areaLabel}`
+    : input.collectionType === 'breakfast_collection'
+      ? 'Breakfast Available Now'
+    : input.collectionType === 'lunch_collection'
+      ? 'Lunch Available Now'
+    : input.collectionType === 'late_night_collection'
+      ? 'Late Night Eats'
+    : input.collectionType === 'popular_near_you'
+      ? 'Popular Near You'
+    : input.collectionType === 'back_in_stock'
+      ? 'Back in Stock'
+    : input.collectionType === 'order_activity_collection'
+      ? 'Popular from Marketplace Activity'
+    : input.collectionType === 'morning_collection'
       ? `Good morning ${input.area.areaLabel} ☀️`
     : input.collectionType === 'evening_collection'
       ? 'Late Night Eats 🌙'
@@ -341,7 +390,21 @@ export function buildOfficialCollectionPlan(input: {
   )
 
   const subtitle = input.forcedSubtitle ?? (
-    input.collectionType === 'morning_collection'
+    input.collectionType === 'cheap_eats'
+      ? `Available meals under ${formatOfficialMoney(rules.priceThresholdKobo)}`
+    : input.collectionType === 'breakfast_collection'
+      ? 'Breakfast ideas from real live menus'
+    : input.collectionType === 'lunch_collection'
+      ? 'Midday meals that are actually available now'
+    : input.collectionType === 'late_night_collection'
+      ? `Only vendors and meals still available after ${rules.lateNightStart}`
+    : input.collectionType === 'popular_near_you'
+      ? 'Ranked from aggregated verified paid and completed orders'
+    : input.collectionType === 'back_in_stock'
+      ? 'Meaningful items available again'
+    : input.collectionType === 'order_activity_collection'
+      ? 'Discovery from anonymous area-level order aggregates'
+    : input.collectionType === 'morning_collection'
       ? 'Breakfast, lunch, dinner, and live deals near you'
     : input.collectionType === 'evening_collection'
       ? `Only vendors and meals still available after ${rules.lateNightStart}`

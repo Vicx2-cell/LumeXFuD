@@ -9,6 +9,7 @@ import { SITE_URL, PLACE, seoUrl, vendorPath } from '@/lib/seo/config'
 import { allInKobo } from '@/lib/seo/pricing'
 import { buildVendorJsonLd } from '@/lib/seo/jsonld'
 import { getSeoVendorBySlug, type SeoVendor, type SeoMenuItem } from '@/lib/seo/vendor-data'
+import { formatNullableNumber } from '@/lib/number-format'
 
 // Rendered dynamically (server-side) per request — NOT force-static/ISR. The
 // app's root layout is `force-dynamic`; a force-static page nested under it
@@ -28,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const fromAllIn = v.priceStats ? formatPrice(allInKobo(v.priceStats.minKobo, v.fees)) : null
   const title = `${v.shopName} — menu & all-in prices near ${PLACE.campusShort}, ${PLACE.town}`
   const ratingBit = v.totalRatings > 0
-    ? `Rated ${v.avgRating.toFixed(1)}★ by ${v.totalRatings} ${v.totalRatings === 1 ? 'student' : 'students'}.`
+    ? `Rated ${formatNullableNumber(v.avgRating, 1) ?? 'rating unavailable'}★ by ${v.totalRatings} ${v.totalRatings === 1 ? 'student' : 'students'}.`
     : 'New on LumeX.'
   const priceBit = fromAllIn ? `Meals from ${fromAllIn} delivered (all-in, no surprises).` : ''
   const description =
@@ -150,7 +151,7 @@ function VendorHero({ v }: { v: SeoVendor }) {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
             <StatusDot v={v} />
             {v.totalRatings > 0 ? (
-              <span className="text-sm text-white/70">★ {v.avgRating.toFixed(1)} <span className="text-white/45">({v.totalRatings})</span></span>
+              <span className="text-sm text-white/70">★ {formatNullableNumber(v.avgRating, 1) ?? '—'} <span className="text-white/45">({v.totalRatings})</span></span>
             ) : (
               <span className="text-sm text-white/45">New — no reviews yet</span>
             )}
@@ -323,7 +324,7 @@ function ReviewsSection({ v }: { v: SeoVendor }) {
       ) : (
         <>
           <p className="text-sm text-white/70 mb-3">
-            {v.avgRating.toFixed(1)}★ average from {v.totalRatings} {v.totalRatings === 1 ? 'verified order' : 'verified orders'}.
+            {formatNullableNumber(v.avgRating, 1) ?? 'Rating unavailable'}★ average from {v.totalRatings} {v.totalRatings === 1 ? 'verified order' : 'verified orders'}.
           </p>
           {withText.length > 0 && (
             <ul className="space-y-2.5">

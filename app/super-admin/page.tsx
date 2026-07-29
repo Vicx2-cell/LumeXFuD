@@ -60,6 +60,13 @@ const actions = [
     highlight: true,
   },
   {
+    href: '/super-admin/feed-automation',
+    label: 'Feed automation',
+    desc: 'Kill switch, failed jobs, provenance, and official pins',
+    icon: svg(<><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/><circle cx="18" cy="18" r="3"/></>),
+    highlight: true,
+  },
+  {
     href: '/super-admin/feed-stories',
     label: 'Approve stories',
     desc: 'Review student stories before they go live',

@@ -25,6 +25,9 @@ type OfficialAreaSetting = {
   max_posts_per_day: number | null
   max_collection_items: number | null
   picks_max_per_day: number | null
+  coverage_latitude: number | null
+  coverage_longitude: number | null
+  coverage_radius_meters: number | null
   updated_by: string | null
   updated_at: string | null
 }
@@ -87,6 +90,9 @@ type AreaForm = {
   maxPostsPerDay: number
   maxCollectionItems: number
   picksMaxPerDay: number
+  coverageLatitude: string
+  coverageLongitude: string
+  coverageRadiusMeters: string
 }
 
 const emptyAreaForm: AreaForm = {
@@ -105,6 +111,9 @@ const emptyAreaForm: AreaForm = {
   maxPostsPerDay: 2,
   maxCollectionItems: 5,
   picksMaxPerDay: 2,
+  coverageLatitude: '',
+  coverageLongitude: '',
+  coverageRadiusMeters: '',
 }
 
 function fmtDate(value: string | null) {
@@ -272,6 +281,9 @@ export default function SuperAdminOfficialFeedPage() {
       maxPostsPerDay: setting.max_posts_per_day ?? 2,
       maxCollectionItems: setting.max_collection_items ?? 5,
       picksMaxPerDay: setting.picks_max_per_day ?? 2,
+      coverageLatitude: setting.coverage_latitude == null ? '' : String(setting.coverage_latitude),
+      coverageLongitude: setting.coverage_longitude == null ? '' : String(setting.coverage_longitude),
+      coverageRadiusMeters: setting.coverage_radius_meters == null ? '' : String(setting.coverage_radius_meters),
     })
     setError('')
   }
@@ -344,6 +356,11 @@ export default function SuperAdminOfficialFeedPage() {
       setError('Pick a zone id for zone-scoped rules.')
       return
     }
+    const coverageValues = [areaForm.coverageLatitude, areaForm.coverageLongitude, areaForm.coverageRadiusMeters]
+    if (coverageValues.some(Boolean) && !coverageValues.every(Boolean)) {
+      setError('Coverage latitude, longitude, and radius must be configured together.')
+      return
+    }
 
     setBusy('setting')
     setError('')
@@ -367,6 +384,9 @@ export default function SuperAdminOfficialFeedPage() {
           maxPostsPerDay: areaForm.maxPostsPerDay,
           maxCollectionItems: areaForm.maxCollectionItems,
           picksMaxPerDay: areaForm.picksMaxPerDay,
+          coverageLatitude: areaForm.coverageLatitude ? Number(areaForm.coverageLatitude) : null,
+          coverageLongitude: areaForm.coverageLongitude ? Number(areaForm.coverageLongitude) : null,
+          coverageRadiusMeters: areaForm.coverageRadiusMeters ? Number(areaForm.coverageRadiusMeters) : null,
         }),
       })
       const json = await res.json().catch(() => ({})) as { error?: string }
@@ -749,6 +769,9 @@ export default function SuperAdminOfficialFeedPage() {
               <Field label="Max posts/day" value={String(areaForm.maxPostsPerDay)} onChange={(value) => setAreaForm((prev) => ({ ...prev, maxPostsPerDay: Number(value) || 1 }))} />
               <Field label="Max collection items" value={String(areaForm.maxCollectionItems)} onChange={(value) => setAreaForm((prev) => ({ ...prev, maxCollectionItems: Number(value) || 1 }))} />
               <Field label="Picks/day" value={String(areaForm.picksMaxPerDay)} onChange={(value) => setAreaForm((prev) => ({ ...prev, picksMaxPerDay: Number(value) || 1 }))} />
+              <Field label="Coverage latitude" value={areaForm.coverageLatitude} onChange={(value) => setAreaForm((prev) => ({ ...prev, coverageLatitude: value }))} />
+              <Field label="Coverage longitude" value={areaForm.coverageLongitude} onChange={(value) => setAreaForm((prev) => ({ ...prev, coverageLongitude: value }))} />
+              <Field label="Coverage radius (metres)" value={areaForm.coverageRadiusMeters} onChange={(value) => setAreaForm((prev) => ({ ...prev, coverageRadiusMeters: value }))} />
               <div className="md:col-span-2 flex flex-wrap gap-2">
                 <ToggleChip label="Morning" value={areaForm.morningEnabled} onChange={(value) => setAreaForm((prev) => ({ ...prev, morningEnabled: value }))} />
                 <ToggleChip label="Evening" value={areaForm.eveningEnabled} onChange={(value) => setAreaForm((prev) => ({ ...prev, eveningEnabled: value }))} />

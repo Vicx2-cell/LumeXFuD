@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { GlassSheen } from '@/components/fx'
+import { formatNullableNumber } from '@/lib/number-format'
 
 interface RiderRow {
   id: string
@@ -173,7 +174,7 @@ export default function AdminRiders() {
                     <p className="text-sm text-white/40 mt-0.5">{r.phone}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-xs text-white/40">⭐ {r.avg_rating.toFixed(1)}</p>
+                    <p className="text-xs text-white/40">⭐ {formatNullableNumber(r.avg_rating, 1) ?? 'Rating unavailable'}</p>
                     <p className="text-xs text-white/40 mt-0.5">{r.total_deliveries} deliveries</p>
                   </div>
                 </div>

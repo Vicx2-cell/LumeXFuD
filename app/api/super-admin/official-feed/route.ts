@@ -25,6 +25,18 @@ const areaSchema = z.object({
   maxPostsPerDay: z.number().int().min(1).max(20).optional(),
   maxCollectionItems: z.number().int().min(1).max(5).optional(),
   picksMaxPerDay: z.number().int().min(1).max(10).optional(),
+  coverageLatitude: z.number().min(-90).max(90).nullable().optional(),
+  coverageLongitude: z.number().min(-180).max(180).nullable().optional(),
+  coverageRadiusMeters: z.number().int().min(1).max(200_000).nullable().optional(),
+}).superRefine((value, context) => {
+  const coverage = [value.coverageLatitude, value.coverageLongitude, value.coverageRadiusMeters]
+  const supplied = coverage.filter((entry) => entry != null).length
+  if (supplied !== 0 && supplied !== 3) {
+    context.addIssue({ code: 'custom', message: 'Coverage latitude, longitude, and radius are required together' })
+  }
+  if (value.autoPublish && supplied !== 3) {
+    context.addIssue({ code: 'custom', message: 'Automatic publishing requires an explicit delivery coverage anchor and radius' })
+  }
 })
 
 const actionSchema = z.object({
@@ -55,7 +67,7 @@ export async function GET() {
   const db = createSupabaseAdmin()
   const [posts, settings] = await Promise.all([
     listOfficialFeedPosts(db, 40),
-    db.from('official_feed_area_settings').select('id, city_id, zone_id, area_scope, area_label, morning_enabled, evening_enabled, auto_publish, morning_cron, evening_cron, late_night_start, min_popularity_orders, price_threshold_kobo, max_posts_per_day, max_collection_items, picks_max_per_day, updated_by, updated_at').order('area_label', { ascending: true }),
+    db.from('official_feed_area_settings').select('id, city_id, zone_id, area_scope, area_label, morning_enabled, evening_enabled, auto_publish, morning_cron, evening_cron, late_night_start, min_popularity_orders, price_threshold_kobo, max_posts_per_day, max_collection_items, picks_max_per_day, coverage_latitude, coverage_longitude, coverage_radius_meters, updated_by, updated_at').order('area_label', { ascending: true }),
   ])
   return NextResponse.json({ posts, settings: settings.data ?? [] })
 }
@@ -92,6 +104,9 @@ export async function PATCH(req: NextRequest) {
     maxPostsPerDay: parsed.data.maxPostsPerDay,
     maxCollectionItems: parsed.data.maxCollectionItems,
     picksMaxPerDay: parsed.data.picksMaxPerDay,
+    coverageLatitude: parsed.data.coverageLatitude,
+    coverageLongitude: parsed.data.coverageLongitude,
+    coverageRadiusMeters: parsed.data.coverageRadiusMeters,
     updatedBy: gate.session.phone,
   })
   return NextResponse.json({ ok: true, setting: saved })

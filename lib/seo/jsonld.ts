@@ -2,6 +2,7 @@ import { SITE_URL, PLACE, seoUrl, vendorPath } from './config'
 import { allInKobo } from './pricing'
 import type { SeoVendor } from './vendor-data'
 import type { FaqItem } from './guides'
+import { formatNullableNumber } from '@/lib/number-format'
 
 // JSON-LD builders. Hard rule (guardrail §2.2): NEVER emit AggregateRating/Review
 // unless real ratings exist — fabricated review markup is a manual-penalty risk
@@ -74,10 +75,11 @@ export function buildVendorJsonLd(v: SeoVendor) {
   if (oh) restaurant.openingHoursSpecification = oh
 
   // Reviews — ONLY when genuine ratings exist. Otherwise omitted entirely.
-  if (v.totalRatings > 0 && v.avgRating > 0) {
+  const ratingValue = formatNullableNumber(v.avgRating, 2)
+  if (v.totalRatings > 0 && v.avgRating > 0 && ratingValue) {
     restaurant.aggregateRating = {
       '@type': 'AggregateRating',
-      ratingValue: v.avgRating.toFixed(2),
+      ratingValue,
       reviewCount: v.totalRatings,
       bestRating: 5,
       worstRating: 1,

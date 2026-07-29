@@ -30,6 +30,7 @@ const PRIMARY_ITEMS: SidebarItem[] = [
   { label: 'Overview', href: '/vendor-dashboard', icon: Grid2x2 },
   { label: 'Orders', href: '/vendor-dashboard/orders', icon: ListOrdered },
   { label: 'Menu', href: '/vendor-dashboard/menu', icon: UtensilsCrossed },
+  { label: 'Bundles', href: '/vendor-dashboard/bundles', icon: UtensilsCrossed },
   { label: 'Store', href: '/vendor-dashboard/store', icon: Store },
 ]
 
@@ -40,6 +41,7 @@ const SECONDARY_ITEMS: SidebarItem[] = [
 
 const MORE_ITEMS: SidebarItem[] = [
   { label: 'Feed', href: '/vendor-dashboard/videos', icon: Sparkles },
+  { label: 'Feed automation', href: '/vendor-dashboard/feed-automation', icon: Sparkles },
   { label: 'Reviews', href: '/vendor-dashboard/reviews', icon: Star },
   { label: 'Support', href: '/vendor-dashboard/support', icon: LifeBuoy },
 ]

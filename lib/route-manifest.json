@@ -1,5 +1,5 @@
 {
-  "count": 250,
+  "count": 255,
   "routes": [
     {
       "path": "/api/admin/audit",
@@ -1493,6 +1493,23 @@
       ]
     },
     {
+      "path": "/api/super-admin/feed-automation",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "PATCH",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/super-admin/feed-pins",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
       "path": "/api/super-admin/feed-reports",
       "dynamic": false,
       "methods": [
@@ -1662,6 +1679,30 @@
       "path": "/api/vendor-ai/describe",
       "dynamic": false,
       "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/vendor/bundles",
+      "dynamic": false,
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/vendor/bundles/[id]",
+      "dynamic": true,
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/vendor/feed-automation",
+      "dynamic": false,
+      "methods": [
+        "GET",
         "POST"
       ]
     },

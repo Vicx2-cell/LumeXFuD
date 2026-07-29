@@ -3,6 +3,7 @@ import { classifyDiscoveryTopics, getCampusDeals, getFeaturedVendors, getTrendin
 import { formatOfficialFeedHeadline, isFeedMenuOrderable } from '@/lib/feed/display'
 import { OFFICIAL_SYSTEM_AVATAR_URL } from '@/lib/feed/official-service'
 import { loadFeedViewerContext } from '@/lib/feed/service'
+import type { FeedViewerContext } from '@/lib/feed/types'
 import { formatPrice } from '@/lib/money'
 import {
   canPublishFeedPost,
@@ -11,6 +12,12 @@ import {
   type FeedPermissionVendor,
 } from '@/lib/feed/permissions'
 import type { FeedV2Post, FeedV2RailCollection, FeedV2RailTopic, FeedV2RailVendor, FeedV2Story } from '@/app/feed-v2/types'
+import {
+  DEFAULT_FEED_AUTOMATION_CONFIG,
+  buildEmptyFeedFallback,
+  selectAffordableItems,
+  type FeedFallbackCard,
+} from './automation'
 
 export type FeedV2TabKey = 'for_you' | 'following' | 'nearby' | 'deals' | 'trending'
 
@@ -164,6 +171,7 @@ export interface FeedV2SurfaceData {
   rightRail: FeedV2RightRailData
   hasMore: boolean
   nextOffset: number
+  fallbackCards: FeedFallbackCard[]
 }
 
 type LiveQuotedPostRow = {
@@ -178,6 +186,56 @@ export type FeedV2SurfaceOptions = {
   postId?: string
   offset?: number
   limit?: number
+}
+
+async function loadEmptyFeedFallback(
+  db: ReturnType<typeof createSupabaseAdmin>,
+  viewer: FeedViewerContext,
+): Promise<FeedFallbackCard[]> {
+  let vendorQuery = db.from('vendors')
+    .select('id, status, city_id, zone_id')
+    .eq('approval_state', 'approved').eq('is_active', true).is('deleted_at', null).limit(24)
+  if (viewer.zoneId) vendorQuery = vendorQuery.eq('zone_id', viewer.zoneId)
+  else if (viewer.campusId) vendorQuery = vendorQuery.eq('city_id', viewer.campusId)
+  const { data: vendorRows } = await vendorQuery
+  const vendors = (vendorRows ?? []) as Array<{ id: string; status: string | null; city_id: string | null; zone_id: string | null }>
+  const vendorIds = vendors.map((vendor) => vendor.id)
+  if (!vendorIds.length) {
+    return buildEmptyFeedFallback({ nearbyVendorIds: [], affordableItemIds: [], recentItemIds: [], openVendorIds: [], categories: [] })
+  }
+  const { data: menuRows } = await db.from('menu_items')
+    .select('id, vendor_id, name, price_kobo, category, created_at')
+    .in('vendor_id', vendorIds).eq('is_available', true).is('deleted_at', null)
+    .order('created_at', { ascending: false }).limit(40)
+  const menus = (menuRows ?? []) as Array<{ id: string; vendor_id: string; name: string; price_kobo: number | null; category: string | null; created_at: string }>
+  const menuIds = menus.map((item) => item.id)
+  const { data: addonRows } = menuIds.length
+    ? await db.from('menu_item_addons').select('menu_item_id, price_kobo, is_available')
+      .in('menu_item_id', menuIds).eq('is_required', true).is('deleted_at', null)
+    : { data: [] }
+  const required = new Map<string, Array<{ priceKobo: number; available: boolean }>>()
+  for (const addon of addonRows ?? []) {
+    const row = addon as { menu_item_id: string; price_kobo: number; is_available: boolean }
+    required.set(row.menu_item_id, [...(required.get(row.menu_item_id) ?? []), { priceKobo: row.price_kobo, available: row.is_available }])
+  }
+  const vendorById = new Map(vendors.map((vendor) => [vendor.id, vendor]))
+  const areaId = viewer.zoneId ?? viewer.campusId ?? 'global'
+  const affordable = selectAffordableItems(menus.map((item) => {
+    const vendor = vendorById.get(item.vendor_id)!
+    return {
+      id: item.id, vendorId: item.vendor_id, vendorName: '', name: item.name,
+      priceKobo: item.price_kobo, requiredAddons: required.get(item.id) ?? [],
+      available: true, vendorApproved: true, vendorActive: true,
+      vendorOpen: vendor.status === 'OPEN', inDeliveryCoverage: true, areaId,
+    }
+  }), DEFAULT_FEED_AUTOMATION_CONFIG, areaId)
+  return buildEmptyFeedFallback({
+    nearbyVendorIds: vendorIds,
+    affordableItemIds: affordable.map((item) => item.id),
+    recentItemIds: menus.slice(0, 8).map((item) => item.id),
+    openVendorIds: vendors.filter((vendor) => vendor.status === 'OPEN').map((vendor) => vendor.id),
+    categories: [...new Set(menus.map((item) => item.category).filter((value): value is string => Boolean(value)))],
+  })
 }
 
 function unique(values: Array<string | null | undefined>) {
@@ -868,7 +926,34 @@ export async function loadFeedV2Surface(options: FeedV2SurfaceOptions = {}): Pro
 
   if (error) throw new Error(error.message)
 
-  const loadedRows = (postRows ?? []) as LivePostRow[]
+  let loadedRows = (postRows ?? []) as LivePostRow[]
+  if (!options.postId && offset === 0) {
+    const nowIso = new Date().toISOString()
+    const { data: pins } = await db.from('feed_post_pins')
+      .select('post_id, scope_type, scope_id, priority, starts_at, expires_at')
+      .is('unpinned_at', null)
+      .lte('starts_at', nowIso)
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+      .order('priority', { ascending: false })
+      .limit(20)
+    const matchingPin = (pins ?? []).find((pin) => {
+      if (pin.scope_type === 'global') return pin.scope_id === null
+      if (pin.scope_type === 'delivery_area') return pin.scope_id === viewer.zoneId
+      if (pin.scope_type === 'city' || pin.scope_type === 'campus') return pin.scope_id === viewer.campusId
+      return false
+    })
+    if (matchingPin && !loadedRows.some((row) => row.id === matchingPin.post_id)) {
+      const { data: pinnedPost } = await db.from('posts')
+        .select('id, author_profile_id, vendor_id, related_menu_item_id, related_promotion_ref, quoted_post_id, post_kind, status, visibility, body, content_warning, campus_id, zone_id, location_text, hashtags_cached, view_count, like_count, reply_count, repost_count, bookmark_count, share_count, menu_click_count, cart_add_count, order_count, revenue_kobo, watch_time_ms, completion_rate, safe_rank_score, is_sponsored, is_boosted, is_archived, published_at, created_at')
+        .eq('id', matchingPin.post_id).eq('status', 'published').eq('is_archived', false).is('deleted_at', null).maybeSingle()
+      if (pinnedPost) loadedRows = [pinnedPost as LivePostRow, ...loadedRows]
+    } else if (matchingPin) {
+      loadedRows = [
+        ...loadedRows.filter((row) => row.id === matchingPin.post_id),
+        ...loadedRows.filter((row) => row.id !== matchingPin.post_id),
+      ]
+    }
+  }
   const hasMore = !options.postId && loadedRows.length > pageLimit
   const rows = loadedRows.slice(0, pageLimit)
   const postIds = rows.map((row) => row.id)
@@ -969,6 +1054,7 @@ export async function loadFeedV2Surface(options: FeedV2SurfaceOptions = {}): Pro
   const liveStories = stories.length > 0
     ? stories
     : buildStoriesFromRecentPosts({ rows, profileById, vendorById, mediaByPostId })
+  const fallbackCards = visiblePosts.length === 0 ? await loadEmptyFeedFallback(db, viewer) : []
 
   return {
     posts: visiblePosts,
@@ -976,5 +1062,6 @@ export async function loadFeedV2Surface(options: FeedV2SurfaceOptions = {}): Pro
     rightRail,
     hasMore,
     nextOffset: offset + rows.length,
+    fallbackCards,
   }
 }

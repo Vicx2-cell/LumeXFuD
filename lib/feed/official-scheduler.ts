@@ -1,6 +1,7 @@
 import { createSupabaseAdmin } from '@/lib/supabase/server'
-import { buildOfficialCollectionPlan, isLateNight, isSupportedPopularityClaim, type OfficialAreaConfig, type OfficialCollectionHistoryRow, type OfficialCollectionPlan, type OfficialSourceItem } from './official'
+import { buildOfficialCollectionPlan, isLateNight, isSupportedPopularityClaim, isWithinOfficialDeliveryCoverage, type OfficialAreaConfig, type OfficialCollectionHistoryRow, type OfficialCollectionPlan, type OfficialSourceItem } from './official'
 import { ensureOfficialAccount, loadOfficialAreaSettings, persistOfficialCollection, type OfficialAreaSettingRow } from './official-service'
+import { loadFeedAutomationConfig } from './automation-service'
 
 type DB = ReturnType<typeof createSupabaseAdmin>
 
@@ -27,23 +28,24 @@ async function loadHistory(db: DB, area: OfficialAreaConfig, limit = 25): Promis
 export async function getOfficialAreaSettingByScope(db: DB, areaScope: 'city' | 'zone', areaId: string) {
   const { data } = await db
     .from('official_feed_area_settings')
-    .select('id, city_id, zone_id, area_scope, area_label, morning_enabled, evening_enabled, auto_publish, morning_cron, evening_cron, late_night_start, min_popularity_orders, price_threshold_kobo, max_posts_per_day, max_collection_items, picks_max_per_day, updated_by, updated_at')
+    .select('id, city_id, zone_id, area_scope, area_label, morning_enabled, evening_enabled, auto_publish, morning_cron, evening_cron, late_night_start, min_popularity_orders, price_threshold_kobo, max_posts_per_day, max_collection_items, picks_max_per_day, coverage_latitude, coverage_longitude, coverage_radius_meters, updated_by, updated_at')
     .eq('area_scope', areaScope)
     .eq(areaScope === 'city' ? 'city_id' : 'zone_id', areaId)
     .maybeSingle()
   return data ? (data as unknown as OfficialAreaSettingRow) : null
 }
 
-async function loadMenuCandidates(db: DB, area: OfficialAreaConfig): Promise<OfficialSourceItem[]> {
+async function loadMenuCandidates(db: DB, area: OfficialAreaConfig, orderAggregationHours = 6): Promise<OfficialSourceItem[]> {
   const { data: vendorRows } = await db
     .from('vendors')
-    .select('id, shop_name, is_active, approval_state, deleted_at, city_id, zone_id, avg_rating, total_ratings, created_at, opening_time, closing_time')
+    .select('id, shop_name, status, is_active, approval_state, deleted_at, city_id, zone_id, avg_rating, total_ratings, created_at, opening_time, closing_time, official_latitude, official_longitude, latitude, longitude')
     .eq(area.areaScope === 'city' ? 'city_id' : 'zone_id', area.areaId)
     .is('deleted_at', null)
 
   const vendors = (vendorRows ?? []) as Array<{
     id: string
     shop_name: string
+    status: string | null
     is_active: boolean
     approval_state: string
     deleted_at: string | null
@@ -54,8 +56,16 @@ async function loadMenuCandidates(db: DB, area: OfficialAreaConfig): Promise<Off
     created_at?: string | null
     opening_time?: string | null
     closing_time?: string | null
+    official_latitude?: number | null
+    official_longitude?: number | null
+    latitude?: number | null
+    longitude?: number | null
   }>
-  const approved = vendors.filter((vendor) => vendor.is_active && vendor.approval_state === 'approved')
+  const approved = vendors.filter((vendor) => vendor.is_active && vendor.status === 'OPEN' &&
+    vendor.approval_state === 'approved' && isWithinOfficialDeliveryCoverage(area, {
+      latitude: vendor.official_latitude ?? vendor.latitude,
+      longitude: vendor.official_longitude ?? vendor.longitude,
+    }))
   const vendorById = new Map(approved.map((vendor) => [vendor.id, vendor]))
 
   const { data: menuRows } = approved.length > 0
@@ -65,6 +75,44 @@ async function loadMenuCandidates(db: DB, area: OfficialAreaConfig): Promise<Off
       .in('vendor_id', approved.map((vendor) => vendor.id))
       .is('deleted_at', null)
     : { data: [] as unknown[] }
+
+  const rawMenuRows = (menuRows ?? []) as Array<{ id: string }>
+  const menuIds = rawMenuRows.map((item) => item.id)
+  const [{ data: requiredAddonRows }, { data: orderItemRows }] = await Promise.all([
+    menuIds.length
+      ? db.from('menu_item_addons').select('menu_item_id, price_kobo, is_available').in('menu_item_id', menuIds).eq('is_required', true).is('deleted_at', null)
+      : Promise.resolve({ data: [] }),
+    menuIds.length
+      ? db.from('order_items').select('menu_item_id, order_id').in('menu_item_id', menuIds).limit(10_000)
+      : Promise.resolve({ data: [] }),
+  ])
+  const requiredByItem = new Map<string, Array<{ price: number; available: boolean }>>()
+  for (const addon of requiredAddonRows ?? []) {
+    const row = addon as { menu_item_id: string; price_kobo: number; is_available: boolean }
+    requiredByItem.set(row.menu_item_id, [...(requiredByItem.get(row.menu_item_id) ?? []), { price: Number(row.price_kobo), available: row.is_available }])
+  }
+  const orderLines = (orderItemRows ?? []) as Array<{ menu_item_id: string; order_id: string }>
+  const orderIds = [...new Set(orderLines.map((line) => line.order_id))]
+  const { data: validOrderRows } = orderIds.length
+    ? await db.from('orders').select('id, created_at').in('id', orderIds).eq('payment_status', 'PAID')
+      .in('status', ['DELIVERED', 'COMPLETED'])
+      .eq('is_test_order', false).eq('fraud_flagged', false)
+      .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    : { data: [] }
+  const validOrderIds = new Set((validOrderRows ?? []).map((order) => String(order.id)))
+  const activitySince = Date.now() - orderAggregationHours * 60 * 60 * 1000
+  const recentValidOrderIds = new Set((validOrderRows ?? [])
+    .filter((order) => new Date(String(order.created_at)).getTime() >= activitySince)
+    .map((order) => String(order.id)))
+  const orderCountByItem = new Map<string, number>()
+  const activityCountByItem = new Map<string, number>()
+  for (const line of orderLines) {
+    if (!validOrderIds.has(line.order_id)) continue
+    orderCountByItem.set(line.menu_item_id, (orderCountByItem.get(line.menu_item_id) ?? 0) + 1)
+    if (recentValidOrderIds.has(line.order_id)) {
+      activityCountByItem.set(line.menu_item_id, (activityCountByItem.get(line.menu_item_id) ?? 0) + 1)
+    }
+  }
 
   return (menuRows ?? []).map((row) => {
     const item = row as {
@@ -79,16 +127,20 @@ async function loadMenuCandidates(db: DB, area: OfficialAreaConfig): Promise<Off
       category?: string | null
     }
     const vendor = vendorById.get(item.vendor_id)
+    const requiredAddons = requiredByItem.get(item.id) ?? []
+    const requiredPrice = requiredAddons.reduce((sum, addon) => sum + addon.price, 0)
+    const requiredAvailable = requiredAddons.every((addon) => addon.available && Number.isSafeInteger(addon.price) && addon.price >= 0)
+    const minimumOrderablePrice = Number(item.price_kobo) + requiredPrice
     return {
       id: item.id,
       vendorId: item.vendor_id,
       vendorName: vendor?.shop_name ?? 'Vendor',
     vendorHandle: null,
       itemName: item.name,
-      priceKobo: Number(item.price_kobo ?? 0),
+      priceKobo: Number.isSafeInteger(minimumOrderablePrice) ? minimumOrderablePrice : Number.NaN,
       imageUrl: item.image_url ?? null,
       imageBelongsToItem: Boolean(item.image_url),
-      isAvailable: Boolean(item.is_available),
+      isAvailable: Boolean(item.is_available) && requiredAvailable,
       vendorApproved: true,
       vendorActive: true,
       vendorVisible: true,
@@ -99,7 +151,8 @@ async function loadMenuCandidates(db: DB, area: OfficialAreaConfig): Promise<Off
       createdAt: item.created_at,
       vendorCreatedAt: vendor?.created_at ?? null,
       category: item.category ?? null,
-      popularityOrders30d: Number(vendor?.total_ratings ?? 0),
+      popularityOrders30d: orderCountByItem.get(item.id) ?? 0,
+      activityOrders: activityCountByItem.get(item.id) ?? 0,
       totalRatings: Number(vendor?.total_ratings ?? 0),
       avgRating: Number(vendor?.avg_rating ?? 0),
       openingTime: vendor?.opening_time ?? null,
@@ -301,16 +354,33 @@ async function hasPublishedToday(db: DB, areaId: string, collectionType: Officia
   return (count ?? 0) > 0
 }
 
+async function loadRecentBackInStockItemIds(db: DB, area: OfficialAreaConfig, now: Date) {
+  const since = new Date(now.getTime() - 72 * 60 * 60 * 1000).toISOString()
+  let query = db.from('feed_automation_outbox').select('source_entity_id')
+    .eq('event_type', 'item_back_in_stock')
+    .gte('created_at', since)
+  query = area.areaScope === 'zone'
+    ? query.eq('zone_id', area.areaId)
+    : query.eq('city_id', area.areaId)
+  const { data } = await query.limit(100)
+  return new Set((data ?? []).map((row) => String(row.source_entity_id)))
+}
+
 export async function runOfficialFeedScheduler(now = new Date()) {
   const db = createSupabaseAdmin()
   await ensureOfficialAccount(db)
+  const automation = await loadFeedAutomationConfig(db)
   const configs = await loadOfficialAreaSettings(db)
   const results: Array<{ areaId: string; collectionType: string; created: boolean; deduped: boolean; postId?: string }> = []
 
   for (const area of configs) {
     const history = await loadHistory(db, area)
-    const menuCandidates = await loadMenuCandidates(db, area)
+    const menuCandidates = await loadMenuCandidates(db, area, automation.orderAggregationHours)
     const dealCandidates = await loadDealCandidates(db, area)
+    const recentBackInStockIds = await loadRecentBackInStockItemIds(db, area, now)
+    const lagosHour = Number(new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Lagos', hour12: false, hour: '2-digit',
+    }).format(now))
     let remainingSlots = Math.max(0, area.maxPostsPerDay - await countPublishedToday(db, area.areaId, now))
 
     async function publishIfAllowed(
@@ -320,6 +390,7 @@ export async function runOfficialFeedScheduler(now = new Date()) {
       forceAutoPublish = area.autoPublish,
     ) {
       if (remainingSlots <= 0) return
+      if (!automation.enabledPostTypes.has(collectionType as never)) return
       if (await hasPublishedToday(db, area.areaId, collectionType, now)) return
       const plan = maybeBuildPlan(area, collectionType, source, history, reason, now)
       if (!plan) return
@@ -333,20 +404,55 @@ export async function runOfficialFeedScheduler(now = new Date()) {
       if (saved.created) remainingSlots -= 1
     }
 
-    if (area.morningEnabled) {
+    if (area.morningEnabled && lagosHour >= 6 && lagosHour < 11) {
       const breakfastSource = menuCandidates.filter((item) => item.priceKobo <= area.priceThresholdKobo && isSupportedPopularityClaim(item, area.minPopularityOrders))
       await publishIfAllowed(
-        'breakfast_picks',
+        'breakfast_collection',
         breakfastSource.length > 0 ? breakfastSource : menuCandidates,
         'Breakfast collection built from verified live menu items.',
       )
     }
 
-    if (area.eveningEnabled && isLateNight(now, area.lateNightStart)) {
+    if (lagosHour >= 11 && lagosHour < 16) {
+      await publishIfAllowed(
+        'lunch_collection',
+        menuCandidates,
+        'Lunch collection built from currently orderable live menu items.',
+      )
+    }
+
+    if (area.eveningEnabled && lagosHour >= 17 && lagosHour < 22) {
       await publishIfAllowed(
         'evening_collection',
         menuCandidates,
+        'Evening collection built from currently orderable live menu items.',
+      )
+    }
+
+    if (area.eveningEnabled && isLateNight(now, area.lateNightStart)) {
+      await publishIfAllowed(
+        'late_night_collection',
+        menuCandidates,
         'Late-night collection from vendors and meals still genuinely available after the configured cutoff.',
+      )
+    }
+
+    if (remainingSlots > 0) {
+      await publishIfAllowed(
+        'back_in_stock',
+        menuCandidates.filter((item) =>
+          recentBackInStockIds.has(item.id) &&
+          Number(item.popularityOrders30d ?? 0) >= automation.backInStockMinimumOrders),
+        'Back-in-stock collection projects meaningful verified inventory-return events from live menus.',
+      )
+    }
+
+    if (remainingSlots > 0) {
+      const supported = menuCandidates.filter((item) => item.priceKobo <= area.priceThresholdKobo)
+      await publishIfAllowed(
+        'cheap_eats',
+        supported,
+        'Affordable collection uses the current minimum orderable price including mandatory add-ons.',
       )
     }
 
@@ -358,6 +464,26 @@ export async function runOfficialFeedScheduler(now = new Date()) {
         'lumex_picks',
         pickSource.length > 0 ? pickSource : menuCandidates,
         'LumeX Picks generated from verified live menu data and configured thresholds.',
+      )
+    }
+
+    if (remainingSlots > 0) {
+      const popular = menuCandidates.filter((item) =>
+        Number(item.popularityOrders30d ?? 0) >= Math.max(area.minPopularityOrders, automation.anonymityMinimumOrders))
+      await publishIfAllowed(
+        'popular_near_you',
+        popular,
+        'Popular-near-you collection uses anonymous area-level paid/completed order aggregates.',
+      )
+    }
+
+    if (remainingSlots > 0) {
+      const active = menuCandidates.filter((item) =>
+        Number(item.activityOrders ?? 0) >= automation.anonymityMinimumOrders)
+      await publishIfAllowed(
+        'order_activity_collection',
+        active,
+        'Order activity collection uses only anonymous paid/completed area aggregates.',
       )
     }
 

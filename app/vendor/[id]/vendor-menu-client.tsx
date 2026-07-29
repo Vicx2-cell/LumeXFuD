@@ -15,6 +15,7 @@ import { getCampaignSessionId, trackCampaignEvent } from '@/lib/campaign-client'
 import { recordFeedCommerceEvent } from '@/lib/feed/client-attribution'
 import { ArrowLeft, Clock3, MapPin, Search, Share2, Star, Users } from 'lucide-react'
 import type { VendorInfo, MenuAddon, MenuItem, VendorReview } from './types'
+import { formatNullableNumber } from '@/lib/number-format'
 
 const CATEGORIES = ['All', 'Rice', 'Protein', 'Drinks', 'Snacks', 'Other']
 
@@ -429,7 +430,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
           <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/65">
             <span className={`inline-flex items-center gap-1.5 font-semibold ${isClosed ? 'text-red-300' : 'text-emerald-300'}`}><span className={`h-2 w-2 rounded-full ${isClosed ? 'bg-red-400' : 'bg-emerald-400'}`} />{isPaused ? 'Temporarily paused' : vendor.status === 'CLOSED' ? `Closed${vendor.opening_time ? ` - opens ${vendor.opening_time}` : ''}` : 'Open for orders'}</span>
             <span className="inline-flex items-center gap-1.5"><Clock3 size={14} />{vendor.prep_time_minutes}-{vendor.prep_time_minutes + 10} min</span>
-            {vendor.total_ratings > 0 ? <span className="inline-flex items-center gap-1.5"><Star size={14} className="fill-[#F5A623] text-[#F5A623]" />{vendor.avg_rating.toFixed(1)} ({vendor.total_ratings})</span> : null}
+            {vendor.total_ratings > 0 ? <span className="inline-flex items-center gap-1.5"><Star size={14} className="fill-[#F5A623] text-[#F5A623]" />{formatNullableNumber(vendor.avg_rating, 1) ?? 'Rating unavailable'} ({vendor.total_ratings})</span> : null}
             {vendor.address_text ? <span className="inline-flex min-w-0 items-center gap-1.5 truncate"><MapPin size={14} />{vendor.address_text}</span> : null}
           </div>
           <div className="mt-5 flex gap-3">
@@ -467,7 +468,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
               {vendor.opening_time && vendor.closing_time && (
                 <span className="text-xs text-white/40">🕒 {vendor.opening_time}–{vendor.closing_time}</span>
               )}
-              {vendor.total_ratings >= 5 && <span className="lx-amber text-xs">★ {vendor.avg_rating.toFixed(1)}</span>}
+              {vendor.total_ratings >= 5 && <span className="lx-amber text-xs">★ {formatNullableNumber(vendor.avg_rating, 1) ?? '—'}</span>}
               {vendorTrustBadges(vendor).map((b) => (
                 <span key={b.label} className="lx-card-amber lx-amber text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                   <span aria-hidden="true">{b.emoji}</span>{b.label}
@@ -580,7 +581,7 @@ export function VendorMenuClient({ vendor, menu, reviews = [], loggedOut = false
           {vendor.total_ratings > 0 && (
             <div className="flex items-center gap-2 text-sm">
               <Stars value={Math.round(vendor.avg_rating)} />
-              <span className="text-white/70 tabular-nums">{vendor.avg_rating.toFixed(1)}</span>
+              <span className="text-white/70 tabular-nums">{formatNullableNumber(vendor.avg_rating, 1) ?? '—'}</span>
               <span className="text-white/40">({vendor.total_ratings})</span>
             </div>
           )}

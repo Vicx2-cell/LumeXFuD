@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseDeliveryEstimate } from './delivery-estimate-response'
+import { parseDeliveryEstimate, toDeliveryEstimateResponse } from './delivery-estimate-response'
 
 const valid = {
   distanceKm: 1.25,
@@ -15,6 +15,19 @@ describe('parseDeliveryEstimate', () => {
 
   it('rejects a missing distance instead of allowing a toFixed crash', () => {
     expect(parseDeliveryEstimate({ ...valid, distanceKm: undefined })).toBeNull()
+  })
+
+  it('maps the launch quote into the cart contract that production expects', () => {
+    expect(toDeliveryEstimateResponse({
+      roadDistanceMeters: 1_256,
+      platformFeeKobo: 10_000,
+      deliveryFeeKobo: 40_000,
+    })).toEqual({
+      distanceKm: 1.26,
+      serviceFeeKobo: 10_000,
+      deliveryFeeKobo: 40_000,
+      activeSurchargeTotalKobo: 0,
+    })
   })
 
   it('rejects string, NaN, and infinite money values', () => {

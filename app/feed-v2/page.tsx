@@ -1,6 +1,7 @@
 import { FeedV2Screen } from '@/components/feed-v2/feed-v2-screen'
 import { loadFeedV2Surface, type FeedV2RightRailData, type FeedV2TabKey } from '@/lib/feed/v2'
 import { feedV2LeftNav, feedV2Tabs, type FeedV2Post, type FeedV2Story, type FeedV2Tab } from './types'
+import type { FeedFallbackCard } from '@/lib/feed/automation'
 
 const tabByLabel: Record<string, FeedV2TabKey> = {
   'for-you': 'for_you',
@@ -37,6 +38,7 @@ export default async function FeedV2Page({ searchParams }: { searchParams?: Prom
   let liveRightRail: FeedV2RightRailData = { topics: [], vendors: [], collections: [] }
   let hasMore = false
   let nextOffset = 0
+  let fallbackCards: FeedFallbackCard[] = []
 
   try {
     const live = await loadFeedV2Surface({ tab: activeTab })
@@ -45,6 +47,7 @@ export default async function FeedV2Page({ searchParams }: { searchParams?: Prom
     liveRightRail = live.rightRail
     hasMore = live.hasMore
     nextOffset = live.nextOffset
+    fallbackCards = live.fallbackCards
   } catch (error) {
     console.error('[feed-v2] live data load failed:', error instanceof Error ? error.message : error)
   }
@@ -59,6 +62,7 @@ export default async function FeedV2Page({ searchParams }: { searchParams?: Prom
       hasMore={hasMore}
       activeTab={activeTab}
       nextOffset={nextOffset}
+      fallbackCards={fallbackCards}
     />
   )
 }

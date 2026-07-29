@@ -10,6 +10,7 @@ import { useCart, type CartItem } from '@/components/cart-context'
 import { BottomNav } from '@/components/nav-bottom'
 import { formatPrice } from '@/lib/money'
 import { parseDeliveryEstimate } from '@/lib/delivery-estimate-response'
+import { formatDistanceKm, formatNullableNumber } from '@/lib/number-format'
 import { useFeatures } from '@/lib/use-features'
 import { estimateOrderPrepMinutes, prepRangeLabel } from '@/lib/prep-time'
 import { formatHoursRange } from '@/lib/hours'
@@ -247,6 +248,7 @@ export default function CartPage() {
   const platformMarkup  = isPickup ? (fees?.markup ?? 0) : estimate?.serviceFeeKobo ?? fees?.markup ?? 0
   const tipApplied      = isPickup ? 0 : tip
   const total           = subtotal + platformMarkup + deliveryFee + tipApplied
+  const deliveryDistanceLabel = formatDistanceKm(estimate?.distanceKm, 2)
 
   // Longest-dish prep estimate from the per-item times captured at add-time
   // (falls back to a 25-min default for any item saved before that field existed).
@@ -594,7 +596,7 @@ export default function CartPage() {
             </button>
             {coords && (
               <p className="text-xs text-white/40">
-                Active GPS: {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+                Active GPS: {formatNullableNumber(coords.lat, 5) ?? 'Coordinates unavailable'}, {formatNullableNumber(coords.lng, 5) ?? 'Coordinates unavailable'}
               </p>
             )}
             {gpsMessage && <p className="text-xs text-white/45">{gpsMessage}</p>}
@@ -995,7 +997,7 @@ export default function CartPage() {
             <>
               <div className="flex justify-between text-sm">
                 <span className="text-white/60">Delivery distance</span>
-                <span>{estimate.distanceKm.toFixed(2)} km</span>
+                <span>{deliveryDistanceLabel ?? 'Distance unavailable'}</span>
               </div>
               {estimate.activeSurchargeTotalKobo > 0 && (
                 <div className="flex justify-between text-sm">
