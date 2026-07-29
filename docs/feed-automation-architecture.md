@@ -1,8 +1,8 @@
 # Automatic feed architecture
 
 LumeX Fud uses the existing `posts`, `social_profiles`, `post_menu_items`, and
-official-feed tables. Migration 155 extends them; it does not create a second
-feed. Migration 156 adds authoritative bundle sources, order test/fraud flags,
+official-feed tables. Migration 156 extends them; it does not create a second
+feed. Migration 157 adds authoritative bundle sources, order test/fraud flags,
 and explicit area coverage anchors.
 
 ## Data flow

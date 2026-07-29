@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { GlassSheen } from '@/components/fx'
 import { formatNullableNumber } from '@/lib/number-format'
+import { PartnerVerificationPanel } from '@/components/admin/partner-verification-panel'
 
 interface VendorRow {
   id: string
@@ -18,6 +19,7 @@ interface VendorRow {
   subscription_tier: string
   subscription_paid_until: string | null
   is_active: boolean
+  verification_status: string
   approved_at: string | null
   avg_rating: number
   total_ratings: number
@@ -50,6 +52,8 @@ export default function AdminVendors() {
   const [toast, setToast] = useState('')
   const [removeTarget, setRemoveTarget] = useState<VendorRow | null>(null)
   const [removing, setRemoving] = useState(false)
+  const [verificationTarget, setVerificationTarget] = useState<VendorRow | null>(null)
+  const [canApprove, setCanApprove] = useState(false)
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -59,8 +63,9 @@ export default function AdminVendors() {
   async function fetchVendors() {
     const res = await fetch('/api/admin/vendors')
     if (res.ok) {
-      const d = await res.json() as { vendors: VendorRow[] }
+      const d = await res.json() as { vendors: VendorRow[]; can_approve: boolean }
       setVendors(d.vendors)
+      setCanApprove(d.can_approve)
     }
     setLoading(false)
   }
@@ -103,6 +108,7 @@ export default function AdminVendors() {
   return (
     <div className="lx-page lx-console px-4 py-8 overflow-hidden">
       <GlassSheen />
+      {verificationTarget && <PartnerVerificationPanel kind="vendor" id={verificationTarget.id} name={verificationTarget.shop_name} onClose={() => setVerificationTarget(null)} onVerified={fetchVendors} />}
       {/* Remove confirmation */}
       {removeTarget && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center lx-scrim px-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => !removing && setRemoveTarget(null)}>
@@ -185,6 +191,15 @@ export default function AdminVendors() {
                 </div>
 
                 <div className="flex gap-2 flex-wrap">
+                  {!v.is_active && v.verification_status !== 'verified' && (
+                    <button onClick={() => canApprove && setVerificationTarget(v)}
+                      disabled={!canApprove}
+                      title={canApprove ? 'Open the inspection checklist' : 'A super admin must verify inspection evidence'}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+                      style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
+                      {canApprove ? 'Inspect & verify' : 'Await super-admin verification'}
+                    </button>
+                  )}
                   {(v.approval_state === 'application_submitted' || v.approval_state === 'draft' || v.approval_state === 'pending_review') && (
                     <button onClick={() => doAction(v.id, 'review')}
                       disabled={actionLoading === v.id + 'review'}
@@ -209,9 +224,10 @@ export default function AdminVendors() {
                       {actionLoading === v.id + 'mark_inspected' ? '…' : 'Mark inspected'}
                     </button>
                   )}
-                  {v.approval_state === 'shop_inspected' && (
+                  {v.verification_status === 'verified' && v.approval_state !== 'approved' && (
                     <button onClick={() => doAction(v.id, 'approve')}
-                      disabled={actionLoading === v.id + 'approve'}
+                      disabled={!canApprove || actionLoading === v.id + 'approve'}
+                      title={canApprove ? 'Make vendor active' : 'A super admin must give final approval'}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
                       style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
                       {actionLoading === v.id + 'approve' ? '…' : 'Approve'}

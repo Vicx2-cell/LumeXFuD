@@ -2,7 +2,7 @@
 
 ## Before enabling
 
-1. Apply migrations 155 and 156 in staging and verify all new tables, triggers, grants,
+1. Apply migrations 156 and 157 in staging and verify all new tables, triggers, grants,
    indexes, and the claim RPC.
 2. Keep `feed_automation_settings.enabled = false`.
 3. Confirm the protected official profile has key `lumex_fud`, gold/official
@@ -41,5 +41,5 @@ own errors and the worker is asynchronous.
 ## Rollback
 
 Disable the kill switch first. Code can be rolled back while the additive
-tables remain. Do not edit or remove migrations 155 or 156 after application. Add a new
+tables remain. Do not edit or remove migrations 156 or 157 after application. Add a new
 reconciliation migration for any production drift.

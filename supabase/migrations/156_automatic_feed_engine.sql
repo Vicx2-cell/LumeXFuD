@@ -296,6 +296,7 @@ BEGIN
     EXECUTE format('ALTER TABLE official_feed_posts DROP CONSTRAINT %I', constraint_name);
   END LOOP;
 END $$;
+ALTER TABLE official_feed_posts DROP CONSTRAINT IF EXISTS official_feed_posts_collection_type_ck;
 ALTER TABLE official_feed_posts ADD CONSTRAINT official_feed_posts_collection_type_ck
 CHECK (collection_type IN (
   'new_on_lumex','lumex_picks','morning_collection','evening_collection',

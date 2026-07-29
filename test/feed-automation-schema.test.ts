@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const migration = readFileSync('supabase/migrations/155_automatic_feed_engine.sql', 'utf8')
-const completionMigration = readFileSync('supabase/migrations/156_feed_bundles_and_coverage.sql', 'utf8')
+const migration = readFileSync('supabase/migrations/156_automatic_feed_engine.sql', 'utf8')
+const completionMigration = readFileSync('supabase/migrations/157_feed_bundles_and_coverage.sql', 'utf8')
 const vendorApi = readFileSync('app/api/vendor/feed-automation/route.ts', 'utf8')
 const adminApi = readFileSync('app/api/super-admin/feed-automation/route.ts', 'utf8')
 const pinApi = readFileSync('app/api/super-admin/feed-pins/route.ts', 'utf8')

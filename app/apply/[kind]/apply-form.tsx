@@ -62,6 +62,7 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
   const [success, setSuccess] = useState(false)
   const [reference, setReference] = useState('')
   const [acknowledgementStatus, setAcknowledgementStatus] = useState('')
+  const [tempPin, setTempPin] = useState('')
   const [loading, setLoading] = useState(false)
   const [phoneVerified, setPhoneVerified] = useState(false)
   const [emailVerified, setEmailVerified] = useState(false)
@@ -120,13 +121,14 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
           date_of_birth: !isVendor ? dateOfBirth || undefined : undefined,
         }),
       })
-      const data = await res.json() as { error?: string; reference?: string; acknowledgement_status?: string }
+      const data = await res.json() as { error?: string; reference?: string; acknowledgement_status?: string; temp_pin?: string }
       if (!res.ok) {
         setError(data.error ?? 'Could not submit your application right now.')
         return
       }
       setReference(data.reference ?? '')
       setAcknowledgementStatus(data.acknowledgement_status ?? 'skipped')
+      setTempPin(data.temp_pin ?? '')
       setSuccess(true)
     } catch {
       setError('Network error. Please try again.')
@@ -146,6 +148,7 @@ export function ApplyForm({ kind }: { kind: ApplicationKind }) {
               Admin will review your application, verify the required checks, and contact you on WhatsApp before activation.
             </p>
             {reference && <p className="mt-3 text-sm text-white/75">Reference: <strong>{reference}</strong></p>}
+            {tempPin && <div className="mt-4 rounded-2xl border border-amber-400/25 bg-black/20 p-4"><p className="text-xs uppercase tracking-[0.16em] text-white/45">Temporary login PIN — save it now</p><p className="mt-2 text-3xl font-bold tracking-[0.28em] text-amber-300">{tempPin}</p><p className="mt-2 text-xs text-white/50">It becomes usable only after super-admin approval and must be changed on first login.</p></div>}
             <p className="mt-2 text-xs text-white/50">{acknowledgementStatus === 'sent' ? 'An acknowledgement was sent to your email.' : 'Your application is saved, but email delivery was not confirmed. Keep this reference.'}</p>
           </div>
 

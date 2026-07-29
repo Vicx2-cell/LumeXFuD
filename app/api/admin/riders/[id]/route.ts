@@ -4,13 +4,21 @@ import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { audit } from '@/lib/audit'
 import { rateLimitGeneric } from '@/lib/rate-limit'
-import { nextRiderReviewState, riderReadyForApproval } from '@/lib/onboarding'
+import { nextRiderReviewState, requiredChecksPassed, RIDER_VERIFICATION_CHECKS, riderReadyForApproval } from '@/lib/onboarding'
 import { renderApplicationEmail } from '@/lib/email/templates'
 import { deliverWorkflowEmail } from '@/lib/email/workflow-email'
 
 const updateInput = z.object({
-  action: z.enum(['review', 'verification_failed', 'approve', 'reject', 'suspend', 'unsuspend']),
+  action: z.enum(['review', 'verify', 'verification_failed', 'approve', 'reject', 'suspend', 'unsuspend']),
   reason: z.string().max(500).optional(),
+  checks: z.record(z.string(), z.boolean()).optional(),
+  nin: z.string().trim().min(8).max(50).optional(),
+  id_photo_url: z.string().trim().url().max(500).optional(),
+  live_selfie_url: z.string().trim().url().max(500).optional(),
+  guarantor_name: z.string().trim().min(2).max(100).optional(),
+  guarantor_phone: z.string().trim().min(7).max(20).optional(),
+  vehicle_type: z.enum(['bike', 'bicycle', 'foot']).optional(),
+  vehicle_photo_url: z.string().trim().url().max(500).optional(),
 })
 
 export async function PATCH(
@@ -36,20 +44,67 @@ export async function PATCH(
   const db = createSupabaseAdmin()
   const { data: rider } = await db
     .from('riders')
-    .select('id, is_active, approval_state, nin, id_photo_url, live_selfie_url, guarantor_name, guarantor_phone, vehicle_type')
+    .select('id, is_active, approval_state, nin, id_photo_url, live_selfie_url, guarantor_name, guarantor_phone, vehicle_type, verification_status, verification_checks')
     .eq('id', id)
     .single()
   if (!rider) return NextResponse.json({ error: 'Rider not found' }, { status: 404 })
 
   const now = new Date().toISOString()
-  const updates: Record<string, unknown> = { updated_at: now, approval_state: nextRiderReviewState(rider.approval_state, parsed.data.action) }
+  const updates: Record<string, unknown> = {
+    updated_at: now,
+    approval_state: parsed.data.action === 'verify'
+      ? rider.approval_state
+      : nextRiderReviewState(rider.approval_state, parsed.data.action),
+  }
 
   if (parsed.data.action === 'review') {
     updates.is_active = false
   } else if (parsed.data.action === 'verification_failed') {
     updates.is_active = false
     updates.approval_state = 'verification_failed'
+    updates.verification_status = 'failed'
+    updates.verification_notes = parsed.data.reason ?? null
+  } else if (parsed.data.action === 'verify') {
+    if (session.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Verification requires a super admin.' }, { status: 403 })
+    }
+    if (
+      !requiredChecksPassed(RIDER_VERIFICATION_CHECKS, parsed.data.checks) ||
+      !parsed.data.nin ||
+      !parsed.data.id_photo_url ||
+      !parsed.data.live_selfie_url ||
+      !parsed.data.guarantor_name ||
+      !parsed.data.guarantor_phone ||
+      !parsed.data.vehicle_type ||
+      !parsed.data.vehicle_photo_url
+    ) {
+      return NextResponse.json({ error: 'Complete every identity, guarantor, vehicle, safety, and test-delivery check.' }, { status: 409 })
+    }
+    Object.assign(updates, {
+      nin: parsed.data.nin,
+      id_photo_url: parsed.data.id_photo_url,
+      live_selfie_url: parsed.data.live_selfie_url,
+      guarantor_name: parsed.data.guarantor_name,
+      guarantor_phone: parsed.data.guarantor_phone,
+      vehicle_type: parsed.data.vehicle_type,
+      vehicle_photo_url: parsed.data.vehicle_photo_url,
+      verification_checks: parsed.data.checks,
+      verification_notes: parsed.data.reason ?? null,
+      verification_status: 'verified',
+      verified_at: now,
+      verified_by: session.phone,
+      email_verified: true,
+      email_verified_at: now,
+      whatsapp_verified: true,
+      id_verified: true,
+      vehicle_inspected: true,
+      approval_state: 'under_review',
+      is_active: false,
+    })
   } else if (parsed.data.action === 'approve') {
+    if (session.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Final approval requires a super admin.' }, { status: 403 })
+    }
     if (!riderReadyForApproval(rider)) {
       return NextResponse.json(
         { error: 'Complete rider identity, selfie, guarantor, and vehicle checks before approval.' },
@@ -80,7 +135,8 @@ export async function PATCH(
     updates.approval_state = 'approved'
   }
 
-  await db.from('riders').update(updates).eq('id', id)
+  const { error: updateError } = await db.from('riders').update(updates).eq('id', id)
+  if (updateError) return NextResponse.json({ error: 'Could not update rider review.' }, { status: 500 })
 
   if (['review', 'verification_failed', 'approve', 'reject'].includes(parsed.data.action)) {
     const applicationStatus = parsed.data.action === 'approve' ? 'approved' : parsed.data.action === 'reject' ? 'rejected' : parsed.data.action === 'verification_failed' ? 'verification_failed' : 'under_review'

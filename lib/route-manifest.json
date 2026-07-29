@@ -1,5 +1,5 @@
 {
-  "count": 255,
+  "count": 254,
   "routes": [
     {
       "path": "/api/admin/audit",
@@ -1555,14 +1555,6 @@
       "dynamic": false,
       "methods": [
         "GET"
-      ]
-    },
-    {
-      "path": "/api/super-admin/premium",
-      "dynamic": false,
-      "methods": [
-        "GET",
-        "PATCH"
       ]
     },
     {

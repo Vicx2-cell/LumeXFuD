@@ -6,7 +6,7 @@ import { readdirSync, statSync, writeFileSync, readFileSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const root = fileURLToPath(new URL('..', import.meta.url))
+const root = fileURLToPath(new URL('.', import.meta.url))
 const apiDir = join(root, 'app', 'api')
 
 function walk(dir) {

@@ -15,11 +15,11 @@ export async function GET() {
     .select(`
       id, shop_name, owner_name, phone, category, subscription_tier,
       subscription_paid_until, status, is_active, approval_state,
-      id_verified, site_inspected, avg_rating,
+      id_verified, site_inspected, verification_status, verification_checks, avg_rating,
       total_ratings, created_at, paused_until
     `)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
-  return NextResponse.json({ vendors: vendors ?? [] })
+  return NextResponse.json({ vendors: vendors ?? [], can_approve: session.role === 'super_admin' })
 }

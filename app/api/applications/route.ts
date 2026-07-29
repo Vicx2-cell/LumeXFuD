@@ -11,6 +11,7 @@ import { loadAdminRecipients, notifyFeedRecipients } from '@/lib/feed/notificati
 import { renderApplicationEmail } from '@/lib/email/templates'
 import { deliverWorkflowEmail } from '@/lib/email/workflow-email'
 import { EMAIL_VERIFIED_COOKIE, emailVerifiedCookieOptions, verifyEmailVerified } from '@/lib/email-verify'
+import { generateTempPin, hashSecret } from '@/lib/pin-auth'
 
 export const runtime = 'nodejs'
 
@@ -158,6 +159,8 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString()
   const reference = `LXF-${parsed.data.kind === 'vendor' ? 'VND' : 'RDR'}-${now.slice(0, 10).replaceAll('-', '')}-${randomUUID().slice(0, 8).toUpperCase()}`
   const applicantEmail = parsed.data.email.toLowerCase()
+  const tempPin = generateTempPin()
+  const pinHash = await hashSecret(tempPin)
   const emailVerified = await verifyEmailVerified(req.cookies.get(EMAIL_VERIFIED_COOKIE)?.value, applicantEmail, 'application')
   if (!emailVerified) {
     return NextResponse.json({ error: 'Verify this email address before submitting the application.' }, { status: 403 })
@@ -226,10 +229,12 @@ export async function POST(req: NextRequest) {
       .from('vendors')
       .insert({
         phone,
+        owner_phone: phone,
         email: applicantEmail,
         email_verified: true,
         email_verified_at: now,
         shop_name: business_name,
+        name: business_name,
         business_name,
         owner_name,
         category,
@@ -239,6 +244,9 @@ export async function POST(req: NextRequest) {
         cac_number,
         cac_document_url,
         approval_state: 'application_submitted',
+        verification_status: 'unverified',
+        login_pin_hash: pinHash,
+        pin_reset_pending: true,
         is_active: false,
         status: 'CLOSED',
         created_by_admin: false,
@@ -286,6 +294,7 @@ export async function POST(req: NextRequest) {
       reference,
       acknowledgement_status: acknowledgementStatus,
       vendor_id: vendor.id,
+      temp_pin: tempPin,
       message: 'Application Submitted. Thank you for applying to become a LumeX Fud vendor. Our team will review your application within 3-7 business days. We will contact you through your verified WhatsApp number if we need more information.',
     })
     res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))
@@ -336,6 +345,7 @@ export async function POST(req: NextRequest) {
     .from('riders')
     .insert({
       phone,
+      name: full_name,
       email: applicantEmail,
       email_verified: true,
       email_verified_at: now,
@@ -350,6 +360,9 @@ export async function POST(req: NextRequest) {
       vehicle_photo_url: parsed.data.vehicle_photo_url ?? null,
       plate_number: parsed.data.plate_number ?? null,
       approval_state: 'application_submitted',
+      verification_status: 'unverified',
+      login_pin_hash: pinHash,
+      pin_reset_pending: true,
       is_active: false,
       status: 'OFFLINE',
       updated_at: now,
@@ -385,6 +398,7 @@ export async function POST(req: NextRequest) {
     reference,
     acknowledgement_status: acknowledgementStatus,
     rider_id: rider.id,
+    temp_pin: tempPin,
     message: 'Application Submitted. Thank you for applying to become a LumeX Fud rider. Our team will review your application within 3-7 business days. We will contact you through your verified WhatsApp number if we need more information.',
   })
   res.cookies.set(PHONE_VERIFIED_COOKIE, '', verifiedCookieOptions(0))

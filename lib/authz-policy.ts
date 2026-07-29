@@ -29,7 +29,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
     'super-admin/cron-health', 'super-admin/cron-run', 'super-admin/earnings',
     'super-admin/earnings/history', 'super-admin/feature-usage', 'super-admin/features',
     'super-admin/financials', 'super-admin/lockdown', 'super-admin/pricing',
-    'super-admin/premium', 'super-admin/campus-partners', 'super-admin/official-feed',
+    'super-admin/campus-partners', 'super-admin/official-feed',
     'super-admin/payments', 'super-admin/feed-reports', 'super-admin/feed-stories',
     'super-admin/feed-automation', 'super-admin/feed-pins',
     'super-admin/revoke-sessions', 'super-admin/rewards', 'super-admin/security-health',

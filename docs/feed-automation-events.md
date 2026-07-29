@@ -24,6 +24,6 @@
 Cancelled, unpaid, failed, refunded, test, fraud-flagged, or individually
 identifiable customer activity is never eligible. The migrations install
 durable triggers for approval, menu creation, stock return, price reduction, and
-paid completion. Migration 156 adds the authoritative `menu_bundles` and
+paid completion. Migration 157 adds the authoritative `menu_bundles` and
 `menu_bundle_items` source tables and emits `new_bundle` only when a real bundle
 is activated.
