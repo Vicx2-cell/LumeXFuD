@@ -1,5 +1,6 @@
 screenshots
 scripts
+!scripts/gen-route-manifest.mjs
 docs
 *.bak
 *.log
