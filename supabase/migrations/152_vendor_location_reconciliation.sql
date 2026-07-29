@@ -1,5 +1,5 @@
 -- ============================================================
--- LumeX Fud — Migration 090: Vendor store location (address + map pinpoint)
+-- LumeX Fud — Reconciliation 152: Vendor store location (address + map pinpoint)
 -- ============================================================
 -- Vendors had NO location data at all — customers and riders could not see
 -- where a store physically is. This adds a human address line, a short rider

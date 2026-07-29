@@ -1,3 +1,4 @@
+-- Reconciliation 154: preserve the feed menu-image snapshot schema under a unique migration version.
 ALTER TABLE post_menu_items
   ADD COLUMN IF NOT EXISTS menu_item_image_url_snapshot TEXT;
 

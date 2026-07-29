@@ -1,4 +1,4 @@
--- Explicit order-state overlay and paid-live timestamps for the 2-hour pickup ceiling.
+-- Reconciliation 153: explicit order-state overlay and paid-live timestamps for the 2-hour pickup ceiling.
 -- Legacy orders.status remains in place during transition; order_state records the
 -- normalized lifecycle without breaking existing routes/imports.
 

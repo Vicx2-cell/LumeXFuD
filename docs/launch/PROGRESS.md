@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-07-29
 
-This is a codebase readiness record, not a declaration of launch readiness. The deployed Supabase project, provider accounts and environment values were not mutated or independently verified during this review.
+This is a codebase readiness record, not a declaration of launch readiness. The production Supabase project was reconciled and migrated during this review; provider capabilities and live payment credentials still require independent verification.
 
 ## Completed systems
 
@@ -21,6 +21,7 @@ This is a codebase readiness record, not a declaration of launch readiness. The 
 - Migration `084_rls_coverage_backstop.sql` provides a database-derived RLS-gap check; migration `048_column_grants_lockdown.sql` limits public columns on sensitive public-read tables.
 - Email sends use Resend-oriented transactional workflows and provider-event/retry tables. Vercel cron schedules are declared in `vercel.json`.
 - Core order-path code review and focused verification confirm the implemented sequence: approved vendor discovery → slug storefront → single-vendor cart with add-ons → server-side checkout recalculation and idempotency → Paystack initialization/webhook deduplication → vendor/rider state transitions → customer order history/tracking → code-gated delivery completion. The focused suite covers cart isolation, menu selections, tampered order inputs, unauthorized access, webhook replay, rider assignment races and handover completion.
+- Production Supabase project `lnrjjhnbzmaygghjytdp` was baselined after prerequisite probes and a validated custom-format backup. The previously empty migration history now records the verified existing schema through `147`; migrations `148` through `154` were applied successfully. Post-migration REST and rollback-only SQL checks confirmed zero RLS gaps, service-role RPC execution, anonymous isolation, immutable promo-ledger enforcement and vendor-funding constraints.
 
 ## Broken systems fixed in this review
 
@@ -33,36 +34,29 @@ This is a codebase readiness record, not a declaration of launch readiness. The 
 
 ## Missing or unverified systems
 
-- No reproducible local Supabase bootstrap/seed command is declared in `package.json`; migration application and RLS need verification against the target project before release.
-- Migration filenames have duplicate version prefixes (`090`, `098`, `106`). Do not rename historical files blindly: first compare the repository with the deployed Supabase migration history and prepare a controlled reconciliation plan, because migration runners may treat the shared prefix as one applied version.
 - Production provider configuration remains unverified: Paystack live keys/webhook endpoint, Resend domain and webhook, Upstash rate-limit credentials, Sentry DSN, and all cron secrets.
 - Paystack DVA capability is not verified on the merchant account. Keep both the `customer_virtual_accounts` application feature and `PAYSTACK_DVA_ENABLED=false` until Paystack confirms the registered Nigerian business is eligible, the DVA provider slug is selected, and `PAYSTACK_DVA_COMPLIANCE_REQUIRED` matches the merchant category. Configure `PAYSTACK_DVA_PREFERRED_BANK` only from Paystack's Fetch Providers response.
-- There is no CI workflow in `.github/` visible to enforce typecheck, lint, tests, build, migration checks, or deployment environment validation.
+- The existing GitHub workflow runs tests and an optional Vercel deploy, but does not enforce typecheck, lint, production build, migration dry-run or deployment environment validation.
 - MVP delivery distance uses a server-side straight-line-to-road multiplier (default 1.35×), editable by a super-admin. It is an estimate, not live navigation routing; review it against completed trips and replace it with routing only when justified.
 - The initial fuel/efficiency/maintenance values are provisional settings (`₦1,000/litre`, `40 km/litre`, `₦20/km`) and must be approved or edited by a super-admin before launch.
 
 ## Security blockers
 
-1. **P0** — Apply and verify every tracked migration, including `148`, in the exact production Supabase project. Run `select * from public.rls_coverage_gaps();` as service role and require zero rows.
-2. **P0** — Reconcile the duplicate migration prefixes with the target Supabase migration history before provisioning or rebuilding any database.
-3. **P0** — Verify production secrets are set, distinct from examples, server-only where required, and that `SUPABASE_SERVICE_ROLE_KEY` is never exposed to the browser.
-4. **P0** — Perform live role/BOLA checks for customer, vendor, rider, admin and super-admin sessions, plus webhook signature/replay checks, against the deployed environment.
-5. **P1** — Add CI and a controlled migration/deployment gate so future schema drift cannot recur.
+1. **P0** — Verify production secrets are non-empty, distinct from examples, server-only where required, and that `SUPABASE_SERVICE_ROLE_KEY` is never exposed to the browser.
+2. **P0** — Perform live role/BOLA checks for customer, vendor, rider, admin and super-admin sessions, plus webhook signature/replay checks, against the deployed environment.
+3. **P1** — Add CI and a controlled migration/deployment gate so future schema drift cannot recur.
 
 ## Payment blockers
 
-1. **P0** — Deploy migration `148` before accepting Paystack payments on a newly provisioned or schema-rebuilt project.
-2. **P0** — Configure Paystack live secret key and webhook callback, then run a small live payment/refund/replay test and reconcile the resulting order, ledger and webhook rows.
-3. **P1** — Validate the configured payout account, transfer recipient flow and reconciliation cron with a controlled low-value payout.
-4. **P0** — Configure and test transaction-specific Pay with Transfer in the Paystack account if it is required for launch. The repository initializes standard Paystack transactions, but provider-side channel enablement is outside source control.
-5. **P0** — Apply migration `151`, recharge the promo fund with a traceable provider reference, then run concurrent reservation, paid/failed/expired payment and reconciliation drills before activating a LumeX-funded code.
-6. **P0** — Confirm Paystack DVA availability and compliance category on the live merchant account before enabling `PAYSTACK_DVA_ENABLED` and the `customer_virtual_accounts` feature. Exercise assign success/failure, signed `charge.success`, duplicate delivery and requery; confirm receipts remain unallocated and no customer wallet balance changes.
+1. **P0** — Configure Paystack live secret key and webhook callback, then run a small live payment/refund/replay test and reconcile the resulting order, ledger and webhook rows.
+2. **P1** — Validate the configured payout account, transfer recipient flow and reconciliation cron with a controlled low-value payout.
+3. **P0** — Configure and test transaction-specific Pay with Transfer in the Paystack account if it is required for launch. The repository initializes standard Paystack transactions, but provider-side channel enablement is outside source control.
+4. **P0** — Recharge the migrated promo fund with a traceable provider reference, then run concurrent reservation, paid/failed/expired payment and reconciliation drills before activating a LumeX-funded code.
+5. **P0** — Confirm Paystack DVA availability and compliance category on the live merchant account before enabling `PAYSTACK_DVA_ENABLED` and the `customer_virtual_accounts` feature. Exercise assign success/failure, signed `charge.success`, duplicate delivery and requery; confirm receipts remain unallocated and no customer wallet balance changes.
 
 ## Exact next implementation order
 
-1. Freeze production schema changes, take a restorable database backup, and compare duplicate migration prefixes with the deployed Supabase migration history. Write and review the smallest reconciliation plan; do not rename or mark migrations applied without matching their SQL effects.
-2. Restore a production-like staging database, apply the reconciled migration set through `151`, run `select * from public.rls_coverage_gaps();` as service role, and require zero rows. Verify the promo ledger rejects update/delete and the four promo RPCs execute only through the intended server role.
-3. Set and independently review production secrets and callbacks. Keep `PAYSTACK_DVA_ENABLED=false`, keep the `customer_virtual_accounts` feature off, and keep `promo.kill_switch` enabled for the first application deployment.
-4. Deploy the exact tested commit, then run a low-value live order, failed payment, refund, duplicate webhook, transfer/reversal, rider payout, vendor commission, platform/guest-fee and reconciliation drill. Stop if any provider amount differs from the stored kobo snapshots.
-5. Recharge the promo fund with a traceable provider reference, run concurrent LumeX/vendor campaign reservations plus paid/failed/expired settlement drills, reconcile to zero difference, then disable the kill switch only for one low-budget campaign.
-6. Enable guest Pay with Transfer only after Paystack confirms the channel. Enable DVA last, only after Paystack confirms merchant/category/provider eligibility and the signed assignment/charge/requery drills leave receipts unallocated without changing any customer wallet balance.
+1. Set and independently review production secrets and callbacks. Keep `PAYSTACK_DVA_ENABLED=false`, keep the `customer_virtual_accounts` feature off, and keep `promo.kill_switch` enabled for the first application deployment.
+2. Deploy the exact tested commit, then run a low-value live order, failed payment, refund, duplicate webhook, transfer/reversal, rider payout, vendor commission, platform/guest-fee and reconciliation drill. Stop if any provider amount differs from the stored kobo snapshots.
+3. Recharge the promo fund with a traceable provider reference, run concurrent LumeX/vendor campaign reservations plus paid/failed/expired settlement drills, reconcile to zero difference, then disable the kill switch only for one low-budget campaign.
+4. Enable guest Pay with Transfer only after Paystack confirms the channel. Enable DVA last, only after Paystack confirms merchant/category/provider eligibility and the signed assignment/charge/requery drills leave receipts unallocated without changing any customer wallet balance.
