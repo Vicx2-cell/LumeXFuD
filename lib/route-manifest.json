@@ -1,5 +1,5 @@
 {
-  "count": 254,
+  "count": 255,
   "routes": [
     {
       "path": "/api/admin/audit",
@@ -1315,6 +1315,13 @@
       "methods": [
         "POST",
         "DELETE"
+      ]
+    },
+    {
+      "path": "/api/promotions/quote",
+      "dynamic": false,
+      "methods": [
+        "POST"
       ]
     },
     {

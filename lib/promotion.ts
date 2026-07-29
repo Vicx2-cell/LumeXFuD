@@ -35,32 +35,49 @@ export type PromotionContext = {
   now?: Date
 }
 
-export function quotePromotion(promotion: Promotion, input: PromotionContext): number {
+export type PromotionQuoteResult = {
+  eligible: boolean
+  discountKobo: number
+  reason?: string
+}
+
+export function evaluatePromotion(promotion: Promotion, input: PromotionContext): PromotionQuoteResult {
   const now = input.now ?? new Date()
-  const ineligible =
-    promotion.status !== 'ACTIVE' ||
-    now < new Date(promotion.startsAt) ||
-    Boolean(promotion.expiresAt && now >= new Date(promotion.expiresAt!)) ||
-    input.subtotalKobo < promotion.minimumSubtotalKobo ||
-    (promotion.firstOrderOnly && !input.isFirstOrder) ||
-    (promotion.groupOrderOnly && !input.isGroupOrder) ||
-    Boolean(promotion.eligibleVendorId && promotion.eligibleVendorId !== input.vendorId) ||
-    Boolean(promotion.eligibleCategory && promotion.eligibleCategory.toUpperCase() !== input.category?.toUpperCase()) ||
-    Boolean(promotion.eligibleCampusId && promotion.eligibleCampusId !== input.campusId) ||
-    Boolean(promotion.totalUsesLimit != null && (input.totalUses ?? 0) >= promotion.totalUsesLimit) ||
-    Boolean(promotion.usesPerCustomer != null && (input.customerUses ?? 0) >= promotion.usesPerCustomer)
-  if (ineligible) return 0
+  if (promotion.status !== 'ACTIVE') return { eligible: false, discountKobo: 0, reason: 'Promotion is paused.' }
+  if (now < new Date(promotion.startsAt)) return { eligible: false, discountKobo: 0, reason: 'Promotion has not started yet.' }
+  if (promotion.expiresAt && now >= new Date(promotion.expiresAt)) return { eligible: false, discountKobo: 0, reason: 'Promotion has expired.' }
+  if (input.subtotalKobo < promotion.minimumSubtotalKobo) return { eligible: false, discountKobo: 0, reason: 'Basket minimum not reached.' }
+  if (promotion.firstOrderOnly && !input.isFirstOrder) return { eligible: false, discountKobo: 0, reason: 'First order only.' }
+  if (promotion.groupOrderOnly && !input.isGroupOrder) return { eligible: false, discountKobo: 0, reason: 'Group orders only.' }
+  if (promotion.eligibleVendorId && promotion.eligibleVendorId !== input.vendorId) return { eligible: false, discountKobo: 0, reason: 'This code is for a different vendor.' }
+  if (promotion.eligibleCategory && promotion.eligibleCategory.toUpperCase() !== input.category?.toUpperCase()) return { eligible: false, discountKobo: 0, reason: 'This code is for a different item category.' }
+  if (promotion.eligibleCampusId && promotion.eligibleCampusId !== input.campusId) return { eligible: false, discountKobo: 0, reason: 'This code is for a different campus.' }
+  if (promotion.totalUsesLimit != null && (input.totalUses ?? 0) >= promotion.totalUsesLimit) return { eligible: false, discountKobo: 0, reason: 'Promotion limit reached.' }
+  if (promotion.usesPerCustomer != null && (input.customerUses ?? 0) >= promotion.usesPerCustomer) return { eligible: false, discountKobo: 0, reason: 'Customer limit reached.' }
+
+  let discountKobo = 0
   switch (promotion.discountType) {
     case 'PERCENTAGE':
-      return Math.min(Math.floor(input.subtotalKobo * promotion.percentageBps / 10_000), promotion.percentageCapKobo ?? Number.MAX_SAFE_INTEGER)
+      discountKobo = Math.min(Math.floor(input.subtotalKobo * promotion.percentageBps / 10_000), promotion.percentageCapKobo ?? Number.MAX_SAFE_INTEGER)
+      break
     case 'DELIVERY':
     case 'FREE_DELIVERY':
-      return Math.min(input.deliveryFeeKobo, promotion.valueKobo || input.deliveryFeeKobo)
+      discountKobo = Math.min(input.deliveryFeeKobo, promotion.valueKobo || input.deliveryFeeKobo)
+      break
     case 'PLATFORM_FEE':
-      return Math.min(input.platformFeeKobo, promotion.valueKobo)
+      discountKobo = Math.min(input.platformFeeKobo, promotion.valueKobo)
+      break
     default:
-      return Math.min(input.subtotalKobo, promotion.valueKobo)
+      discountKobo = Math.min(input.subtotalKobo, promotion.valueKobo)
+      break
   }
+
+  if (discountKobo <= 0) return { eligible: false, discountKobo: 0, reason: 'Promotion has no applicable value.' }
+  return { eligible: true, discountKobo }
+}
+
+export function quotePromotion(promotion: Promotion, input: PromotionContext): number {
+  return evaluatePromotion(promotion, input).discountKobo
 }
 
 const optionalPositiveInt = z.number().int().positive().nullable().optional()

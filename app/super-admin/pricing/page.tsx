@@ -95,6 +95,31 @@ const newRule = (): PricingRuleRow => ({
   enabled: true,
 })
 
+const makeNewLocationForm = (pricing: Pricing): NewLocationForm => ({
+  zone_name: '',
+  zone_status: 'ACTIVE',
+  uses_lodge_catalog: true,
+  city_name: '',
+  city_state: '',
+  city_slug: '',
+  city_status: 'ACTIVE',
+  base_bike_fee_kobo: pricing.delivery_fee_bike_kobo,
+  base_door_fee_kobo: pricing.delivery_fee_door_kobo,
+  platform_markup_kobo: pricing.platform_markup_kobo,
+  rider_cut_bike_kobo: pricing.rider_cut_bike_kobo,
+  rider_cut_door_kobo: pricing.rider_cut_door_kobo,
+  pricing_mode: 'DISTANCE',
+  base_distance_meters: 2000,
+  distance_increment_meters: 2000,
+  bike_increment_fee_kobo: 0,
+  door_increment_fee_kobo: 0,
+  bike_increment_rider_fee_kobo: 0,
+  door_increment_rider_fee_kobo: 0,
+  max_delivery_distance_meters: 10000,
+  vendor_delivery_radius_meters: 10000,
+  rules: [],
+})
+
 const toNaira = (kobo: number) => Math.round(kobo / 100)
 const fmt = (kobo: number) => `₦${toNaira(kobo).toLocaleString('en-NG')}`
 
@@ -202,30 +227,7 @@ export default function SuperAdminPricing() {
       setLaunchPricing(d.launchPricing)
       setAffordableThresholdsKobo(d.affordableThresholdsKobo)
       setLocations(d.locations ?? [])
-      setNewLocation({
-        zone_name: '',
-        zone_status: 'ACTIVE',
-        uses_lodge_catalog: true,
-        city_name: '',
-        city_state: '',
-        city_slug: '',
-        city_status: 'ACTIVE',
-        base_bike_fee_kobo: d.pricing.delivery_fee_bike_kobo,
-        base_door_fee_kobo: d.pricing.delivery_fee_door_kobo,
-        platform_markup_kobo: d.pricing.platform_markup_kobo,
-        rider_cut_bike_kobo: d.pricing.rider_cut_bike_kobo,
-        rider_cut_door_kobo: d.pricing.rider_cut_door_kobo,
-        pricing_mode: 'DISTANCE',
-        base_distance_meters: 2000,
-        distance_increment_meters: 2000,
-        bike_increment_fee_kobo: 0,
-        door_increment_fee_kobo: 0,
-        bike_increment_rider_fee_kobo: 0,
-        door_increment_rider_fee_kobo: 0,
-        max_delivery_distance_meters: 10000,
-        vendor_delivery_radius_meters: 10000,
-        rules: [],
-      })
+      setNewLocation(makeNewLocationForm(d.pricing))
     }
     setLoading(false)
   }
@@ -252,6 +254,21 @@ export default function SuperAdminPricing() {
     setNewLocation((prev) => prev ? { ...prev, ...patch } : prev)
     setError('')
   }
+
+  function resetNewLocationPricing() {
+    if (!naira) return
+    setNewLocation((prev) => prev ? {
+      ...prev,
+      base_bike_fee_kobo: naira.delivery_fee_bike_kobo * 100,
+      base_door_fee_kobo: naira.delivery_fee_door_kobo * 100,
+      platform_markup_kobo: naira.platform_markup_kobo * 100,
+      rider_cut_bike_kobo: naira.rider_cut_bike_kobo * 100,
+      rider_cut_door_kobo: naira.rider_cut_door_kobo * 100,
+    } : prev)
+    setError('')
+  }
+
+  const slugify = (value: string) => value.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
 
   function updateLocationRule(zoneId: string, index: number, patch: Partial<PricingRuleRow>) {
     setLocations((prev) => prev.map((row) => row.zone_id !== zoneId ? row : {
@@ -508,7 +525,7 @@ export default function SuperAdminPricing() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <TextInput label="State" value={newLocation.city_state} onChange={(v) => updateNewLocation({ city_state: v })} />
                     <TextInput label="City name" value={newLocation.city_name} onChange={(v) => updateNewLocation({ city_name: v })} />
-                    <TextInput label="City slug" value={newLocation.city_slug} onChange={(v) => updateNewLocation({ city_slug: v.trim().toLowerCase().replace(/\s+/g, '-') })} hint="Example: uturu" />
+                    <TextInput label="City slug" value={newLocation.city_slug} onChange={(v) => updateNewLocation({ city_slug: slugify(v) })} hint="Example: uturu" />
                     <StatusInput label="City status" value={newLocation.city_status} onChange={(v) => updateNewLocation({ city_status: v })} />
                     <TextInput label="Zone name" value={newLocation.zone_name} onChange={(v) => updateNewLocation({ zone_name: v })} hint="Example: ABSU campus, Gregory University, Greater Uturu" />
                     <StatusInput label="Zone status" value={newLocation.zone_status} onChange={(v) => updateNewLocation({ zone_status: v })} />
@@ -525,6 +542,12 @@ export default function SuperAdminPricing() {
                       Use the lodge dropdown and campus map in checkout for this zone. Turn this off for wider city areas where customers should just type their address manually.
                     </span>
                   </label>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button type="button" onClick={resetNewLocationPricing} className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/70">Use default zone pricing</button>
+                    <button type="button" onClick={() => updateNewLocation({ city_slug: slugify(newLocation.city_name) })} className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/70">Slug from city name</button>
+                    <button type="button" onClick={() => updateNewLocation({ rules: [...newLocation.rules, newRule()] })} className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-300">Add rule</button>
+                  </div>
 
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <div className="space-y-3 rounded-2xl border border-white/10 bg-[#111113] p-4">
@@ -543,62 +566,65 @@ export default function SuperAdminPricing() {
                     <NairaInput label="Platform markup" value={toNaira(newLocation.platform_markup_kobo)} onChange={(n) => updateNewLocation({ platform_markup_kobo: n * 100 })} />
                   </div>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <MeterInput label="Base distance" value={newLocation.base_distance_meters} onChange={(n) => updateNewLocation({ base_distance_meters: n })} />
-                    <MeterInput label="Distance increment" value={newLocation.distance_increment_meters} onChange={(n) => updateNewLocation({ distance_increment_meters: n })} />
-                    <MeterInput label="Max delivery distance" value={newLocation.max_delivery_distance_meters} onChange={(n) => updateNewLocation({ max_delivery_distance_meters: n })} />
-                    <MeterInput label="Vendor radius" value={newLocation.vendor_delivery_radius_meters} onChange={(n) => updateNewLocation({ vendor_delivery_radius_meters: n })} />
-                    <NairaInput label="Bike add-on per step" value={toNaira(newLocation.bike_increment_fee_kobo)} onChange={(n) => updateNewLocation({ bike_increment_fee_kobo: n * 100 })} />
-                    <NairaInput label="Bike rider bonus per step" value={toNaira(newLocation.bike_increment_rider_fee_kobo)} onChange={(n) => updateNewLocation({ bike_increment_rider_fee_kobo: n * 100 })} />
-                    <NairaInput label="Door add-on per step" value={toNaira(newLocation.door_increment_fee_kobo)} onChange={(n) => updateNewLocation({ door_increment_fee_kobo: n * 100 })} />
-                    <NairaInput label="Door rider bonus per step" value={toNaira(newLocation.door_increment_rider_fee_kobo)} onChange={(n) => updateNewLocation({ door_increment_rider_fee_kobo: n * 100 })} />
-                  </div>
+                  <details className="mt-4 rounded-2xl border border-white/10 bg-[#111113] p-4">
+                    <summary className="cursor-pointer text-sm font-semibold text-white/80">Advanced distance + step pricing</summary>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <MeterInput label="Base distance" value={newLocation.base_distance_meters} onChange={(n) => updateNewLocation({ base_distance_meters: n })} />
+                      <MeterInput label="Distance increment" value={newLocation.distance_increment_meters} onChange={(n) => updateNewLocation({ distance_increment_meters: n })} />
+                      <MeterInput label="Max delivery distance" value={newLocation.max_delivery_distance_meters} onChange={(n) => updateNewLocation({ max_delivery_distance_meters: n })} />
+                      <MeterInput label="Vendor radius" value={newLocation.vendor_delivery_radius_meters} onChange={(n) => updateNewLocation({ vendor_delivery_radius_meters: n })} />
+                      <NairaInput label="Bike add-on per step" value={toNaira(newLocation.bike_increment_fee_kobo)} onChange={(n) => updateNewLocation({ bike_increment_fee_kobo: n * 100 })} />
+                      <NairaInput label="Bike rider bonus per step" value={toNaira(newLocation.bike_increment_rider_fee_kobo)} onChange={(n) => updateNewLocation({ bike_increment_rider_fee_kobo: n * 100 })} />
+                      <NairaInput label="Door add-on per step" value={toNaira(newLocation.door_increment_fee_kobo)} onChange={(n) => updateNewLocation({ door_increment_fee_kobo: n * 100 })} />
+                      <NairaInput label="Door rider bonus per step" value={toNaira(newLocation.door_increment_rider_fee_kobo)} onChange={(n) => updateNewLocation({ door_increment_rider_fee_kobo: n * 100 })} />
+                    </div>
+                  </details>
 
-                  <div className="mt-4 rounded-2xl border border-white/10 bg-[#111113] p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <h4 className="text-sm font-semibold text-white/80">Dynamic pricing rules</h4>
-                        <p className="mt-1 text-xs text-white/45">Optional surcharges like rain or peak hours. Each one must also pay riders more.</p>
-                      </div>
+                  <details className="mt-4 rounded-2xl border border-white/10 bg-[#111113] p-4" open={newLocation.rules.length > 0}>
+                    <summary className="cursor-pointer text-sm font-semibold text-white/80">Advanced pricing rules</summary>
+                    <p className="mt-1 text-xs text-white/45">Optional surcharges like rain or peak hours. Each one must also pay riders more.</p>
+                    <div className="mt-3 flex justify-end">
                       <button type="button" onClick={() => updateNewLocation({ rules: [...newLocation.rules, newRule()] })} className="rounded-xl border border-amber-500/30 px-3 py-2 text-xs font-semibold text-amber-300">Add rule</button>
                     </div>
-                    {newLocation.rules.map((rule, index) => (
-                      <div key={`new-rule-${index}`} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <TextInput label="Rule name" value={rule.name} onChange={(v) => updateNewLocationRule(index, { name: v })} />
-                          <TextInput label="Weather trigger" value={rule.weather_trigger ?? ''} onChange={(v) => updateNewLocationRule(index, { weather_trigger: v || null })} hint="Optional. Example: rain" />
-                          <TextInput label="Start time" value={rule.start_time ?? ''} onChange={(v) => updateNewLocationRule(index, { start_time: v || null })} hint="HH:MM" />
-                          <TextInput label="End time" value={rule.end_time ?? ''} onChange={(v) => updateNewLocationRule(index, { end_time: v || null })} hint="HH:MM" />
-                          <NairaInput label="Customer surcharge" value={toNaira(rule.customer_adjustment_value)} onChange={(n) => updateNewLocationRule(index, { customer_adjustment_kind: 'FIXED', customer_adjustment_value: n * 100 })} />
-                          <NairaInput label="Rider bonus" value={toNaira(rule.rider_bonus_value)} onChange={(n) => updateNewLocationRule(index, { rider_bonus_kind: 'FIXED', rider_bonus_value: n * 100 })} />
+                    <div className="mt-3 space-y-3">
+                      {newLocation.rules.map((rule, index) => (
+                        <div key={`new-rule-${index}`} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <TextInput label="Rule name" value={rule.name} onChange={(v) => updateNewLocationRule(index, { name: v })} />
+                            <TextInput label="Weather trigger" value={rule.weather_trigger ?? ''} onChange={(v) => updateNewLocationRule(index, { weather_trigger: v || null })} hint="Optional. Example: rain" />
+                            <TextInput label="Start time" value={rule.start_time ?? ''} onChange={(v) => updateNewLocationRule(index, { start_time: v || null })} hint="HH:MM" />
+                            <TextInput label="End time" value={rule.end_time ?? ''} onChange={(v) => updateNewLocationRule(index, { end_time: v || null })} hint="HH:MM" />
+                            <NairaInput label="Customer surcharge" value={toNaira(rule.customer_adjustment_value)} onChange={(n) => updateNewLocationRule(index, { customer_adjustment_kind: 'FIXED', customer_adjustment_value: n * 100 })} />
+                            <NairaInput label="Rider bonus" value={toNaira(rule.rider_bonus_value)} onChange={(n) => updateNewLocationRule(index, { rider_bonus_kind: 'FIXED', rider_bonus_value: n * 100 })} />
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {DAYS.map((day) => {
+                              const active = rule.days_of_week.includes(day.key)
+                              return (
+                                <button
+                                  key={`new-rule-day-${index}-${day.key}`}
+                                  type="button"
+                                  onClick={() => updateNewLocationRule(index, { days_of_week: active ? rule.days_of_week.filter((value) => value !== day.key) : [...rule.days_of_week, day.key].sort() })}
+                                  className="rounded-full px-3 py-1.5 text-xs font-medium"
+                                  style={{ background: active ? '#F5A623' : 'rgba(255,255,255,0.08)', color: active ? '#000' : 'rgba(255,255,255,0.7)' }}
+                                >
+                                  {day.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <MeterInput label="Priority" value={rule.priority} onChange={(n) => updateNewLocationRule(index, { priority: n })} />
+                            <label className="mt-6 flex items-center gap-2 text-xs text-white/60">
+                              <input type="checkbox" checked={rule.enabled} onChange={(e) => updateNewLocationRule(index, { enabled: e.target.checked })} className="h-4 w-4 accent-amber-500" />
+                              Enabled
+                            </label>
+                            <button type="button" onClick={() => updateNewLocation({ rules: newLocation.rules.filter((_, ruleIndex) => ruleIndex !== index) })} className="mt-6 rounded-xl border border-red-500/25 px-3 py-2 text-xs font-semibold text-red-300">Remove</button>
+                          </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          {DAYS.map((day) => {
-                            const active = rule.days_of_week.includes(day.key)
-                            return (
-                              <button
-                                key={`new-rule-day-${index}-${day.key}`}
-                                type="button"
-                                onClick={() => updateNewLocationRule(index, { days_of_week: active ? rule.days_of_week.filter((value) => value !== day.key) : [...rule.days_of_week, day.key].sort() })}
-                                className="rounded-full px-3 py-1.5 text-xs font-medium"
-                                style={{ background: active ? '#F5A623' : 'rgba(255,255,255,0.08)', color: active ? '#000' : 'rgba(255,255,255,0.7)' }}
-                              >
-                                {day.label}
-                              </button>
-                            )
-                          })}
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <MeterInput label="Priority" value={rule.priority} onChange={(n) => updateNewLocationRule(index, { priority: n })} />
-                          <label className="mt-6 flex items-center gap-2 text-xs text-white/60">
-                            <input type="checkbox" checked={rule.enabled} onChange={(e) => updateNewLocationRule(index, { enabled: e.target.checked })} className="h-4 w-4 accent-amber-500" />
-                            Enabled
-                          </label>
-                          <button type="button" onClick={() => updateNewLocation({ rules: newLocation.rules.filter((_, ruleIndex) => ruleIndex !== index) })} className="mt-6 rounded-xl border border-red-500/25 px-3 py-2 text-xs font-semibold text-red-300">Remove</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  </details>
 
                   <button onClick={() => void createLocation()} disabled={busyKey === 'new-location'} className="lx-btn-amber mt-4 w-full py-3.5">
                     {busyKey === 'new-location' ? 'Saving…' : 'Add location'}

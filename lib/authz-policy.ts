@@ -92,6 +92,7 @@ export const ROUTE_POLICY: Record<string, Policy> = {
 
   'campaign/track': { kind: 'public' },
   'feed/page': { kind: 'public' },
+  'promotions/quote': { kind: 'public' },
 
   ...map([
     'group-order/[code]', 'group-order/[code]/items',

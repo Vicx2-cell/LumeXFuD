@@ -104,6 +104,7 @@ export default function CartPage() {
   const [gpsMessage,       setGpsMessage]       = useState('')
   const [campaignId,       setCampaignId]       = useState('')
   const [promoCode,        setPromoCode]        = useState('')
+  const [promoQuote,       setPromoQuote]       = useState<{ checking: boolean; eligible: boolean; discountKobo: number; reason: string; matched: boolean; code: string }>({ checking: false, eligible: false, discountKobo: 0, reason: '', matched: false, code: '' })
   const [authChecked,      setAuthChecked]      = useState(false)
   const [isGuest,          setIsGuest]          = useState(false)
   const [guestName,        setGuestName]        = useState('')
@@ -247,8 +248,63 @@ export default function CartPage() {
     : fees?.door ?? 0)
   const platformMarkup  = isPickup ? (fees?.markup ?? 0) : estimate?.serviceFeeKobo ?? fees?.markup ?? 0
   const tipApplied      = isPickup ? 0 : tip
-  const total           = subtotal + platformMarkup + deliveryFee + tipApplied
+  const promoDiscount   = promoQuote.eligible ? promoQuote.discountKobo : 0
+  const total           = Math.max(0, subtotal + platformMarkup + deliveryFee + tipApplied - promoDiscount)
   const deliveryDistanceLabel = formatDistanceKm(estimate?.distanceKm, 2)
+
+  useEffect(() => {
+    const code = promoCode.trim().toUpperCase()
+    if (!code || code.length < 2 || subtotal <= 0) {
+      setPromoQuote({ checking: false, eligible: false, discountKobo: 0, reason: '', matched: false, code })
+      return
+    }
+
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      setPromoQuote((current) => ({ ...current, checking: true, code }))
+      void fetch('/api/promotions/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          subtotal_kobo: subtotal,
+          delivery_fee_kobo: isPickup ? 0 : deliveryFee,
+          platform_fee_kobo: platformMarkup,
+          vendor_id: cart.vendor_id,
+        }),
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => null) as { matched?: boolean; eligible?: boolean; discount_kobo?: number; reason?: string } | null
+          if (cancelled) return
+          const eligible = !!response.ok && !!data?.matched && !!data?.eligible && Number(data.discount_kobo ?? 0) > 0
+          setPromoQuote({
+            checking: false,
+            eligible,
+            discountKobo: eligible ? Number(data?.discount_kobo ?? 0) : 0,
+            reason: data?.reason ?? (eligible ? 'Promo applied' : 'Promotion not available'),
+            matched: !!data?.matched,
+            code,
+          })
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setPromoQuote({
+              checking: false,
+              eligible: false,
+              discountKobo: 0,
+              reason: 'Could not verify the code right now.',
+              matched: false,
+              code,
+            })
+          }
+        })
+    }, 350)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [cart.vendor_id, deliveryFee, isPickup, platformMarkup, promoCode, subtotal])
 
   // Longest-dish prep estimate from the per-item times captured at add-time
   // (falls back to a 25-min default for any item saved before that field existed).
@@ -836,7 +892,16 @@ export default function CartPage() {
               <label htmlFor="promo-code" className="mb-1 block text-xs font-medium text-white/55">Promotion code</label>
               <input id="promo-code" value={promoCode} onChange={(e) => setPromoCode(e.target.value.slice(0, 40).toUpperCase())}
                 placeholder="Optional" className="lx-field w-full px-3 py-2.5 text-sm uppercase outline-none" autoComplete="off" />
-              <p className="mt-1 text-xs text-white/35">Eligibility and the final discount are verified securely when you pay.</p>
+              <div className="mt-1 flex items-center justify-between gap-3 text-xs">
+                <p className="text-white/35">We verify the code here and again at checkout.</p>
+                {promoQuote.checking ? (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-white/45">Checking…</span>
+                ) : promoQuote.eligible ? (
+                  <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-emerald-300">{promoQuote.code || 'Promo'} applied</span>
+                ) : promoQuote.reason && promoQuote.code ? (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-white/45">{promoQuote.reason}</span>
+                ) : null}
+              </div>
             </div>
             {authChecked && isGuest && (
               <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
@@ -1011,6 +1076,12 @@ export default function CartPage() {
             <div className="flex justify-between text-sm">
               <span className="text-white/60">Tip</span>
               <span>{formatPrice(tip)}</span>
+            </div>
+          )}
+          {promoQuote.eligible && promoDiscount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-white/60">Promo discount</span>
+              <span className="text-emerald-300">-{formatPrice(promoDiscount)}</span>
             </div>
           )}
           {paymentMethod !== 'PAYSTACK' && walletBalance !== null && walletBalance > 0 && (
