@@ -15,7 +15,9 @@ This is a codebase readiness record, not a declaration of launch readiness. The 
 - P1 commerce uses the existing validated cart/order flow: feed menu references resolve against live availability, vendor slug storefronts provide public sharing metadata, host-paid group orders enforce one vendor/location and lock edits, and affordable discovery/recommendations are filtered server-side from live menu data. Affordable price bands are edited from Super Admin Pricing and seeded by migration `150_affordable_discovery_settings.sql`.
 
 - Next.js 16.2.12 application compiles as a production build; strict TypeScript and ESLint pass.
-- 138 Vitest files / 896 tests pass after removing four isolated tests for abandoned implementations, covering authz, order creation, cart contracts, delivery pricing, menu add-ons, payment-webhook idempotency, refunds, wallets, promotions, promo-fund locking/reconciliation, virtual-account boundaries, RLS coverage contracts, feeds, email flows and operations.
+- 139 Vitest files / 900 tests pass. The exact reduction from the earlier 914
+  count and the four new mobile delivery-estimate regression cases are recorded
+  in `TEST_COVERAGE_RECONCILIATION.md`.
 - Customer storefront, cart, checkout, order tracking, guest checkout, vendor menu/dashboard, rider workflow, admin/super-admin operations and the Feed have implemented routes and server-side authorization layers.
 - Checkout recalculates server-side prices, delivery charges, discounts and payment split; order creation uses an idempotency key. Paystack webhook HMAC validation and deduplication are implemented.
 - Migration `084_rls_coverage_backstop.sql` provides a database-derived RLS-gap check; migration `048_column_grants_lockdown.sql` limits public columns on sensitive public-read tables.
@@ -34,6 +36,12 @@ This is a codebase readiness record, not a declaration of launch readiness. The 
 - The release-payment cron independently credited a vendor's full subtotal, bypassing the commission and vendor-funded promotion deduction in `lib/order-payout.ts`. It now delegates to that single payout authority; a regression test prevents reintroducing the duplicate formula.
 
 ## Missing or unverified systems
+
+- Certification V2 repaired the bounded Playwright process lifecycle and passes
+  all 13 customer, guest, vendor, rider, admin and mobile scenarios. It also
+  remediated the reachable Sharp advisory, leaving zero production dependency
+  findings. See `PLAYWRIGHT_RESULTS.md`,
+  `DEPENDENCY_SECURITY_DECISION.md`, and `MVP_CERTIFICATION_V2.md`.
 
 - Production provider configuration remains unverified: Paystack live keys/webhook endpoint, Resend domain and webhook, Upstash rate-limit credentials, Sentry DSN, and all cron secrets.
 - Paystack DVA capability is not verified on the merchant account. Keep both the `customer_virtual_accounts` application feature and `PAYSTACK_DVA_ENABLED=false` until Paystack confirms the registered Nigerian business is eligible, the DVA provider slug is selected, and `PAYSTACK_DVA_COMPLIANCE_REQUIRED` matches the merchant category. Configure `PAYSTACK_DVA_PREFERRED_BANK` only from Paystack's Fetch Providers response.

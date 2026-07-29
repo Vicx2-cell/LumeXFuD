@@ -32,7 +32,7 @@ export interface PlatformControls {
 // The NORMAL operating state. Used to seed the result and to fill in any control
 // whose settings row hasn't been written yet — so the platform runs normally
 // before a super-admin ever touches a switch.
-export const CONTROL_DEFAULTS: PlatformControls = {
+const CONTROL_DEFAULTS: PlatformControls = {
   withdrawals_frozen: false,
   payouts_mode: 'auto',
   maintenance_enabled: false,

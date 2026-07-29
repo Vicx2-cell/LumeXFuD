@@ -7,6 +7,20 @@ const addonLongId = '66666666-6666-4666-8666-666666666666'
 const addonSoldOutId = '77777777-7777-4777-8777-777777777777'
 const zoneId = '88888888-8888-4888-8888-888888888888'
 const cityId = '99999999-9999-4999-8999-999999999999'
+const customerId = 'aaaaaaaa-0000-4000-8000-000000000001'
+const riderId = 'aaaaaaaa-0000-4000-8000-000000000002'
+const adminId = 'aaaaaaaa-0000-4000-8000-000000000003'
+const superAdminId = 'aaaaaaaa-0000-4000-8000-000000000004'
+const readyOrderId = 'aaaaaaaa-0000-4000-8000-000000000005'
+const currentOrderId = 'aaaaaaaa-0000-4000-8000-000000000006'
+
+export const playwrightIdentities = {
+  customer: { sessionId: 'e2e-session-customer', userId: customerId, phone: '+2348011111111', role: 'customer' },
+  vendor: { sessionId: 'e2e-session-vendor', userId: vendorId, phone: '+2348000000000', role: 'vendor' },
+  rider: { sessionId: 'e2e-session-rider', userId: riderId, phone: '+2348022222222', role: 'rider' },
+  admin: { sessionId: 'e2e-session-admin', userId: adminId, phone: '+2348033333333', role: 'admin' },
+  super_admin: { sessionId: 'e2e-session-super-admin', userId: superAdminId, phone: '+2348044444444', role: 'super_admin' },
+} as const
 
 const vendor = {
   id: vendorId,
@@ -85,6 +99,10 @@ const settings = [
   { id: 'min_order_amount', value: { amount_kobo: 100000 } },
   { id: 'wallet_topup_bonus_percent', value: { value: 0 } },
   { id: 'platform_hours', value: { open: '07:00', close: '22:00', enforce: false } },
+  { id: 'maintenance', value: { enabled: true, message: 'Ordering is paused for the launch drill.' } },
+  // Test-fixture only: exercises the already-built handover UI without changing
+  // the production feature default or persisted launch configuration.
+  { id: 'feature.delivery_handover_v1', value: { enabled: true } },
 ]
 
 const deliveryZone = {
@@ -97,6 +115,8 @@ const deliveryZone = {
   rider_split: { BIKE: 15000, DOOR: 25000 },
   platform_split: { BIKE: 5000, DOOR: 10000 },
   created_at: '2026-07-22T00:00:00.000Z',
+  name: 'Fixture Campus',
+  uses_lodge_catalog: false,
 }
 
 function rowsFor(table: string): Record<string, unknown>[] {
@@ -106,25 +126,98 @@ function rowsFor(table: string): Record<string, unknown>[] {
     case 'menu_item_addons': return addons
     case 'settings': return settings
     case 'delivery_zones': return [deliveryZone]
+    case 'cities': return [{ id: cityId, name: 'Fixture City', state: 'Abia', slug: 'fixture-city', status: 'ACTIVE' }]
     case 'social_profiles': return [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', vendor_id: vendorId, handle: 'playwright-kitchen', display_name: vendor.shop_name, avatar_url: vendor.logo_url, is_verified: true, official_badge_kind: null }]
     case 'ratings': return [{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', vendor_id: vendorId, stars: 5, review: 'Reliable fixture food.', created_at: '2026-07-22T00:00:00.000Z' }]
+    case 'customers': return [{ id: customerId, phone: playwrightIdentities.customer.phone, name: 'Ada Customer', deleted_at: null, suspended_until: null }]
+    case 'riders': return [{
+      id: riderId, phone: playwrightIdentities.rider.phone, full_name: 'Rita Rider',
+      status: 'BUSY', active_order_id: currentOrderId, avg_rating: 4.9, total_deliveries: 30,
+      avatar_url: null, is_active: true, approval_state: 'approved', deleted_at: null,
+    }]
+    case 'admins': return [
+      { id: adminId, phone: playwrightIdentities.admin.phone, name: 'Opal Admin', role: 'admin', is_active: true },
+      { id: superAdminId, phone: playwrightIdentities.super_admin.phone, name: 'Sola Super Admin', role: 'super_admin', is_active: true },
+    ]
+    case 'sessions': return Object.values(playwrightIdentities).map((identity) => ({
+      id: identity.sessionId,
+      user_id: identity.userId,
+      phone: identity.phone,
+      role: identity.role,
+      revoked_at: null,
+      expires_at: '2099-01-01T00:00:00.000Z',
+    }))
+    case 'orders': return [{
+      id: readyOrderId,
+      order_number: 'LX-E2E-READY',
+      vendor_id: vendorId,
+      customer_id: customerId,
+      rider_id: null,
+      status: 'READY',
+      delivery_type: 'BIKE',
+      delivery_address: 'Fixture Hostel, Block A, Room 2',
+      delivery_latitude: 5.8302,
+      delivery_longitude: 7.3959,
+      rider_delivery_cut: 15000,
+      subtotal: 250000,
+      total_amount: 285000,
+      platform_markup: 10000,
+      platform_delivery_cut: 5000,
+      created_at: '2026-07-29T08:00:00.000Z',
+      leave_at_gate: false,
+    }, {
+      id: currentOrderId,
+      order_number: 'LX-E2E-CURRENT',
+      vendor_id: vendorId,
+      customer_id: customerId,
+      rider_id: riderId,
+      status: 'PICKED_UP',
+      delivery_type: 'BIKE',
+      delivery_address: 'Fixture Hostel, Block B, Room 4',
+      delivery_latitude: 5.8302,
+      delivery_longitude: 7.3959,
+      rider_delivery_cut: 15000,
+      subtotal: 250000,
+      total_amount: 285000,
+      platform_markup: 10000,
+      platform_delivery_cut: 5000,
+      picked_up_at: '2026-07-29T08:20:00.000Z',
+      delivery_photo_url: null,
+      created_at: '2026-07-29T08:00:00.000Z',
+      leave_at_gate: false,
+    }]
+    case 'wallet_balances': return [
+      {
+        user_id: vendorId, user_type: 'VENDOR', wallet_pin_hash: 'fixture-hash',
+        bank_verified_at: '2026-07-01T00:00:00.000Z', bank_account_number: '0000000000',
+        bank_account_last4: '0000', bank_code: '000', bank_account_name: 'ADA VENDOR',
+        bank_name: 'Fixture Bank', total_balance: 0, available_balance: 0, held_balance: 0,
+        trust_tier: 'BRONZE', is_frozen: false, lifetime_earned: 0, total_withdrawals: 0,
+      },
+      {
+        user_id: riderId, user_type: 'RIDER', wallet_pin_hash: 'fixture-hash',
+        bank_verified_at: '2026-07-01T00:00:00.000Z', bank_account_number: '0000000001',
+        bank_account_last4: '0001', bank_code: '000', bank_account_name: 'RITA RIDER',
+        bank_name: 'Fixture Bank', total_balance: 0, available_balance: 0, held_balance: 0,
+        trust_tier: 'BRONZE', is_frozen: false, lifetime_earned: 0, total_withdrawals: 0,
+      },
+    ]
     case 'follows':
     case 'posts':
     case 'lodges':
-    case 'sessions':
-    case 'customers':
       return []
     default:
       return []
   }
 }
 
-type Filter = { column: string; op: 'eq' | 'is' | 'in' | 'not' | 'gt'; value: unknown }
+type Filter = { column: string; op: 'eq' | 'is' | 'in' | 'not' | 'gt' | 'gte' | 'lte'; value: unknown }
 
 class FixtureQuery {
   private filters: Filter[] = []
   private limitCount: number | null = null
   private countMode = false
+  private mutationRow: Record<string, unknown> | null = null
 
   constructor(private table: string) {}
 
@@ -138,13 +231,15 @@ class FixtureQuery {
   in(column: string, value: unknown[]) { this.filters.push({ column, op: 'in', value }); return this }
   not(column: string, op: string, value: unknown) { this.filters.push({ column, op: 'not', value: { op, value } }); return this }
   gt(column: string, value: unknown) { this.filters.push({ column, op: 'gt', value }); return this }
+  gte(column: string, value: unknown) { this.filters.push({ column, op: 'gte', value }); return this }
+  lte(column: string, value: unknown) { this.filters.push({ column, op: 'lte', value }); return this }
   or(_expr: string) { return this }
   order(_column: string, _opts?: unknown) { return this }
   limit(count: number) { this.limitCount = count; return this }
   range(from: number, to: number) { this.limitCount = Math.max(0, to - from + 1); return this }
 
   async single() {
-    const data = this.execute()[0] ?? null
+    const data = this.mutationRow ?? this.execute()[0] ?? null
     return { data, error: data ? null : { message: 'not found' } }
   }
 
@@ -152,12 +247,19 @@ class FixtureQuery {
     return { data: this.execute()[0] ?? null, error: null }
   }
 
-  async insert(payload?: unknown) {
+  insert(payload?: unknown) {
     const row = Array.isArray(payload) ? payload[0] : payload
-    return { data: row ?? null, error: null, select: () => this, single: async () => ({ data: row ?? null, error: null }) }
+    this.mutationRow = row && typeof row === 'object'
+      ? { id: 'aaaaaaaa-0000-4000-8000-000000000099', ...row as Record<string, unknown> }
+      : null
+    return this
   }
 
-  update(_payload?: unknown) { return this }
+  upsert(payload?: unknown) { return this.insert(payload) }
+  update(payload?: unknown) {
+    if (payload && typeof payload === 'object') this.mutationRow = payload as Record<string, unknown>
+    return this
+  }
   delete() { return this }
 
   then<TResult1 = { data: Record<string, unknown>[]; error: null; count?: number }, TResult2 = never>(
@@ -182,6 +284,8 @@ class FixtureQuery {
         if (filter.op === 'in') return Array.isArray(filter.value) && filter.value.includes(value)
         if (filter.op === 'not') return value !== null
         if (filter.op === 'gt') return String(value) > String(filter.value)
+        if (filter.op === 'gte') return String(value) >= String(filter.value)
+        if (filter.op === 'lte') return String(value) <= String(filter.value)
         return true
       })
     }
@@ -197,6 +301,21 @@ export function createPlaywrightCommerceSupabase() {
     storage: {
       from(_bucket: string) {
         return {
+          async list(path: string) {
+            if (path.startsWith('verified/')) {
+              return {
+                data: [
+                  { name: 'face.webp' },
+                  { name: 'government_id.webp' },
+                  { name: 'vehicle.webp' },
+                  { name: 'food_safety.webp' },
+                  { name: 'storefront.webp' },
+                ],
+                error: null,
+              }
+            }
+            return { data: [], error: null }
+          },
           async createSignedUrl(_path: string, _seconds: number) {
             return { data: { signedUrl: '/icons/icon-192-v2.png' }, error: null }
           },

@@ -10,7 +10,7 @@ import {
   type FeedPermissionProfile,
   type FeedPermissionVendor,
 } from '@/lib/feed/permissions'
-import type { FeedV2Post, FeedV2RailCollection, FeedV2RailTopic, FeedV2RailVendor, FeedV2Story } from '@/app/feed-v2/fixtures'
+import type { FeedV2Post, FeedV2RailCollection, FeedV2RailTopic, FeedV2RailVendor, FeedV2Story } from '@/app/feed-v2/types'
 
 export type FeedV2TabKey = 'for_you' | 'following' | 'nearby' | 'deals' | 'trending'
 

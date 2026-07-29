@@ -24,6 +24,12 @@ export type RateLimitResult = { success: boolean; remaining: number; reset: numb
 // must never 500 a login or payment. Pass `true` only where an unmetered request
 // has a real external cost (e.g. an OTP or paid SMS), so a blip can't drain credits.
 async function check(limiter: Ratelimit | null, key: string, failClosed = false): Promise<RateLimitResult> {
+  if (
+    process.env.PLAYWRIGHT_COMMERCE_FIXTURE === '1' &&
+    process.env.SUPABASE_SERVICE_ROLE_KEY === 'playwright-service-role-key'
+  ) {
+    return { success: true, remaining: 999, reset: 0 }
+  }
   if (!limiter) {
     // Limiter unconfigured (no Upstash env). Same open/closed decision applies.
     return failClosed

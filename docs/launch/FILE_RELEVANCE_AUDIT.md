@@ -87,13 +87,13 @@ Each deletion is recoverable from Git history. No migration was deleted.
   current release status; `docs/launch/` is authoritative.
 - Static analysis sees several framework/config/script files as unused because
   they are not imported. They remain intentionally.
-- The repository history still contains the expired credentials removed from
-  the current tree. Confirm revocation/expiry and decide whether organizational
-  history rewriting is required; never rewrite shared history casually.
-- The remaining high npm advisories are transitive build/image dependencies
-  under the latest Next release and its required Sharp 0.34 line. They require
-  an upstream-compatible remediation; npm's proposed forced fix is a breaking
-  downgrade to Next 14 and was not applied.
+- The repository history contains two expired Vercel OIDC tokens removed from
+  the current tree. Their signed expiry and no-rewrite disposition are verified
+  in `HISTORICAL_SECRET_RESPONSE.md`.
+- Certification V2 constrains every Next consumer to patched Sharp 0.35.3 and
+  the production audit is clean. The remaining full-audit advisory is confined
+  to development ESLint glob processing and is dispositioned in
+  `DEPENDENCY_SECURITY_DECISION.md`.
 
 ## Dependencies
 

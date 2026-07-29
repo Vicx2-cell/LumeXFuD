@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/run-playwright.mjs",
     "audit:prod": "npm audit --omit=dev"
   },
   "dependencies": {
@@ -63,6 +63,7 @@
     "vitest": "4.1.8"
   },
   "overrides": {
+    "sharp": "0.35.3",
     "next": {
       "postcss": "8.5.24"
     }

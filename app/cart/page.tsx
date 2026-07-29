@@ -9,6 +9,7 @@ import { FOOD_BLUR } from '@/lib/blur'
 import { useCart, type CartItem } from '@/components/cart-context'
 import { BottomNav } from '@/components/nav-bottom'
 import { formatPrice } from '@/lib/money'
+import { parseDeliveryEstimate } from '@/lib/delivery-estimate-response'
 import { useFeatures } from '@/lib/use-features'
 import { estimateOrderPrepMinutes, prepRangeLabel } from '@/lib/prep-time'
 import { formatHoursRange } from '@/lib/hours'
@@ -217,12 +218,13 @@ export default function CartPage() {
       .then(async (response) => {
         const data = await response.json().catch(() => null) as { error?: string; estimate?: { distanceKm: number; serviceFeeKobo: number; deliveryFeeKobo: number; activeSurchargeTotalKobo: number } } | null
         if (cancelled) return
-        if (!response.ok || !data?.estimate) {
+        const estimate = parseDeliveryEstimate(data?.estimate)
+        if (!response.ok || !estimate) {
           setEstimate(null)
           setEstimateError(data?.error ?? 'Could not estimate delivery right now.')
           return
         }
-        setEstimate(data.estimate)
+        setEstimate(estimate)
         setEstimateError('')
       })
       .catch(() => {

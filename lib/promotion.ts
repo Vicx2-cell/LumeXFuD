@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-export const discountTypes = ['FIXED', 'PERCENTAGE', 'DELIVERY', 'FREE_DELIVERY', 'PLATFORM_FEE'] as const
-export const promotionKinds = ['STANDARD', 'VENDOR', 'GROUP_ORDER', 'REFERRAL', 'AMBASSADOR'] as const
+const discountTypes = ['FIXED', 'PERCENTAGE', 'DELIVERY', 'FREE_DELIVERY', 'PLATFORM_FEE'] as const
+const promotionKinds = ['STANDARD', 'VENDOR', 'GROUP_ORDER', 'REFERRAL', 'AMBASSADOR'] as const
 
 export type Promotion = {
   discountType: typeof discountTypes[number]

@@ -39,7 +39,7 @@ import type {
   FeedV2RailVendor,
   FeedV2Story,
   FeedV2Tab,
-} from '@/app/feed-v2/fixtures'
+} from '@/app/feed-v2/types'
 import { recordFeedCommerceEvent, rememberFeedCommerceSource } from '@/lib/feed/client-attribution'
 
 type FeedV2ScreenProps = {

@@ -2,6 +2,10 @@
 
 Last reviewed: 2026-07-29
 
+> Historical report superseded by `MVP_CERTIFICATION_V2.md`. Its blocked
+> conclusion records the pre-repair state and must not be used as the current
+> certification decision.
+
 ## Executive conclusion
 
 MVP_NOT_CERTIFIED_BLOCKERS_REMAIN

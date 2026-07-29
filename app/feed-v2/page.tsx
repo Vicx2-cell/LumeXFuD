@@ -1,6 +1,6 @@
 import { FeedV2Screen } from '@/components/feed-v2/feed-v2-screen'
 import { loadFeedV2Surface, type FeedV2RightRailData, type FeedV2TabKey } from '@/lib/feed/v2'
-import { feedV2LeftNav, feedV2Tabs, type FeedV2Post, type FeedV2Story, type FeedV2Tab } from './fixtures'
+import { feedV2LeftNav, feedV2Tabs, type FeedV2Post, type FeedV2Story, type FeedV2Tab } from './types'
 
 const tabByLabel: Record<string, FeedV2TabKey> = {
   'for-you': 'for_you',

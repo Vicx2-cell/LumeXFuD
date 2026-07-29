@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { FeedV2Screen } from '@/components/feed-v2/feed-v2-screen'
 import { loadFeedV2Surface } from '@/lib/feed/v2'
-import { feedV2LeftNav, feedV2Tabs } from '../../fixtures'
+import { feedV2LeftNav, feedV2Tabs } from '../../types'
 
 export const dynamic = 'force-dynamic'
 
