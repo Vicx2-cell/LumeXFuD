@@ -5,6 +5,16 @@ import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { getFeature } from '@/lib/features'
 import { assignDedicatedAccount, createPaystackCustomer, fetchPaystackCustomer, maskIdentity, requeryDedicatedAccount } from '@/lib/paystack/virtual-accounts'
 
+type SafeVirtualAccount = {
+  bank_name: string | null
+  account_name: string | null
+  account_number: string | null
+  provider_slug: string | null
+  status: string
+  consented_at?: string | null
+  failure_reason?: string | null
+}
+
 const inputSchema = z.object({
   consent: z.literal(true),
   account_number: z.string().regex(/^\d{10}$/).optional(),
@@ -19,10 +29,25 @@ const inputSchema = z.object({
 async function customerGate() {
   const session = await getCurrentUser()
   if (!session || session.role !== 'customer') return { error: NextResponse.json({ error: 'Customer authentication required' }, { status: 401 }) }
-  if (!(await getFeature('customer_virtual_accounts')) || process.env.PAYSTACK_DVA_ENABLED !== 'true') {
+  const dvaEnabled = await getFeature('customer_virtual_accounts')
+  const dvaDisabledByEnv = process.env.PAYSTACK_DVA_ENABLED === 'false'
+  if (!dvaEnabled || dvaDisabledByEnv) {
     return { error: NextResponse.json({ error: 'Virtual accounts are not enabled' }, { status: 404 }) }
   }
   return { session }
+}
+
+function toSafeVirtualAccount(row: Record<string, unknown> | null | undefined): SafeVirtualAccount | null {
+  if (!row) return null
+  return {
+    bank_name: typeof row.bank_name === 'string' ? row.bank_name : null,
+    account_name: typeof row.account_name === 'string' ? row.account_name : null,
+    account_number: typeof row.account_number === 'string' ? row.account_number : null,
+    provider_slug: typeof row.provider_slug === 'string' ? row.provider_slug : null,
+    status: typeof row.status === 'string' ? row.status : 'PENDING',
+    consented_at: typeof row.consented_at === 'string' ? row.consented_at : null,
+    failure_reason: typeof row.failure_reason === 'string' ? row.failure_reason : null,
+  }
 }
 
 export async function GET() {
@@ -34,7 +59,7 @@ export async function GET() {
   const { data } = await db.from('customer_virtual_accounts')
     .select('bank_name, account_name, account_number, provider_slug, status, consented_at, failure_reason')
     .eq('customer_id', customer.id).maybeSingle()
-  return NextResponse.json({ virtual_account: data ?? null }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({ virtual_account: toSafeVirtualAccount(data as Record<string, unknown> | null) }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 export async function POST(req: NextRequest) {
@@ -50,7 +75,7 @@ export async function POST(req: NextRequest) {
   const names = customer.name.trim().split(/\s+/)
   if (names.length < 2) return NextResponse.json({ error: 'Add your full legal name before continuing' }, { status: 409 })
   const existing = await db.from('customer_virtual_accounts').select('*').eq('customer_id', customer.id).maybeSingle()
-  if (existing.data?.status === 'ACTIVE') return NextResponse.json({ virtual_account: existing.data })
+  if (existing.data?.status === 'ACTIVE') return NextResponse.json({ virtual_account: toSafeVirtualAccount(existing.data as Record<string, unknown>) })
   if (existing.data?.status === 'PROVISIONING') return NextResponse.json({ error: 'Account assignment is already in progress' }, { status: 409 })
   const assignmentReference = crypto.randomUUID()
   const row = {
@@ -85,7 +110,7 @@ export async function POST(req: NextRequest) {
         paystack_customer_code: assigned.customer?.customer_code ?? customerCode, updated_at: new Date().toISOString(),
       }
       await db.from('customer_virtual_accounts').update(active).eq('customer_id', customer.id).eq('assignment_reference', assignmentReference)
-      return NextResponse.json({ virtual_account: active }, { status: 201 })
+      return NextResponse.json({ virtual_account: toSafeVirtualAccount({ ...claim.data, ...active }) }, { status: 201 })
     }
     return NextResponse.json({ status: 'PENDING' }, { status: 202 })
   } catch (error) {
