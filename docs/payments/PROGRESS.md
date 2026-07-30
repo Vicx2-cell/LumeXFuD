@@ -81,8 +81,13 @@ Implement admin hardening on top of the completed reconciliation slice.
 - `docs/payments/FINAL_AUDIT.md`
 - `app/api/customer/virtual-account/route.ts`
 - `app/api/customer/virtual-account/route.test.ts`
+- `app/api/cron/wallet-reconciliation/route.ts`
+- `app/api/cron/wallet-reconciliation/route.test.ts`
 - `supabase/migrations/158_payments_ledger_foundation.sql`
+- `supabase/migrations/163_reconciliation_records.sql`
 - `lib/wallet-reservations.ts`
+- `lib/reconciliation.ts`
+- `lib/reconciliation.test.ts`
 - `lib/paystack/webhook.ts`
 - `app/api/orders/route.ts`
 - `app/api/orders/[id]/deliver/route.ts`
@@ -110,6 +115,8 @@ Implement admin hardening on top of the completed reconciliation slice.
 - `npm.cmd exec tsc -- --noEmit`
 - `npm.cmd exec tsc -- --noEmit`
 - `npm.cmd exec vitest run lib/refund-ledger.test.ts lib/paystack/webhook.refund.test.ts`
+- `npm.cmd exec tsc -- --noEmit`
+- `npm.cmd exec vitest run lib/reconciliation.test.ts app/api/cron/wallet-reconciliation/route.test.ts`
 
 ## Test results
 
@@ -122,11 +129,12 @@ Implement admin hardening on top of the completed reconciliation slice.
 - The DVA deposit ledger linkage test passes.
 - The refund ledger helper tests pass.
 - The refund webhook finalization and reversal tests pass.
+- The reconciliation helper tests pass.
+- The wallet reconciliation cron records both healthy runs and shortfalls.
 
 ## Current failures
 
-- The remaining launch work is reconciliation and admin hardening.
-- Vendor and rider payout flows still need to be completed on the new ledger.
+- The remaining launch work is admin hardening.
 
 ## External blockers
 
@@ -148,7 +156,7 @@ Implement admin hardening on top of the completed reconciliation slice.
 
 ## Latest commit
 
-- `2a05568` - `payments: add refund ledger wiring`
+- `579af2f` - `payments: add reconciliation runs and wallet cron persistence`
 
 ## Global stop-condition status
 
