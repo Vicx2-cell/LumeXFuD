@@ -16,7 +16,7 @@ Phase 2 - Direct checkout and payout rails
 
 ## Current bounded task
 
-Implement admin hardening on top of the completed reconciliation slice.
+Run production hardening validation on the completed payments admin surfaces.
 
 ## Completed requirements
 
@@ -57,10 +57,13 @@ Implement admin hardening on top of the completed reconciliation slice.
 - Added persistent reconciliation run and discrepancy records with trusted server helpers.
 - Wired the wallet reconciliation cron to persist run summaries, shortfalls, and healthy completion records.
 - Added focused reconciliation tests for run creation, discrepancy recording, and wallet reconciliation shortfall/healthy paths.
+- Expanded the super-admin payments view to cover payment intents, beneficiary profiles, payouts, refunds, reconciliation runs, discrepancies, webhook records, and DVA transactions.
+- Added a super-admin webhook replay endpoint with explicit confirmation, reason, idempotency, and audit logging.
+- Added focused admin tests for the broader payments view and webhook replay control.
 
 ## Incomplete requirements
 
-- Admin hardening still needs completion.
+- Production hardening and launch certification still need completion.
 
 ## Files changed
 
@@ -83,6 +86,10 @@ Implement admin hardening on top of the completed reconciliation slice.
 - `app/api/customer/virtual-account/route.test.ts`
 - `app/api/cron/wallet-reconciliation/route.ts`
 - `app/api/cron/wallet-reconciliation/route.test.ts`
+- `app/api/super-admin/payments/route.ts`
+- `app/api/super-admin/payments/route.test.ts`
+- `app/api/super-admin/payments/replay/route.ts`
+- `app/api/super-admin/payments/replay/route.test.ts`
 - `supabase/migrations/158_payments_ledger_foundation.sql`
 - `supabase/migrations/163_reconciliation_records.sql`
 - `lib/wallet-reservations.ts`
@@ -117,6 +124,8 @@ Implement admin hardening on top of the completed reconciliation slice.
 - `npm.cmd exec vitest run lib/refund-ledger.test.ts lib/paystack/webhook.refund.test.ts`
 - `npm.cmd exec tsc -- --noEmit`
 - `npm.cmd exec vitest run lib/reconciliation.test.ts app/api/cron/wallet-reconciliation/route.test.ts`
+- `npm.cmd exec tsc -- --noEmit`
+- `npm.cmd exec vitest run app/api/super-admin/payments/route.test.ts app/api/super-admin/payments/replay/route.test.ts`
 
 ## Test results
 
@@ -131,10 +140,12 @@ Implement admin hardening on top of the completed reconciliation slice.
 - The refund webhook finalization and reversal tests pass.
 - The reconciliation helper tests pass.
 - The wallet reconciliation cron records both healthy runs and shortfalls.
+- The super-admin payments view returns the broader payment surfaces.
+- The super-admin webhook replay endpoint requires confirmation and replays the payload.
 
 ## Current failures
 
-- The remaining launch work is admin hardening.
+- The remaining launch work is production hardening and launch certification.
 
 ## External blockers
 
@@ -152,11 +163,11 @@ Implement admin hardening on top of the completed reconciliation slice.
 
 ## Next task
 
-- Implement admin controls on top of the completed reconciliation slice.
+- Run production hardening validation on the completed payments admin surfaces.
 
 ## Latest commit
 
-- `579af2f` - `payments: add reconciliation runs and wallet cron persistence`
+- `62a7fed` - `docs: refresh payments progress hash`
 
 ## Global stop-condition status
 
