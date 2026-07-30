@@ -105,6 +105,8 @@ Implement reconciliation and admin hardening on top of the completed refund slic
 - `npm.cmd exec tsc -- --noEmit`
 - `npm.cmd exec vitest run test/payments-ledger-db.test.ts test/paystack-dva-deposit.test.ts`
 - `npm.cmd exec tsc -- --noEmit`
+- `npm.cmd exec tsc -- --noEmit`
+- `npm.cmd exec vitest run lib/refund-ledger.test.ts lib/paystack/webhook.refund.test.ts`
 
 ## Test results
 
@@ -115,10 +117,12 @@ Implement reconciliation and admin hardening on top of the completed refund slic
 - TypeScript compile check passes after the test typing cleanup.
 - The payments ledger foundation test passes.
 - The DVA deposit ledger linkage test passes.
+- The refund ledger helper tests pass.
+- The refund webhook finalization and reversal tests pass.
 
 ## Current failures
 
-- The remaining launch work is direct Paystack checkout, payout batching, refunds, reconciliation, and admin hardening.
+- The remaining launch work is reconciliation and admin hardening.
 - Vendor and rider payout flows still need to be completed on the new ledger.
 
 ## External blockers
@@ -141,7 +145,7 @@ Implement reconciliation and admin hardening on top of the completed refund slic
 
 ## Latest commit
 
-- `8f73137` - `payments: add payout batching and transfer lifecycle`
+- `2a05568` - `payments: add refund ledger wiring`
 
 ## Global stop-condition status
 
