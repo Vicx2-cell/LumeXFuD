@@ -16,7 +16,7 @@ Phase 2 - Direct checkout and payout rails
 
 ## Current bounded task
 
-Land the payout batching and transfer lifecycle, then continue into refunds, reconciliation, and admin hardening.
+Implement refunds, reconciliation, and admin hardening on top of the payout lifecycle that is now in place.
 
 ## Completed requirements
 
@@ -46,10 +46,13 @@ Land the payout batching and transfer lifecycle, then continue into refunds, rec
 - Added focused tests for direct-payment tampering, callback processing-only behavior, valid finalization, duplicate finalization, and quarantine/rejection cases.
 - Added versioned vendor/rider payment beneficiary profiles with server-side bank verification, masked storage, Paystack recipient creation, optional subaccount creation, and owner-scoped profile reads.
 - Added focused tests for profile versioning and profile ownership checks.
+- Added ledger-backed payout batch, payout item, and transfer-attempt tracking for wallet sweep payouts.
+- Switched the wallet sweep cron to profile-backed payout batches and idempotent transfer attempt recording.
+- Wired Paystack transfer webhooks to finalize payout batches and transfer attempts on success, failure, and reversal.
+- Added focused tests for payout attempt replay, transfer success, duplicate success, failure, and reversal handling.
 
 ## Incomplete requirements
 
-- Ledger-backed payout batching and transfer lifecycle still need completion.
 - Refunds, reconciliation, and admin hardening still need completion.
 
 ## Files changed
@@ -130,8 +133,7 @@ Land the payout batching and transfer lifecycle, then continue into refunds, rec
 
 ## Next task
 
-- Implement ledger-backed payout batching and transfer lifecycle on top of the new beneficiary profiles.
-- Continue into refunds, reconciliation, and admin controls.
+- Implement refunds, reconciliation, and admin controls on top of the payout lifecycle.
 
 ## Latest commit
 

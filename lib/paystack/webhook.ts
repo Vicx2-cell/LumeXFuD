@@ -7,11 +7,19 @@ import { recordPlatformEarning } from '../platform-earnings'
 import { processCustomerTopup, spendCustomerWallet, isCustomerWalletEnabled } from '../customer-wallet'
 import { consumeWalletReservation, findWalletReservationByOrder } from '../wallet-reservations'
 import { findOrderPaymentIntentByReference, finalizeOrderPaymentIntent, markOrderPaymentIntentVerified, quarantineOrderPaymentIntent } from '../order-payment-intents'
+import { finalizeSweep } from '../wallet'
 import { refundTransaction } from './transfer'
 import { verifyPaystackTransaction } from './init'
 import { processPremiumOrBoostWebhook } from './billing'
 import { recordSecurityEvent } from '../security-events'
 import { sendOrderConfirmationEmail } from '../transactional-email'
+import {
+  findPayoutBatchItemByTransferCode,
+  findPayoutTransferAttemptByTransferCode,
+  markPayoutBatchItemStatus,
+  markPayoutBatchStatus,
+  markPayoutTransferAttemptStatus,
+} from '../payout-batches'
 
 // Naira for a refund notification, derived from the canonical kobo column.
 // Guards against NaN: a missing/garbled amount renders ₦0, never "NaN".
@@ -698,43 +706,89 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
     }
 
     case 'transfer.success': {
-      const transferCode = (data.transfer_code as string) ?? ''
-      await db
-        .from('wallet_transactions')
-        .update({ status: 'COMPLETED' })
-        .eq('paystack_transfer_code', transferCode)
+      const transferCode = String(data.transfer_code ?? '').trim()
+      const transferReference = String(data.reference ?? '').trim()
+      const attempt = transferCode
+        ? await findPayoutTransferAttemptByTransferCode(db, transferCode).catch(() => null)
+        : null
+      const { data: txn } = transferCode
+        ? await db.from('wallet_transactions').select('id, status').eq('paystack_transfer_code', transferCode).maybeSingle()
+        : { data: null as null }
+      if (!txn || (txn as { status?: string }).status !== 'PENDING') {
+        break
+      }
+
+      if (transferCode) {
+        await db
+          .from('wallet_transactions')
+          .update({ status: 'COMPLETED' })
+          .eq('paystack_transfer_code', transferCode)
+      }
+
+      const item = transferReference
+        ? (await db.from('payout_batch_items').select('*').eq('transfer_reference', transferReference).maybeSingle()).data
+        : transferCode
+          ? await findPayoutBatchItemByTransferCode(db, transferCode)
+          : null
+      if (item) {
+        await markPayoutBatchItemStatus(db, {
+          transferReference: String((item as { transfer_reference: string }).transfer_reference),
+          status: 'SUCCESS',
+          paystackTransferCode: transferCode || null,
+          snapshotMetadata: (item as { snapshot_metadata?: Record<string, unknown> }).snapshot_metadata ?? {},
+        }).catch(() => {})
+        const batch = await db.from('payout_batches').select('batch_reference').eq('id', (item as { batch_id: string }).batch_id).maybeSingle()
+        if (batch.data?.batch_reference) {
+          await markPayoutBatchStatus(db, {
+            batchReference: String(batch.data.batch_reference),
+            status: 'COMPLETED',
+          }).catch(() => {})
+        }
+      }
+      const resolvedTransferReference = transferReference || attempt?.transfer_reference || transferCode
+      if (resolvedTransferReference) {
+        await markPayoutTransferAttemptStatus(db, {
+          transferReference: resolvedTransferReference,
+          status: 'SUCCESS',
+          transferCode,
+          providerPayload: data,
+        }).catch(() => {})
+      }
       break
     }
 
     case 'transfer.failed':
     case 'transfer.reversed': {
-      const transferCode = (data.transfer_code as string) ?? ''
+      const transferCode = String(data.transfer_code ?? '').trim()
+      const transferReference = String(data.reference ?? '').trim()
       const failureReason = (data.reason as string) ?? 'Transfer failed'
+      const terminalStatus = event === 'transfer.reversed' ? 'REVERSED' : 'FAILED'
+      const attempt = transferCode
+        ? await findPayoutTransferAttemptByTransferCode(db, transferCode).catch(() => null)
+        : null
 
-      const { data: txn } = await db
-        .from('wallet_transactions')
-        .update({ status: 'FAILED', failure_reason: failureReason })
-        .eq('paystack_transfer_code', transferCode)
-        .select('user_id, user_type, amount')
-        .single()
+      const txnQuery = transferCode
+        ? db.from('wallet_transactions').select('id, user_id, user_type, amount, reference, status').eq('paystack_transfer_code', transferCode).maybeSingle()
+        : Promise.resolve({ data: null as null })
+      const { data: txn } = await txnQuery
 
-      if (txn) {
+      if (txn && (txn as { status?: string }).status === 'PENDING') {
         // Restore the debited balance. credit_wallet is atomic (FOR UPDATE) and
         // idempotent on the reference, so a duplicate transfer.failed /
         // transfer.reversed pair can't double-credit. If it fails (e.g. wallet
         // row missing), the money is stuck debited — alert an admin loudly
         // rather than swallowing it.
         const { data: restored, error: creditErr } = await db.rpc('credit_wallet', {
-          p_user_id: txn.user_id,
-          p_user_type: txn.user_type,
-          p_amount: txn.amount,
-          p_reference: `refund-${transferCode}`,
+          p_user_id: (txn as { user_id: string }).user_id,
+          p_user_type: (txn as { user_type: string }).user_type,
+          p_amount: (txn as { amount: number }).amount,
+          p_reference: `refund-${transferCode || transferReference}`,
         })
 
         if (creditErr || restored !== true) {
           console.error(
-            `[webhook] credit_wallet reversal FAILED for ${txn.user_type} ${txn.user_id} ` +
-            `(${txn.amount} kobo, transfer ${transferCode}):`, creditErr?.message ?? 'returned false'
+            `[webhook] credit_wallet reversal FAILED for ${(txn as { user_type: string }).user_type} ${(txn as { user_id: string }).user_id} ` +
+            `(${(txn as { amount: number }).amount} kobo, transfer ${transferCode}):`, creditErr?.message ?? 'returned false'
           )
           const adminPhone = process.env.ADMIN_PHONE
           if (adminPhone) {
@@ -742,12 +796,51 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
               to: adminPhone,
               message:
                 `🚨 Payout reversal NOT credited back.\n` +
-                `${txn.user_type} ${txn.user_id}\n` +
-                `Amount: ₦${Math.round(Number(txn.amount) / 100)}\n` +
+                `${(txn as { user_type: string }).user_type} ${(txn as { user_id: string }).user_id}\n` +
+                `Amount: ₦${Math.round(Number((txn as { amount: number }).amount) / 100)}\n` +
                 `Transfer: ${transferCode}\n` +
                 `Wallet balance must be restored manually.`,
             }).catch(() => {})
           }
+        }
+
+        await finalizeSweep({
+          txId: (txn as { id: string }).id,
+          success: false,
+          reason: failureReason,
+        }).catch(() => {})
+      }
+
+      if (transferReference || transferCode) {
+        const resolvedTransferReference = transferReference || attempt?.transfer_reference || transferCode
+        const item = transferReference
+          ? (await db.from('payout_batch_items').select('*').eq('transfer_reference', transferReference).maybeSingle()).data
+          : transferCode
+            ? await findPayoutBatchItemByTransferCode(db, transferCode)
+            : null
+        if (item) {
+          await markPayoutBatchItemStatus(db, {
+            transferReference: String((item as { transfer_reference: string }).transfer_reference),
+            status: terminalStatus,
+            paystackTransferCode: transferCode || null,
+            snapshotMetadata: (item as { snapshot_metadata?: Record<string, unknown> }).snapshot_metadata ?? {},
+          }).catch(() => {})
+          const batch = await db.from('payout_batches').select('batch_reference').eq('id', (item as { batch_id: string }).batch_id).maybeSingle()
+          if (batch.data?.batch_reference) {
+            await markPayoutBatchStatus(db, {
+              batchReference: String(batch.data.batch_reference),
+              status: 'FAILED',
+            }).catch(() => {})
+          }
+        }
+        if (transferCode) {
+          await markPayoutTransferAttemptStatus(db, {
+            transferReference: resolvedTransferReference,
+            status: terminalStatus,
+            transferCode,
+            failureReason,
+            providerPayload: data,
+          }).catch(() => {})
         }
       }
       break
