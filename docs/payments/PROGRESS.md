@@ -16,7 +16,7 @@ Phase 2 - Direct checkout and payout rails
 
 ## Current bounded task
 
-Implement reconciliation and admin hardening on top of the completed refund slice.
+Implement admin hardening on top of the completed reconciliation slice.
 
 ## Completed requirements
 
@@ -54,10 +54,13 @@ Implement reconciliation and admin hardening on top of the completed refund slic
 - Wired wallet and direct Paystack refund paths to reserve, settle, and compensate via the trusted ledger.
 - Wired refund failure webhooks to reverse the reservation journal for direct refunds.
 - Added focused refund tests for ledger posting, processed refund finalization, duplicate delivery, and refund failure reversal.
+- Added persistent reconciliation run and discrepancy records with trusted server helpers.
+- Wired the wallet reconciliation cron to persist run summaries, shortfalls, and healthy completion records.
+- Added focused reconciliation tests for run creation, discrepancy recording, and wallet reconciliation shortfall/healthy paths.
 
 ## Incomplete requirements
 
-- Reconciliation and admin hardening still need completion.
+- Admin hardening still needs completion.
 
 ## Files changed
 
@@ -141,7 +144,7 @@ Implement reconciliation and admin hardening on top of the completed refund slic
 
 ## Next task
 
-- Implement reconciliation and admin controls on top of the completed refund slice.
+- Implement admin controls on top of the completed reconciliation slice.
 
 ## Latest commit
 

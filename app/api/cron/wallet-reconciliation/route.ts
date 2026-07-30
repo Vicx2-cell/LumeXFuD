@@ -4,6 +4,8 @@ import { withCronHealth, verifyCronSecret } from '@/lib/cron-health'
 import { audit } from '@/lib/audit'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { formatPrice } from '@/lib/wallet'
+import { paystackEnvironmentFromSecret } from '@/lib/paystack/init'
+import { createReconciliationRun, recordReconciliationDiscrepancy, updateReconciliationRun } from '@/lib/reconciliation'
 
 // Called daily at 6am by Vercel cron.
 //
@@ -55,6 +57,18 @@ export async function POST(req: NextRequest) {
   }
 
   const db = createSupabaseAdmin()
+  const environment = paystackEnvironmentFromSecret(process.env.PAYSTACK_SECRET_KEY)
+  let reconciliationRun = null as Awaited<ReturnType<typeof createReconciliationRun>> | null
+  try {
+    reconciliationRun = await createReconciliationRun(db, {
+      runType: 'wallet_balance',
+      environment,
+      sourceReference: req.headers.get('x-vercel-cron') ?? null,
+      summary: { route: 'wallet-reconciliation' },
+    })
+  } catch (err) {
+    console.error('[cron/wallet-reconciliation] reconciliation run insert failed:', err)
+  }
 
   // Liability leg 1: vendor/rider wallets — money earned but not yet withdrawn
   // (held + available, i.e. total_balance).
@@ -64,6 +78,14 @@ export async function POST(req: NextRequest) {
 
   if (vrError) {
     console.error('[cron/wallet-reconciliation] wallet_balances query failed:', vrError.message)
+    if (reconciliationRun) {
+      await updateReconciliationRun(db, {
+        runId: reconciliationRun.id,
+        status: 'FAILED',
+        summary: { route: 'wallet-reconciliation', error: vrError.message },
+        completedAt: new Date().toISOString(),
+      }).catch(() => {})
+    }
     return NextResponse.json({ error: 'DB query failed' }, { status: 500 })
   }
 
@@ -81,6 +103,14 @@ export async function POST(req: NextRequest) {
 
   if (cwError) {
     console.error('[cron/wallet-reconciliation] customer_wallets query failed:', cwError.message)
+    if (reconciliationRun) {
+      await updateReconciliationRun(db, {
+        runId: reconciliationRun.id,
+        status: 'FAILED',
+        summary: { route: 'wallet-reconciliation', error: cwError.message },
+        completedAt: new Date().toISOString(),
+      }).catch(() => {})
+    }
     return NextResponse.json({ error: 'DB query failed' }, { status: 500 })
   }
 
@@ -112,13 +142,21 @@ export async function POST(req: NextRequest) {
     paystackBalance = await getPaystackBalance()
   } catch (err) {
     console.error('[cron/wallet-reconciliation] Paystack balance fetch failed:', err)
-    // Don't freeze on API error — log and exit
+    // Don't freeze on API error – log and exit
     await audit({
       actor_id:   'cron',
       actor_role: 'system',
       action:     'RECONCILIATION_ERROR',
       new_value:  { error: String(err) },
     })
+    if (reconciliationRun) {
+      await updateReconciliationRun(db, {
+        runId: reconciliationRun.id,
+        status: 'FAILED',
+        summary: { route: 'wallet-reconciliation', error: String(err) },
+        completedAt: new Date().toISOString(),
+      }).catch(() => {})
+    }
     return NextResponse.json({ error: 'Failed to fetch Paystack balance' }, { status: 502 })
   }
 
@@ -128,10 +166,42 @@ export async function POST(req: NextRequest) {
   const shortfall = liabilities - paystackBalance
 
   if (shortfall > TOLERANCE_KOBO) {
-    // CRITICAL: real shortfall — freeze all withdrawals and alert admin
+    // CRITICAL: real shortfall – freeze all withdrawals and alert admin
     await db
       .from('settings')
       .upsert({ id: 'withdrawals_frozen', value: true }, { onConflict: 'id' })
+
+    if (reconciliationRun) {
+      await recordReconciliationDiscrepancy(db, {
+        reconciliationRunId: reconciliationRun.id,
+        entityType: 'WALLET_FLOAT',
+        internalReference: 'wallet-reconciliation',
+        providerReference: 'paystack-balance',
+        expectedAmountKobo: liabilities,
+        actualAmountKobo: paystackBalance,
+        currency: 'NGN',
+        environment,
+        severity: 'critical',
+        status: 'OPEN',
+        investigationNotes: 'Paystack balance is below user liabilities and withdrawals were frozen.',
+        resolver: null,
+      }).catch(() => {})
+      await updateReconciliationRun(db, {
+        runId: reconciliationRun.id,
+        status: 'SHORTFALL',
+        summary: {
+          route: 'wallet-reconciliation',
+          liabilities,
+          vendor_rider_total: vendorRiderTotal,
+          customer_float: customerFloat,
+          paystack_balance: paystackBalance,
+          shortfall_kobo: shortfall,
+          reward_liability: rewardLiability,
+          withdrawals_frozen: true,
+        },
+        completedAt: new Date().toISOString(),
+      }).catch(() => {})
+    }
 
     const adminPhone = process.env.ADMIN_PHONE
     if (adminPhone) {
@@ -177,7 +247,7 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // Healthy — Paystack covers all user liabilities. Surplus is expected.
+  // Healthy – Paystack covers all user liabilities. Surplus is expected.
   const surplus = paystackBalance - liabilities
   await audit({
     actor_id:   'cron',
@@ -192,6 +262,22 @@ export async function POST(req: NextRequest) {
       reward_liability:   rewardLiability,
     },
   })
+  if (reconciliationRun) {
+    await updateReconciliationRun(db, {
+      runId: reconciliationRun.id,
+      status: 'COMPLETED',
+      summary: {
+        route: 'wallet-reconciliation',
+        liabilities,
+        vendor_rider_total: vendorRiderTotal,
+        customer_float: customerFloat,
+        paystack_balance: paystackBalance,
+        surplus_kobo: surplus,
+        reward_liability: rewardLiability,
+      },
+      completedAt: new Date().toISOString(),
+    }).catch(() => {})
+  }
 
   return NextResponse.json({
     status:     'OK',
