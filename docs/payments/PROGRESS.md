@@ -132,7 +132,7 @@ Land the double-entry ledger, immutable order financial snapshots, and wallet re
 
 ## Latest commit
 
-- `c670ed4` - `payments: harden DVA response and document state`
+- `de6facc` - `payments: add ledger foundation and reservation flow`
 
 ## Global stop-condition status
 
