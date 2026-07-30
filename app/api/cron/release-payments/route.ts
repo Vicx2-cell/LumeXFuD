@@ -284,7 +284,7 @@ export async function POST(req: NextRequest) {
           const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lumexfud.com.ng'
           sendWhatsAppWithFallback({
             to: rider.phone,
-            message: `💰 ${formatPrice(riderAmount)} added to your LumeX Wallet for order #${order.order_number}.\nYour wallet shows when held earnings become withdrawable.\n${appUrl}/rider/wallet`,
+            message: `${formatPrice(riderAmount)} added to your LumeX payouts for order #${order.order_number}.\nYour payout page shows when held earnings become withdrawable.\n${appUrl}/rider/wallet`,
           }).catch(() => {})
 
           // ── Check milestone bonuses ─────────────────────────────────────────

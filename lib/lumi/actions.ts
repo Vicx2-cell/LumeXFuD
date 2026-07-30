@@ -665,7 +665,7 @@ async function handleFundWallet(_ctx: LumiContext, entities: LumiEntities): Prom
     return {
       response: {
         reply: `Top-up amounts must stay between ${limits.minKobo / 100} and ${limits.maxKobo / 100} naira.`,
-        quickReplies: [{ id: 'fund-wallet', label: 'Try again', value: 'fund my wallet' }],
+        quickReplies: [{ id: 'open-wallet', label: 'Open wallet', value: '/profile/virtual-account' }],
       },
       clearState: true,
     }
@@ -847,8 +847,8 @@ export async function processLumiMessage(
       case 'awaiting_payment_confirmation':
         return continueConfirmationStep(state, {
           reply: isConfirmationMessage(message)
-            ? 'Tap "Continue" below and I’ll open the normal wallet top-up flow.'
-            : `I’m still waiting to confirm your top-up.`,
+            ? 'Tap "Continue" below and I will open your LumeX Wallet account.'
+            : 'I am still waiting to open your LumeX Wallet account.',
           quickReplies: [
             { id: 'confirm-funding', label: 'Continue', value: 'confirm_funding' },
             { id: 'cancel-flow', label: 'Cancel', value: 'cancel' },

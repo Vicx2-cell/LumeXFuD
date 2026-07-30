@@ -60,3 +60,10 @@ export function maskIdentity(input: { accountNumber?: string; bankCode?: string 
     bank_code: input.bankCode ?? null,
   }
 }
+
+export function maskVerificationIdentity(input: { type?: 'bvn' | 'nin'; value?: string }) {
+  return {
+    validation_method: input.type ?? 'profile_only',
+    identity_last4: input.value?.slice(-4) ?? null,
+  }
+}

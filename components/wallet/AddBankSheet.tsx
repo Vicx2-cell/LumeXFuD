@@ -183,10 +183,10 @@ export default function AddBankSheet({ open, onClose, onSuccess }: Props) {
           </div>
         )}
 
-        {/* Step 3: Enter wallet PIN */}
+        {/* Step 3: Enter payout PIN */}
         {step === 3 && (
           <div>
-            <h3 className="text-white font-semibold text-lg mb-2">Confirm with wallet PIN</h3>
+            <h3 className="text-white font-semibold text-lg mb-2">Confirm with payout PIN</h3>
             <p className="text-white/50 text-sm mb-6">
               Saving {selectedBank?.name} ****{accountNumber.slice(-4)}
             </p>

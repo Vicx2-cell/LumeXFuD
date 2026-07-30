@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ChevronRight, Landmark, MapPin, MessageCircle, WalletCards } from 'lucide-react'
+import { ChevronRight, Landmark, MapPin, MessageCircle } from 'lucide-react'
 import { ConfirmSheet } from '@/components/ui/confirm-sheet'
 import { BackButton } from '@/components/back-button'
 import { FaceIdSetup } from '@/components/face-id-setup'
@@ -316,33 +316,18 @@ export function ProfileClient({
           </div>
         </div>
 
-        {/* Money entry points: stored balance stays separate from the Paystack
-            transfer account so customers do not confuse the two surfaces. */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {features.customer_wallet_enabled === true && (
-        <Link
-          href="/profile/wallet"
-          className="lx-card-amber lx-tap flex items-center gap-3 rounded-lg p-4"
-        >
-          <span className="lx-icon-badge flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><WalletCards size={20} aria-hidden="true" /></span>
-          <div className="flex-1 min-w-0">
-            <p className="lx-amber font-semibold">LumeX Wallet</p>
-            <p className="text-xs text-white/50">Stored balance for checkout and top-ups</p>
-          </div>
-          <ChevronRight size={18} className="text-[var(--lx-text-faint)]" aria-hidden="true" />
-        </Link>
-        )}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {features.customer_virtual_accounts === true && (
         <Link
           href="/profile/virtual-account"
-          className="lx-tap flex items-center gap-3 rounded-lg border border-white/10 p-4"
+          className="lx-card-amber lx-tap flex items-center gap-3 rounded-lg p-4"
         >
           <span className="lx-icon-badge flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
             <Landmark size={20} aria-hidden="true" />
           </span>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-white">Bank transfer account</p>
-            <p className="text-xs text-white/50">Paystack account, separate from wallet balance</p>
+            <p className="font-semibold text-white">LumeX Wallet</p>
+            <p className="text-xs text-white/50">Your Paystack account for transfers and checkout balance</p>
           </div>
           <ChevronRight size={18} className="text-[var(--lx-text-faint)]" aria-hidden="true" />
         </Link>

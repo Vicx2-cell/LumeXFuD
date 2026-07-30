@@ -492,11 +492,11 @@ export default function RiderDashboard() {
         </div>
       </div>
 
-      {/* Wallet card */}
+      {/* Payout card */}
       {wallet && (
         <div className="mx-4 mb-5 border-y border-white/10 py-4 lx-enter">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-white/40 uppercase tracking-wide">Wallet</p>
+            <p className="text-xs text-white/40 uppercase tracking-wide">Payouts</p>
             <span className="text-xs px-2 py-0.5 rounded-full font-bold"
               style={{ background: TRUST_COLORS[wallet.trust_tier] ?? '#CD7F32', color: '#000' }}>
               {wallet.trust_tier}
@@ -515,7 +515,7 @@ export default function RiderDashboard() {
             href="/rider/wallet"
             className="lx-card-amber lx-amber mt-3 inline-block text-xs font-medium px-3 py-1.5 rounded-lg"
           >
-            View Wallet →
+            View Payouts →
           </a>
         </div>
       )}

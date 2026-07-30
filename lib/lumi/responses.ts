@@ -8,12 +8,12 @@ function qr(id: string, label: string, value = id): LumiQuickReply {
 export const lumiResponses = {
   help(): LumiResponse {
     return {
-      reply: 'I can help you check your wallet, browse vendors, view menus, place an order, track an order, fund your wallet, or cancel an order.',
+      reply: 'I can help you check your LumeX Wallet, browse vendors, view menus, place an order, track an order, or cancel an order.',
       quickReplies: [
         qr('check-balance', 'Check balance', 'check balance'),
         qr('browse-vendors', 'Browse vendors', 'show vendors'),
         qr('order-food', 'Order food', 'i want food'),
-        qr('fund-wallet', 'Fund wallet', 'fund my wallet'),
+        qr('open-wallet', 'LumeX Wallet', 'open my lumex wallet'),
       ],
     }
   },
@@ -41,9 +41,9 @@ export const lumiResponses = {
 
   balance(balanceKobo: number): LumiResponse {
     return {
-      reply: `Your wallet balance is ${formatPrice(balanceKobo)}.`,
+      reply: `Your LumeX Wallet checkout balance is ${formatPrice(balanceKobo)}.`,
       quickReplies: [
-        qr('fund-wallet', 'Fund wallet', 'fund my wallet'),
+        qr('open-wallet', 'LumeX Wallet', 'open my lumex wallet'),
         qr('browse-vendors', 'Browse vendors', 'show vendors'),
       ],
     }
@@ -151,7 +151,7 @@ export const lumiResponses = {
 
   fundWalletAskAmount(): LumiResponse {
     return {
-      reply: 'How much would you like to add to your wallet?',
+      reply: 'Open your LumeX Wallet account to copy your Paystack transfer details.',
       quickReplies: [
         qr('fund-2000', '₦2,000', 'add 2000'),
         qr('fund-5000', '₦5,000', 'add 5000'),
@@ -162,8 +162,9 @@ export const lumiResponses = {
   },
 
   fundWalletConfirm(amountKobo: number): LumiResponse {
+    void amountKobo
     return {
-      reply: `I’m ready to start a wallet top-up for ${formatPrice(amountKobo)}. Continue to Paystack?`,
+      reply: 'Open your LumeX Wallet account and transfer from your banking app. Deposits are confirmed by Paystack.',
       quickReplies: [
         qr('confirm-funding', 'Continue', 'confirm_funding'),
         qr('cancel-flow', 'Cancel', 'cancel'),
@@ -173,9 +174,9 @@ export const lumiResponses = {
 
   withdrawUnavailable(): LumiResponse {
     return {
-      reply: 'Student wallet withdrawals are not available in this app. You can fund your wallet and spend it on orders.',
+      reply: 'Customer withdrawals are not available. Use your LumeX Wallet account for deposits and checkout.',
       quickReplies: [
-        qr('fund-wallet', 'Fund wallet', 'fund my wallet'),
+        qr('open-wallet', 'LumeX Wallet', 'open my lumex wallet'),
         qr('check-balance', 'Check balance', 'check my balance'),
       ],
     }

@@ -74,6 +74,8 @@ const IDS = {
   lockdown: 'lockdown_enabled',
 } as const
 
+const RETIRED_LAUNCH_MAINTENANCE_COPY = /launch deployment is being verified|ordering will reopen after live payment checks/i
+
 type Row = { id: string; value: unknown }
 
 function asBool(v: unknown): boolean {
@@ -116,8 +118,10 @@ export async function getControls(force = false): Promise<PlatformControls> {
 
     const maint = map.get(IDS.maintenance) as { enabled?: unknown; message?: unknown } | undefined
     if (maint && typeof maint === 'object') {
-      out.maintenance_enabled = maint.enabled === true
-      if (typeof maint.message === 'string' && maint.message) out.maintenance_message = maint.message
+      const message = typeof maint.message === 'string' ? maint.message : ''
+      const retiredLaunchGate = RETIRED_LAUNCH_MAINTENANCE_COPY.test(message)
+      out.maintenance_enabled = maint.enabled === true && !retiredLaunchGate
+      if (message && !retiredLaunchGate) out.maintenance_message = message
     }
 
     const support = map.get(IDS.support) as { value?: unknown; phone?: unknown } | string | undefined

@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   if (urCast?.phone) {
     sendWhatsAppWithFallback({
       to: urCast.phone,
-      message: `Your LumeX Wallet has been frozen. Please contact support for assistance.`,
+      message: `Your LumeX payouts have been frozen. Please contact support for assistance.`,
     }).catch(() => {})
   }
 

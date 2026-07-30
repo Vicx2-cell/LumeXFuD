@@ -31,12 +31,12 @@ type LumiConfirmPayload = {
 const INITIAL_MESSAGE: ChatMessage = {
   id: 'welcome',
   from: 'lumi',
-  text: 'Hi, I am Lumi. I can help you check your wallet, browse vendors, place an order, track an order, fund your wallet, or cancel an order.',
+  text: 'Hi, I am Lumi. I can help you check your LumeX Wallet, browse vendors, place an order, track an order, or cancel an order.',
   quickReplies: [
     { id: 'check-balance', label: 'Check balance', value: 'check my balance' },
     { id: 'browse-vendors', label: 'Browse vendors', value: 'show vendors' },
     { id: 'order-food', label: 'Order food', value: 'i want food' },
-    { id: 'fund-wallet', label: 'Fund wallet', value: 'fund my wallet' },
+    { id: 'open-wallet', label: 'LumeX Wallet', value: 'open my lumex wallet' },
   ],
 }
 
@@ -113,18 +113,9 @@ export default function LumiChat() {
       }
 
       if (data.action === 'fund_wallet' && data.requestBody) {
-        const fundRes = await fetch('/api/customer-wallet/topup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data.requestBody),
-        })
-        const fundData = await fundRes.json() as { error?: string; authorization_url?: string }
-        if (!fundRes.ok) throw new Error(fundData.error ?? 'Could not start the top-up.')
-        if (fundData.authorization_url) {
-          window.location.assign(fundData.authorization_url)
-          return
-        }
-        throw new Error('Top-up started, but no payment link came back.')
+        void data.requestBody
+        router.push('/profile/virtual-account')
+        return
       }
 
       if (data.action === 'cancel_order' && data.orderId) {

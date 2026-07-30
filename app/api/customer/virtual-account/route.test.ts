@@ -19,7 +19,7 @@ vi.mock('@/lib/paystack/virtual-accounts', () => ({
   assignDedicatedAccount: vi.fn(),
   createPaystackCustomer: vi.fn(),
   fetchPaystackCustomer: vi.fn(),
-  maskIdentity: vi.fn(),
+  maskVerificationIdentity: vi.fn(),
   requeryDedicatedAccount: vi.fn(),
 }))
 

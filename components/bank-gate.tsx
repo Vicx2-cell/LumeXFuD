@@ -10,7 +10,7 @@ import AddBankSheet from '@/components/wallet/AddBankSheet'
 // API routes enforce the same gate server-side). The bank is the destination for
 // both manual withdrawals and the 48h auto-sweep, so it's collected up front.
 //
-// save-bank requires a wallet PIN first, so the gate sequences PIN → bank. It
+// save-bank requires a payout PIN first, so the gate sequences PIN → bank. It
 // fails OPEN on a network blip (never lock someone out of their own dashboard) —
 // the server-side checks remain the hard backstop.
 interface Status { exempt?: boolean; has_pin: boolean; has_verified_bank: boolean }
@@ -91,7 +91,7 @@ export function BankGate({ children }: { children: React.ReactNode }) {
               onClick={() => { setPinOpen(true); setPinStep(1); setNewPin(''); setConfirmPin(''); setPinError('') }}
               className="lx-btn-amber w-full py-4 text-sm font-semibold"
             >
-              Step 1: Set your wallet PIN
+              Step 1: Set your payout PIN
             </button>
           ) : (
             <button
@@ -102,7 +102,7 @@ export function BankGate({ children }: { children: React.ReactNode }) {
               Add &amp; verify bank account
             </button>
           )}
-          <p className="text-xs text-white/30 text-center">A 4-digit wallet PIN protects your payouts. You’ll set it once.</p>
+          <p className="text-xs text-white/30 text-center">A 4-digit payout PIN protects your payouts. You’ll set it once.</p>
         </div>
       </div>
 
@@ -112,7 +112,7 @@ export function BankGate({ children }: { children: React.ReactNode }) {
           <div className="absolute inset-0 bg-black/60 lx-scrim" onClick={() => setPinOpen(false)} />
           <div className="lx-sheet relative w-full sm:max-w-md bg-[#111] rounded-t-2xl sm:rounded-2xl sm:mb-4 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[92dvh] overflow-y-auto">
             <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
-            <h3 className="text-white font-semibold text-lg mb-4">{pinStep === 1 ? 'Set your wallet PIN' : 'Confirm your PIN'}</h3>
+            <h3 className="text-white font-semibold text-lg mb-4">{pinStep === 1 ? 'Set your payout PIN' : 'Confirm your PIN'}</h3>
             <div className="flex justify-center gap-4 mb-6">
               {[0,1,2,3].map((i) => {
                 const len = pinStep === 1 ? newPin.length : confirmPin.length

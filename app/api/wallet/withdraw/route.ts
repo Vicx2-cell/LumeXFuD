@@ -72,13 +72,13 @@ export async function POST(req: NextRequest) {
 
   // ── 2. Must have PIN set ────────────────────────────────────────────────────
   if (!wallet?.wallet_pin_hash) {
-    return NextResponse.json({ error: 'Set a wallet PIN first before withdrawing.' }, { status: 403 })
+    return NextResponse.json({ error: 'Set a payout PIN first before withdrawing.' }, { status: 403 })
   }
 
   // ── 3. PIN lockout check ────────────────────────────────────────────────────
   if (wallet.pin_locked_until && new Date(wallet.pin_locked_until) > new Date()) {
     return NextResponse.json(
-      { error: 'Wallet PIN locked due to too many wrong attempts. Contact support or wait 30 minutes.' },
+      { error: 'Payout PIN locked due to too many wrong attempts. Contact support or wait 30 minutes.' },
       { status: 429 }
     )
   }
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
       if (adminPhone) {
         sendWhatsAppWithFallback({
           to: adminPhone,
-          message: `ALERT: Wallet PIN locked for user ${session.userId} (${userType}) after 5 failed attempts.`,
+          message: `ALERT: Payout PIN locked for user ${session.userId} (${userType}) after 5 failed attempts.`,
         }).catch(() => {})
       }
     }
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
   // ── 5. Wallet frozen? ───────────────────────────────────────────────────────
   if (wallet.is_frozen) {
     return NextResponse.json(
-      { error: 'Your wallet is frozen. Contact support.' },
+      { error: 'Your payouts are frozen. Contact support.' },
       { status: 403 }
     )
   }

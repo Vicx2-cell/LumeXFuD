@@ -13,7 +13,7 @@ export default async function RiderWalletPage() {
     <main className="lx-page lx-console overflow-hidden">
       <GlassSheen />
       <div className="max-w-lg mx-auto px-4 pt-6">
-        <PageHeader title="My Wallet" />
+        <PageHeader title="Payouts" />
       </div>
       <WalletView userType="RIDER" />
       <RiderAssistant />

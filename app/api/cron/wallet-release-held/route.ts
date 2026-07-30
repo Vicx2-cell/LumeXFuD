@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       if (phone) {
         sendWhatsAppWithFallback({
           to: phone,
-          message: `${formatPrice(item.amount)} is now available for withdrawal in your LumeX Wallet. Tap "Withdraw" in the app.`,
+          message: `${formatPrice(item.amount)} is now available for payout. Tap "Withdraw" in the app.`,
         }).catch(() => {})
       }
     } catch {

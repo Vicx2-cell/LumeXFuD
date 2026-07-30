@@ -449,6 +449,22 @@ export default function SuperAdminPricing() {
           <div className="space-y-3">{[1, 2, 3, 4].map((i) => <div key={i} className="lx-skeleton h-36" style={{ borderRadius: 20 }} />)}</div>
         ) : (
           <div className="space-y-4">
+            {launchPricing ? <div className="lx-surface space-y-4 border-amber-500/25 bg-amber-500/[0.04] p-4">
+              <div>
+                <h2 className="text-base font-semibold text-white">Quick pricing</h2>
+                <p className="mt-1 text-xs text-white/50">Most-used live checkout controls. Advanced zone rules are still below.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <NairaInput label="Customer delivery starts at" value={toNaira(launchPricing.minimumCustomerDeliveryFeeKobo)} onChange={(n) => setLaunchPricingValue('minimumCustomerDeliveryFeeKobo', n * 100)} />
+                <NairaInput label="Rider minimum payout" value={toNaira(launchPricing.minimumRiderPayoutKobo)} onChange={(n) => setLaunchPricingValue('minimumRiderPayoutKobo', n * 100)} />
+                <NairaInput label="Customer platform fee" value={toNaira(launchPricing.customerPlatformFeeKobo)} onChange={(n) => setLaunchPricingValue('customerPlatformFeeKobo', n * 100)} />
+                <NumberInput label="Vendor commission" value={launchPricing.vendorCommissionBps / 100} onChange={(n) => setLaunchPricingValue('vendorCommissionBps', Math.round(n * 100))} suffix="%" />
+              </div>
+              <button onClick={saveLaunchPricing} disabled={saving} className="lx-btn-amber w-full py-4" style={{ minHeight: 56 }}>
+                {saving ? 'Saving...' : 'Save quick pricing'}
+              </button>
+            </div> : null}
+
             <div className="lx-surface space-y-3 p-4">
               <h2 className="text-sm font-semibold text-white/80">Default pricing</h2>
               <div className="grid gap-3 sm:grid-cols-2">

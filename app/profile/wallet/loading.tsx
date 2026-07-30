@@ -1,10 +1,10 @@
 import { Skeleton } from '@/components/ui/skeleton'
 
-// Instant wallet skeleton — appears the moment the page is opened.
+// Instant account-balance skeleton — appears the moment the page is opened.
 export default function WalletLoading() {
   return (
     <main className="lx-page min-h-dvh pb-24" aria-busy="true">
-      <span className="sr-only" role="status">Loading wallet</span>
+      <span className="sr-only" role="status">Loading account balance</span>
       <div className="lx-topbar sticky top-0 z-40 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <div className="h-9 w-9 rounded-full animate-pulse" style={{ background: 'rgba(255,255,255,0.08)' }} />

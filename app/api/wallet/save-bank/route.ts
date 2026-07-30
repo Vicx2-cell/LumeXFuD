@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   const wallet = walletRaw as unknown as Pick<WalletBalance, 'wallet_pin_hash' | 'pin_attempts' | 'pin_locked_until'> | null
 
   if (!wallet?.wallet_pin_hash) {
-    return NextResponse.json({ error: 'Set a wallet PIN first' }, { status: 403 })
+    return NextResponse.json({ error: 'Set a payout PIN first' }, { status: 403 })
   }
 
   // Check PIN lockout

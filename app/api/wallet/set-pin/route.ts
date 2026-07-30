@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
   if (urCast?.phone) {
     sendWhatsAppWithFallback({
       to: urCast.phone,
-      message: `Your LumeX Wallet PIN has been ${wallet?.wallet_pin_hash ? 'changed' : 'set'}. Contact support if you did not do this.`,
+      message: `Your LumeX payout PIN has been ${wallet?.wallet_pin_hash ? 'changed' : 'set'}. Contact support if you did not do this.`,
     }).catch(() => {})
   }
 

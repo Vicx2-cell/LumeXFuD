@@ -201,12 +201,12 @@ export default function WalletView({ userType: _userType }: Props) {
     <div className="p-4 pb-24 space-y-4 max-w-lg mx-auto">
       <div className="flex items-center gap-3">
         <BackButton />
-        <h1 className="font-semibold text-base">Wallet</h1>
+        <h1 className="font-semibold text-base">Payouts</h1>
       </div>
       {/* ── Balance Card ─────────────────────────────────────── */}
       <div className="glass-thin rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <span className="text-white font-semibold">LumeX Wallet</span>
+          <span className="text-white font-semibold">Earnings Available for Payout</span>
           <button onClick={() => setTiersOpen(true)} className={`text-sm font-medium ${tierColor} flex items-center gap-1`}>
             {wallet?.tier_emoji} {tier}
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
@@ -249,7 +249,7 @@ export default function WalletView({ userType: _userType }: Props) {
 
         {wallet?.is_frozen && (
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-4">
-            <p className="text-red-400 text-sm font-medium">🔒 Wallet frozen</p>
+            <p className="text-red-400 text-sm font-medium">Payouts frozen</p>
             <p className="text-red-400/70 text-xs mt-1">{wallet.frozen_reason ?? 'Contact support'}</p>
           </div>
         )}
@@ -367,10 +367,10 @@ export default function WalletView({ userType: _userType }: Props) {
         )}
       </div>
 
-      {/* ── Wallet PIN ─────────────────────────────────────── */}
+      {/* ── Payout PIN ─────────────────────────────────────── */}
       {!wallet?.wallet_pin_set && (
         <div className="lx-card-amber-soft rounded-2xl p-5">
-          <p className="lx-amber text-sm font-medium mb-2">🔑 Set a Wallet PIN</p>
+          <p className="lx-amber text-sm font-medium mb-2">Set a Payout PIN</p>
           <p className="text-white/50 text-xs mb-3">Required to withdraw earnings</p>
           <button
             className="lx-btn-amber w-full py-3"
@@ -472,7 +472,7 @@ export default function WalletView({ userType: _userType }: Props) {
                       type="button"
                       onClick={() => downloadReceiptPng({
                         title: 'Payment Receipt',
-                        party: 'LumeX Wallet',
+                        party: 'LumeX Payouts',
                         amountLine: `${tx.sign}${tx.amount}`,
                         amountPositive: tx.sign === '+',
                         rows: [
@@ -538,7 +538,7 @@ export default function WalletView({ userType: _userType }: Props) {
             <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
             {pinStep === 1 && (
               <div>
-                <h3 className="text-white font-semibold text-lg mb-4">Set your wallet PIN</h3>
+                <h3 className="text-white font-semibold text-lg mb-4">Set your payout PIN</h3>
                 <div className="flex justify-center gap-4 mb-6">
                   {[0,1,2,3].map((i) => (
                     <div key={i} className={`w-4 h-4 rounded-full border-2 ${i < newPin.length ? 'bg-amber-500 border-amber-500' : 'border-white/30'}`} />

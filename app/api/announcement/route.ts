@@ -5,6 +5,8 @@ import { readAnnouncements, audienceMatches, isVisibleNow } from '@/lib/announce
 
 export const dynamic = 'force-dynamic'
 
+const RETIRED_LAUNCH_COPY = /launch deployment is being verified|ordering will reopen after live payment checks/i
+
 // GET /api/announcement — ALL announcements visible to the CURRENT viewer right
 // now (multiple can be live at once). Public: a logged-out visitor sees
 // ALL-audience messages; logged-in users also see ones targeted at their role.
@@ -16,6 +18,7 @@ export async function GET() {
   const all = await readAnnouncements()
   const visible = all
     .filter((a) => isVisibleNow(a) && audienceMatches(a.audience, role))
+    .filter((a) => !RETIRED_LAUNCH_COPY.test(`${a.title ?? ''} ${a.message ?? ''}`))
     .map((a) => ({ id: a.id, title: a.title, message: a.message, level: a.level }))
 
   // Opaque per-login marker: changes on every new login (new session row), stable

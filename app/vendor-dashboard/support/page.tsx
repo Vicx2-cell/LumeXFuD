@@ -88,7 +88,7 @@ export default async function VendorSupportPage() {
             />
             <SupportCard
               title="Payout issue"
-              desc="A payout, wallet, or withdrawal needs attention."
+              desc="A payout, earnings, or withdrawal issue needs attention."
               href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Vendor payout issue')}`}
               cta="Email finance support"
             />

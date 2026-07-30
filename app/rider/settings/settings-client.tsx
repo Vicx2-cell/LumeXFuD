@@ -10,7 +10,7 @@ import { Wallet, Star, ChevronRight } from 'lucide-react'
 import type { RiderSettable } from './types'
 
 const LINKS = [
-  { href: '/rider/wallet',  Icon: Wallet, label: 'Wallet & payout', desc: 'Balance, withdrawals & bank account' },
+  { href: '/rider/wallet',  Icon: Wallet, label: 'Payouts', desc: 'Earnings, withdrawals & bank account' },
   { href: '/rider/reviews', Icon: Star,   label: 'Reviews',         desc: 'Private feedback from your deliveries' },
 ]
 

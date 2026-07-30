@@ -103,7 +103,7 @@ export default function WithdrawSheet({
         <div className="absolute inset-0 bg-black/60 lx-scrim" onClick={handleClose} />
         <div className="lx-sheet relative w-full sm:max-w-md bg-[#111] rounded-t-2xl sm:rounded-2xl sm:mb-4 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[90dvh] overflow-y-auto">
           <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
-          <p className="text-white/60 text-center mb-4">Set a wallet PIN first to enable withdrawals.</p>
+          <p className="text-white/60 text-center mb-4">Set a payout PIN first to enable withdrawals.</p>
           <button className="w-full bg-amber-500 text-black font-semibold py-4 rounded-xl active:scale-[0.98] transition-transform" onClick={handleClose}>
             Close
           </button>
@@ -201,7 +201,7 @@ export default function WithdrawSheet({
         {/* Step 2: Enter PIN */}
         {step === 2 && (
           <div>
-            <h3 className="text-white font-semibold text-lg mb-1">Enter wallet PIN</h3>
+            <h3 className="text-white font-semibold text-lg mb-1">Enter payout PIN</h3>
             <p className="text-white/50 text-sm mb-6">
               Sending ₦{amountNaira.toLocaleString()} to {bankName} ****{bankLast4}
             </p>
