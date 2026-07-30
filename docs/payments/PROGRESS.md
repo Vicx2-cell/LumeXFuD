@@ -111,7 +111,7 @@ Record the actual payment system state, identify the missing financial primitive
 
 ## Latest commit
 
-- `d4f703e` - `Simplify pricing and promo workflows`
+- `c670ed4` - `payments: harden DVA response and document state`
 
 ## Global stop-condition status
 
