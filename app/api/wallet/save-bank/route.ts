@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
 import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { verifyWalletPin } from '@/lib/wallet'
-import { encryptField } from '@/lib/crypto'
 import { audit } from '@/lib/audit'
 import { sendWhatsAppWithFallback } from '@/lib/notify'
 import { rateLimitGeneric } from '@/lib/rate-limit'
 import { z } from 'zod'
 import type { WalletBalance } from '@/lib/wallet'
+import { createPaymentBeneficiaryProfile, beneficiaryTypeFromRole, resolveBankAccountName } from '@/lib/payment-profiles'
 
 const schema = z.object({
   account_number: z.string().length(10).regex(/^\d{10}$/),
@@ -76,36 +76,22 @@ export async function POST(req: NextRequest) {
   }
 
   // Re-verify account name with Paystack (never trust client-provided account_name)
-  const secret = process.env.PAYSTACK_SECRET_KEY
-  if (!secret) return NextResponse.json({ error: 'Payment service misconfigured' }, { status: 500 })
-
-  const resolveUrl = `https://api.paystack.co/bank/resolve?account_number=${account_number}&bank_code=${bank_code}`
-  const resolveRes = await fetch(resolveUrl, {
-    headers: { Authorization: `Bearer ${secret}` },
-    signal: AbortSignal.timeout(15_000),
-  }).catch(() => null)
-
-  if (!resolveRes) {
-    return NextResponse.json({ error: 'Could not reach the bank service. Please try again.' }, { status: 502 })
-  }
-  const resolveJson = (await resolveRes.json().catch(() => null)) as
-    | { status?: boolean; message?: string; data?: { account_name?: string } }
-    | null
-  if (!resolveRes.ok || !resolveJson?.status || !resolveJson.data?.account_name) {
-    console.error('[save-bank] Paystack resolve failed', { httpStatus: resolveRes.status, message: resolveJson?.message })
+  let verifiedName: string
+  try {
+    verifiedName = await resolveBankAccountName(account_number, bank_code)
+  } catch (err) {
+    console.error('[save-bank] Paystack resolve failed', err)
     return NextResponse.json(
-      { error: resolveJson?.message || 'Account could not be verified. Check the account number and bank.' },
+      { error: 'Account could not be verified. Check the account number and bank.' },
       { status: 422 }
     )
   }
-  const verifiedName = resolveJson.data.account_name
 
   // Save bank account details
   const now = new Date().toISOString()
   await db
     .from('wallet_balances')
     .update({
-      bank_account_number: encryptField(account_number), // encrypted at rest
       bank_account_last4:  account_number.slice(-4),      // plaintext, for display
       bank_code,
       bank_account_name:   verifiedName,
@@ -120,14 +106,31 @@ export async function POST(req: NextRequest) {
     .eq('user_id', session.userId!)
     .eq('user_type', userType)
 
+  const beneficiaryType = beneficiaryTypeFromRole(session.role)
+  const { profile, replayed } = await createPaymentBeneficiaryProfile(db, {
+    beneficiaryType,
+    beneficiaryId: session.userId!,
+    bankName: bank_name,
+    bankCode: bank_code,
+    accountNumber: account_number,
+    accountName: verifiedName,
+    profileMetadata: { source: 'wallet-save-bank', wallet_user_type: userType },
+    providerMetadata: { source: 'wallet-save-bank', wallet_user_type: userType },
+  })
+
   // Log to audit
   await audit({
     actor_id:     session.phone,
     actor_role:   session.role,
-    action:       'BANK_ACCOUNT_SAVED',
-    target_table: 'wallet_balances',
-    target_id:    session.userId!,
-    new_value:    { bank_name, account_last_4: account_number.slice(-4) },
+    action:       'PAYMENT_BENEFICIARY_PROFILE_SAVED',
+    target_table: 'payment_beneficiary_profiles',
+    target_id:    profile.id,
+    new_value:    {
+      bank_name,
+      account_last_4: account_number.slice(-4),
+      version_number: profile.version_number,
+      replayed,
+    },
   })
 
   // WhatsApp notification
@@ -148,5 +151,9 @@ export async function POST(req: NextRequest) {
     success: true,
     verified_name: verifiedName,
     available_from: availableFrom.toISOString(),
+    profile_version: profile.version_number,
+    profile_status: profile.status,
+    paystack_recipient_code: profile.paystack_recipient_code,
+    paystack_subaccount_code: profile.paystack_subaccount_code,
   })
 }

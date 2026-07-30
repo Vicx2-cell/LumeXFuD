@@ -4,6 +4,14 @@ interface TransferRecipientParams {
   bank_code: string
 }
 
+interface SubaccountParams {
+  business_name: string
+  settlement_bank: string
+  account_number: string
+  percentage_charge?: number
+  description?: string
+}
+
 interface TransferParams {
   amount: number // kobo
   recipient_code: string
@@ -39,6 +47,39 @@ export async function createTransferRecipient(params: TransferRecipientParams): 
   const json = (await res.json()) as { status: boolean; data: { recipient_code: string } }
   if (!json.status) throw new Error('Paystack returned status=false on create recipient')
   return json.data.recipient_code
+}
+
+export async function createPaystackSubaccount(params: SubaccountParams): Promise<string> {
+  const secret = process.env.PAYSTACK_SECRET_KEY
+  if (!secret) throw new Error('PAYSTACK_SECRET_KEY not set')
+
+  const body: Record<string, unknown> = {
+    business_name: params.business_name,
+    settlement_bank: params.settlement_bank,
+    account_number: params.account_number,
+    currency: 'NGN',
+  }
+  if (typeof params.percentage_charge === 'number') body.percentage_charge = params.percentage_charge
+  if (params.description) body.description = params.description
+
+  const res = await fetch('https://api.paystack.co/subaccount', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Create subaccount failed (${res.status}): ${text.slice(0, 300)}`)
+  }
+
+  const json = (await res.json()) as { status: boolean; data: { subaccount_code: string } }
+  if (!json.status) throw new Error('Paystack returned status=false on create subaccount')
+  return json.data.subaccount_code
 }
 
 export async function initiateTransfer(params: TransferParams): Promise<string> {

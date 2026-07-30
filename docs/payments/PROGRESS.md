@@ -16,7 +16,7 @@ Phase 2 - Direct checkout and payout rails
 
 ## Current bounded task
 
-Land the direct Paystack checkout flow, then continue into vendor/rider payment profiles, payout batching, refunds, reconciliation, and admin hardening.
+Land the payout batching and transfer lifecycle, then continue into refunds, reconciliation, and admin hardening.
 
 ## Completed requirements
 
@@ -44,10 +44,11 @@ Land the direct Paystack checkout flow, then continue into vendor/rider payment 
 - Added focused tests for the ledger foundation and DVA deposit linkage.
 - Added direct Paystack checkout intent storage, safe callback routing, exact-match webhook finalization, and ledger posting.
 - Added focused tests for direct-payment tampering, callback processing-only behavior, valid finalization, duplicate finalization, and quarantine/rejection cases.
+- Added versioned vendor/rider payment beneficiary profiles with server-side bank verification, masked storage, Paystack recipient creation, optional subaccount creation, and owner-scoped profile reads.
+- Added focused tests for profile versioning and profile ownership checks.
 
 ## Incomplete requirements
 
-- Vendor and rider payment profiles still need completion.
 - Ledger-backed payout batching and transfer lifecycle still need completion.
 - Refunds, reconciliation, and admin hardening still need completion.
 
@@ -129,8 +130,8 @@ Land the direct Paystack checkout flow, then continue into vendor/rider payment 
 
 ## Next task
 
-- Implement vendor and rider payment profiles on the new ledger-backed checkout flow.
-- Continue into payout batching, transfers, refunds, reconciliation, and admin controls.
+- Implement ledger-backed payout batching and transfer lifecycle on top of the new beneficiary profiles.
+- Continue into refunds, reconciliation, and admin controls.
 
 ## Latest commit
 
