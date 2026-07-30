@@ -13,6 +13,7 @@ import { recordConsent, CONSENT_ACTIONS } from '@/lib/consent'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { finalizeOrderFeedAttribution } from '@/lib/feed/attribution'
 import { emailCommittedOrderStatus } from '@/lib/order-status-email'
+import { consumeWalletReservation, findWalletReservationByOrder } from '@/lib/wallet-reservations'
 
 // POST /api/orders/[id]/collect
 // The vendor hands a pickup (order ahead) order to the customer by entering the
@@ -120,6 +121,20 @@ export async function POST(
 
   // Release the money: vendor gets the food (held), platform keeps the pickup fee.
   // No rider on a pickup order. completeOrderPayout is idempotent (wallet_released).
+  const walletReservation = await findWalletReservationByOrder(id)
+  if (walletReservation?.status === 'ACTIVE') {
+    await consumeWalletReservation({
+      reservationId: walletReservation.id,
+      idempotencyKey: `wallet-consume:${id}`,
+      actorType: session.role,
+      actorId: session.userId ?? null,
+      correlationId: req.headers.get('x-request-id'),
+      metadata: {
+        order_number: order.order_number,
+        handover_method: 'CODE',
+      },
+    })
+  }
   void recordOrderCompletedEarnings({
     order_id: id, platform_markup_kobo: (order.platform_markup as number) ?? 0,
     delivery_cut_kobo: 0, order_number: order.order_number as string,

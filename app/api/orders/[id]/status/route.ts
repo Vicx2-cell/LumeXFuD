@@ -16,6 +16,7 @@ import { recordSecurityEvent } from '@/lib/security-events'
 import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
 import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 import { finalizeOrderFeedAttribution, reverseOrderFeedAttribution } from '@/lib/feed/attribution'
+import { consumeWalletReservation, findWalletReservationByOrder, releaseWalletReservation } from '@/lib/wallet-reservations'
 import {
   MAX_READY_EXTENSION_COUNT,
   ORDER_AUTO_CANCELLED_CODE,
@@ -332,6 +333,20 @@ export async function PATCH(
   // release-payments cron (which isn't running) — doing it here makes the flow
   // self-contained, so a rider tapping "Complete delivery" pays everyone out.
   if (newStatus === 'COMPLETED') {
+    const walletReservation = await findWalletReservationByOrder(id)
+    if (walletReservation?.status === 'ACTIVE') {
+      await consumeWalletReservation({
+        reservationId: walletReservation.id,
+        idempotencyKey: `wallet-consume:${id}`,
+        actorType: session.role,
+        actorId: session.userId ?? null,
+        correlationId: context.requestId,
+        metadata: {
+          order_number: order.order_number,
+          status_transition: `${currentStatus}->COMPLETED`,
+        },
+      })
+    }
     void recordOrderCompletedEarnings({
       order_id:             id,
       platform_markup_kobo: (order.platform_markup as number) ?? 0,
@@ -354,6 +369,23 @@ export async function PATCH(
   }
 
   if (newStatus === 'CANCELLED' || newStatus === 'REFUNDED') {
+    if (newStatus === 'REFUNDED') {
+      const walletReservation = await findWalletReservationByOrder(id)
+      if (walletReservation?.status === 'ACTIVE') {
+        await releaseWalletReservation({
+          reservationId: walletReservation.id,
+          reason: 'dispute_refund',
+          idempotencyKey: `wallet-release:${id}`,
+          actorType: session.role,
+          actorId: session.userId ?? null,
+          correlationId: context.requestId,
+          metadata: {
+            order_number: order.order_number,
+            status_transition: `${currentStatus}->REFUNDED`,
+          },
+        })
+      }
+    }
     void reverseOrderFeedAttribution(
       id,
       newStatus === 'REFUNDED' ? 'refunded_order' : 'cancelled_order',

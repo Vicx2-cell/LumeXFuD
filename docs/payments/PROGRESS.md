@@ -12,11 +12,11 @@ Bring the LumeX Fud payments stack to production launch readiness for:
 
 ## Current phase
 
-Phase 0 - Repository audit and durable state
+Phase 1 - Foundational financial primitives
 
 ## Current bounded task
 
-Record the actual payment system state, identify the missing financial primitives, and prepare the next implementation slice.
+Land the double-entry ledger, immutable order financial snapshots, and wallet reservation state machine, then continue into the remaining payments flow.
 
 ## Completed requirements
 
@@ -33,14 +33,21 @@ Record the actual payment system state, identify the missing financial primitive
   - promo-fund ledger records
   - webhook dedupe storage
 - Hardened the customer virtual-account route so it returns only the safe customer-facing subset of fields.
+- Added the payments ledger foundation migration with:
+  - double-entry financial accounts
+  - immutable ledger journals and entries
+  - immutable order financial snapshots
+  - wallet reservation state machine
+  - trusted posting / balance RPCs
+- Wired verified DVA deposits into the new ledger with idempotent credit posting.
+- Wired checkout, delivery completion, pickup collection, cancellation, webhook split settlement, and dispute refund paths toward the reservation-backed wallet flow.
+- Added focused tests for the ledger foundation and DVA deposit linkage.
 
 ## Incomplete requirements
 
-- No general double-entry ledger foundation exists yet.
-- No order financial snapshot table or reservation state machine exists yet.
-- DVA receipts are persisted, but the launch spec still requires stronger environment separation and verification flow hardening.
-- Vendor and rider payable / payout flows are still backed by the legacy wallet model.
-- Reconciliation and operational runbooks were incomplete before this update.
+- Direct Paystack checkout, payout batches, refunds, reconciliation, and admin hardening still need completion.
+- Vendor and rider payable / payout flows still need a full ledger-backed rollout.
+- Reconciliation and operational runbooks still need the remaining launch work.
 
 ## Files changed
 
@@ -61,10 +68,20 @@ Record the actual payment system state, identify the missing financial primitive
 - `docs/payments/FINAL_AUDIT.md`
 - `app/api/customer/virtual-account/route.ts`
 - `app/api/customer/virtual-account/route.test.ts`
+- `supabase/migrations/158_payments_ledger_foundation.sql`
+- `lib/wallet-reservations.ts`
+- `lib/paystack/webhook.ts`
+- `app/api/orders/route.ts`
+- `app/api/orders/[id]/deliver/route.ts`
+- `app/api/orders/[id]/collect/route.ts`
+- `app/api/orders/[id]/status/route.ts`
+- `app/api/orders/[id]/cancel/route.ts`
+- `test/payments-ledger-db.test.ts`
+- `test/paystack-dva-deposit.test.ts`
 
 ## Migrations added
 
-- None in this cycle.
+- `supabase/migrations/158_payments_ledger_foundation.sql`
 
 ## Tests run
 
@@ -76,6 +93,8 @@ Record the actual payment system state, identify the missing financial primitive
 - `npm.cmd exec vitest run app/api/customer/virtual-account/route.test.ts`
 - `npm.cmd exec eslint app/api/customer/virtual-account/route.ts app/api/customer/virtual-account/route.test.ts`
 - `npm.cmd exec tsc -- --noEmit`
+- `npm.cmd exec vitest run test/payments-ledger-db.test.ts test/paystack-dva-deposit.test.ts`
+- `npm.cmd exec tsc -- --noEmit`
 
 ## Test results
 
@@ -84,11 +103,13 @@ Record the actual payment system state, identify the missing financial primitive
 - `git grep` found documentation and code references to secret-related terms, but not committed secret values in the output reviewed here.
 - The DVA route test passes with the safe-response assertion in place.
 - TypeScript compile check passes after the test typing cleanup.
+- The payments ledger foundation test passes.
+- The DVA deposit ledger linkage test passes.
 
 ## Current failures
 
-- The payments launch spec still lacks the general ledger, financial snapshots, and reservation foundation it requires.
-- The existing payments stack still does not implement the launch-required payout and reconciliation primitives.
+- The remaining launch work is direct Paystack checkout, payout batching, refunds, reconciliation, and admin hardening.
+- Vendor and rider payout flows still need to be completed on the new ledger.
 
 ## External blockers
 
@@ -106,8 +127,8 @@ Record the actual payment system state, identify the missing financial primitive
 
 ## Next task
 
-- Implement the ledger and financial snapshot foundation, or if a smaller safe slice is chosen first, harden the schema inventory and reconciliation docs around the current production data model.
-- Implement the ledger and financial snapshot foundation, or if a smaller safe slice is chosen first, harden the payout and reconciliation flows around the current production data model.
+- Implement the direct Paystack checkout and callback hardening on top of the new ledger and reservation primitives.
+- Continue into vendor and rider payables, payout batching, refunds, reconciliation, and admin controls.
 
 ## Latest commit
 

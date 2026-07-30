@@ -33,9 +33,14 @@ import { normalizePhone } from '@/lib/phone'
 import { validateMenuAddonSelection, type MenuAddonChoice } from '@/lib/menu-addon-selection'
 import { normalizeGroupOrderAddons } from '@/lib/group-order-addons'
 import { guestPaystackChannels } from '@/lib/promotion'
+import { reserveWalletBalance, releaseWalletReservation } from '@/lib/wallet-reservations'
 
 function groupCheckoutLineKey(menuItemId: string, quantity: number, addonIds: string[], notes: string | null | undefined): string {
   return `${menuItemId}|${quantity}|${addonIds.slice().sort().join(',')}|${(notes ?? '').trim()}`
+}
+
+function paystackEnvironmentFromSecret(secret: string | undefined): 'test' | 'production' {
+  return typeof secret === 'string' && secret.startsWith('sk_live_') ? 'production' : 'test'
 }
 
 export async function POST(req: NextRequest) {
@@ -793,6 +798,101 @@ export async function POST(req: NextRequest) {
       .eq('id', order.id)
   }
 
+  const snapshotEnvironment = paystackEnvironmentFromSecret(process.env.PAYSTACK_SECRET_KEY)
+  const snapshotIdempotencyKey = `order-snapshot:${order.id}`
+  const snapshotChargeKobo = Math.max(0, subtotal + deliveryFee + platformMarkup + guestFeeKobo - promoApplied - rewardApplied)
+  const snapshotFundingSource = promoApplied > 0 ? 'PROMO' : rewardApplied > 0 ? 'PLATFORM' : 'NONE'
+  const snapshotMetadata = {
+    order_number: orderNumber,
+    payment_method_requested: payment_method,
+    resolved_payment_method: resolvedMethod,
+    wallet_amount_kobo: walletApply,
+    tip_kobo: tipKobo,
+    active_surcharge_total_kobo: activeSurchargeTotalKobo,
+    rider_bonus_total_kobo: riderBonusTotalKobo,
+    platform_delivery_cut_kobo: platformDeliveryCut,
+    rider_delivery_cut_kobo: riderCut,
+    delivery_distance_meters: deliveryDistanceMeters,
+    delivery_pricing_breakdown: deliveryPricingBreakdown,
+    promo_code: promo_code ?? null,
+    promo_discount_kobo: promoApplied,
+    reward_discount_kobo: rewardApplied,
+    order_intent_hash: orderIntentHash,
+  }
+  const { data: snapshotRows, error: snapshotError } = await db.rpc('record_order_financial_snapshot', {
+    p_order_id: order.id,
+    p_customer_id: customerId,
+    p_vendor_id: vendor_id,
+    p_rider_id: null,
+    p_zone_id: pricingConfig.zoneId ?? (vendor as { zone_id?: string | null }).zone_id ?? null,
+    p_delivery_type: delivery_type,
+    p_currency: 'NGN',
+    p_pricing_policy_version: 'launch-order-pricing-v1',
+    p_commission_policy_version: 'launch-vendor-commission-v1',
+    p_merchandise_subtotal_kobo: subtotal,
+    p_vendor_gross_kobo: subtotal,
+    p_vendor_commission_rate_bps: launchPricing.vendorCommissionBps,
+    p_vendor_commission_kobo: vendorCommissionKobo,
+    p_vendor_net_kobo: Math.max(0, subtotal - vendorCommissionKobo),
+    p_delivery_fee_kobo: deliveryFee,
+    p_delivery_platform_fee_kobo: platformDeliveryCut,
+    p_rider_allocation_kobo: riderCut,
+    p_platform_fee_kobo: platformMarkup,
+    p_guest_fee_kobo: guestFeeKobo,
+    p_packaging_fee_kobo: 0,
+    p_discount_amount_kobo: promoApplied,
+    p_discount_funding_source: snapshotFundingSource,
+    p_promotional_credit_kobo: rewardApplied,
+    p_total_customer_charge_kobo: snapshotChargeKobo,
+    p_calculation_timestamp: new Date().toISOString(),
+    p_idempotency_key: snapshotIdempotencyKey,
+    p_snapshot_metadata: snapshotMetadata,
+  })
+  const snapshotRow = (snapshotRows as Array<{ snapshot_id: string; replayed: boolean }> | null)?.[0]
+  if (snapshotError || !snapshotRow) {
+    console.error('[orders] snapshot insert failed', {
+      message: snapshotError?.message,
+      orderId: order.id,
+      orderNumber,
+      requestId: context.requestId,
+    })
+    await db.from('order_items').delete().eq('order_id', order.id)
+    await db.from('orders').delete().eq('id', order.id)
+    return json({ error: 'We could not record order pricing. Please retry.' }, { status: 500 })
+  }
+
+  let walletReservationId: string | null = null
+  if (customerId && walletApply > 0 && (resolvedMethod === 'WALLET' || resolvedMethod === 'SPLIT')) {
+    try {
+      const reservation = await reserveWalletBalance({
+        customerId,
+        orderId: order.id,
+        amountKobo: walletApply,
+        currency: 'NGN',
+        environment: snapshotEnvironment,
+        idempotencyKey: `wallet-reservation:${order.id}`,
+        expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+        correlationId: context.correlationId,
+        metadata: {
+          order_number: orderNumber,
+          snapshot_id: snapshotRow.snapshot_id,
+          payment_method: resolvedMethod,
+        },
+      })
+      walletReservationId = reservation.reservationId
+    } catch (err) {
+      console.error('[orders] wallet reservation failed', {
+        orderId: order.id,
+        orderNumber,
+        message: err instanceof Error ? err.message : String(err),
+      })
+      await db.from('order_financial_snapshots').delete().eq('order_id', order.id)
+      await db.from('order_items').delete().eq('order_id', order.id)
+      await db.from('orders').delete().eq('id', order.id)
+      return json({ error: 'Wallet balance is unavailable right now. Please try again.' }, { status: 409 })
+    }
+  }
+
   // Record the customer's binding place-order consent (Invariant I8) against the
   // current terms version. Append-only; fire-and-forget so it never blocks checkout.
   if (customerId) {
@@ -958,15 +1058,53 @@ export async function POST(req: NextRequest) {
   // No Paystack charge and therefore no webhook will ever fire for this order,
   // so the whole payment must settle here. spend_customer_wallet is atomic and
   // idempotent per order (CWUSE-<id>).
+  if (false && resolvedMethod === 'WALLET') {
+    const orderRecord = order as { id: string }
+    if (walletApply > 0 && !walletReservationId) {
+      console.error('[orders] wallet reservation missing for full-wallet checkout', { orderId: orderRecord.id, orderNumber })
+      await db.from('order_financial_snapshots').delete().eq('order_id', orderRecord.id)
+      await db.from('order_items').delete().eq('order_id', orderRecord.id)
+      await db.from('orders').delete().eq('id', orderRecord.id)
+      return NextResponse.json({ error: 'Wallet balance is unavailable right now. Please try again.' }, { status: 409 })
+    }
+
+    const now = new Date().toISOString()
+    const { data: paidOrder } = await db
+      .from('orders')
+      .update(
+        isScheduled
+          ? { payment_status: 'PAID', status: 'SCHEDULED', updated_at: now }
+          : { payment_status: 'PAID', status: 'PENDING', pending_since: now, placed_at: now, order_state: 'placed', updated_at: now },
+      )
+      .eq('id', orderRecord.id)
+      .eq('payment_status', 'PENDING')
+      .select('id')
+      .maybeSingle()
+
+    if (paidOrder) await sendOrderConfirmationEmail(db, { orderId: orderRecord.id })
+
+    if (!isScheduled) {
+      await notifyVendorNewOrder(db, orderRecord.id, vendor_id, orderNumber, netTotal, appUrl)
+      if (linkedGroupId) {
+        const walletGroupOrderId = linkedGroupId as string
+        await notifyGroupOrderPlaced(db, { groupOrderId: walletGroupOrderId, orderNumber, deliveryAddress: resolvedAddress, appUrl })
+      }
+    }
+
+    return NextResponse.json({ order_number: orderNumber, payment_method: 'WALLET', paid: true, scheduled: isScheduled })
+  }
+
   if (resolvedMethod === 'WALLET') {
+    const legacyOrder = order as NonNullable<typeof order>
+    const legacyCustomerId = customerId ?? null
     let spend: { success: boolean; errorMsg: string | null }
     try {
       spend = await spendCustomerWallet({
-        customerId:  customerId!,
+        customerId:  legacyCustomerId ?? '',
         amountKobo:  walletApply,
-        orderId:     order.id,
+        orderId:     legacyOrder.id,
         orderNumber,
-        reference:   `CWUSE-${order.id}`,
+        reference:   `CWUSE-${legacyOrder.id}`,
       })
     } catch (err) {
       console.error('[orders] wallet debit RPC error:', err)
@@ -976,8 +1114,8 @@ export async function POST(req: NextRequest) {
     if (!spend.success) {
       // Nothing was charged — drop the reserved order + items so the customer
       // can retry or pick another method (e.g. balance changed since checkout).
-      await db.from('order_items').delete().eq('order_id', order.id)
-      await db.from('orders').delete().eq('id', order.id)
+      await db.from('order_items').delete().eq('order_id', legacyOrder.id)
+      await db.from('orders').delete().eq('id', legacyOrder.id)
       return NextResponse.json({ error: spend.errorMsg ?? 'Wallet payment failed' }, { status: 400 })
     }
 
@@ -993,15 +1131,15 @@ export async function POST(req: NextRequest) {
           ? { payment_status: 'PAID', status: 'SCHEDULED', updated_at: now }
           : { payment_status: 'PAID', status: 'PENDING', pending_since: now, placed_at: now, order_state: 'placed', updated_at: now },
       )
-      .eq('id', order.id)
+      .eq('id', legacyOrder.id)
       .eq('payment_status', 'PENDING')
       .select('id')
       .maybeSingle()
 
-    if (paidOrder) await sendOrderConfirmationEmail(db, { orderId: order.id })
+    if (paidOrder) await sendOrderConfirmationEmail(db, { orderId: legacyOrder.id })
 
     if (!isScheduled) {
-      await notifyVendorNewOrder(db, order.id, vendor_id, orderNumber, netTotal, appUrl)
+      await notifyVendorNewOrder(db, legacyOrder.id, vendor_id, orderNumber, netTotal, appUrl)
       // Wallet orders are paid right here (no webhook), so tell the group now.
       if (linkedGroupId) {
         await notifyGroupOrderPlaced(db, { groupOrderId: linkedGroupId, orderNumber, deliveryAddress: resolvedAddress, appUrl })
@@ -1037,6 +1175,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     // No charge was created — drop the reserved order + items so the customer can retry.
     console.error('[orders] Paystack init failed, rolling back order:', err)
+    await db.from('order_financial_snapshots').delete().eq('order_id', order.id)
     await db.from('order_items').delete().eq('order_id', order.id)
     await db.from('orders').delete().eq('id', order.id)
     return NextResponse.json({ error: 'Could not start payment. Please try again.' }, { status: 502 })

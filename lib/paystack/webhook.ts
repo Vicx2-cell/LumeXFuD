@@ -5,6 +5,7 @@ import { notifyInApp } from '../notifications'
 import { sendPushToUser } from '../push'
 import { recordPlatformEarning } from '../platform-earnings'
 import { processCustomerTopup, spendCustomerWallet, isCustomerWalletEnabled } from '../customer-wallet'
+import { consumeWalletReservation, findWalletReservationByOrder } from '../wallet-reservations'
 import { refundTransaction } from './transfer'
 import { verifyPaystackTransaction } from './init'
 import { processPremiumOrBoostWebhook } from './billing'
@@ -111,7 +112,10 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
       const receiverAccount = dedicatedAccountNumber(data)
       if (receiverAccount) {
         const { data: virtualAccount } = await db.from('customer_virtual_accounts')
-          .select('id').eq('account_number', receiverAccount).eq('status', 'ACTIVE').maybeSingle()
+          .select('id, customer_id, account_number, account_name, paystack_customer_code, provider_slug, bank_name, status')
+          .eq('account_number', receiverAccount)
+          .eq('status', 'ACTIVE')
+          .maybeSingle()
         if (virtualAccount) {
           const verified = await verifyPaystackTransaction(reference)
           if (verified.status !== 'success' || Number(verified.amount) <= 0) break
@@ -123,6 +127,22 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
             currency: String(data.currency ?? 'NGN'),
             status: 'UNALLOCATED',
             provider_payload: data,
+          })
+          await creditVerifiedDvaDeposit({
+            db,
+            reference,
+            verified,
+            data,
+            virtualAccount: virtualAccount as {
+              id: string
+              customer_id: string
+              account_number: string | null
+              account_name: string | null
+              paystack_customer_code: string | null
+              provider_slug: string | null
+              bank_name: string | null
+              status: string
+            },
           })
           break
         }
@@ -206,21 +226,34 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
       // part (spent elsewhere since checkout) we must not half-pay the order:
       // refund the card remainder, cancel, and alert — never mark it paid.
       if (pending.payment_method === 'SPLIT' && walletPortion > 0 && pending.customer_id) {
-        let spendOk = false
+        let splitOk = false
         try {
-          const spend = await spendCustomerWallet({
-            customerId:  pending.customer_id,
-            amountKobo:  walletPortion,
-            orderId:     pending.id,
-            orderNumber: pending.order_number,
-            reference:   `CWUSE-${pending.id}`,
-          })
-          spendOk = spend.success
+          const reservation = await findWalletReservationByOrder(pending.id)
+          if (reservation?.status === 'ACTIVE') {
+            await consumeWalletReservation({
+              reservationId: reservation.id,
+              idempotencyKey: `wallet-consume:${pending.id}`,
+              actorType: 'system',
+              actorId: null,
+              correlationId: null,
+              metadata: { order_number: pending.order_number, payment_method: 'SPLIT' },
+            })
+            splitOk = true
+          } else {
+            const spend = await spendCustomerWallet({
+              customerId:  pending.customer_id,
+              amountKobo:  walletPortion,
+              orderId:     pending.id,
+              orderNumber: pending.order_number,
+              reference:   `CWUSE-${pending.id}`,
+            })
+            splitOk = spend.success
+          }
         } catch (err) {
-          console.error(`[webhook] split wallet debit RPC error on ${reference}:`, err)
+          console.error(`[webhook] split wallet settlement error on ${reference}:`, err)
         }
 
-        if (!spendOk) {
+        if (!splitOk) {
           let refundOk = true
           try {
             await refundTransaction(reference, paidAmount)
@@ -730,4 +763,128 @@ async function handleWalletTopup(
     // (falls back to "A family member" if the sender left their name blank).
     sponsorName:   metadata.is_sponsor ? ((metadata.sponsor_name as string | undefined)?.trim() || 'A family member') : undefined,
   })
+}
+
+function paystackEnvironmentFromSecret(secret: string | undefined): 'test' | 'production' {
+  return secret?.startsWith('sk_live_') ? 'production' : 'test'
+}
+
+async function creditVerifiedDvaDeposit(params: {
+  db: ReturnType<typeof createSupabaseAdmin>
+  reference: string
+  verified: Awaited<ReturnType<typeof verifyPaystackTransaction>>
+  data: Record<string, unknown>
+  virtualAccount: {
+    id: string
+    customer_id: string
+    account_number: string | null
+    account_name: string | null
+    paystack_customer_code: string | null
+    provider_slug: string | null
+    bank_name: string | null
+    status: string
+  }
+}): Promise<void> {
+  const amountKobo = Number(params.verified.amount ?? 0)
+  if (!Number.isFinite(amountKobo) || amountKobo <= 0) {
+    throw new Error('Invalid verified DVA amount')
+  }
+  const currency = String(params.verified.metadata?.currency ?? params.data.currency ?? 'NGN').toUpperCase()
+  if (currency !== 'NGN') {
+    throw new Error(`Unsupported DVA currency: ${currency}`)
+  }
+  const environment = paystackEnvironmentFromSecret(process.env.PAYSTACK_SECRET_KEY)
+  const accountNumber = dedicatedAccountNumber(params.data)
+  if (!accountNumber || accountNumber !== params.virtualAccount.account_number) {
+    throw new Error('DVA ownership could not be verified')
+  }
+
+  const [customerAvailableId, paystackReceivableId] = await Promise.all([
+    params.db.rpc('ensure_financial_account', {
+      p_account_type: 'CUSTOMER_AVAILABLE',
+      p_owner_type: 'CUSTOMER',
+      p_owner_id: params.virtualAccount.customer_id,
+      p_currency: currency,
+      p_environment: environment,
+      p_metadata: {
+        source: 'dva_deposit',
+        virtual_account_id: params.virtualAccount.id,
+      },
+    }),
+    params.db.rpc('ensure_financial_account', {
+      p_account_type: 'PAYSTACK_RECEIVABLE',
+      p_owner_type: 'PAYSTACK',
+      p_owner_id: null,
+      p_currency: currency,
+      p_environment: environment,
+      p_metadata: {
+        source: 'dva_deposit',
+        virtual_account_id: params.virtualAccount.id,
+      },
+    }),
+  ])
+
+  if (customerAvailableId.error) {
+    throw new Error(`Could not ensure customer account: ${customerAvailableId.error.message}`)
+  }
+  if (paystackReceivableId.error) {
+    throw new Error(`Could not ensure Paystack clearing account: ${paystackReceivableId.error.message}`)
+  }
+
+  const journalKey = `paystack:dva-deposit:${environment}:${params.reference}`
+  const walletReference = `DVA-${environment}-${params.reference}`
+  const posted = await params.db.rpc('post_ledger_journal', {
+    p_journal_type: 'DVA_DEPOSIT',
+    p_business_reference: params.reference,
+    p_idempotency_key: journalKey,
+    p_currency: currency,
+    p_source: 'paystack_webhook',
+    p_actor_type: 'system',
+    p_actor_id: null,
+    p_correlation_id: String(params.verified.reference ?? params.reference),
+    p_metadata: {
+      environment,
+      paystack_reference: params.reference,
+      paystack_transaction_id: params.data.id != null ? String(params.data.id) : null,
+      customer_id: params.virtualAccount.customer_id,
+      customer_virtual_account_id: params.virtualAccount.id,
+      customer_code: params.virtualAccount.paystack_customer_code,
+      account_number: accountNumber,
+      account_name: params.virtualAccount.account_name,
+      bank_name: params.virtualAccount.bank_name,
+      provider_slug: params.virtualAccount.provider_slug,
+      channel: String(params.data.channel ?? 'bank_transfer'),
+      verified_at: new Date().toISOString(),
+    },
+    p_reversal_of_journal_id: null,
+    p_entries: [
+      {
+        account_id: paystackReceivableId.data as string,
+        side: 'DEBIT',
+        amount_kobo: amountKobo,
+        metadata: { flow: 'dva_deposit', reference: params.reference },
+      },
+      {
+        account_id: customerAvailableId.data as string,
+        side: 'CREDIT',
+        amount_kobo: amountKobo,
+        metadata: { flow: 'dva_deposit', reference: params.reference },
+      },
+    ],
+  })
+
+  if (posted.error) {
+    throw new Error(`Could not post DVA deposit journal: ${posted.error.message}`)
+  }
+
+  const walletTopup = await params.db.rpc('topup_customer_wallet', {
+    p_customer_id: params.virtualAccount.customer_id,
+    p_amount_kobo: amountKobo,
+    p_bonus_kobo: 0,
+    p_reference: walletReference,
+    p_description: `Verified DVA deposit from ${params.virtualAccount.bank_name ?? 'Paystack'}`,
+  })
+  if (walletTopup.error) {
+    throw new Error(`Could not mirror DVA deposit to customer wallet: ${walletTopup.error.message}`)
+  }
 }

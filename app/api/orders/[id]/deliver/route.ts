@@ -15,6 +15,7 @@ import { maybeApplyLateDeliveryCredit } from '@/lib/late-delivery-credit'
 import { promoteVerifiedPlaceFromOrder } from '@/lib/location-intelligence'
 import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 import { finalizeOrderFeedAttribution } from '@/lib/feed/attribution'
+import { consumeWalletReservation, findWalletReservationByOrder } from '@/lib/wallet-reservations'
 import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 import { distanceMeters, evaluateLocationRisk, validCoordinates } from '@/lib/location-risk'
 
@@ -223,6 +224,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Release escrow into the HELD wallets (vendor: food; rider: delivery cut + tip;
   // platform: markup + delivery cut). Idempotent via the wallet_released claim.
+  const walletReservation = await findWalletReservationByOrder(id)
+  if (walletReservation?.status === 'ACTIVE') {
+    await consumeWalletReservation({
+      reservationId: walletReservation.id,
+      idempotencyKey: `wallet-consume:${id}`,
+      actorType: session.role,
+      actorId: session.userId ?? null,
+      correlationId: context.requestId,
+      metadata: {
+        order_number: order.order_number,
+        handover_method: method,
+      },
+    })
+  }
   void recordOrderCompletedEarnings({
     order_id: id,
     platform_markup_kobo: (order.platform_markup as number) ?? 0,

@@ -8,6 +8,9 @@ import { rateLimitGeneric } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 import { reverseOrderFeedAttribution } from '@/lib/feed/attribution'
 import { emailCommittedOrderStatus } from '@/lib/order-status-email'
+import { refundTransaction } from '@/lib/paystack/transfer'
+import { recordPlatformEarning } from '@/lib/platform-earnings'
+import { findWalletReservationByOrder, releaseWalletReservation } from '@/lib/wallet-reservations'
 
 const CANCELLABLE_STATUSES = ['PENDING_PAYMENT', 'SCHEDULED', 'PENDING', 'VENDOR_ACCEPTED']
 
@@ -110,7 +113,73 @@ export async function POST(
 
   // Refund if paid — wallet portion back to the wallet, card portion via Paystack
   // (rule #30). The CANCELLED claim above means this runs once.
-  if (order.payment_status === 'PAID') {
+  const walletReservation = await findWalletReservationByOrder(id)
+  if (order.payment_status === 'PAID' && walletReservation?.status === 'ACTIVE') {
+    let walletOk = true
+    let paystackOk = true
+    try {
+      await releaseWalletReservation({
+        reservationId: walletReservation.id,
+        reason,
+        idempotencyKey: `wallet-release:${id}`,
+        actorType: session.role,
+        actorId: session.userId ?? null,
+        correlationId: null,
+        metadata: { order_number: order.order_number as string },
+      })
+    } catch (err) {
+      walletOk = false
+      console.error('[orders.cancel] wallet reservation release failed:', err)
+    }
+
+    const total = Number(order.total_amount) || 0
+    const walletPortion = Math.max(0, Math.min(Number(walletReservation.amount_kobo) || 0, total))
+    const paystackPortion = total - walletPortion
+    if (paystackPortion > 0 && order.paystack_reference) {
+      let providerRefundReference: string | undefined
+      try {
+        const providerRefund = await refundTransaction(order.paystack_reference, paystackPortion)
+        providerRefundReference = providerRefund.providerReference
+      } catch (err) {
+        paystackOk = false
+        console.error('[orders.cancel] paystack refund failed:', err)
+      }
+
+      const { data: priorRefund } = await db
+        .from('refunds')
+        .select('id')
+        .eq('order_id', order.id)
+        .eq('paystack_transaction_reference', order.paystack_reference)
+        .maybeSingle()
+      if (!priorRefund) {
+        await db.from('refunds').insert({
+          order_id: order.id,
+          paystack_transaction_reference: order.paystack_reference,
+          amount_kobo: paystackPortion,
+          reason,
+          status: paystackOk ? 'PROCESSING' : 'NEEDS_ATTENTION',
+          triggered_by: session.phone,
+          paystack_refund_reference: providerRefundReference,
+        })
+      }
+      if (paystackOk) {
+        void recordPlatformEarning({
+          type: 'REFUND_COST',
+          amount_kobo: -paystackPortion,
+          order_id: order.id,
+          description: `Refund â€” order ${order.order_number} â€” ${reason}`,
+        })
+      }
+    }
+
+    if (walletOk && paystackOk) {
+      await db
+        .from('orders')
+        .update({ payment_status: 'REFUNDED', updated_at: new Date().toISOString() })
+        .eq('id', id)
+      customerEmailStatus = 'REFUNDED'
+    }
+  } else if (order.payment_status === 'PAID') {
     const { walletOk, paystackOk } = await refundOrderPayments({
       order: {
         id:                 order.id as string,
