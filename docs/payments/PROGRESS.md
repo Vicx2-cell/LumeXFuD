@@ -134,7 +134,7 @@ Land the direct Paystack checkout flow, then continue into vendor/rider payment 
 
 ## Latest commit
 
-- `de6facc` - `payments: add ledger foundation and reservation flow`
+- `d42f7bc` - `payments: complete direct paystack checkout`
 
 ## Global stop-condition status
 
