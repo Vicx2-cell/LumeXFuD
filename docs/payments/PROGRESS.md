@@ -137,7 +137,7 @@ Implement refunds, reconciliation, and admin hardening on top of the payout life
 
 ## Latest commit
 
-- `36c48cf` - `payments: add beneficiary profiles`
+- `8f73137` - `payments: add payout batching and transfer lifecycle`
 
 ## Global stop-condition status
 
