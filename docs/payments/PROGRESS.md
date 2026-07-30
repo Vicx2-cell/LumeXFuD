@@ -167,7 +167,7 @@ Run production hardening validation on the completed payments admin surfaces.
 
 ## Latest commit
 
-- `62a7fed` - `docs: refresh payments progress hash`
+- `25f5485` - `payments: add super-admin payment surveillance and replay`
 
 ## Global stop-condition status
 
