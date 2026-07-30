@@ -12,11 +12,11 @@ Bring the LumeX Fud payments stack to production launch readiness for:
 
 ## Current phase
 
-Phase 1 - Foundational financial primitives
+Phase 2 - Direct checkout and payout rails
 
 ## Current bounded task
 
-Land the double-entry ledger, immutable order financial snapshots, and wallet reservation state machine, then continue into the remaining payments flow.
+Land the direct Paystack checkout flow, then continue into vendor/rider payment profiles, payout batching, refunds, reconciliation, and admin hardening.
 
 ## Completed requirements
 
@@ -42,12 +42,14 @@ Land the double-entry ledger, immutable order financial snapshots, and wallet re
 - Wired verified DVA deposits into the new ledger with idempotent credit posting.
 - Wired checkout, delivery completion, pickup collection, cancellation, webhook split settlement, and dispute refund paths toward the reservation-backed wallet flow.
 - Added focused tests for the ledger foundation and DVA deposit linkage.
+- Added direct Paystack checkout intent storage, safe callback routing, exact-match webhook finalization, and ledger posting.
+- Added focused tests for direct-payment tampering, callback processing-only behavior, valid finalization, duplicate finalization, and quarantine/rejection cases.
 
 ## Incomplete requirements
 
-- Direct Paystack checkout, payout batches, refunds, reconciliation, and admin hardening still need completion.
-- Vendor and rider payable / payout flows still need a full ledger-backed rollout.
-- Reconciliation and operational runbooks still need the remaining launch work.
+- Vendor and rider payment profiles still need completion.
+- Ledger-backed payout batching and transfer lifecycle still need completion.
+- Refunds, reconciliation, and admin hardening still need completion.
 
 ## Files changed
 
@@ -127,8 +129,8 @@ Land the double-entry ledger, immutable order financial snapshots, and wallet re
 
 ## Next task
 
-- Implement the direct Paystack checkout and callback hardening on top of the new ledger and reservation primitives.
-- Continue into vendor and rider payables, payout batching, refunds, reconciliation, and admin controls.
+- Implement vendor and rider payment profiles on the new ledger-backed checkout flow.
+- Continue into payout batching, transfers, refunds, reconciliation, and admin controls.
 
 ## Latest commit
 

@@ -6,6 +6,7 @@ import { sendPushToUser } from '../push'
 import { recordPlatformEarning } from '../platform-earnings'
 import { processCustomerTopup, spendCustomerWallet, isCustomerWalletEnabled } from '../customer-wallet'
 import { consumeWalletReservation, findWalletReservationByOrder } from '../wallet-reservations'
+import { findOrderPaymentIntentByReference, finalizeOrderPaymentIntent, markOrderPaymentIntentVerified, quarantineOrderPaymentIntent } from '../order-payment-intents'
 import { refundTransaction } from './transfer'
 import { verifyPaystackTransaction } from './init'
 import { processPremiumOrBoostWebhook } from './billing'
@@ -52,6 +53,268 @@ export function refundWebhookAmountKobo(data: Record<string, unknown>): number |
   const raw = data.amount ?? data.refund_amount ?? data.refunded_amount
   const n = Number(raw)
   return Number.isFinite(n) && n > 0 ? n : null
+}
+
+export interface DirectOrderPaymentContext {
+  id: string
+  order_number: string
+  vendor_id: string | null
+  customer_id: string | null
+  guest_phone: string | null
+  guest_name: string | null
+  payment_status: string | null
+  status: string | null
+  total_amount: number | null
+  subtotal: number | null
+  wallet_amount_kobo: number | null
+  payment_method: string | null
+  scheduled_for: string | null
+  scheduled_release_at: string | null
+}
+
+export interface DirectOrderPaymentResult {
+  accepted: boolean
+  duplicate: boolean
+  reason?: string
+  intentId?: string
+  verifiedAmount?: number
+  verifiedCurrency?: string
+  verifiedEnvironment?: 'test' | 'production'
+  verifiedTransactionId?: string | null
+}
+
+export async function verifyAndRecordDirectOrderPayment(params: {
+  db: ReturnType<typeof createSupabaseAdmin>
+  reference: string
+  data: Record<string, unknown>
+  pending: DirectOrderPaymentContext
+}): Promise<DirectOrderPaymentResult> {
+  const intent = await findOrderPaymentIntentByReference(params.db, params.reference)
+  if (!intent) {
+    return { accepted: false, duplicate: false, reason: 'unknown_reference' }
+  }
+
+  if (intent.status === 'FINALIZED') {
+    return { accepted: false, duplicate: true, reason: 'already_finalized', intentId: intent.id }
+  }
+
+  const environment = paystackEnvironmentFromSecret(process.env.PAYSTACK_SECRET_KEY)
+  let verified
+  try {
+    verified = await verifyPaystackTransaction(params.reference)
+  } catch (err) {
+    console.error(`[webhook] direct payment verify failed for ${params.reference}:`, err)
+    return { accepted: false, duplicate: false, reason: 'verification_failed', intentId: intent.id }
+  }
+
+  const verifiedAmount = Number(verified.amount)
+  const verifiedCurrency = String(verified.currency ?? params.data.currency ?? 'NGN').toUpperCase()
+  const verifiedReference = String(verified.reference ?? params.reference)
+  const providerTransactionId = params.data.id != null ? String(params.data.id) : null
+
+  if (verified.status !== 'success') {
+    return { accepted: false, duplicate: false, reason: 'provider_not_success', intentId: intent.id }
+  }
+  if (verifiedReference !== params.reference) {
+    await quarantineOrderPaymentIntent(params.db, {
+      orderId: params.pending.id,
+      reason: 'reference_mismatch',
+      providerAmountKobo: verifiedAmount,
+      providerCurrency: verifiedCurrency,
+      providerEnvironment: environment,
+      providerPayload: { ...params.data, verified_reference: verifiedReference },
+    })
+    return { accepted: false, duplicate: false, reason: 'reference_mismatch', intentId: intent.id }
+  }
+  if (!Number.isFinite(verifiedAmount) || verifiedAmount <= 0) {
+    await quarantineOrderPaymentIntent(params.db, {
+      orderId: params.pending.id,
+      reason: 'invalid_amount',
+      providerAmountKobo: verifiedAmount,
+      providerCurrency: verifiedCurrency,
+      providerEnvironment: environment,
+      providerPayload: params.data,
+    })
+    return { accepted: false, duplicate: false, reason: 'invalid_amount', intentId: intent.id }
+  }
+  if (verifiedAmount !== intent.amount_kobo) {
+    await quarantineOrderPaymentIntent(params.db, {
+      orderId: params.pending.id,
+      reason: 'amount_mismatch',
+      providerAmountKobo: verifiedAmount,
+      providerCurrency: verifiedCurrency,
+      providerEnvironment: environment,
+      providerPayload: params.data,
+    })
+    return { accepted: false, duplicate: false, reason: 'amount_mismatch', intentId: intent.id }
+  }
+  if (verifiedCurrency !== intent.currency) {
+    await quarantineOrderPaymentIntent(params.db, {
+      orderId: params.pending.id,
+      reason: 'currency_mismatch',
+      providerAmountKobo: verifiedAmount,
+      providerCurrency: verifiedCurrency,
+      providerEnvironment: environment,
+      providerPayload: params.data,
+    })
+    return { accepted: false, duplicate: false, reason: 'currency_mismatch', intentId: intent.id }
+  }
+  if (environment !== intent.environment) {
+    await quarantineOrderPaymentIntent(params.db, {
+      orderId: params.pending.id,
+      reason: 'environment_mismatch',
+      providerAmountKobo: verifiedAmount,
+      providerCurrency: verifiedCurrency,
+      providerEnvironment: environment,
+      providerPayload: params.data,
+    })
+    return { accepted: false, duplicate: false, reason: 'environment_mismatch', intentId: intent.id }
+  }
+  if (intent.order_id !== params.pending.id) {
+    await quarantineOrderPaymentIntent(params.db, {
+      orderId: params.pending.id,
+      reason: 'order_mismatch',
+      providerAmountKobo: verifiedAmount,
+      providerCurrency: verifiedCurrency,
+      providerEnvironment: environment,
+      providerPayload: params.data,
+    })
+    return { accepted: false, duplicate: false, reason: 'order_mismatch', intentId: intent.id }
+  }
+  if (intent.customer_id && intent.customer_id !== params.pending.customer_id) {
+    await quarantineOrderPaymentIntent(params.db, {
+      orderId: params.pending.id,
+      reason: 'customer_mismatch',
+      providerAmountKobo: verifiedAmount,
+      providerCurrency: verifiedCurrency,
+      providerEnvironment: environment,
+      providerPayload: params.data,
+    })
+    return { accepted: false, duplicate: false, reason: 'customer_mismatch', intentId: intent.id }
+  }
+  if (!intent.customer_id && intent.guest_phone && intent.guest_phone !== params.pending.guest_phone) {
+    await quarantineOrderPaymentIntent(params.db, {
+      orderId: params.pending.id,
+      reason: 'guest_mismatch',
+      providerAmountKobo: verifiedAmount,
+      providerCurrency: verifiedCurrency,
+      providerEnvironment: environment,
+      providerPayload: params.data,
+    })
+    return { accepted: false, duplicate: false, reason: 'guest_mismatch', intentId: intent.id }
+  }
+
+  await markOrderPaymentIntentVerified(params.db, {
+    orderId: params.pending.id,
+    amountKobo: verifiedAmount,
+    currency: verifiedCurrency,
+    environment,
+    providerPayload: {
+      ...params.data,
+      verified_reference: verifiedReference,
+      verified_transaction_id: providerTransactionId,
+      verified_status: verified.status,
+    },
+  })
+
+  const [receivableId, clearingId] = await Promise.all([
+    params.db.rpc('ensure_financial_account', {
+      p_account_type: 'PAYSTACK_RECEIVABLE',
+      p_owner_type: 'PAYSTACK',
+      p_owner_id: null,
+      p_currency: verifiedCurrency,
+      p_environment: environment,
+      p_metadata: {
+        source: 'direct_checkout',
+        order_id: params.pending.id,
+        order_number: params.pending.order_number,
+      },
+    }),
+    params.db.rpc('ensure_financial_account', {
+      p_account_type: 'COLLECTION_CLEARING',
+      p_owner_type: 'PLATFORM',
+      p_owner_id: null,
+      p_currency: verifiedCurrency,
+      p_environment: environment,
+      p_metadata: {
+        source: 'direct_checkout',
+        order_id: params.pending.id,
+        order_number: params.pending.order_number,
+      },
+    }),
+  ])
+
+  if (receivableId.error) {
+    throw new Error(`Could not ensure Paystack receivable account: ${receivableId.error.message}`)
+  }
+  if (clearingId.error) {
+    throw new Error(`Could not ensure collection clearing account: ${clearingId.error.message}`)
+  }
+
+  const posted = await params.db.rpc('post_ledger_journal', {
+    p_journal_type: 'DIRECT_PAYSTACK_CHARGE',
+    p_business_reference: params.pending.order_number,
+    p_idempotency_key: `paystack:direct-payment:${environment}:${params.reference}`,
+    p_currency: verifiedCurrency,
+    p_source: 'paystack_webhook',
+    p_actor_type: 'system',
+    p_actor_id: null,
+    p_correlation_id: verifiedReference,
+    p_metadata: {
+      environment,
+      payment_intent_id: intent.id,
+      payment_intent_reference: intent.internal_reference,
+      order_id: params.pending.id,
+      order_number: params.pending.order_number,
+      paystack_reference: params.reference,
+      paystack_transaction_id: providerTransactionId,
+      customer_id: intent.customer_id,
+      guest_phone: intent.guest_phone,
+      amount_kobo: verifiedAmount,
+      currency: verifiedCurrency,
+      expected_vendor_allocation_kobo: intent.expected_vendor_allocation_kobo,
+      expected_rider_allocation_kobo: intent.expected_rider_allocation_kobo,
+      expected_platform_allocation_kobo: intent.expected_platform_allocation_kobo,
+      payment_method: params.pending.payment_method,
+    },
+    p_reversal_of_journal_id: null,
+    p_entries: [
+      {
+        account_id: receivableId.data as string,
+        side: 'DEBIT',
+        amount_kobo: verifiedAmount,
+        metadata: {
+          flow: 'direct_checkout',
+          reference: params.reference,
+          order_id: params.pending.id,
+        },
+      },
+      {
+        account_id: clearingId.data as string,
+        side: 'CREDIT',
+        amount_kobo: verifiedAmount,
+        metadata: {
+          flow: 'direct_checkout',
+          reference: params.reference,
+          order_id: params.pending.id,
+        },
+      },
+    ],
+  })
+
+  if (posted.error) {
+    throw new Error(`Could not post direct payment journal: ${posted.error.message}`)
+  }
+
+  return {
+    accepted: true,
+    duplicate: false,
+    intentId: intent.id,
+    verifiedAmount,
+    verifiedCurrency,
+    verifiedEnvironment: environment,
+    verifiedTransactionId: providerTransactionId,
+  }
 }
 
 export function chooseRefundWebhookTarget(
@@ -152,32 +415,25 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
       // Find the pending order for this reference BEFORE crediting.
       const { data: pending } = await db
         .from('orders')
-        .select('id, order_number, vendor_id, customer_id, total_amount, subtotal, wallet_amount_kobo, payment_method, scheduled_for, scheduled_release_at')
+        .select('id, order_number, vendor_id, customer_id, guest_phone, guest_name, status, payment_status, total_amount, subtotal, wallet_amount_kobo, payment_method, scheduled_for, scheduled_release_at')
         .eq('paystack_reference', reference)
         .eq('payment_status', 'PENDING')
         .maybeSingle()
 
       if (!pending) break
 
-      // A4 — independent re-verification before marking the order paid. The
-      // HMAC-signed payload is only a signal; confirm status + amount straight
-      // from Paystack. On a DEFINITIVE negative (Paystack does not say success)
-      // we never mark the order paid. On a TRANSIENT verify error we fall back
-      // to the authenticated payload amount — HMAC already proves authenticity,
-      // so a Paystack API hiccup must not strand a genuinely-paid order — but we
-      // log it. The exact `paidAmount === expectedCharge` check below is the
-      // real money guard either way.
-      let paidAmount = Number(data.amount)
-      try {
-        const verified = await verifyPaystackTransaction(reference)
-        if (verified.status !== 'success') {
-          console.warn(`[webhook] order charge ${reference} not 'success' on verify (status=${verified.status}) — not marking paid`)
+      const directPayment = await verifyAndRecordDirectOrderPayment({ db, reference, data, pending })
+      if (!directPayment.accepted) {
+        if (directPayment.reason === 'unknown_reference') {
+          console.warn(`[webhook] unknown direct payment reference ${reference}`)
+        }
+        if (directPayment.duplicate || directPayment.reason === 'already_finalized') {
           break
         }
-        paidAmount = Number(verified.amount)
-      } catch (err) {
-        console.error(`[webhook] order verify failed for ${reference}, falling back to signed payload amount:`, err)
+        break
       }
+
+      const paidAmount = directPayment.verifiedAmount ?? Number(data.amount)
 
       // The card only ever pays the NON-wallet portion. For a plain PAYSTACK
       // order wallet_amount_kobo is 0 so this equals total_amount; for a SPLIT
@@ -323,6 +579,17 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
         .single()
 
       if (error || !order) break
+
+      await finalizeOrderPaymentIntent(db, {
+        orderId: order.id as string,
+        providerPayload: {
+          reference,
+          verified_amount_kobo: paidAmount,
+          verified_currency: directPayment.verifiedCurrency ?? 'NGN',
+          verified_environment: directPayment.verifiedEnvironment ?? 'test',
+          verified_transaction_id: directPayment.verifiedTransactionId,
+        },
+      })
 
       await sendOrderConfirmationEmail(db, { orderId: order.id as string })
 

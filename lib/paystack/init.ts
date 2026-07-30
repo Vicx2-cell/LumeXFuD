@@ -13,6 +13,10 @@ interface PaystackInitResponse {
   reference: string
 }
 
+export function paystackEnvironmentFromSecret(secret: string | undefined): 'test' | 'production' {
+  return typeof secret === 'string' && secret.startsWith('sk_live_') ? 'production' : 'test'
+}
+
 export async function initializePaystackTransaction(
   params: PaystackInitParams
 ): Promise<PaystackInitResponse> {
@@ -43,6 +47,7 @@ export async function verifyPaystackTransaction(reference: string): Promise<{
   status: string
   amount: number
   reference: string
+  currency: string
   metadata: Record<string, unknown>
 }> {
   const secret = process.env.PAYSTACK_SECRET_KEY
@@ -64,6 +69,7 @@ export async function verifyPaystackTransaction(reference: string): Promise<{
     status: string
     amount: number
     reference: string
+    currency: string
     metadata: Record<string, unknown>
   }
 }

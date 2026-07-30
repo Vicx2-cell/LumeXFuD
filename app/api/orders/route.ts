@@ -34,6 +34,7 @@ import { validateMenuAddonSelection, type MenuAddonChoice } from '@/lib/menu-add
 import { normalizeGroupOrderAddons } from '@/lib/group-order-addons'
 import { guestPaystackChannels } from '@/lib/promotion'
 import { reserveWalletBalance, releaseWalletReservation } from '@/lib/wallet-reservations'
+import { createOrderPaymentIntent, markOrderPaymentIntentInitialized } from '@/lib/order-payment-intents'
 
 function groupCheckoutLineKey(menuItemId: string, quantity: number, addonIds: string[], notes: string | null | undefined): string {
   return `${menuItemId}|${quantity}|${addonIds.slice().sort().join(',')}|${(notes ?? '').trim()}`
@@ -1152,19 +1153,61 @@ export async function POST(req: NextRequest) {
   // ── PAYSTACK or SPLIT: charge the remaining amount via Paystack ─────────────
   // For SPLIT the wallet portion is debited in the charge.success webhook (a
   // single commit point), so an abandoned checkout never touches the wallet.
+  const paymentIntentInternalReference = `PINT-${order.id}`
+  const paymentIntentResult = await createOrderPaymentIntent(db, {
+    orderId: order.id,
+    customerId,
+    guestPhone,
+    guestName: isGuest ? guest_name ?? null : null,
+    amountKobo: paystackAmount,
+    currency: 'NGN',
+    environment: snapshotEnvironment,
+    expectedVendorAllocationKobo: Math.max(0, subtotal - vendorCommissionKobo),
+    expectedRiderAllocationKobo: walletApply > 0 ? 0 : riderCut,
+    expectedPlatformAllocationKobo: Math.max(0, paystackAmount - Math.max(0, subtotal - vendorCommissionKobo) - (walletApply > 0 ? 0 : riderCut)),
+    idempotencyKey: `paystack-intent:${idempotencyKey}`,
+    internalReference: paymentIntentInternalReference,
+    paystackReference: orderNumber,
+    metadata: {
+      order_number: orderNumber,
+      payment_method_requested: payment_method,
+      resolved_payment_method: resolvedMethod,
+      snapshot_id: snapshotRow.snapshot_id,
+    },
+  })
+  if (paymentIntentResult.replayed && paymentIntentResult.intent.paystack_authorization_url && paymentIntentResult.intent.paystack_access_code) {
+    const response = json({
+      order_number: orderNumber,
+      authorization_url: paymentIntentResult.intent.paystack_authorization_url,
+      access_code: paymentIntentResult.intent.paystack_access_code,
+      idempotent_replay: true,
+    })
+    if (guestAccessToken) {
+      response.cookies.set({
+        name: guestOrderCookieName(orderNumber),
+        value: guestAccessToken,
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 30,
+      })
+    }
+    return response
+  }
   let paystackResult
   try {
     paystackResult = await initializePaystackTransaction({
       email: customerEmail,
       amount: paystackAmount,
       reference: orderNumber,
-      // Guest access is kept in an HttpOnly, order-scoped browser cookie below.
-      // Keeping it out of the callback URL prevents referrer/history leakage.
-      callback_url: `${appUrl}/order/${orderNumber}${campaignQuery}`,
+      callback_url: `${appUrl}/paystack/callback?order=${encodeURIComponent(orderNumber)}&intent=${encodeURIComponent(paymentIntentInternalReference)}`,
       metadata: {
         order_number: orderNumber,
         customer_phone: customerPhone,
         vendor_id,
+        payment_intent_reference: paymentIntentInternalReference,
+        payment_intent_idempotency_key: `paystack-intent:${idempotencyKey}`,
         campaign_id: campaign_id ?? undefined,
         payment_context: isGuest ? 'GUEST_TRANSACTION_TRANSFER' : 'REGISTERED_CHECKOUT',
       },
@@ -1175,11 +1218,23 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     // No charge was created — drop the reserved order + items so the customer can retry.
     console.error('[orders] Paystack init failed, rolling back order:', err)
+    await db.from('order_payment_intents').update({
+      status: 'FAILED',
+      updated_at: new Date().toISOString(),
+    }).eq('order_id', order.id)
     await db.from('order_financial_snapshots').delete().eq('order_id', order.id)
     await db.from('order_items').delete().eq('order_id', order.id)
     await db.from('orders').delete().eq('id', order.id)
     return NextResponse.json({ error: 'Could not start payment. Please try again.' }, { status: 502 })
   }
+
+  await markOrderPaymentIntentInitialized(db, {
+    orderId: order.id,
+    authorizationUrl: paystackResult.authorization_url,
+    accessCode: paystackResult.access_code,
+    transactionId: null,
+    providerPayload: { paystack_reference: paystackResult.reference },
+  })
 
   // Persist the authorization so a duplicate request can replay it (above).
   await db
