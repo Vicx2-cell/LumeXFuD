@@ -135,7 +135,7 @@ Land the payout batching and transfer lifecycle, then continue into refunds, rec
 
 ## Latest commit
 
-- `d42f7bc` - `payments: complete direct paystack checkout`
+- `36c48cf` - `payments: add beneficiary profiles`
 
 ## Global stop-condition status
 
