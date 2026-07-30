@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { downloadReceiptPng } from '@/lib/receipt-download'
 import { useFeatures } from '@/lib/use-features'
 import { formatPrice } from '@/lib/money'
@@ -228,11 +229,35 @@ export default function CustomerWalletClient() {
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
-          <h1 className="font-semibold text-lg">💰 LumeX Wallet</h1>
+          <div className="min-w-0">
+            <h1 className="font-semibold text-lg">💰 LumeX Wallet</h1>
+            <p className="text-[11px] text-white/45 leading-tight">
+              Stored balance only. Your Paystack transfer account lives on the profile page.
+            </p>
+          </div>
         </div>
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-5 space-y-4">
+
+        {features.customer_virtual_accounts === true && (
+          <div className="rounded-2xl p-4 flex items-start gap-3"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'rgba(255,255,255,0.06)' }}>
+              DVA
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-white">Need the bank transfer account?</p>
+              <p className="text-xs text-white/50 mt-0.5">
+                That is separate from this wallet. Open your profile to request or recheck it.
+              </p>
+            </div>
+            <Link href="/profile/virtual-account" className="lx-amber text-sm font-semibold shrink-0">
+              Open
+            </Link>
+          </div>
+        )}
 
         {/* ── Balance Card ─────────────────────────────────────── */}
         {loading ? (
@@ -532,3 +557,4 @@ export default function CustomerWalletClient() {
     </main>
   )
 }
+
