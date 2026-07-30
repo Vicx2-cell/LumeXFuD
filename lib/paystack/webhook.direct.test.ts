@@ -154,6 +154,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseAdmin: () => makeDb() as any,
 }))
 vi.mock('./init', () => ({
+  paystackEnvironmentFromSecret: vi.fn(() => 'test'),
   verifyPaystackTransaction: state.verify,
 }))
 vi.mock('./billing', () => ({ processPremiumOrBoostWebhook: vi.fn(async () => undefined) }))

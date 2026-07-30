@@ -22,7 +22,7 @@ describe('contact intake', () => {
       contact_cases: {
         data: {
           id: 'case-1',
-          reference_number: 'LXF-SUP-20260729-ABC12345',
+          reference_number: 'LXF-SUP-20260730-ABC12345',
           acknowledgement_status: 'failed',
         },
         error: null,
@@ -51,7 +51,7 @@ describe('contact intake', () => {
       duplicate: false,
       acknowledgementStatus: 'failed',
     })
-    expect(json.reference).toMatch(/^LXF-SUP-20260729-/)
+    expect(json.reference).toMatch(/^LXF-SUP-20260730-/)
     expect(h.delivered).toHaveBeenCalledOnce()
   })
 })

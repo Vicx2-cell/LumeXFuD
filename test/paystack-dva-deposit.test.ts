@@ -52,6 +52,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/paystack/init', () => ({
+  paystackEnvironmentFromSecret: vi.fn(() => 'production'),
   verifyPaystackTransaction: vi.fn(async () => ({
     status: 'success',
     amount: 5000,

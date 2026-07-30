@@ -28,7 +28,7 @@ describe('guest checkout contract', () => {
     expect(ordersRoute).toContain('guestOrderCookieName(orderNumber)')
     expect(ordersRoute).toContain('httpOnly: true')
     expect(ordersRoute).toContain("sameSite: 'lax'")
-    expect(ordersRoute).toContain("callback_url: `${appUrl}/order/${orderNumber}${campaignQuery}`")
+    expect(ordersRoute).toContain("callback_url: `${appUrl}/paystack/callback?order=${encodeURIComponent(orderNumber)}&intent=${encodeURIComponent(paymentIntentInternalReference)}`")
     expect(orderPage).toContain('cookies()')
     expect(orderPage).toContain('guestOrderCookieName(orderNumber)')
     expect(ordersPage).toContain('guestOrderNumberFromCookieName')

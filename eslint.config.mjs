@@ -37,6 +37,10 @@ const eslintConfig = defineConfig([
     files: ["scripts/**/*.{js,mjs}"],
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
+  {
+    files: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: { "@typescript-eslint/no-explicit-any": "off" },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

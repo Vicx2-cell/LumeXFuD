@@ -1,5 +1,5 @@
 {
-  "count": 255,
+  "count": 257,
   "routes": [
     {
       "path": "/api/admin/audit",
@@ -1275,6 +1275,13 @@
       ]
     },
     {
+      "path": "/api/payment-profiles",
+      "dynamic": false,
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "path": "/api/paystack/refund",
       "dynamic": false,
       "methods": [
@@ -1562,6 +1569,13 @@
       "dynamic": false,
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "path": "/api/super-admin/payments/replay",
+      "dynamic": false,
+      "methods": [
+        "POST"
       ]
     },
     {
