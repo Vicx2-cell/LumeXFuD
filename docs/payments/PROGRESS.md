@@ -16,7 +16,7 @@ Phase 2 - Direct checkout and payout rails
 
 ## Current bounded task
 
-Run production hardening validation on the completed payments admin surfaces.
+Run controlled live-mode checks on the completed payments surfaces.
 
 ## Completed requirements
 
@@ -126,6 +126,12 @@ Run production hardening validation on the completed payments admin surfaces.
 - `npm.cmd exec vitest run lib/reconciliation.test.ts app/api/cron/wallet-reconciliation/route.test.ts`
 - `npm.cmd exec tsc -- --noEmit`
 - `npm.cmd exec vitest run app/api/super-admin/payments/route.test.ts app/api/super-admin/payments/replay/route.test.ts`
+- `npm.cmd run lint`
+- `npm.cmd test`
+- `npm.cmd run build`
+- `npm.cmd exec vitest run test/rls-coverage.test.ts`
+- `git grep -nE "sk_live_[A-Za-z0-9]{20,}|sk_test_[A-Za-z0-9]{20,}"`
+- `git grep -n "service_role"`
 
 ## Test results
 
@@ -142,10 +148,15 @@ Run production hardening validation on the completed payments admin surfaces.
 - The wallet reconciliation cron records both healthy runs and shortfalls.
 - The super-admin payments view returns the broader payment surfaces.
 - The super-admin webhook replay endpoint requires confirmation and replays the payload.
+- The full Vitest suite passes.
+- The production build passes.
+- The RLS coverage backstop passes.
+- The secret scan found only references and placeholders, not committed secret values.
+- ESLint passes with warnings only in existing test cleanup.
 
 ## Current failures
 
-- The remaining launch work is production hardening and launch certification.
+- Only controlled live checks remain.
 
 ## External blockers
 
@@ -163,11 +174,11 @@ Run production hardening validation on the completed payments admin surfaces.
 
 ## Next task
 
-- Run production hardening validation on the completed payments admin surfaces.
+- Run controlled live-mode checks on the completed payments surfaces.
 
 ## Latest commit
 
-- `25f5485` - `payments: add super-admin payment surveillance and replay`
+- `dc03342` - `chore: finalize payments hardening validation`
 
 ## Global stop-condition status
 
