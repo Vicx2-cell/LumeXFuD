@@ -20,6 +20,8 @@ import {
   markPayoutBatchStatus,
   markPayoutTransferAttemptStatus,
 } from '../payout-batches'
+import { paystackEnvironmentFromSecret } from './init'
+import { settleRefundLedger } from '../refund-ledger'
 
 // Naira for a refund notification, derived from the canonical kobo column.
 // Guards against NaN: a missing/garbled amount renders ₦0, never "NaN".
@@ -848,6 +850,7 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
 
     case 'refund.processed': {
       const orderRef = (data.transaction_reference as string) ?? ''
+      const environment = paystackEnvironmentFromSecret(process.env.PAYSTACK_SECRET_KEY)
       const { data: candidates } = await db.from('refunds')
         .select('id, paystack_refund_reference, amount_kobo, created_at')
         .eq('paystack_transaction_reference', orderRef)
@@ -873,13 +876,47 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
         .update(completedUpdate)
         .eq('id', chosen.refundId)
 
-      // Notify customer
       const { data: refund } = await db
         .from('refunds')
-        .select('order_id, amount_kobo')
+        .select('order_id, amount_kobo, paystack_transaction_reference')
         .eq('id', chosen.refundId)
         .single()
 
+      if (refund) {
+        const { data: order } = await db
+          .from('orders')
+          .select('order_number, customer_id, guest_phone')
+          .eq('id', refund.order_id)
+          .single()
+
+        if (order) {
+          const settlement = await settleRefundLedger({
+            db,
+            idempotencyKey: `refund-settle:${environment}:${chosen.refundId}`,
+            businessReference: String(order.order_number),
+            correlationId: providerRefundReference || orderRef,
+            amountKobo: Number(refund.amount_kobo) || 0,
+            paystackAmountKobo: Number(refund.amount_kobo) || 0,
+            walletAmountKobo: 0,
+            customerId: null,
+            environment,
+            actorType: 'system',
+            actorId: null,
+            metadata: {
+              refund_id: chosen.refundId,
+              order_id: refund.order_id,
+              order_number: order.order_number,
+              provider_refund_reference: providerRefundReference || null,
+              refund_type: 'direct_paystack',
+            },
+          })
+          if (settlement.journalId === '') {
+            console.error('[webhook] refund settlement ledger replayed or skipped')
+          }
+        }
+      }
+
+      // Notify customer
       if (refund) {
         const { data: order } = await db
           .from('orders')
@@ -909,6 +946,7 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
 
     case 'refund.failed': {
       const orderRef = (data.transaction_reference as string) ?? ''
+      const environment = paystackEnvironmentFromSecret(process.env.PAYSTACK_SECRET_KEY)
       const { data: candidates } = await db.from('refunds')
         .select('id, paystack_refund_reference, amount_kobo, created_at')
         .eq('paystack_transaction_reference', orderRef)
@@ -933,6 +971,31 @@ export async function processWebhookAsync(payload: PaystackWebhookPayload): Prom
         .from('refunds')
         .update(failedUpdate)
         .eq('id', chosen.refundId)
+
+      const { data: reservationJournal } = await db
+        .from('ledger_journals')
+        .select('id')
+        .eq('idempotency_key', `refund-reserve:${environment}:${chosen.refundId}`)
+        .maybeSingle()
+
+      if (reservationJournal?.id) {
+        const reverseReservation = await db.rpc('reverse_ledger_journal', {
+          p_original_journal_id: reservationJournal.id,
+          p_idempotency_key: `refund-reverse:${environment}:${chosen.refundId}`,
+          p_actor_type: 'system',
+          p_actor_id: null,
+          p_correlation_id: providerRefundReference || orderRef,
+          p_source: 'refund_provider_failure',
+          p_metadata: {
+            refund_id: chosen.refundId,
+            order_ref: orderRef,
+            refund_type: 'direct_paystack',
+          },
+        })
+        if (reverseReservation.error) {
+          console.error('[webhook] refund reversal ledger failed:', reverseReservation.error.message)
+        }
+      }
 
       // Alert admin
       const adminPhone = process.env.ADMIN_PHONE
@@ -1123,10 +1186,6 @@ async function handleWalletTopup(
     // (falls back to "A family member" if the sender left their name blank).
     sponsorName:   metadata.is_sponsor ? ((metadata.sponsor_name as string | undefined)?.trim() || 'A family member') : undefined,
   })
-}
-
-function paystackEnvironmentFromSecret(secret: string | undefined): 'test' | 'production' {
-  return secret?.startsWith('sk_live_') ? 'production' : 'test'
 }
 
 async function creditVerifiedDvaDeposit(params: {

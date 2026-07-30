@@ -16,7 +16,7 @@ Phase 2 - Direct checkout and payout rails
 
 ## Current bounded task
 
-Implement refunds, reconciliation, and admin hardening on top of the payout lifecycle that is now in place.
+Implement reconciliation and admin hardening on top of the completed refund slice.
 
 ## Completed requirements
 
@@ -50,10 +50,14 @@ Implement refunds, reconciliation, and admin hardening on top of the payout life
 - Switched the wallet sweep cron to profile-backed payout batches and idempotent transfer attempt recording.
 - Wired Paystack transfer webhooks to finalize payout batches and transfer attempts on success, failure, and reversal.
 - Added focused tests for payout attempt replay, transfer success, duplicate success, failure, and reversal handling.
+- Added refund ledger reservation and settlement helpers on top of the existing refund flows.
+- Wired wallet and direct Paystack refund paths to reserve, settle, and compensate via the trusted ledger.
+- Wired refund failure webhooks to reverse the reservation journal for direct refunds.
+- Added focused refund tests for ledger posting, processed refund finalization, duplicate delivery, and refund failure reversal.
 
 ## Incomplete requirements
 
-- Refunds, reconciliation, and admin hardening still need completion.
+- Reconciliation and admin hardening still need completion.
 
 ## Files changed
 
@@ -133,7 +137,7 @@ Implement refunds, reconciliation, and admin hardening on top of the payout life
 
 ## Next task
 
-- Implement refunds, reconciliation, and admin controls on top of the payout lifecycle.
+- Implement reconciliation and admin controls on top of the completed refund slice.
 
 ## Latest commit
 

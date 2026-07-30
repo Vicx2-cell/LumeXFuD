@@ -13,6 +13,8 @@ import { emailCommittedOrderStatus } from '@/lib/order-status-email'
 import { applyRequestContext, createRequestContext } from '@/lib/request-context'
 import { recordSecurityEvent } from '@/lib/security-events'
 import { evaluateRefundRisk } from '@/lib/refund-risk'
+import { paystackEnvironmentFromSecret } from '@/lib/paystack/init'
+import { reserveRefundLedger } from '@/lib/refund-ledger'
 
 export async function POST(req: NextRequest) {
   const context = createRequestContext(req.headers)
@@ -162,9 +164,26 @@ export async function POST(req: NextRequest) {
       NOT_FOUND: [404, 'Order not found'], NOT_REFUNDABLE: [400, 'Order is not in a refundable state'],
       INVALID_AMOUNT: [400, 'Invalid refund amount'], EXCEEDS_TOTAL: [400, 'Refund exceeds order total'],
     }
-    const [st, msg] = map[row?.error_code ?? ''] ?? [409, 'Refund could not be processed']
-    return json({ error: msg }, { status: st })
+  const [st, msg] = map[row?.error_code ?? ''] ?? [409, 'Refund could not be processed']
+  return json({ error: msg }, { status: st })
   }
+
+  const environment = paystackEnvironmentFromSecret(process.env.PAYSTACK_SECRET_KEY)
+  const refundReservation = await reserveRefundLedger({
+    db,
+    idempotencyKey: `refund-reserve:${environment}:${row.refund_id}`,
+    businessReference: order.order_number as string,
+    correlationId: order.paystack_reference as string,
+    amountKobo: refundAmount,
+    environment,
+    actorType: session.role,
+    actorId: session.userId ?? null,
+    metadata: {
+      order_id: order.id,
+      refund_id: row.refund_id,
+      refund_type: 'direct_paystack',
+    },
+  })
 
   // External money movement AFTER the ledger reservation; compensate on failure.
   try {
@@ -176,6 +195,22 @@ export async function POST(req: NextRequest) {
     }
   } catch (err) {
     console.error('[paystack/refund] Paystack refund failed, compensating:', err)
+    const reverseReservation = await db.rpc('reverse_ledger_journal', {
+      p_original_journal_id: refundReservation.journalId,
+      p_idempotency_key: `refund-reverse:${environment}:${row.refund_id}`,
+      p_actor_type: session.role,
+      p_actor_id: session.userId ?? null,
+      p_correlation_id: order.paystack_reference as string,
+      p_source: 'refund_provider_failure',
+      p_metadata: {
+        order_id: order.id,
+        refund_id: row.refund_id,
+        refund_type: 'direct_paystack',
+      },
+    })
+    if (reverseReservation.error) {
+      console.error('[paystack/refund] refund reservation reversal failed:', reverseReservation.error.message)
+    }
     const { error: compErr } = await db.rpc('fail_order_refund', {
       p_refund_id: row.refund_id,
       p_reason: 'Paystack refund request failed',

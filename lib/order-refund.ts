@@ -19,8 +19,10 @@
 
 import { createSupabaseAdmin } from './supabase/server'
 import { refundTransaction } from './paystack/transfer'
+import { paystackEnvironmentFromSecret } from './paystack/init'
 import { refundToCustomerWallet } from './customer-wallet'
 import { recordPlatformEarning } from './platform-earnings'
+import { reserveRefundLedger, settleRefundLedger } from './refund-ledger'
 
 export interface RefundableOrder {
   id: string
@@ -50,6 +52,7 @@ export async function refundOrderPayments(params: {
   const total = Number(order.total_amount) || 0
   const walletPortion = Math.max(0, Math.min(Number(order.wallet_amount_kobo) || 0, total))
   const paystackPortion = total - walletPortion
+  const environment = paystackEnvironmentFromSecret(process.env.PAYSTACK_SECRET_KEY)
 
   // ── GROUP SPLIT order: each participant paid their OWN share from their wallet
   // (group_order_collect), so refund EACH of them their share — not the single
@@ -73,6 +76,21 @@ export async function refundOrderPayments(params: {
     for (const s of rows) {
       const reference = `CWREFUND-${order.id}-${s.customer_id.slice(0, 8)}`
       if (done.has(reference)) continue
+      const reservation = await reserveRefundLedger({
+        db,
+        idempotencyKey: `refund-reserve:${environment}:${reference}`,
+        businessReference: order.order_number,
+        correlationId: reference,
+        amountKobo: Number(s.amount_kobo),
+        environment,
+        actorType: 'system',
+        actorId: null,
+        metadata: {
+          order_id: order.id,
+          customer_id: s.customer_id,
+          refund_type: 'wallet_group_split',
+        },
+      })
       const ok = await refundToCustomerWallet({
         customerId: s.customer_id,
         amountKobo: Number(s.amount_kobo),
@@ -81,7 +99,40 @@ export async function refundOrderPayments(params: {
         reason,
         customerPhone: phoneMap.get(s.customer_id),
       })
-      if (!ok) allOk = false
+      if (ok) {
+        await settleRefundLedger({
+          db,
+          idempotencyKey: `refund-settle:${environment}:${reference}`,
+          businessReference: order.order_number,
+          correlationId: reference,
+          amountKobo: Number(s.amount_kobo),
+          walletAmountKobo: Number(s.amount_kobo),
+          paystackAmountKobo: 0,
+          customerId: s.customer_id,
+          environment,
+          actorType: 'system',
+          actorId: null,
+          metadata: {
+            order_id: order.id,
+            customer_id: s.customer_id,
+            refund_type: 'wallet_group_split',
+          },
+        })
+      } else {
+        allOk = false
+        const reverseReservation = await db.rpc('reverse_ledger_journal', {
+          p_original_journal_id: reservation.journalId,
+          p_idempotency_key: `refund-reverse:${environment}:${reference}`,
+          p_actor_type: 'system',
+          p_actor_id: null,
+          p_correlation_id: reference,
+          p_source: 'refund_wallet_reversal',
+          p_metadata: { order_id: order.id, customer_id: s.customer_id, refund_type: 'wallet_group_split' },
+        })
+        if (reverseReservation.error) {
+          console.error('[order-refund] refund reservation reversal failed:', reverseReservation.error.message)
+        }
+      }
     }
     return { walletPortion: total, paystackPortion: 0, walletOk: allOk, paystackOk: true }
   }
@@ -101,14 +152,63 @@ export async function refundOrderPayments(params: {
       .limit(1)
 
     if (!existing || existing.length === 0) {
+      const walletReference = `CWREFUND-${order.id}`
+      const reservation = await reserveRefundLedger({
+        db,
+        idempotencyKey: `refund-reserve:${environment}:${walletReference}`,
+        businessReference: order.order_number,
+        correlationId: walletReference,
+        amountKobo: walletPortion,
+        environment,
+        actorType: 'system',
+        actorId: null,
+        metadata: {
+          order_id: order.id,
+          customer_id: order.customer_id,
+          refund_type: 'wallet',
+        },
+      })
       walletOk = await refundToCustomerWallet({
         customerId: order.customer_id,
         amountKobo: walletPortion,
         orderId:    order.id,
-        reference:  `CWREFUND-${order.id}`,
+        reference:  walletReference,
         reason,
         customerPhone,
       })
+      if (walletOk) {
+        await settleRefundLedger({
+          db,
+          idempotencyKey: `refund-settle:${environment}:${walletReference}`,
+          businessReference: order.order_number,
+          correlationId: walletReference,
+          amountKobo: walletPortion,
+          walletAmountKobo: walletPortion,
+          paystackAmountKobo: 0,
+          customerId: order.customer_id,
+          environment,
+          actorType: 'system',
+          actorId: null,
+          metadata: {
+            order_id: order.id,
+            customer_id: order.customer_id,
+            refund_type: 'wallet',
+          },
+        })
+      } else {
+        const reverseReservation = await db.rpc('reverse_ledger_journal', {
+          p_original_journal_id: reservation.journalId,
+          p_idempotency_key: `refund-reverse:${environment}:${walletReference}`,
+          p_actor_type: 'system',
+          p_actor_id: null,
+          p_correlation_id: walletReference,
+          p_source: 'refund_wallet_reversal',
+          p_metadata: { order_id: order.id, customer_id: order.customer_id, refund_type: 'wallet' },
+        })
+        if (reverseReservation.error) {
+          console.error('[order-refund] refund reservation reversal failed:', reverseReservation.error.message)
+        }
+      }
     }
   }
 
